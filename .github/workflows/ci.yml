@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+      # mvnw được lưu với mode 100644 trong git nên cần quyền thực thi trên runner Linux
+      - name: Make Maven wrapper executable
+        run: chmod +x mvnw
+
+      # build + test. Các chặng còn lại (phân tích tĩnh, coverage, quét bảo mật, Docker, deploy)
+      # sẽ được bổ sung dần, xem doc/ke-hoach-xay-dung.md mục 7 và doc/tech-debt.md TD-07..09.
+      - name: Build and test
+        run: ./mvnw -B verify
