@@ -2,5 +2,6 @@ spring.application.name=LMS-API
 
 # Chuỗi kết nối MongoDB. Giá trị thật đặt qua biến môi trường MONGODB_URI, KHÔNG commit.
 # Spring Boot 4 dùng spring.mongodb.uri (spring.data.mongodb.uri không còn tác dụng cho kết nối).
-# Dạng replica set (bắt buộc cho transaction nhập điểm): mongodb://localhost:27017/learning_outcomes?replicaSet=rs0
-spring.mongodb.uri=${MONGODB_URI:mongodb://localhost:27017/learning_outcomes}
+# Mặc định khớp image Docker docker/mongo (replica set rs0, cổng 27017) nên không cần đặt biến nào.
+# Chỉ đặt MONGODB_URI khi dùng cổng/máy khác. replicaSet=rs0 là bắt buộc cho transaction nhập điểm.
+spring.mongodb.uri=${MONGODB_URI:mongodb://localhost:27017/learning_outcomes?replicaSet=rs0}

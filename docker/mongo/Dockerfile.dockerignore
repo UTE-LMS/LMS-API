@@ -1,0 +1,4 @@
+# Chỉ đưa vào build context đúng hai file image cần (không gửi target/, .git/, ...)
+*
+!doc/database_import.js
+!docker/mongo/entrypoint.sh
