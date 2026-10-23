@@ -26,15 +26,16 @@ Frontend: repo riêng `LMS-UI` (Angular 21 + TypeScript).
 
 ## Cài đặt và chạy
 
-1. **Cấu hình.** Sao chép file mẫu rồi đặt giá trị thật qua biến môi trường (không commit):
+1. **Cấu hình.** Sao chép file mẫu (file thật bị `.gitignore`, không commit):
 
    ```
    copy src\main\resources\application.properties.example src\main\resources\application.properties
-   set MONGODB_URI=mongodb://localhost:27017/learning_outcomes?replicaSet=rs0
    ```
 
-   Spring Boot 4 đọc kết nối MongoDB từ `spring.mongodb.uri`. Nếu không đặt `MONGODB_URI`, mặc định là
-   `mongodb://localhost:27017/learning_outcomes`.
+   Spring Boot 4 đọc kết nối MongoDB từ `spring.mongodb.uri`. Mặc định là
+   `mongodb://localhost:27017/learning_outcomes?replicaSet=rs0`, khớp image Docker ở mục dưới, nên chạy
+   container với cổng mặc định thì **không cần đặt gì thêm**. Chỉ đặt biến `MONGODB_URI` khi dùng cổng hoặc
+   máy khác, ví dụ `set MONGODB_URI=mongodb://localhost:27018/learning_outcomes?replicaSet=rs0`.
 
 2. **MongoDB + nạp CSDL ban đầu** — chọn một trong hai cách (xem mục [MongoDB bằng Docker](#mongodb-bằng-docker)
    và [MongoDB cài sẵn trên máy](#mongodb-cài-sẵn-trên-máy)). Dữ liệu khởi tạo gồm 1 chương trình, 7 PLO,
@@ -58,11 +59,8 @@ docker build -f docker/mongo/Dockerfile -t lms-mongo .
 docker run -d --name lms-mongo -p 27017:27017 -v lms-mongo-data:/data/db lms-mongo
 ```
 
-Sau khoảng 10–20 giây MongoDB sẵn sàng (xem `docker logs lms-mongo`, dòng cuối có `HOÀN TẤT`). Chuỗi kết nối:
-
-```
-MONGODB_URI=mongodb://localhost:27017/learning_outcomes?replicaSet=rs0
-```
+Sau khoảng 10–20 giây MongoDB sẵn sàng (xem `docker logs lms-mongo`, dòng cuối có `HOÀN TẤT`). Chuỗi kết nối
+`mongodb://localhost:27017/learning_outcomes?replicaSet=rs0` đã là mặc định của ứng dụng.
 
 | Việc | Lệnh |
 |---|---|
