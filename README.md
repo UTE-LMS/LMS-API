@@ -140,7 +140,7 @@ logsAI/                                # nhật ký sử dụng AI (Rubric TC2.3
 
 - `doc/GiaiThich_CoSoDuLieu.md` — thiết kế CSDL MongoDB v0.5 (30 collection, 14 nguyên tắc); `doc/PLO_DB_UPDATE.md`
   là đặc tả nguồn của các thay đổi v0.5; `doc/database_import.js` là script dựng CSDL.
-- `doc/ke-hoach-xay-dung.md` — kế hoạch v0.3, backlog, lộ trình, rủi ro.
+- `doc/ke-hoach-xay-dung.md` — kế hoạch v0.3, backlog, lộ trình, rủi ro; `doc/plan/` — kế hoạch tách theo từng feature (F01…F08) để giao cho LLM hỗ trợ code.
 - `doc/chot-feature-do-an.md` — đề xuất chốt danh sách tính năng (chưa ký); `doc/tom-tat-du-an-de-thao-luan.md` — tóm tắt để thảo luận.
 - `doc/cam-ket-san-pham-metric.md` — bản cam kết Bước 3 (dự thảo).
 - `doc/adr/` — quyết định thiết kế (ADR 0001: duyệt ma trận đề thi, đang chờ GVHD).

@@ -10,6 +10,8 @@ mới NEW-01); thêm 3 story mới NEW-02…04; sửa phạm vi "duyệt đề" 
 collection (30, dùng 29), rủi ro R11, câu hỏi Q17–Q19, hiện trạng (đã có image MongoDB Docker). Danh sách tính năng
 đề xuất chốt nằm ở `chot-feature-do-an.md`.
 
+**Bản chia theo từng feature (để giao cho LLM hỗ trợ code): `doc/plan/README.md`.** File này là bản tổng.
+
 Nguồn: `Rubric_Do_An_Mon_Hoc_CNPM_V2-1.docx.md`, `BS.md`, `Misa.md`, `GiaiThich_CoSoDuLieu.md` (v0.5),
 `database_import.js`. Rule cho agent: `CLAUDE.md`, `.claude/rules/`.
 
@@ -24,7 +26,7 @@ Nguồn: `Rubric_Do_An_Mon_Hoc_CNPM_V2-1.docx.md`, `BS.md`, `Misa.md`, `GiaiThic
 
 **Quy ước đọc**
 - **[ĐỀ XUẤT]**: ý của người soạn, chưa được Khoa/GVHD xác nhận; không đưa vào hồ sơ như số liệu thật.
-- **[CHỜ XÁC NHẬN]**: phụ thuộc câu hỏi Q01–Q19 (`GiaiThich_CoSoDuLieu.md` §8; Q17–Q19 mới từ v0.5) hoặc người có thẩm quyền.
+- **[CHỜ XÁC NHẬN]**: phụ thuộc câu hỏi Q01–Q23 (`GiaiThich_CoSoDuLieu.md` §8; Q17–Q19 mới từ v0.5; Q20–Q23 là công thức còn thiếu, xem `plan/F06-do-luong.md` §9) hoặc người có thẩm quyền.
 - Mốc thời gian tính theo tuần của kỳ (T1…T19). Ngày cụ thể điền khi chốt lịch.
 
 ---
@@ -216,7 +218,7 @@ còn ~12 tuần, nên mục tiêu này vẫn đạt được nếu mỗi lần m
 | Giai đoạn | Tuần | Mục tiêu | Đầu ra chính (có minh chứng) |
 |---|---|---|---|
 | **P0 Nền tảng** | **T5–T6** | Repo, môi trường, CI sườn, quy ước | Commit toàn bộ tài liệu hiện có; MongoDB replica set chạy được; sửa `.gitignore` + gỡ track `application.properties`; quét secret; coding convention; bảo vệ nhánh `main`; README; CI chạy build + test; ADR đầu tiên (xác thực, migrate CSDL); nạp `database_import.js` |
-| **P1 Khảo sát** | T5–T8 (song song) | Hiểu nhu cầu thật | Phỏng vấn ≥ 3 bên liên quan; so sánh ≥ 3 giải pháp; chân dung người dùng; trả lời Q01–Q19; danh mục MC01–MC09 với trạng thái |
+| **P1 Khảo sát** | T5–T8 (song song) | Hiểu nhu cầu thật | Phỏng vấn ≥ 3 bên liên quan; so sánh ≥ 3 giải pháp; chân dung người dùng; trả lời Q01–Q23; danh mục MC01–MC09 với trạng thái |
 | **P2 Danh mục lõi** | **T6–T9** | E01, E02, E03 | Đăng nhập + phân quyền; CTĐT/PLO/PI/ma trận I/R/M; học phần/đề cương/CLO/liên kết CLO–PI; UI quản lý; **staging đầu tiên (mục tiêu T7)** |
 | **K1: cam kết Bước 3** | **mục tiêu hết T7, hạn cuối T10** | Chốt sản phẩm và metric có chữ ký | `doc/cam-ket-san-pham-metric.md` (mục 8) |
 | **P3 Đánh giá và nhập điểm** | T8–T11 | E04 (kể cả NEW-01), E05, E06 | Ngân hàng câu hỏi, bài đánh giá, ánh xạ, duyệt ma trận đề thi; học kỳ/lớp/ghi danh; nhập tệp, báo lỗi, xác nhận/rollback; sửa điểm có audit |
@@ -333,6 +335,7 @@ trung xong trước T14. Mục tiêu: build xanh ≥ 90%, commit → staging ≤
 | R9 | Lộ dữ liệu sinh viên hoặc secret | Cao | `studentRef`, dữ liệu giả, gitleaks trong CI, `.gitignore` đúng |
 | R10 | **Chậm tiến độ**: T5 mà code mới là scaffold; P0–P2 bị nén còn 5 tuần | Cao | Giữ thứ tự: nền tảng → K1 → danh mục lõi; ưu tiên Must; hỗ trợ chéo để không chờ nhau; cắt Should trước, rồi tới Could, không cắt kiểm thử |
 | R11 | **CSDL v0.5 chạm phạm vi:** duyệt ma trận đề thi (NEW-01), `exportedFiles`, `irmWeights`, `departmentId` đi ngoài phạm vi "không duyệt đề" và nguyên tắc "I/R/M ≠ trọng số" (Q11, Q17, Q18). Nếu GVHD/Khoa không đồng ý, mã và test của NEW-01 phải sửa | Trung bình | Hỏi GVHD trước khi code NEW-01 (hạn trước P3, T8). Phương án dự phòng đã ghi ở mục 1: bỏ bước Trưởng bộ môn, giữ khóa `items`. `irmWeights`: engine luôn coi `useIrmAsWeight = false`. Ghi ADR (`adr/0001`) |
+| R12 | **Công thức đo lường còn thiếu:** `PLO_DB_UPDATE.md` chỉ có công thức CLO (§4.1) và PI (§4.2). Chưa có công thức cấp PLO, cấp học phần khi `requireAllCloPass = false`, `WEIGHTED_ITEMS`, gộp PI qua nhiều học phần, định nghĩa `minCoverage`/mẫu số, ưu tiên ngưỡng (Q20–Q23; danh sách CT-01…CT-11 ở `plan/F06-do-luong.md` §9) | **Cao** | Hỏi GVHD/Khoa sớm (trước P4, T10); trong lúc chờ chỉ cài CLO và PI theo công thức đã có, phần còn lại trả 422, không tự bịa. Nếu không có trả lời trước K3: báo cáo PLO ở chế độ không chính thức hoặc cắt phạm vi PLO bằng ADR |
 
 ---
 
@@ -358,7 +361,7 @@ trung xong trước T14. Mục tiêu: build xanh ≥ 90%, commit → staging ≤
 | 6 | Dựng CI sườn (build + test), quét gitleaks, bảo vệ nhánh `main` (≥ 1 review) | |
 | 7 | Viết coding convention và `README` | |
 | 8 | Chốt bản khung phân công `doc/quy-trinh/phan-cong.md` (một trang) | cả hai |
-| 9 | Gửi lại danh mục MC01–MC09 và Q01–Q19 cho đầu mối của Khoa, kèm hạn; đề xuất chọn ba học phần. Hỏi GVHD riêng về Q11 (duyệt ma trận đề thi), vì ảnh hưởng NEW-01 | |
+| 9 | Gửi lại danh mục MC01–MC09 và Q01–Q23 cho đầu mối của Khoa, kèm hạn; đề xuất chọn ba học phần. Hỏi GVHD riêng về Q11 (duyệt ma trận đề thi), vì ảnh hưởng NEW-01 | |
 | 10 | Lên danh sách ≥ 3 bên liên quan để phỏng vấn, ≥ 10 người dùng cho thực nghiệm | |
 | 11 | Đối chiếu bản CTĐT gốc để trích đủ 7 PLO/17 PI nguyên văn | |
 | 12 | Bắt đầu viết SRS/AC cho tập Must, nháp bản cam kết K1 | |
@@ -378,3 +381,4 @@ trung xong trước T14. Mục tiêu: build xanh ≥ 90%, commit → staging ≤
    collection `departments` (Q17). Hỏi GVHD trước P3.
 8. Phương pháp mặc định của engine: `pi.aggregationMethod`, `plo.method`, `reimportPolicy` (Q19); có cho quy đổi I/R/M
    không (Q18, mặc định không).
+9. **Công thức đo lường còn thiếu (Q20–Q23):** cấp PLO, cấp học phần khi `requireAllCloPass = false`, `WEIGHTED_ITEMS`, gộp PI qua nhiều học phần, thiếu dữ liệu/ngưỡng trong công thức. Danh sách đầy đủ để hỏi GVHD: `plan/F06-do-luong.md` §9. Hạn đề xuất: trước P4 (T10).
