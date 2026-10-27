@@ -12,7 +12,15 @@ Các bất biến dưới đây **chính là** mục tiêu đã thống nhất; 
   ẩn nút ở UI không thay cho kiểm tra ở backend.
 - MongoDB không có khóa ngoại: tầng service phải kiểm tra tham chiếu (cloId tồn tại, câu hỏi và danh mục
   cùng ngân hàng, cặp CLO–PI nằm trong `clo_pi_links` của chính CLO đó…) trước khi ghi.
-- Xác nhận nhập điểm cần transaction nhiều document → MongoDB chạy replica set (cả dev và CI).
+- Xác nhận nhập điểm cần transaction nhiều document → MongoDB chạy replica set (cả dev và CI). Dev: image
+  `docker/mongo/` (README).
+- **Bài đánh giá (`assessments`) có quy trình duyệt ma trận** (CSDL v0.5, NEW-01, chờ GVHD Q11): `DRAFT → SUBMITTED →
+  APPROVED | REJECTED → SCORE_ENTERED → LOCKED`. Chỉ nhập điểm khi `APPROVED`/`SCORE_ENTERED`; `isLocked = true` khi
+  `status ∈ {APPROVED, SCORE_ENTERED, LOCKED}` và cấm sửa `items[]`; gửi duyệt cần ≥ 1 item và
+  `|totalPoints − Σ items.maxScore| < 0,001`; duyệt/từ chối ghi `approval.history[]` và `audit_logs`. Chỉ duyệt
+  *ma trận ánh xạ*, không duyệt nội dung câu hỏi. `exportedFiles` (xuất phôi in) không có tính năng.
+- Phân quyền theo 7 vai trò của CSDL v0.5: `ADMIN`, `PROGRAM_MANAGER`, `DEPARTMENT_HEAD`, `QA_OFFICER`, `LECTURER`,
+  `STUDENT` (chỉ đọc kết quả của chính mình), `VIEWER`; `scope = {programIds, courseIds, sectionIds}`.
 - Tệp minh chứng/tệp điểm gốc: lưu thông tin mô tả và tham chiếu trong MongoDB, nơi lưu tệp thiết kế riêng.
 
 ## Quy tắc đo lường (không tự đặt số)
@@ -33,7 +41,7 @@ Các bất biến dưới đây **chính là** mục tiêu đã thống nhất; 
 | Không đồng nhất | Hệ quả khi code |
 |---|---|
 | Mức Bloom ≠ điểm số | Lưu riêng `bloomLevel`, không có trường quy đổi sang điểm |
-| I/R/M ≠ trọng số | `course_pi_contributions` không được dùng làm trọng số; cấm map I=1, R=2, M=3 |
+| I/R/M ≠ trọng số | `course_pi_contributions` không được dùng làm trọng số; cấm map I=1, R=2, M=3. CSDL v0.5 có `pi.useIrmAsWeight`/`irmWeights`: engine coi `useIrmAsWeight` luôn là `false`, không đặt `irmWeights` mẫu; chỉ xem lại khi Khoa xác nhận (Q18) |
 | `capabilityLevelRaw` ≠ Bloom | Lưu nguyên giá trị nguồn, không diễn giải (Q03) |
 | Mức rubric (1–4) ≠ Bloom | Hai trường riêng |
 | Điểm học phần ≠ mức đạt CLO | CLO tính từ điểm câu hỏi/tiêu chí gắn CLO, không từ điểm tổng kết |
