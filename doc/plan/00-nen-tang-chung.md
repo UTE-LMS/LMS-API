@@ -1,13 +1,13 @@
 # 00 — Nền tảng dùng chung
 
 Story: **US-39** (health check, log, cảnh báo), **US-40** (xử lý ngoại lệ thống nhất). Ưu tiên C. Giai đoạn P0, làm
-**trước mọi feature khác**. Chủ trì đề xuất: IT. Package: `common`, `audit`, `config`.
+**trước mọi feature khác**. Chủ trì đề xuất: IT. Kiến trúc: Chuẩn 3 tầng (3-tier) theo cấu trúc Package-by-Layer ở cấp gốc `com.hcmute.lms.lmsapi.{controller, dto, service, service.impl, repository, repository.impl, document, mapper, mapper.impl, exception, config, filter}` tuân thủ 5 nguyên lý SOLID.
 
 ## 1. Mục tiêu
 
-Đặt sẵn những phần mà mọi feature dùng lại: cấu hình Mongo + transaction, định dạng lỗi thống nhất, dịch vụ ghi
-`audit_logs`, khung kiểm thử tích hợp với MongoDB replica set, health check. Làm xong phần này thì các feature sau chỉ cần
-viết nghiệp vụ.
+Đặt sẵn những phần mà mọi feature dùng lại: cấu hình Mongo + transaction trên Replica Set `rs0`, định dạng lỗi thống nhất (US-40), dịch vụ ghi
+`audit_logs` có sanitize dữ liệu nhạy cảm qua `mapper` độc lập, khung kiểm thử tích hợp với MongoDB replica set thật, health check và correlationId (US-39), cùng tài liệu hợp đồng liên repo `API-CONTRACT.md`. Làm xong phần này thì các feature sau chỉ cần
+viết nghiệp vụ tuân thủ đúng mô hình 3 tầng.
 
 ## 2. Đọc trước
 
@@ -33,13 +33,13 @@ viết nghiệp vụ.
   tổng `weight` ≠ 1, cặp CLO–PI không có trong `clo_pi_links`).
 - Không lộ stack trace hay thông tin nội bộ ra ngoài; log chi tiết ở phía server.
 
-### 3.3 Dịch vụ ghi nhật ký (`audit`)
-- Một service `AuditService.record(action, entity, before, after, reason)` dùng chung. `action` thuộc enum của validator:
-  `SCORE_UPDATE`, `IMPORT_CONFIRM`, `ASSESSMENT_APPROVE`, `ASSESSMENT_REJECT`, `RUN_CALCULATION`, `RULE_CONFIRM`, `LOGIN`.
-  `entity = { collection, id }`; `before`/`after`: tài liệu rút gọn; `reason` bắt buộc với `SCORE_UPDATE`.
-- Khi được gọi trong một thao tác có transaction thì bản ghi audit **nằm cùng transaction** (lỗi giữa chừng không để lại
-  audit mồ côi).
-- Không ghi mật khẩu, băm mật khẩu hay dữ liệu cá nhân thừa vào `before`/`after`.
+### 3.3 Dịch vụ ghi nhật ký (`audit`) và Kiến trúc SOLID
+- Interface `AuditService` đặt tại `com.hcmute.lms.lmsapi.service`, triển khai `AuditServiceImpl` đặt tại `com.hcmute.lms.lmsapi.service.impl`.
+- `action` thuộc enum của validator: `SCORE_UPDATE`, `IMPORT_CONFIRM`, `ASSESSMENT_APPROVE`, `ASSESSMENT_REJECT`, `RUN_CALCULATION`, `RULE_CONFIRM`, `LOGIN` đặt tại `com.hcmute.lms.lmsapi.document`.
+- **Nguyên lý Single Responsibility (SRP):** Tách logic làm sạch dữ liệu nhạy cảm (sanitization cho password, hash, token, secret) và khởi tạo tài liệu ra interface riêng `AuditLogMapper` (`com.hcmute.lms.lmsapi.mapper`) và lớp hiện thực `AuditLogMapperImpl` (`com.hcmute.lms.lmsapi.mapper.impl`), không trộn lẫn vào `AuditServiceImpl`.
+- **Nguyên lý Open-Closed & Dependency Inversion (OCP & DIP):** Tầng Data Access tách `AuditLogRepository` và `AuditLogRepositoryCustom` (`com.hcmute.lms.lmsapi.repository`) kèm `AuditLogRepositoryCustomImpl` (`com.hcmute.lms.lmsapi.repository.impl`) sử dụng `MongoTemplate` cho truy vấn động mở rộng. `AuditServiceImpl` chỉ phụ thuộc vào `AuditLogRepository` và `AuditLogMapper` abstractions.
+- Khi được gọi trong một thao tác có transaction thì bản ghi audit **nằm cùng transaction** (lỗi giữa chừng không để lại audit mồ côi).
+- `reason` bắt buộc với `SCORE_UPDATE`. Không ghi mật khẩu, băm mật khẩu hay dữ liệu cá nhân thừa vào `before`/`after`.
 
 ### 3.4 Health check, log, cảnh báo (US-39)
 - `/actuator/health` cần `spring-boot-starter-actuator`: **chưa có trong `pom.xml`**, thêm kèm lý do (US-39) và giữ phiên bản do
@@ -79,10 +79,19 @@ viết nghiệp vụ.
 ## 6. Không làm / chưa quyết
 
 - Không làm: cơ chế log tập trung riêng (ELK…) khi chưa có hạ tầng; không thêm công cụ giám sát ngoài yêu cầu **[CHỜ Q06, Q07]**.
-- Chưa quyết (cần ADR): cách chạy MongoDB replica set cho test (Testcontainers hay service CI); công cụ cảnh báo.
+- Đã quyết (ghi trong ADR 0002): Chạy MongoDB 8.0 replica set `rs0` qua Docker cục bộ và GitHub Actions CI service thay vì Testcontainers; chuẩn hóa mô hình 3 tầng (Package-by-Layer ở cấp gốc kết hợp `.impl`) tuân thủ trọn vẹn 5 nguyên lý SOLID.
 
-## 7. Để vấn đáp (gợi ý cho người review)
+## 7. Để vấn đáp (gợi ý cho người review & bảo vệ đồ án)
 
-Hội đồng có thể hỏi: vì sao xử lý lỗi một chỗ (tránh mỗi controller trả một kiểu; UI chỉ cần một cách đọc lỗi); vì sao audit
-nằm cùng transaction (truy vết không lệch với dữ liệu); vì sao cần replica set (transaction nhiều document); bỏ
-`@RestControllerAdvice` thì mỗi lỗi trả 500 với stack trace.
+Hội đồng có thể hỏi:
+1. **Vì sao chọn mô hình 3 tầng (Package-by-Layer) và tách `.impl`?**
+   - Phân định rành mạch trách nhiệm (SRP): Controller chỉ tiếp nhận HTTP và validate DTO; Service chỉ chứa logic nghiệp vụ; Mapper lọc sạch dữ liệu nhạy cảm; Repository chỉ truy cập CSDL.
+   - Tuân thủ Dependency Inversion (DIP) và Open-Closed (OCP): Controller và Service chỉ phụ thuộc vào Interface trừu tượng ở package gốc, các lớp hiện thực đặt tại `.impl` được Spring IoC tiêm tự động.
+2. **Vì sao xử lý lỗi tập trung (`@RestControllerAdvice`) và ban hành `API-CONTRACT.md`?**
+   - Đảm bảo US-40: Mọi lỗi từ chối đều trả về đúng cấu trúc `{ timestamp, status, code, message, path, fieldErrors }` với mã `ErrorCode` enum nhất quán. Giúp Frontend xử lý tập trung qua HTTP Interceptor, không bị crash ứng dụng.
+3. **Vì sao cần MongoDB Replica Set `rs0` và chạy qua Docker/CI service thay vì Testcontainers?**
+   - Spring Data MongoDB yêu cầu Replica Set để kích hoạt `MongoTransactionManager` thực thi multi-document transactions (đảm bảo tính nguyên tử khi nhập điểm và ghi audit log).
+   - Chọn Docker/CI service giúp môi trường dev và CI đồng nhất 100%, không phát sinh lỗi quyền truy cập Docker socket trên máy sinh viên, không làm nặng file `pom.xml`.
+4. **Nếu bỏ `@RestControllerAdvice` hoặc Replica Set thì hệ thống bị gì?**
+   - Bỏ Exception Handler: Mọi lỗi ngoài ý muốn sẽ trả về HTTP 500 kèm toàn bộ stack trace nội bộ ra client, gây lỗ hổng bảo mật nghiêm trọng (Information Exposure).
+   - Bỏ Replica Set: Các thao tác nghiệp vụ có `@Transactional` sẽ ném ngoại lệ khi ghi nhiều document, dẫn đến nguy cơ dữ liệu mồ côi (audit log ghi nhưng dữ liệu điểm lỗi, hoặc ngược lại).

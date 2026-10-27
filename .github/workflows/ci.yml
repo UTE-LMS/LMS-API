@@ -12,19 +12,56 @@ jobs:
   build-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-java@v4
+      - name: Setup Java 25 (Temurin)
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '25'
+          java-version: "25"
           cache: maven
 
       # mvnw được lưu với mode 100644 trong git nên cần quyền thực thi trên runner Linux
       - name: Make Maven wrapper executable
         run: chmod +x mvnw
 
-      # build + test. Các chặng còn lại (phân tích tĩnh, coverage, quét bảo mật, Docker, deploy)
-      # sẽ được bổ sung dần, xem doc/ke-hoach-xay-dung.md mục 7 và doc/tech-debt.md TD-07..09.
-      - name: Build and test
+      # Khởi chạy MongoDB 8.0 replica set rs0 phục vụ kiểm thử tích hợp giao dịch (@Transactional)
+      - name: Start MongoDB 8.0 Replica Set (rs0)
+        run: |
+          echo ">>> 1. Starting MongoDB 8.0 container with replSet rs0..."
+          docker run -d \
+            --name mongodb \
+            -p 27017:27017 \
+            mongo:8.0 \
+            mongod --replSet rs0 --bind_ip_all
+
+          echo ">>> 2. Waiting for MongoDB server to accept ping..."
+          until docker exec mongodb mongosh --quiet --eval "db.adminCommand('ping').ok" | grep -q 1; do
+            echo "Waiting for mongod to accept ping..."
+            sleep 1
+          done
+
+          echo ">>> 3. Initiating replica set rs0..."
+          docker exec mongodb mongosh --quiet --eval "rs.initiate({ _id: 'rs0', members: [{ _id: 0, host: 'localhost:27017' }] })"
+
+          echo ">>> 4. Waiting for replica set primary to become writable..."
+          until docker exec mongodb mongosh --quiet --eval "db.hello().isWritablePrimary" | grep -q true; do
+            echo "Waiting for replica set primary election..."
+            sleep 1
+          done
+
+          echo ">>> 5. Importing schema validators and initial data into learning_outcomes..."
+          docker cp doc/database_import.js mongodb:/tmp/database_import.js
+          docker exec mongodb mongosh --quiet learning_outcomes /tmp/database_import.js
+
+          echo ">>> MongoDB 8.0 replica set rs0 is ready and initialized."
+
+      - name: Prepare application configuration
+        run: cp src/main/resources/application.properties.example src/main/resources/application.properties
+
+      - name: Build and test with Maven verify
+        env:
+          SPRING_MONGODB_URI: mongodb://localhost:27017/learning_outcomes?replicaSet=rs0
+          MONGODB_URI: mongodb://localhost:27017/learning_outcomes?replicaSet=rs0
         run: ./mvnw -B verify

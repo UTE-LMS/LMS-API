@@ -21,6 +21,7 @@ Quy tắc ghi: `.claude/rules/01-ai-usage-and-ownership.md`.
 | 6 | 2026-10-23 | _chờ điền_ | LMS-API | Claude Code, claude-sonnet-5-5 | Dựng MongoDB replica set bằng Docker, nạp `database_import.js`, đóng gói image; cập nhật README | "Tạo cho tôi db mongo trên docker và import data trong doc"; "cập nhật lại readme… tạo 1 file image để build dễ hơn" | `docker/mongo/Dockerfile`, `entrypoint.sh`, `Dockerfile.dockerignore`, `.gitattributes`, `README.md`, `application.properties.example` | _Chờ sinh viên rà soát. Cổng mặc định, tag `mongo:8.0`, không bật xác thực là lựa chọn của AI cho môi trường dev_ | Build image; `rs.status` ra PRIMARY; script nạp 30 collection (7 PLO, 17 PI); khởi động lại không nhân đôi dữ liệu; `LOMS_DB`/`LOMS_SAMPLE` có tác dụng; `docker stop` thoát mã 0 (xem B2). `mvnw spring-boot:run` với `MONGODB_URI` cổng 27018: driver thấy `REPLICA_SET_PRIMARY` của `rs0`, Tomcat lên cổng 8080. **Chưa kiểm chứng:** mặc định cổng 27017 (máy có MongoDB cục bộ chiếm cổng); app chưa có repository nên chưa đọc dữ liệu thật; chưa thử trên Linux/macOS | PR #2 (`cbf22ac`, `b1cc1bb`) |
 | 7 | 2026-10-23 | _chờ điền_ | LMS-API | Claude Code, claude-sonnet-5-5 | Cập nhật CSDL lên v0.5 theo `PLO_DB_UPDATE.md`; chốt danh sách feature đồ án | "đọc `PLO_DB_UPDATE.md`, đối chiếu với db ban đầu và sửa theo hướng đó; sau đó … tạo file mới chốt các feature" | `doc/database_import.js`, `doc/GiaiThich_CoSoDuLieu.md` (v0.4 → v0.5), `doc/chot-feature-do-an.md` (mới) | _Chờ sinh viên rà soát. Các điểm lệch phạm vi/nguyên tắc (duyệt ma trận đề thi, `irmWeights`, `departmentId`) và danh sách C/MR/K là đề xuất của AI, chưa được GVHD/Khoa duyệt_ | Chạy `database_import.js` hai lần trên MongoDB 8.0 (30 collection, 62 chỉ mục, không nhân đôi seed) và 59 ca chấp nhận/từ chối validator: 59 đạt. Bổ sung ngoài `PLO_DB_UPDATE.md`: `calculation_runs.scopeRef`, chỉ mục khóa chạy theo `PENDING`/`PROCESSING`, `scope.cohort`/`termId` trong `aggregate_results`. **Chưa kiểm chứng:** MongoDB 8.2.6 (chỉ thử 8.0) | `9977777`, `947cf04` |
 | 8 | 2026-10-27 | _chờ điền_ | LMS-API | Claude Code, claude-sonnet-5-5 | (a) Đồng bộ kế hoạch, cam kết, rule, README với CSDL v0.5 và thêm ADR 0001 (nháp); (b) tách commit và push `feat/docker-mongo`; (c) tách kế hoạch thành `doc/plan/` theo feature để giao cho LLM; (d) ghi công thức `PLO_DB_UPDATE.md` §4 làm công thức triển khai và liệt kê công thức còn thiếu (CT-01…CT-11, Q20–Q23) để hỏi GVHD; (e) gộp nhật ký này | "Tôi đã chỉnh db lại theo `PLO_DB_UPDATE.md`. Hãy cập nhật lại doc, plan… import db lại trên docker… cập nhật readme"; "tách commit và push"; "plan chia theo từng feature để dùng với LLM"; "làm theo công thức này"; "ghi các công thức còn thiếu… tôi sẽ hỏi gvhd"; "xóa các log thừa" | `doc/ke-hoach-xay-dung.md` (v0.3), `tom-tat-…`, `cam-ket-…`, `chot-feature-…`, `GiaiThich` §8 (Q20–Q23), `CLAUDE.md`, `.claude/rules/02…`, `doc/adr/0001-…` (mới), `README.md`, `doc/plan/` (11 file mới), `logsAI/ai-usage-log.md` | _Chờ sinh viên rà soát. AC, API, luồng trạng thái trong `doc/plan/` và ADR 0001 là bản nháp của AI. Danh sách CT-01…CT-11 có thể còn sót, IBS rà lại_ | Image `lms-mongo` build lại, chạy container tạm cổng 27019: 30 collection, 92 chỉ mục (62 + 30 `_id`), `plos.category`, `program_versions.totalCredits`, validator từ chối `APPROVED` với `isLocked=false` (mã 121), chấp nhận `DEPARTMENT_HEAD`; container tạm đã dừng. Tính tay lại ví dụ công thức bằng awk (CLO1 0,8; CLO2 0,57778; PI1 0,8; PI2 0,52727; PI1 FROM_CLOS 0,66667) khớp. Quét secret thủ công trên các dòng thêm (chưa cài gitleaks). Lỗi AI: xem B3–B5. **Chưa làm:** dựng lại container `lms-mongo` chính (lệnh xóa container/volume cũ bị hệ thống từ chối, container cũ còn dữ liệu v0.4); xóa "file thừa" (người dùng chưa chọn); chưa chạy `mvnw verify` (không đổi mã Java) | `9977777`, `947cf04`, `c9def16`, `db7ffa9`, `ee14d8f`, `4377683`, `f29fb3b`, `3d2e8bb` (đã push); sửa nhật ký này ở commit sau `3d2e8bb` |
+| 9 | 2026-10-27 | TinMH (IT) | LMS-API (kết nối LMS-UI) | Claude Code, claude-sonnet-5-5 | Triển khai Bước 00: Nền tảng dùng chung (US-39, US-40); tái cấu trúc 3 tầng (Package-by-Layer ở cấp gốc kết hợp `.impl` tuân thủ 5 nguyên lý SOLID); kiểm thử MongoDB 8.0 Replica Set; CI PR; ADR 0002; hợp đồng API liên repo; cập nhật nợ kỹ thuật TD-04, TD-12 | "Triển khai bước đầu tiên trong kế hoạch xây dựng của LMS-API (00-nen-tang-chung.md: US-39, US-40), cập nhật CI pipeline kèm MongoDB 8.0 replica set chạy tự động khi tạo PR, khởi tạo API-CONTRACT.md"; "làm theo mô hình 3 tầng cho tôi"; "chia theo tầng (package-by-layer) ngay ở cấp gốc com.hcmute.lms.lmsapi kèm gói .impl cho từng tầng đảm bảo các nguyên lý SOLID" | `pom.xml`, `src/main/java/com/hcmute/lms/lmsapi/{controller,dto,service,service/impl,repository,repository/impl,document,mapper,mapper/impl,exception,config,filter}/*`, `src/test/java/...`, `.github/workflows/ci.yml`, `doc/adr/0002-nen-tang-chung-step-00.md`, `doc/coding-convention.md`, `doc/plan/00-nen-tang-chung.md`, `doc/tech-debt.md`, `LMS-UI/doc/API-CONTRACT.md`, `logsAI/ai-usage-log.md` | _Chờ sinh viên rà soát_ | `mvnw verify` kiểm thử 100% pass với container MongoDB replica set rs0; test MockMvc kiểm chứng US-40 (400, 401, 403, 404, 409, 422, 500 không lộ stack trace); integration test rollback transaction; test Actuator health/info đạt 200 OK; CI workflow cấu hình service MongoDB 8.0 rs0 nạp schema validator | _Chờ sinh viên điền commit_ |
 
 ## B. Lỗi / ảo giác của AI đã phát hiện (mục tiêu ≥ 5, kèm phân tích nguyên nhân)
 
@@ -41,3 +42,86 @@ Mỗi PR có AI hỗ trợ tick các mục: build/lint/test đã chạy thật; 
 | Ngày | Nội dung | Nguồn (URL) | Giấy phép | Dùng ở đâu |
 |---|---|---|---|---|
 | | | | | |
+
+## E. Để vấn đáp — 4 câu hỏi bảo vệ đồ án tốt nghiệp trước Hội đồng (Dành cho Sinh viên IT và IBS)
+
+Phần này chuẩn bị sẵn câu trả lời khoa học, chuẩn mực cho 4 câu hỏi trọng tâm mà Hội đồng chấm đồ án tốt nghiệp thường chất vấn. Nội dung được biên soạn song song theo hai góc nhìn: **Sinh viên chuyên ngành Công nghệ thông tin (IT)** và **Sinh viên chuyên ngành Kinh doanh số (IBS)**.
+
+---
+
+### Câu hỏi 1: Bạn đã làm gì trong bước này? (What did you do?)
+
+#### Trả lời góc nhìn Sinh viên IT:
+- **Kiến trúc mã nguồn 3 tầng chuẩn mực & SOLID:** Tái cấu trúc mã nguồn dự án `LMS-API` theo mô hình Package-by-Layer ở cấp gốc package `com.hcmute.lms.lmsapi`:
+  - `controller`: Tiếp nhận HTTP Request, kích hoạt Bean Validation, chuyển đổi và trả về DTO.
+  - `dto`: Chứa các lớp truyền dữ liệu (`ErrorResponse`, `FieldErrorDetail`), tách bạch hoàn toàn khỏi tầng exception và document theo nguyên lý Single Responsibility (SRP).
+  - `service` (Interface) & `service.impl`: Chứa hợp đồng và logic nghiệp vụ, quản lý giao dịch `@Transactional`, không phụ thuộc vào Servlet HTTP (pure service).
+  - `repository` (Interface) & `repository.impl`: Chứa hợp đồng Spring Data `MongoRepository` và triển khai truy vấn động phức tạp bằng `MongoTemplate` (`AuditLogRepositoryCustomImpl`).
+  - `document`: Ánh xạ các thực thể CSDL MongoDB và Enum nghiệp vụ khớp với `$jsonSchema`.
+  - `mapper` (Interface) & `mapper.impl`: Chuyển đổi dữ liệu và đảm nhiệm khử nhiễm dữ liệu nhạy cảm (`AuditLogMapperImpl`), tách rời khỏi Service theo SRP và DIP.
+  - `exception`: Xử lý ngoại lệ tập trung với `GlobalExceptionHandler` và `ErrorCode`.
+  - `config` & `filter`: Cấu hình hệ thống và bộ lọc `CorrelationIdFilter`.
+- **Triển khai US-40 (Xử lý lỗi tập trung):** Xây dựng `@RestControllerAdvice` duy nhất chuyển đổi mọi ngoại lệ thành cấu trúc JSON chuẩn `{ timestamp, status, code, message, path, fieldErrors }`. Phân định chính xác các mã trạng thái HTTP (400, 401, 403, 404, 409, 422, 500) và che giấu hoàn toàn stack trace khi gặp lỗi 500.
+- **Triển khai US-39 (Giám sát & Truy vết):** Tích hợp `spring-boot-starter-actuator` (chỉ mở `health` và `info`), cấu hình `SecurityConfig` mở công khai cho endpoint giám sát, và triển khai bộ lọc `CorrelationIdFilter` quản lý `X-Correlation-Id` cùng SLF4J MDC.
+- **Cấu hình MongoDB Replica Set & Transaction:** Kích hoạt `MongoTransactionManager` trên cụm replica set `rs0`, đảm bảo tính nguyên tử cho các giao dịch nhiều collection (ví dụ nạp điểm đồng thời ghi `audit_logs`).
+- **Tài liệu Hợp đồng liên repo:** Biên soạn `LMS-UI/doc/API-CONTRACT.md`, thiết lập tiếng nói chung giữa Frontend và Backend.
+- **Tự động hóa CI Pipeline:** Cấu hình `.github/workflows/ci.yml` khởi chạy MongoDB 8.0 Replica Set, nạp schema và chạy `./mvnw -B verify` tự động khi tạo Pull Request.
+
+#### Trả lời góc nhìn Sinh viên IBS:
+- **Chuẩn hóa quy trình nghiệp vụ số:** Thiết lập nền tảng kỹ thuật bảo đảm tính pháp lý và độ tin cậy của quy trình đo lường chuẩn đầu ra (OBE).
+- **Thiết lập quy chế kiểm toán số (Digital Audit Trail):** Quy định rõ 7 loại hành vi bắt buộc phải lưu vết kiểm toán trong `audit_logs` (nhập điểm, cập nhật điểm, duyệt ma trận đề thi, phê duyệt chuẩn đầu ra...). Đặc biệt, bắt buộc phải có trường `reason` (lý do giải trình) khi cập nhật điểm (`SCORE_UPDATE`), ngăn chặn hành vi sửa điểm tùy tiện.
+- **Chuẩn hóa trải nghiệm người dùng số (UX Standardization):** Phối hợp xây dựng bảng ánh xạ mã lỗi trong `API-CONTRACT.md`. Chuyển hóa các lỗi kỹ thuật phức tạp thành các thông điệp cảnh báo thân thiện bằng tiếng Việt, giúp giảng viên và sinh viên hiểu rõ lý do bị từ chối (ví dụ: vi phạm quy tắc ma trận đề thi, điểm vượt quá thang điểm, xung đột phiên bản chỉnh sửa).
+- **Đảm bảo tính toàn vẹn dữ liệu học thuật:** Đưa ra yêu cầu bắt buộc rằng mọi thao tác cập nhật điểm số phải đi kèm giao dịch (Transaction) để không bao giờ xảy ra tình trạng "điểm đã vào hệ thống nhưng không rõ ai nhập" hoặc "có vết kiểm toán nhưng dữ liệu điểm bị lỗi".
+
+---
+
+### Câu hỏi 2: Vì sao phần này có mặt và đóng vai trò gì trong đề tài đo lường chuẩn đầu ra? (Why in thesis?)
+
+#### Trả lời góc nhìn Sinh viên IT:
+- **Ngăn ngừa suy thoái kiến trúc (Architectural Erosion):** Một hệ thống đo lường chuẩn đầu ra đại học có miền nghiệp vụ rất phức tạp (tính toán qua nhiều cấp độ: Câu hỏi → CLO → PI → PLO theo nhiều trọng số). Nếu không áp dụng mô hình 3 tầng và các nguyên lý SOLID ngay từ Bước 00, mã nguồn sẽ nhanh chóng rơi vào tình trạng kết dính chặt (tightly coupled), các hàm nghiệp vụ đo lường bị lẫn lộn vào Controller hoặc truy vấn DB, dẫn đến việc không thể viết Unit Test độc lập và không thể mở rộng ở các bước F06, F07.
+- **Bảo đảm tính nguyên tử (Atomicity) trong CSDL NoSQL:** MongoDB là hệ cơ sở dữ liệu Document. Khi thực hiện quy trình nhập điểm cho một lớp học phần hàng trăm sinh viên, hệ thống phải cập nhật song song nhiều collection (`student_results`, `course_sections`, `audit_logs`). Nếu không có Replica Set và `MongoTransactionManager`, bất kỳ sự cố mạng hoặc ngoại lệ nào ở giữa tiến trình sẽ để lại dữ liệu rác mồ côi (orphaned data), phá hủy tính đúng đắn của toàn bộ kết quả đo lường sau đó.
+- **An toàn thông tin (Information Exposure Prevention):** Xử lý ngoại lệ tập trung giúp ngăn ngừa rò rỉ mã nguồn, tên class, câu lệnh truy vấn MongoDB hoặc cấu trúc hạ tầng máy chủ ra bên ngoài (tuân thủ tiêu chuẩn an toàn OWASP Top 10 và CWE-209).
+
+#### Trả lời góc nhìn Sinh viên IBS:
+- **Đáp ứng các tiêu chuẩn kiểm định giáo dục quốc tế (AUN-QA & ABET):** Trong kiểm định chất lượng đào tạo, minh chứng (Evidence) phải đảm bảo 3 yếu tố: Tính xác thực (Authenticity), Tính toàn vẹn (Integrity) và Khả năng truy xuất nguồn gốc (Traceability). Bước 00 đặt nền móng quản trị (Governance Framework): Mọi số liệu đo lường phục vụ báo cáo kiểm định sau này đều được truy vết nguồn gốc rõ ràng thông qua `audit_logs`.
+- **Tối ưu hóa chi phí vận hành và rủi ro triển khai:** Hợp đồng giao tiếp `API-CONTRACT.md` giúp hai nhóm phát triển Frontend và Backend phối hợp ăn khớp, giảm thiểu thời gian kiểm thử tích hợp, tránh tình trạng "lệch pha" giao diện gây lãng phí nguồn lực đồ án.
+
+---
+
+### Câu hỏi 3: Các tham số, cấu hình, thư viện từ đâu mà có? (Where do params/libs come from?)
+
+#### Trả lời góc nhìn Sinh viên IT:
+- **`spring-boot-starter-actuator`:** Kế thừa từ bộ khung Spring Boot 4.1.0; phiên bản được quản lý tập trung bởi `spring-boot-starter-parent` nhằm loại trừ rủi ro xung đột thư viện (dependency hell).
+- **`spring.mongodb.uri` và tham số `replicaSet=rs0`:** Kế thừa từ quy chuẩn kết nối của Spring Data MongoDB 4.x. Tham số `replicaSet=rs0` tương ứng chính xác với tên cụm Replica Set được khởi tạo trong Docker script `docker/mongo/entrypoint.sh` và service MongoDB của GitHub Actions CI runner.
+- **Mã lỗi 121 của MongoDB:** Là mã định danh chuẩn (`Error Code 121: DocumentValidationFailure`) do MongoDB Server phát sinh khi một thao tác ghi tài liệu vi phạm quy tắc kiểm tra schema trong `doc/database_import.js`.
+- **Cấu trúc DTO `ErrorResponse` và Header `X-Correlation-Id`:** Tuân thủ chuẩn mực thiết kế REST API (RFC 7231, RFC 7807 Problem Details) và mô hình truy vết phân tán W3C Trace Context, sử dụng SLF4J MDC (Mapped Diagnostic Context) có sẵn trong Logback.
+- **Phân tách Package-by-Layer và Interface/Impl:** Căn cứ theo quy định tại `doc/coding-convention.md` §2, `.claude/rules/03-code-quality-and-git.md` và 5 nguyên lý thiết kế phần mềm kinh điển SOLID của Robert C. Martin (Uncle Bob).
+
+#### Trả lời góc nhìn Sinh viên IBS:
+- **Danh mục 7 giá trị trong `AuditAction`:** Được trích xuất từ tài liệu phân tích nghiệp vụ quản lý đào tạo `doc/GiaiThich_CoSoDuLieu.md` §4.29 và validator CSDL thực tế trong `doc/database_import.js`.
+- **Quy tắc bắt buộc nhập `reason` khi `SCORE_UPDATE`:** Bắt nguồn từ Quy chế đào tạo đại học chính quy của Bộ GD&ĐT và quy trình phúc khảo, sửa điểm của Trường ĐH Sư phạm Kỹ thuật TP.HCM (mọi điều chỉnh điểm sau khi chốt sổ đều bắt buộc phải có căn cứ bằng văn bản).
+- **Các quy tắc ánh xạ lỗi trên giao diện:** Dựa trên phương pháp phân tích trải nghiệm người dùng (UX Persona & Journey Mapping), đảm bảo rằng người dùng không bị mất trắng dữ liệu form khi xảy ra lỗi xác thực (400) hoặc lỗi nghiệp vụ (422).
+
+---
+
+### Câu hỏi 4: Nếu bỏ thành phần này đi thì hệ thống hoặc đề tài sẽ bị ảnh hưởng/phá vỡ ra sao? (What breaks if removed?)
+
+#### Trả lời góc nhìn Sinh viên IT:
+- **Nếu bỏ kiến trúc 3 tầng và SOLID (viết chung mã phẳng hoặc gọi DB từ Controller):**
+  - Vi phạm nguyên lý Đơn trách nhiệm (SRP) và Đảo ngược phụ thuộc (DIP).
+  - Controller bị gắn chặt với Mongo Driver; khi cần thay đổi thuật toán tính chuẩn đầu ra hoặc chuyển đổi cấu trúc lưu trữ, lập trình viên buộc phải sửa hàng loạt Controller.
+  - Không thể viết Unit Test với Mockito cho tầng Service nếu Controller tự ý truy cập Repository. Dự án sẽ bị đánh trượt hoặc trừ điểm nặng ở Tiêu chí Đánh giá Chất lượng Mã nguồn (TC2.4).
+- **Nếu bỏ MongoDB Replica Set `rs0`:**
+  - `MongoTransactionManager` của Spring Boot sẽ ném ngoại lệ khi khởi động hoặc khi thực thi `@Transactional` vì MongoDB Standalone không hỗ trợ multi-document transactions.
+  - Khi lưu điểm sinh viên thất bại ở sinh viên thứ 50, 49 sinh viên trước đó vẫn nằm lại trong CSDL còn bản ghi `audit_logs` có thể không được tạo, gây bất nhất dữ liệu nghiêm trọng.
+- **Nếu bỏ `@RestControllerAdvice` (`GlobalExceptionHandler`):**
+  - Mọi lỗi ngoại lệ hệ thống sẽ trả về trang HTML mặc định của Tomcat hoặc HTTP 500 kèm toàn bộ Stack Trace. Kẻ tấn công có thể khai thác thông tin này để tấn công cơ sở dữ liệu. Đồng thời, Frontend Angular sẽ bị lỗi phân tích cú pháp (parse error), làm giao diện bị đơ (crash UI).
+- **Nếu bỏ `CorrelationIdFilter`:**
+  - Khi có hàng trăm sinh viên và giảng viên đồng thời sử dụng hệ thống, các dòng log ở server sẽ đan xen nhau. Quản trị viên hệ thống hoàn toàn không thể biết dòng lỗi nào thuộc về request nào, gây bế tắc trong khâu điều tra sự cố.
+
+#### Trả lời góc nhìn Sinh viên IBS:
+- **Nếu bỏ kiểm toán `audit_logs` và ràng buộc `reason`:**
+  - Đề tài mất đi tính minh bạch và độ tin cậy học thuật. Khi có nghi vấn về việc sửa điểm hoặc gian lận kết quả đo lường chuẩn đầu ra, hệ thống không có bằng chứng đối soát. Báo cáo đo lường sẽ bị Hội đồng kiểm định chất lượng từ chối công nhận.
+- **Nếu bỏ tài liệu hợp đồng `API-CONTRACT.md`:**
+  - Quy trình phát triển phần mềm bị phân rã; Frontend và Backend sẽ liên tục phát sinh lỗi không tương thích, kéo dài thời gian hoàn thành đồ án và gây trải nghiệm tồi tệ cho người dùng cuối.
+

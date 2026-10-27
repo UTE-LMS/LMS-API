@@ -127,13 +127,27 @@ Hiện chỉ có một test khởi động ngữ cảnh (`LmsApiApplicationTests
 
 ## Cấu trúc
 
+Dự án áp dụng mô hình kiến trúc phân tầng 3 lớp (**Package-by-Layer**) trực tiếp dưới `com.hcmute.lms.lmsapi` kết hợp các package `.impl` và interface trừu tượng nhằm tuân thủ nghiêm ngặt 5 nguyên lý **SOLID**:
+
 ```
-src/main/java/com/hcmute/lms/lmsapi/   # mã nguồn (dự kiến chia module theo chức năng)
-src/main/resources/                    # cấu hình (chỉ commit *.example)
-docker/mongo/                          # image MongoDB dev: replica set + nạp CSDL ban đầu
-doc/                                   # tài liệu thiết kế, kế hoạch, hồ sơ đồ án
-logsAI/                                # nhật ký sử dụng AI (Rubric TC2.3)
-.claude/rules/, CLAUDE.md              # quy tắc làm việc cho trợ lý AI
+src/main/java/com/hcmute/lms/lmsapi/
+├── controller/         # Tầng Presentation: REST Controller (chỉ phụ thuộc Service interface)
+├── dto/                # Data Transfer Objects (ErrorResponse, FieldErrorDetail, request/response DTOs)
+├── service/            # Tầng Business Logic: Interfaces nghiệp vụ (AuditService)
+│   └── impl/           # Hiện thực nghiệp vụ (AuditServiceImpl - tiêm Repository, Mapper, @Transactional)
+├── repository/         # Tầng Data Access: Interfaces truy cập MongoDB (AuditLogRepository, AuditLogRepositoryCustom)
+│   └── impl/           # Hiện thực truy vấn mở rộng dùng MongoTemplate (AuditLogRepositoryCustomImpl)
+├── document/           # Domain Models & MongoDB Documents (AuditLog, AuditEntity, AuditAction)
+├── mapper/             # Interfaces chuyển đổi dữ liệu (AuditLogMapper)
+│   └── impl/           # Hiện thực mapper & sanitize dữ liệu nhạy cảm độc lập theo SRP (AuditLogMapperImpl)
+├── exception/          # Xử lý lỗi tập trung: AppException, ErrorCode, GlobalExceptionHandler
+├── config/             # Cấu hình Spring Beans: MongoConfig (TransactionManager), SecurityConfig
+└── filter/             # Bộ lọc HTTP: CorrelationIdFilter (MDC logging, X-Correlation-Id)
+
+src/main/resources/     # Cấu hình môi trường (application.properties.example)
+docker/mongo/           # Cấu hình Docker MongoDB replica set dev
+doc/                    # Tài liệu kỹ thuật, kiến trúc ADR, kế hoạch thực hiện
+logsAI/                 # Nhật ký sử dụng AI (Rubric TC2.3)
 ```
 
 ## Tài liệu chính
