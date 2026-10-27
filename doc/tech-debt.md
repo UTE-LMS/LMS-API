@@ -17,6 +17,7 @@ Phục vụ Rubric TC2.4 (Mức 5: có danh mục nợ kỹ thuật kèm kế ho
 | TD-10 | Cả hai | Chưa có bảo vệ nhánh `main` (bắt buộc review) | Chỉ số "thay đổi qua PR có review" không được bảo đảm | Bật trong cài đặt GitHub của repo | [ĐIỀN] | [ĐIỀN] | Mở |
 | TD-11 | UI | `npm` 11 chặn script cài đặt của `esbuild`, `lmdb`, `msgpackr-extract`, `@parcel/watcher` (cảnh báo `install-scripts`); build/test vẫn chạy | Có thể phát sinh khác biệt môi trường CI | Theo dõi; nếu CI lỗi thì cấu hình `allow-scripts` có chủ đích và ghi lý do | [ĐIỀN] | [ĐIỀN] | Theo dõi |
 | TD-12 | UI | Hợp đồng API giữa UI và backend chưa có (interface thủ công hay sinh từ OpenAPI) | Dễ lệch tên trường | Quyết bằng ADR cùng bên API | TinMH | 2026-10-27 | Đã xử lý (Bước 00) |
+| TD-13 | API | Rủi ro đồng thời (Race condition) theo cơ chế Snapshot Isolation của MongoDB khi hai ADMIN đồng thời hạ quyền hoặc khóa tài khoản của nhau | Có thể dẫn đến tình trạng hệ thống không còn tài khoản ADMIN ACTIVE nào | Chấp nhận rủi ro trong F01 do tần suất cực thấp; thực thi test tuần tự; bổ sung Distributed Lock (Redis Redisson) khi mở rộng hệ thống (ADR 0003) | TinMH | F01 | Mở (Chấp nhận) |
 
 ## Đã xử lý
 
