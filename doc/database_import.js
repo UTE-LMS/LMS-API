@@ -98,7 +98,7 @@ const COLLECTIONS = {
   users: {
     validator: schema(['username', 'email', 'passwordHash', 'status', 'roleAssignments'], {
       username: STR, email: STR, passwordHash: STR, fullName: STR_N,
-      status: en('ACTIVE', 'LOCKED'),
+      status: en('ACTIVE', 'LOCKED'), tokenVersion: INT,
       roleAssignments: arr({
         bsonType: 'object', required: ['role'],
         properties: {

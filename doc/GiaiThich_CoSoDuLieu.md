@@ -127,6 +127,7 @@ users, audit_logs: dùng chung cho toàn hệ thống
 |---|---|
 | `username`, `email`, `passwordHash`, `fullName` | Thông tin tài khoản (mật khẩu chỉ lưu băm) |
 | `status` | `ACTIVE` / `LOCKED` |
+| `tokenVersion` | Số nguyên (`number` / `['int','long']`, mặc định 0 nếu thiếu). Số phiên đăng nhập/bảo mật, tăng nguyên tử qua `UserRepositoryCustom.incrementTokenVersion` khi logout hoặc khi tài khoản bị khóa (`LOCKED`). Kiểm tra để vô hiệu hóa tức thời và vĩnh viễn các JWT token được cấp trước đó. |
 | `roleAssignments[]` | Mỗi phần tử: `role` (`ADMIN`, `PROGRAM_MANAGER`, `DEPARTMENT_HEAD`, `QA_OFFICER`, `LECTURER`, `STUDENT`, `VIEWER`) và `scope` = `{programIds[], courseIds[], sectionIds[]}` (CTĐT/học phần/lớp được phụ trách) |
 
 `DEPARTMENT_HEAD` có thẩm quyền duyệt ma trận đề thi (`assessments`) và ánh xạ CLO–PI. `STUDENT` chỉ đọc `student_results` của chính mình (nối qua `students.userId`).
