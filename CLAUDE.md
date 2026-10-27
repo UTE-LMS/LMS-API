@@ -10,7 +10,8 @@ Learning Outcomes Management and Analytics System. Tiểu luận chuyên ngành 
   Frontend dùng **Angular hiện đại theo repo `LMS-UI` (Angular 21, TypeScript)**, đã được người dùng xác nhận.
   Không dùng AngularJS 1.x (đã hết hỗ trợ).
 - Tài liệu: `doc/BS.md`, `doc/Misa.md` (kế hoạch, hướng dẫn đọc CTĐT), `doc/GiaiThich_CoSoDuLieu.md`
-  (thiết kế CSDL v0.4, 14 nguyên tắc), `doc/database_import.js` (script dựng CSDL).
+  (thiết kế CSDL v0.5, 14 nguyên tắc; v0.5 cập nhật theo `doc/PLO_DB_UPDATE.md`), `doc/database_import.js`
+  (script dựng CSDL), `docker/mongo/` (image MongoDB replica set nạp script này, xem `README.md`).
 - Chuỗi nghiệp vụ: Điểm câu hỏi/tiêu chí → CLO → PI → PLO → Báo cáo → Hành động cải tiến.
 
 ## Nhóm 2 sinh viên dùng chung repo
@@ -47,7 +48,10 @@ Mọi đầu ra của agent phải **giải thích được, đúng phạm vi, c
 ## Quy tắc cứng (không được vi phạm, không cần người dùng nhắc lại)
 
 1. **Đúng phạm vi.** Chỉ làm trong phạm vi của `GiaiThich_CoSoDuLieu.md` §1 và `BS.md` §3: tiếp nhận và đo
-   lường kết quả có sẵn sau khi thi. KHÔNG tổ chức thi, sinh đề, duyệt đề; KHÔNG lưu bài làm sinh viên.
+   lường kết quả có sẵn sau khi thi. KHÔNG tổ chức thi, sinh đề, duyệt *nội dung* đề thi, xuất phôi in đề; KHÔNG lưu
+   bài làm sinh viên. Riêng *duyệt ma trận đề thi* (Trưởng bộ môn duyệt ánh xạ CLO–PI của bài đánh giá lớp, khóa
+   `items[]`, CSDL v0.5, story NEW-01) là **đề xuất chờ GVHD (Q11)**: có trong CSDL, được phép làm theo
+   `doc/chot-feature-do-an.md` nhưng không coi là đã duyệt; ghi ADR (`doc/adr/0001-…`).
    **ML nằm ngoài phạm vi hiện tại**: không viết mã, collection hay dependency ML. Việc ngoài phạm vi hoặc
    ngoài bản cam kết Bước 3 → dừng và hỏi.
 2. **Không bịa minh chứng.** Không tự tạo số liệu khảo sát, biên bản, danh sách người dùng thử, điểm SUS,
@@ -105,6 +109,8 @@ Kế hoạch xây dựng (backlog US-01…41, giai đoạn P0–P8, cổng K1–
   được, Mục 6). Chờ người dùng quyết.
 - MongoDB cục bộ đang chạy dạng **standalone** (thấy `type=STANDALONE` khi chạy test). Xác nhận nhập điểm cần
   transaction nên phải là **replica set**, nếu không transaction sẽ lỗi khi bắt đầu làm phần nhập điểm.
+  Đã có image `docker/mongo/` (replica set `rs0` + nạp `database_import.js`) để dùng thay MongoDB cục bộ; staging/CI
+  vẫn phải kiểm tra.
 - `.gitignore` ghi `.src/main/resources/application.properties` (thừa dấu chấm đầu, nên không có tác dụng)
   và file này **đã được track**. Phải sửa và `git rm --cached` trước khi đặt cấu hình thật vào đó.
 - Java 25 và Spring Boot 4.1.0 (API), Angular 21 (UI). `BS.md` §4 yêu cầu bộ phiên bản do Trung tâm CNPM
