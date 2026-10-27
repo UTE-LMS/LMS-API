@@ -91,9 +91,12 @@ public class GlobalExceptionHandler {
         List<FieldErrorDetail> fieldErrors = new ArrayList<>();
         ex.getParameterValidationResults().forEach(result -> {
             String paramName = result.getMethodParameter().getParameterName();
+            String cleanFieldName = (paramName != null && paramName.contains("."))
+                    ? paramName.substring(paramName.lastIndexOf('.') + 1)
+                    : paramName;
             result.getResolvableErrors().forEach(error ->
                     fieldErrors.add(FieldErrorDetail.builder()
-                            .field(paramName)
+                            .field(cleanFieldName)
                             .message(error.getDefaultMessage())
                             .rejectedValue(result.getArgument())
                             .build())
@@ -122,13 +125,15 @@ public class GlobalExceptionHandler {
             ConstraintViolationException ex, HttpServletRequest request) {
 
         List<FieldErrorDetail> fieldErrors = new ArrayList<>();
-        ex.getConstraintViolations().forEach(cv ->
-                fieldErrors.add(FieldErrorDetail.builder()
-                        .field(cv.getPropertyPath().toString())
-                        .message(cv.getMessage())
-                        .rejectedValue(cv.getInvalidValue())
-                        .build())
-        );
+        ex.getConstraintViolations().forEach(cv -> {
+            String propertyPath = cv.getPropertyPath() != null ? cv.getPropertyPath().toString() : "";
+            String fieldName = propertyPath.contains(".") ? propertyPath.substring(propertyPath.lastIndexOf('.') + 1) : propertyPath;
+            fieldErrors.add(FieldErrorDetail.builder()
+                    .field(fieldName)
+                    .message(cv.getMessage())
+                    .rejectedValue(cv.getInvalidValue())
+                    .build());
+        });
 
         log.warn("Constraint violation on request [{}]: {} violation(s)", request.getRequestURI(), fieldErrors.size());
 
@@ -297,6 +302,28 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(status).body(response);
     }
 
+    /**
+     * Xử lý ngoại lệ vi phạm tham số phân trang page/size (PageableValidationException).
+     * US-02 / API-CONTRACT §5.1.2: Trả về HTTP 400, code = VALIDATION_ERROR kèm fieldErrors.
+     */
+    @ExceptionHandler(PageableValidationException.class)
+    public ResponseEntity<ErrorResponse> handlePageableValidation(
+            PageableValidationException ex, HttpServletRequest request) {
+
+        log.warn("Pageable validation error on request [{}]: {} field error(s)", request.getRequestURI(), ex.getFieldErrors().size());
+
+        ErrorResponse response = ErrorResponse.builder()
+                .timestamp(Instant.now())
+                .status(HttpStatus.BAD_REQUEST.value())
+                .code(ErrorCode.VALIDATION_ERROR)
+                .message("Dữ liệu yêu cầu không hợp lệ")
+                .path(request.getRequestURI())
+                .fieldErrors(ex.getFieldErrors())
+                .build();
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
     // =========================================================================
     // 2. NHÓM HTTP 401 & 403: BẢO MẬT & PHÂN QUYỀN
     // =========================================================================
@@ -310,11 +337,15 @@ public class GlobalExceptionHandler {
 
         log.warn("Authentication failed on request [{}]: {}", request.getRequestURI(), ex.getMessage());
 
+        String message = (ex.getMessage() != null && !ex.getMessage().isBlank())
+                ? ex.getMessage()
+                : "Chưa xác thực hoặc phiên làm việc đã hết hạn";
+
         ErrorResponse response = ErrorResponse.builder()
                 .timestamp(Instant.now())
                 .status(HttpStatus.UNAUTHORIZED.value())
                 .code(ErrorCode.UNAUTHORIZED)
-                .message("Chưa xác thực hoặc phiên làm việc đã hết hạn")
+                .message(message)
                 .path(request.getRequestURI())
                 .build();
 
