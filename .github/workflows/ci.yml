@@ -2,8 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: ['**']
   pull_request:
+    branches: ['**']
 
 permissions:
   contents: read
@@ -64,4 +65,8 @@ jobs:
         env:
           SPRING_MONGODB_URI: mongodb://localhost:27017/learning_outcomes?replicaSet=rs0
           MONGODB_URI: mongodb://localhost:27017/learning_outcomes?replicaSet=rs0
+          JWT_SECRET: "c2VjcmV0LWtleS1mb3ItdGVzdGluZy1wdXJwb3Nlcy1vbmx5LTMyYnl0ZXM="
+          INITIAL_ADMIN_USERNAME: ""
+          INITIAL_ADMIN_EMAIL: ""
+          INITIAL_ADMIN_PASSWORD: ""
         run: ./mvnw -B verify
