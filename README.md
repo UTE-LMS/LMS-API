@@ -38,9 +38,10 @@ Frontend: repo riêng `LMS-UI` (Angular 21 + TypeScript).
    máy khác, ví dụ `set MONGODB_URI=mongodb://localhost:27018/learning_outcomes?replicaSet=rs0`.
 
 2. **MongoDB + nạp CSDL ban đầu** — chọn một trong hai cách (xem mục [MongoDB bằng Docker](#mongodb-bằng-docker)
-   và [MongoDB cài sẵn trên máy](#mongodb-cài-sẵn-trên-máy)). Dữ liệu khởi tạo gồm 1 chương trình, 7 PLO,
-   17 PI, 1 học phần, 4 dòng ma trận I/R/M và một bản quy tắc đo lường nháp (ngưỡng/trọng số để trống).
-   Chi tiết: `doc/GiaiThich_CoSoDuLieu.md` §7, §9.
+   và [MongoDB cài sẵn trên máy](#mongodb-cài-sẵn-trên-máy)). Script dựng **30 collection** (thiết kế CSDL v0.5,
+   29 collection dùng + `ml_experiments` không dùng) kèm validator và chỉ mục. Dữ liệu khởi tạo gồm 1 chương trình,
+   7 PLO, 17 PI, 1 học phần, 4 dòng ma trận I/R/M và một bản quy tắc đo lường nháp (ngưỡng/trọng số để trống).
+   Chi tiết: `doc/GiaiThich_CoSoDuLieu.md` §7, §9 (tóm tắt thay đổi v0.4 → v0.5 ở §0).
 
 3. **Chạy ứng dụng:**
 
@@ -59,7 +60,7 @@ docker build -f docker/mongo/Dockerfile -t lms-mongo .
 docker run -d --name lms-mongo -p 27017:27017 -v lms-mongo-data:/data/db lms-mongo
 ```
 
-Sau khoảng 10–20 giây MongoDB sẵn sàng (xem `docker logs lms-mongo`, dòng cuối có `HOÀN TẤT`). Chuỗi kết nối
+Sau khoảng 10–20 giây MongoDB sẵn sàng (xem `docker logs lms-mongo`, dòng cuối có `HOÀN TẤT` và `Tổng số collection: 30`). Chuỗi kết nối
 `mongodb://localhost:27017/learning_outcomes?replicaSet=rs0` đã là mặc định của ứng dụng.
 
 | Việc | Lệnh |
@@ -87,6 +88,17 @@ rồi đặt `MONGODB_URI=mongodb://localhost:27018/learning_outcomes?replicaSet
 Lưu ý: container **không bật xác thực**, chỉ dùng cho phát triển trên máy cá nhân; không mở cổng này ra mạng ngoài.
 Sửa `doc/database_import.js` xong thì build lại image (`docker build` như trên) rồi chạy lại container; script
 chạy lại an toàn, chỉ cập nhật validator và chèn dữ liệu khởi tạo còn thiếu.
+
+**Khi thiết kế CSDL đổi phiên bản** (ví dụ v0.4 → v0.5) cần dựng lại từ đầu, vì script *không sửa* bản ghi khởi tạo
+đã có (PLO cũ vẫn thiếu trường `category`, phiên bản CTĐT cũ thiếu `totalCredits`…). Các bước, lưu ý chúng **xóa
+toàn bộ dữ liệu trong volume**, nên chỉ làm khi trong đó chỉ có dữ liệu khởi tạo hoặc dữ liệu thử nghiệm:
+
+```
+docker build -f docker/mongo/Dockerfile -t lms-mongo .
+docker rm -f lms-mongo
+docker volume rm lms-mongo-data
+docker run -d --name lms-mongo -p 27017:27017 -v lms-mongo-data:/data/db lms-mongo
+```
 
 ## MongoDB cài sẵn trên máy
 
@@ -126,9 +138,12 @@ logsAI/                                # nhật ký sử dụng AI (Rubric TC2.3
 
 ## Tài liệu chính
 
-- `doc/GiaiThich_CoSoDuLieu.md` — thiết kế CSDL MongoDB (29 collection, 14 nguyên tắc).
-- `doc/ke-hoach-xay-dung.md` — kế hoạch, backlog, lộ trình, rủi ro.
+- `doc/GiaiThich_CoSoDuLieu.md` — thiết kế CSDL MongoDB v0.5 (30 collection, 14 nguyên tắc); `doc/PLO_DB_UPDATE.md`
+  là đặc tả nguồn của các thay đổi v0.5; `doc/database_import.js` là script dựng CSDL.
+- `doc/ke-hoach-xay-dung.md` — kế hoạch v0.3, backlog, lộ trình, rủi ro.
+- `doc/chot-feature-do-an.md` — đề xuất chốt danh sách tính năng (chưa ký); `doc/tom-tat-du-an-de-thao-luan.md` — tóm tắt để thảo luận.
 - `doc/cam-ket-san-pham-metric.md` — bản cam kết Bước 3 (dự thảo).
+- `doc/adr/` — quyết định thiết kế (ADR 0001: duyệt ma trận đề thi, đang chờ GVHD).
 - `doc/coding-convention.md`, `doc/tech-debt.md`, `doc/rubric-checklist.md`.
 - `doc/BS.md`, `doc/Misa.md` — kế hoạch và hướng dẫn đọc CTĐT.
 
