@@ -244,7 +244,7 @@ trợ chéo tự do. Mỗi story phải có AC dạng Given/When/Then **trước
 | Giai đoạn | Tuần | Mục tiêu | Đầu ra chính |
 |---|---|---|---|
 | **P0** Nền tảng | T5–T6 | Repo, môi trường, CI sườn, quy ước | MongoDB replica set; sửa `.gitignore` + gỡ track `application.properties`; quét secret; coding convention; bảo vệ nhánh `main`; README; CI build + test; ADR đầu tiên; nạp `database_import.js` |
-| **P1** Khảo sát | T5–T8 (song song) | Hiểu nhu cầu thật | Phỏng vấn ≥ 3 bên liên quan; so sánh ≥ 3 giải pháp; chân dung người dùng; trả lời Q01–Q19 |
+| **P1** Khảo sát | T5–T8 (song song) | Hiểu nhu cầu thật | Phỏng vấn ≥ 3 bên liên quan; so sánh ≥ 3 giải pháp; chân dung người dùng; trả lời Q01–Q23 |
 | **P2** Danh mục lõi | T6–T9 | E01, E02, E03 | Đăng nhập + phân quyền; CTĐT/PLO/PI/ma trận; học phần/đề cương/CLO; **staging đầu tiên (mục tiêu T7)** |
 | **K1** | mục tiêu hết T7, hạn T10 | Chốt bản cam kết có chữ ký | `cam-ket-san-pham-metric.md` |
 | **P3** Đánh giá & nhập điểm | T8–T11 | E04, E05, E06 | Ngân hàng câu hỏi, bài đánh giá, lớp, nhập tệp, báo lỗi, xác nhận/rollback |
@@ -334,7 +334,7 @@ diễn tập vấn đáp. GVHD duyệt báo cáo 2 tuần/lần.
 
 ---
 
-## 9. Câu hỏi còn mở với Khoa (Q01–Q19)
+## 9. Câu hỏi còn mở với Khoa (Q01–Q23)
 
 Nguồn: `GiaiThich_CoSoDuLieu.md` §8. Không chọn một đáp án rồi viết như thể Khoa đã duyệt.
 
@@ -358,9 +358,13 @@ Nguồn: `GiaiThich_CoSoDuLieu.md` §8. Không chọn một đáp án rồi vi�
 | Q17 | Bộ môn: có cần collection `departments` không, hay `courses.departmentId` chỉ là mã tham chiếu | Chưa hỏi (v0.5 thêm trường, chưa có collection) | `courses.departmentId`; phạm vi duyệt của `DEPARTMENT_HEAD` |
 | Q18 | Có cho quy đổi I/R/M thành hệ số khi tổng hợp PI từ CLO không, và giá trị | Chưa hỏi. Mặc định **không** (`useIrmAsWeight = false`) | `pi.useIrmAsWeight`, `pi.irmWeights` |
 | Q19 | Phương pháp mặc định: `pi.aggregationMethod`, `plo.method`, `reimportPolicy` | Chưa hỏi | `measurement_rules`, `import_batches` |
+| Q20 | Công thức CLO/học phần còn thiếu: `WEIGHTED_ITEMS` và trọng số câu hỏi; vai trò `weightInCourse`/`defaultWeight`; cấp COURSE khi `requireAllCloPass = false`; điểm tiêu chí rubric | Chưa hỏi (chi tiết: `plan/F06` §9) | `measurement_rules`, `assessments`, `clos.measurement` |
+| Q21 | Công thức cấp PLO: `ALL_PIS_PASSED`, `AVERAGE_PIS`, `WEIGHTED_PIS` (thiếu trọng số PI trong PLO) | Chưa hỏi | `measurement_rules.plo` |
+| Q22 | Gộp PI qua nhiều học phần/lớp/học kỳ (`aggregationMethod`), chuẩn hóa `W` khi `FROM_CLOS`, tổng hợp khóa/CTĐT | Chưa hỏi | `measurement_rules.pi`, `aggregate_results` |
+| Q23 | Thiếu dữ liệu và ngưỡng trong công thức (`minCoverage`, mẫu số, ưu tiên ngưỡng, `≥`/`>`, làm tròn) | Chưa hỏi | `missingDataPolicy`, `completeness`, `passed` |
 
 Đến nay (theo tài liệu) **chỉ 3 câu có câu trả lời tạm** (Q05, Q10, Q11) và đều chờ xác nhận chính thức. Q17–Q19 mới
-từ CSDL v0.5.
+từ CSDL v0.5. Q20–Q23 là các công thức còn thiếu (CLO/học phần, PLO, gộp PI, thiếu dữ liệu/ngưỡng): bản tổng hợp để hỏi GVHD ở `plan/F06-do-luong.md` §9.
 
 ---
 
@@ -407,7 +411,7 @@ từ CSDL v0.5.
 6. CI sườn, quét gitleaks, bảo vệ nhánh `main` (≥ 1 review).
 7. Coding convention và README.
 8. Chốt `phan-cong.md`.
-9. Gửi lại danh mục MC01–MC09 và Q01–Q19 cho đầu mối Khoa, kèm hạn; đề xuất chọn ba học phần.
+9. Gửi lại danh mục MC01–MC09 và Q01–Q23 cho đầu mối Khoa, kèm hạn; đề xuất chọn ba học phần.
 10. Lên danh sách ≥ 3 bên liên quan phỏng vấn và ≥ 10 người dùng thực nghiệm.
 11. Đối chiếu CTĐT gốc để trích nguyên văn 7 PLO/17 PI.
 12. Viết SRS/AC cho tập Must, nháp bản cam kết K1.

@@ -112,7 +112,7 @@ Cột "Đề xuất" phân biệt story gốc (giữ nguyên ưu tiên) với th
 |---|---|---|---|
 | US-26 | Quy tắc đo lường có phiên bản | **C** | Cấu hình `measurement_rules`; chỉ `CONFIRMED` mới cho kết luận chính thức |
 | US-27 | Tính CLO của từng sinh viên | **C** | Kèm khóa chống chạy trùng bằng `lockKey` (chỉ mục duy nhất, chi phí thấp) |
-| US-28 | Tính PI và PLO | **C** | PI: `DIRECT_FROM_ITEMS` (theo Q10). PLO: cài đặt phương pháp Khoa xác nhận, tối thiểu một trong `ALL_PIS_PASSED`/`WEIGHTED_PIS`/`AVERAGE_PIS` **[CHỜ KHOA, Q04, Q19]**. `pi.aggregationMethod`: tối thiểu `WEIGHTED_AVERAGE` |
+| US-28 | Tính PI và PLO | **C** | PI: `DIRECT_FROM_ITEMS` (theo Q10) và `FROM_CLOS`, công thức theo `PLO_DB_UPDATE.md` §4.2. **Công thức cấp PLO chưa có trong tài liệu (Q21)**: cài sau khi GVHD/Khoa trả lời, xem `plan/F06-do-luong.md` §9. PLO: cài đặt phương pháp Khoa xác nhận, tối thiểu một trong `ALL_PIS_PASSED`/`WEIGHTED_PIS`/`AVERAGE_PIS` **[CHỜ KHOA, Q04, Q19]**. `pi.aggregationMethod`: tối thiểu `WEIGHTED_AVERAGE` |
 | US-29 | Tổng hợp lớp/khóa/CTĐT kèm mẫu số | **C** | Luôn trả đủ `counts` (ghi danh, đủ dữ liệu, đạt, chưa đạt, chưa đủ dữ liệu) và `passRateOfEnrolled` |
 | US-30 | Đánh dấu kết quả cũ (`isStale`) | MR | |
 
@@ -228,6 +228,7 @@ Tóm tắt từ `GiaiThich_CoSoDuLieu.md` mục 2; vi phạm là lỗi nghiệp 
 | 7 | Dùng mã sinh viên thật hay mã thay thế (Q09) | Khoa | US-20 |
 | 8 | Chấp nhận chạy chế độ không chính thức nếu K3 trượt | GVHD | Bản cam kết mục 3 |
 | 9 | ~~Cập nhật `CLAUDE.md` và rule 02~~ **Đã cập nhật 2026-10-27**; ADR nháp ở `adr/0001-duyet-ma-tran-de-thi.md`, cần GVHD trả lời để chốt | Hai sinh viên | Tránh agent tự mâu thuẫn với CSDL v0.5 |
+| 10 | **Công thức còn thiếu** (cấp PLO; cấp học phần khi `requireAllCloPass = false`; `WEIGHTED_ITEMS`; gộp PI nhiều học phần; thiếu dữ liệu/ngưỡng trong công thức): 11 mục CT-01…CT-11 ở `plan/F06-do-luong.md` §9 | GVHD, Khoa (Q20–Q23) | US-27, US-28, US-29, US-32; PLO không thể báo cáo chính thức nếu chưa có |
 
 Việc 1 nên ghi thành ADR (`doc/adr/`) vì đổi phạm vi (CLAUDE.md quy tắc 9).
 
