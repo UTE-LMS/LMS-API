@@ -1,7 +1,30 @@
 spring.application.name=LMS-API
 
+# ==============================================================================
+# CSDL MONGODB (Spring Boot 4.1.0 / Java 25)
 # Chuỗi kết nối MongoDB. Giá trị thật đặt qua biến môi trường MONGODB_URI, KHÔNG commit.
 # Spring Boot 4 dùng spring.mongodb.uri (spring.data.mongodb.uri không còn tác dụng cho kết nối).
 # Mặc định khớp image Docker docker/mongo (replica set rs0, cổng 27017) nên không cần đặt biến nào.
-# Chỉ đặt MONGODB_URI khi dùng cổng/máy khác. replicaSet=rs0 là bắt buộc cho transaction nhập điểm.
+# Chỉ đặt MONGODB_URI khi dùng cổng/máy khác. replicaSet=rs0 là bắt buộc cho transaction.
+# ==============================================================================
 spring.mongodb.uri=${MONGODB_URI:mongodb://localhost:27017/learning_outcomes?replicaSet=rs0}
+
+# ==============================================================================
+# QUAN SÁT HỆ THỐNG & ACTUATOR (US-39)
+# Chỉ mở endpoint health và info theo nguyên tắc tối thiểu hóa bề mặt tấn công.
+# ==============================================================================
+management.endpoints.web.exposure.include=health,info
+management.endpoint.health.show-details=always
+
+# Thông tin cơ bản hiển thị tại endpoint /actuator/info
+info.app.name=LMS-API
+info.app.description=Hệ thống quản lý, đo lường và phân tích chuẩn đầu ra CTĐT
+info.app.version=0.0.1-SNAPSHOT
+
+# ==============================================================================
+# CẤU HÌNH LOGGING KÈM MDC CORRELATION ID
+# Định dạng console log tích hợp [%X{correlationId:-NONE}] để liên kết truy vết
+# ==============================================================================
+logging.pattern.console=%clr(%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX}){faint} %clr(%5p) %clr([%X{correlationId:-NONE}]){yellow} %clr(---){faint} %clr([%15.15t]){faint} %clr(%-40.40logger{39}){cyan} %clr(:){faint} %m%n
+logging.level.com.hcmute.lms.lmsapi=INFO
+logging.level.org.springframework.data.mongodb=INFO
