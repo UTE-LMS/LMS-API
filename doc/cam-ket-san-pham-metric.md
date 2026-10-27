@@ -31,17 +31,19 @@
 theo chuỗi *câu hỏi/tiêu chí → CLO → PI → PLO → báo cáo → hành động cải tiến*; có phiên bản; truy vết được về dữ
 liệu gốc; luôn báo rõ phạm vi, mẫu số và số sinh viên chưa đủ dữ liệu.
 
-**Người dùng mục tiêu** (vai trò hệ thống): quản trị (ADMIN), người phụ trách CTĐT (PROGRAM_MANAGER), cán bộ đảm
-bảo chất lượng (QA_OFFICER), giảng viên (LECTURER), người xem (VIEWER). Chân dung chi tiết: [ĐIỀN sau khảo sát,
-xem TC1].
+**Người dùng mục tiêu** (vai trò hệ thống): quản trị (ADMIN), người phụ trách CTĐT (PROGRAM_MANAGER), trưởng bộ
+môn (DEPARTMENT_HEAD, duyệt ma trận đề thi, **[CHỜ GVHD, Q11]**), cán bộ đảm bảo chất lượng (QA_OFFICER), giảng viên
+(LECTURER), người xem (VIEWER). CSDL còn vai trò `STUDENT` (sinh viên xem kết quả của mình), chỉ là mục tiêu mở rộng
+(NEW-03). Chân dung chi tiết: [ĐIỀN sau khảo sát, xem TC1].
 
 ## 3. Phạm vi
 
 **Làm:** CTĐT CNTT (7 PLO, 17 PI) và các học phần thử nghiệm; 8 nhóm chức năng F01–F08 theo mục 4.
 
-**Không làm:** tổ chức thi, sinh đề, duyệt đề; lưu bài làm của sinh viên; thử nghiệm ML; quản lý "minh chứng" như
-danh mục dữ liệu (chỉ lưu tệp điểm gốc và tham chiếu); kết luận mức đạt của toàn chương trình; thay thế quy trình
-đo lường chính thức của Khoa.
+**Không làm:** tổ chức thi, sinh đề, duyệt *nội dung* đề thi, xuất phôi in đề; lưu bài làm của sinh viên; thử nghiệm
+ML; quản lý "minh chứng" như danh mục dữ liệu (chỉ lưu tệp điểm gốc và tham chiếu); quy đổi I/R/M thành hệ số; kết
+luận mức đạt của toàn chương trình; thay thế quy trình đo lường chính thức của Khoa. (Duyệt *ma trận ánh xạ* đề thi
+là NEW-01 ở mục 4, chờ GVHD.)
 
 **Học phần thử nghiệm:** [ĐIỀN: ba học phần; chưa chọn]. Nguồn dữ liệu điểm: [ĐIỀN]. Giới hạn: kết quả chỉ kết luận
 trong phạm vi có đủ minh chứng.
@@ -75,6 +77,7 @@ không tính vào cam kết), **K** = không làm. Cột "Đề xuất" là gợ
 | US-15 | Bài đánh giá theo đề cương và theo lớp (`items[]`) | C | [ĐIỀN] |
 | US-16 | Tiêu chí rubric và mức rubric 1–4 | C | [ĐIỀN] |
 | US-17 | Nhập câu hỏi từ Excel/Moodle | K | [ĐIỀN] |
+| NEW-01 | Duyệt ma trận đề thi: giảng viên gửi duyệt, Trưởng bộ môn duyệt/từ chối, khóa `items` sau khi duyệt (CSDL v0.5). **Chạm phạm vi "không duyệt đề" nên cần GVHD đồng ý (Q11)** | C | [ĐIỀN] |
 | US-18 | Học kỳ và khóa sổ điểm | C | [ĐIỀN] |
 | US-19 | Lớp học phần và giảng viên phụ trách | C | [ĐIỀN] |
 | US-20 | Nhập danh sách lớp → sinh viên và ghi danh | C | [ĐIỀN] |
@@ -96,11 +99,15 @@ không tính vào cam kết), **K** = không làm. Cột "Đề xuất" là gợ
 | US-36 | Dashboard tổng quan | MR | [ĐIỀN] |
 | US-37 | Tạo vấn đề và hành động cải tiến (F08) | C | [ĐIỀN] |
 | US-38 | Theo dõi trạng thái hành động cải tiến (F08) | C | [ĐIỀN] |
+| NEW-02 | Đánh giá hiệu quả hành động cải tiến ở chu kỳ đo kế tiếp (`evaluation`) | MR | [ĐIỀN] |
+| NEW-03 | Vai trò `STUDENT`: sinh viên xem kết quả của chính mình | MR | [ĐIỀN] |
+| NEW-04 | Phương pháp mở rộng của engine (`FROM_CLOS`, `MAX`, `LATEST`, `ACCUMULATED_EVIDENCE`, các phương pháp PLO còn lại) | MR | [ĐIỀN] |
 | US-39 | Health check, log tập trung, cảnh báo | C | [ĐIỀN] |
 | US-40 | Xử lý ngoại lệ thống nhất, trạng thái rỗng/lỗi/hết thời gian ở UI | C | [ĐIỀN] |
 
-**Lưu ý về khối lượng:** đề xuất có 32 story "C" cho hai sinh viên trong khoảng 10 tuần lập trình (từ T6) khi mã mới
-là khung. Rubric TC2.2 chấm theo đúng bản cam kết này (100% chức năng cam kết hoạt động, khối lượng ≥ 100%), nên
+**Lưu ý về khối lượng:** đề xuất ở bảng trên (theo mức ưu tiên của kế hoạch v0.3) có 33 story "C" (32 story gốc + NEW-01)
+cho hai sinh viên trong khoảng 10 tuần lập trình (từ T6) khi mã mới là khung. Phương án gọn hơn (32 story, hạ US-13 và
+US-14 xuống MR vì câu hỏi khai báo trực tiếp trong `assessments.items[]` đã đủ để đo) đang ở `chot-feature-do-an.md`. Rubric TC2.2 chấm theo đúng bản cam kết này (100% chức năng cam kết hoạt động, khối lượng ≥ 100%), nên
 **nên cam kết ít hơn khả năng, và để phần còn lại ở "MR"**. Hai bạn và GVHD cân nhắc trước khi ký.
 
 Tổng số story cam kết: [ĐIỀN]. Khối lượng ước tính mỗi người (mức khung, hỗ trợ chéo tự do): [ĐIỀN].
