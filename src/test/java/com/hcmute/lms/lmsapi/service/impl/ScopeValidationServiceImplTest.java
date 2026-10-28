@@ -1,6 +1,6 @@
 package com.hcmute.lms.lmsapi.service.impl;
 
-import com.hcmute.lms.lmsapi.document.Role;
+import com.hcmute.lms.lmsapi.enums.Role;
 import com.hcmute.lms.lmsapi.document.RoleAssignment;
 import com.hcmute.lms.lmsapi.document.UserScope;
 import com.hcmute.lms.lmsapi.exception.BusinessRuleViolationException;

@@ -1,4 +1,4 @@
-package com.hcmute.lms.lmsapi.document;
+package com.hcmute.lms.lmsapi.enums;
 
 /**
  * Danh mục 7 vai trò người dùng trong hệ thống LMS-API (F01).

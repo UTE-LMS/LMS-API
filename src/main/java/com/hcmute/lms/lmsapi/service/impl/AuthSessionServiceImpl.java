@@ -1,7 +1,7 @@
 package com.hcmute.lms.lmsapi.service.impl;
 
 import com.hcmute.lms.lmsapi.document.User;
-import com.hcmute.lms.lmsapi.document.UserStatus;
+import com.hcmute.lms.lmsapi.enums.UserStatus;
 import com.hcmute.lms.lmsapi.dto.UserPrincipal;
 import com.hcmute.lms.lmsapi.repository.UserRepository;
 import com.hcmute.lms.lmsapi.service.AuthSessionService;

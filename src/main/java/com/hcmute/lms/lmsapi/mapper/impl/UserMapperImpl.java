@@ -1,7 +1,7 @@
 package com.hcmute.lms.lmsapi.mapper.impl;
 
 import com.hcmute.lms.lmsapi.document.User;
-import com.hcmute.lms.lmsapi.document.UserStatus;
+import com.hcmute.lms.lmsapi.enums.UserStatus;
 import com.hcmute.lms.lmsapi.dto.CreateUserRequest;
 import com.hcmute.lms.lmsapi.dto.UserResponse;
 import com.hcmute.lms.lmsapi.mapper.UserMapper;

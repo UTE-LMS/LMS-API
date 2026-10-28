@@ -1,9 +1,9 @@
 package com.hcmute.lms.lmsapi.service.impl;
 
-import com.hcmute.lms.lmsapi.document.Role;
+import com.hcmute.lms.lmsapi.enums.Role;
 import com.hcmute.lms.lmsapi.document.RoleAssignment;
 import com.hcmute.lms.lmsapi.document.User;
-import com.hcmute.lms.lmsapi.document.UserStatus;
+import com.hcmute.lms.lmsapi.enums.UserStatus;
 import com.hcmute.lms.lmsapi.dto.CreateUserRequest;
 import com.hcmute.lms.lmsapi.dto.PageResponse;
 import com.hcmute.lms.lmsapi.dto.UpdateUserRequest;

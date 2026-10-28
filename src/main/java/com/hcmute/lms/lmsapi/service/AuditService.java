@@ -1,6 +1,6 @@
 package com.hcmute.lms.lmsapi.service;
 
-import com.hcmute.lms.lmsapi.document.AuditAction;
+import com.hcmute.lms.lmsapi.enums.AuditAction;
 import com.hcmute.lms.lmsapi.document.AuditEntity;
 import org.bson.types.ObjectId;
 

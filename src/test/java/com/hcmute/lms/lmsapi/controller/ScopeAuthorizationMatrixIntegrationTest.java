@@ -1,11 +1,11 @@
 package com.hcmute.lms.lmsapi.controller;
 
 import com.hcmute.lms.lmsapi.document.CourseSection;
-import com.hcmute.lms.lmsapi.document.Role;
+import com.hcmute.lms.lmsapi.enums.Role;
 import com.hcmute.lms.lmsapi.document.RoleAssignment;
 import com.hcmute.lms.lmsapi.document.User;
 import com.hcmute.lms.lmsapi.document.UserScope;
-import com.hcmute.lms.lmsapi.document.UserStatus;
+import com.hcmute.lms.lmsapi.enums.UserStatus;
 import com.hcmute.lms.lmsapi.dto.LoginRequest;
 import com.hcmute.lms.lmsapi.repository.CourseSectionRepository;
 import com.hcmute.lms.lmsapi.repository.UserRepository;

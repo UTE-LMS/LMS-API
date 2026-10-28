@@ -1,10 +1,10 @@
 package com.hcmute.lms.lmsapi.service.impl;
 
 import com.hcmute.lms.lmsapi.config.JwtConfig;
-import com.hcmute.lms.lmsapi.document.AuditAction;
+import com.hcmute.lms.lmsapi.enums.AuditAction;
 import com.hcmute.lms.lmsapi.document.AuditEntity;
 import com.hcmute.lms.lmsapi.document.User;
-import com.hcmute.lms.lmsapi.document.UserStatus;
+import com.hcmute.lms.lmsapi.enums.UserStatus;
 import com.hcmute.lms.lmsapi.dto.LoginRequest;
 import com.hcmute.lms.lmsapi.dto.LoginResponse;
 import com.hcmute.lms.lmsapi.dto.UserProfileResponse;

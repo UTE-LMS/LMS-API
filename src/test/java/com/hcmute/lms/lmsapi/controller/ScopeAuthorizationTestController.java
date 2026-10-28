@@ -1,6 +1,6 @@
 package com.hcmute.lms.lmsapi.controller;
 
-import com.hcmute.lms.lmsapi.dto.AccessType;
+import com.hcmute.lms.lmsapi.enums.AccessType;
 import com.hcmute.lms.lmsapi.service.ScopeAuthorizationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -30,7 +30,7 @@ public class ScopeAuthorizationTestController {
      * Được bảo vệ bởi @PreAuthorize gọi canAccessSection với AccessType.READ.
      */
     @GetMapping("/{sectionId}")
-    @PreAuthorize("@scopeAuthorizationService.canAccessSection(authentication.principal, #sectionId, T(com.hcmute.lms.lmsapi.dto.AccessType).READ)")
+    @PreAuthorize("@scopeAuthorizationService.canAccessSection(authentication.principal, #sectionId, T(com.hcmute.lms.lmsapi.enums.AccessType).READ)")
     public ResponseEntity<Map<String, Object>> getSection(@PathVariable("sectionId") String sectionId) {
         return ResponseEntity.ok(Map.of(
                 "status", "SUCCESS",
@@ -44,7 +44,7 @@ public class ScopeAuthorizationTestController {
      * Được bảo vệ bởi @PreAuthorize gọi canAccessSection với AccessType.WRITE.
      */
     @PostMapping("/{sectionId}/grades")
-    @PreAuthorize("@scopeAuthorizationService.canAccessSection(authentication.principal, #sectionId, T(com.hcmute.lms.lmsapi.dto.AccessType).WRITE)")
+    @PreAuthorize("@scopeAuthorizationService.canAccessSection(authentication.principal, #sectionId, T(com.hcmute.lms.lmsapi.enums.AccessType).WRITE)")
     public ResponseEntity<Map<String, Object>> updateSectionGrades(@PathVariable("sectionId") String sectionId) {
         return ResponseEntity.ok(Map.of(
                 "status", "SUCCESS",

@@ -1,4 +1,4 @@
-package com.hcmute.lms.lmsapi.dto;
+package com.hcmute.lms.lmsapi.enums;
 
 /**
  * Loại hành vi truy cập tài nguyên lớp học phần trong ma trận phân quyền phạm vi (F01 / ADR 0003).

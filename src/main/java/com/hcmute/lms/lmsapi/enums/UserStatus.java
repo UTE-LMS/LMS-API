@@ -1,4 +1,4 @@
-package com.hcmute.lms.lmsapi.document;
+package com.hcmute.lms.lmsapi.enums;
 
 /**
  * Trạng thái hoạt động của tài khoản người dùng trong hệ thống (F01).

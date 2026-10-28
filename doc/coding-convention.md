@@ -19,7 +19,8 @@
   - `com.hcmute.lms.lmsapi.dto`: Các lớp Data Transfer Object (`ErrorResponse`, `FieldErrorDetail`, Request/Response DTOs); tách riêng khỏi exception và document theo SRP.
   - `com.hcmute.lms.lmsapi.service` & `com.hcmute.lms.lmsapi.service.impl`: Tầng Business Logic quản lý nghiệp vụ đo lường, biên giới giao dịch `@Transactional`; service là service thuần, không phụ thuộc Servlet.
   - `com.hcmute.lms.lmsapi.repository` & `com.hcmute.lms.lmsapi.repository.impl`: Tầng Data Access quản lý truy vấn MongoDB qua Spring Data MongoRepository và các truy vấn tùy biến nâng cao qua MongoTemplate (`*RepositoryCustom` / `*RepositoryCustomImpl`).
-  - `com.hcmute.lms.lmsapi.document`: Domain Models ánh xạ tài liệu MongoDB và Enum dữ liệu theo đúng `$jsonSchema`.
+  - `com.hcmute.lms.lmsapi.document`: Domain Models ánh xạ tài liệu MongoDB và đối tượng nhúng (`UserScope`, `RoleAssignment`).
+  - `com.hcmute.lms.lmsapi.enums`: Enum nghiệp vụ dùng chung giữa các tầng (`Role`, `UserStatus`, `AuditAction`, `AccessType`) theo đúng `$jsonSchema`; không đặt enum trong `dto` hay `document` (tránh phụ thuộc ngược tầng). `ErrorCode` là ngoại lệ, đặt ở `exception` vì gắn chặt với `AppException`.
   - `com.hcmute.lms.lmsapi.mapper` & `com.hcmute.lms.lmsapi.mapper.impl`: Chuyển đổi giữa DTO và Document, đảm nhiệm làm sạch/che giấu dữ liệu nhạy cảm (sanitization) theo SRP và DIP.
   - `com.hcmute.lms.lmsapi.exception`: Ngoại lệ nghiệp vụ (`AppException`, `BusinessRuleViolationException`, `ResourceNotFoundException`), `ErrorCode` enum và `@RestControllerAdvice` tập trung (`GlobalExceptionHandler`).
   - `com.hcmute.lms.lmsapi.config`: Cấu hình Spring Beans (`MongoConfig`, `SecurityConfig`, `WebConfig`).
