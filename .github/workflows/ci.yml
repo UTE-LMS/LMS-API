@@ -17,7 +17,9 @@ concurrency:
 
 jobs:
   build-test:
-    runs-on: ubuntu-latest
+    # Không dùng ubuntu-latest: runner có kernel Linux 6.19 đến 7.0.13 làm mongod 8.x thoát ngay khi khởi động
+    # (SERVER-121912, SERVER-125742). Ghim image 22.04 để tránh kernel đó.
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -36,6 +38,8 @@ jobs:
       # Khởi chạy MongoDB 8.0 replica set rs0 phục vụ kiểm thử tích hợp giao dịch (@Transactional)
       - name: Start MongoDB 8.0 Replica Set (rs0)
         run: |
+          echo ">>> Runner kernel: $(uname -r)"
+
           echo ">>> 1. Starting MongoDB 8.0 container with replSet rs0..."
           docker run -d \
             --name mongodb \
