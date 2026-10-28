@@ -1,5 +1,6 @@
 package com.hcmute.lms.lmsapi.document;
 
+import com.hcmute.lms.lmsapi.enums.AuditAction;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;

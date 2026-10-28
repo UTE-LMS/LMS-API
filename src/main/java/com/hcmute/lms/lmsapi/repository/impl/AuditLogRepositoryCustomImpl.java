@@ -1,6 +1,6 @@
 package com.hcmute.lms.lmsapi.repository.impl;
 
-import com.hcmute.lms.lmsapi.document.AuditAction;
+import com.hcmute.lms.lmsapi.enums.AuditAction;
 import com.hcmute.lms.lmsapi.document.AuditLog;
 import com.hcmute.lms.lmsapi.repository.AuditLogRepositoryCustom;
 import lombok.RequiredArgsConstructor;

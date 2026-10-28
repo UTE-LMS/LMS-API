@@ -1,6 +1,6 @@
 package com.hcmute.lms.lmsapi.repository;
 
-import com.hcmute.lms.lmsapi.document.AuditAction;
+import com.hcmute.lms.lmsapi.enums.AuditAction;
 import com.hcmute.lms.lmsapi.document.AuditLog;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;

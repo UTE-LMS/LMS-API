@@ -1,7 +1,7 @@
 # 00 — Nền tảng dùng chung
 
 Story: **US-39** (health check, log, cảnh báo), **US-40** (xử lý ngoại lệ thống nhất). Ưu tiên C. Giai đoạn P0, làm
-**trước mọi feature khác**. Chủ trì đề xuất: IT. Kiến trúc: Chuẩn 3 tầng (3-tier) theo cấu trúc Package-by-Layer ở cấp gốc `com.hcmute.lms.lmsapi.{controller, dto, service, service.impl, repository, repository.impl, document, mapper, mapper.impl, exception, config, filter}` tuân thủ 5 nguyên lý SOLID.
+**trước mọi feature khác**. Chủ trì đề xuất: IT. Kiến trúc: Chuẩn 3 tầng (3-tier) theo cấu trúc Package-by-Layer ở cấp gốc `com.hcmute.lms.lmsapi.{controller, dto, service, service.impl, repository, repository.impl, document, enums, mapper, mapper.impl, exception, config, filter}` tuân thủ 5 nguyên lý SOLID.
 
 ## 1. Mục tiêu
 
@@ -35,7 +35,7 @@ viết nghiệp vụ tuân thủ đúng mô hình 3 tầng.
 
 ### 3.3 Dịch vụ ghi nhật ký (`audit`) và Kiến trúc SOLID
 - Interface `AuditService` đặt tại `com.hcmute.lms.lmsapi.service`, triển khai `AuditServiceImpl` đặt tại `com.hcmute.lms.lmsapi.service.impl`.
-- `action` thuộc enum của validator: `SCORE_UPDATE`, `IMPORT_CONFIRM`, `ASSESSMENT_APPROVE`, `ASSESSMENT_REJECT`, `RUN_CALCULATION`, `RULE_CONFIRM`, `LOGIN` đặt tại `com.hcmute.lms.lmsapi.document`.
+- `action` thuộc enum của validator: `SCORE_UPDATE`, `IMPORT_CONFIRM`, `ASSESSMENT_APPROVE`, `ASSESSMENT_REJECT`, `RUN_CALCULATION`, `RULE_CONFIRM`, `LOGIN` đặt tại `com.hcmute.lms.lmsapi.enums`.
 - **Nguyên lý Single Responsibility (SRP):** Tách logic làm sạch dữ liệu nhạy cảm (sanitization cho password, hash, token, secret) và khởi tạo tài liệu ra interface riêng `AuditLogMapper` (`com.hcmute.lms.lmsapi.mapper`) và lớp hiện thực `AuditLogMapperImpl` (`com.hcmute.lms.lmsapi.mapper.impl`), không trộn lẫn vào `AuditServiceImpl`.
 - **Nguyên lý Open-Closed & Dependency Inversion (OCP & DIP):** Tầng Data Access tách `AuditLogRepository` và `AuditLogRepositoryCustom` (`com.hcmute.lms.lmsapi.repository`) kèm `AuditLogRepositoryCustomImpl` (`com.hcmute.lms.lmsapi.repository.impl`) sử dụng `MongoTemplate` cho truy vấn động mở rộng. `AuditServiceImpl` chỉ phụ thuộc vào `AuditLogRepository` và `AuditLogMapper` abstractions.
 - Khi được gọi trong một thao tác có transaction thì bản ghi audit **nằm cùng transaction** (lỗi giữa chừng không để lại audit mồ côi).

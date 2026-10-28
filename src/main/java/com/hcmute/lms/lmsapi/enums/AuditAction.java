@@ -1,4 +1,4 @@
-package com.hcmute.lms.lmsapi.document;
+package com.hcmute.lms.lmsapi.enums;
 
 /**
  * Danh mục hành động kiểm toán khớp chính xác với $jsonSchema của collection audit_logs

@@ -1,9 +1,9 @@
 package com.hcmute.lms.lmsapi.repository;
 
-import com.hcmute.lms.lmsapi.document.Role;
+import com.hcmute.lms.lmsapi.enums.Role;
 import com.hcmute.lms.lmsapi.document.RoleAssignment;
 import com.hcmute.lms.lmsapi.document.User;
-import com.hcmute.lms.lmsapi.document.UserStatus;
+import com.hcmute.lms.lmsapi.enums.UserStatus;
 import org.bson.Document;
 import org.bson.types.ObjectId;
 import org.junit.jupiter.api.AfterEach;

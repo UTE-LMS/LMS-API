@@ -1,6 +1,6 @@
 package com.hcmute.lms.lmsapi.service;
 
-import com.hcmute.lms.lmsapi.dto.AccessType;
+import com.hcmute.lms.lmsapi.enums.AccessType;
 import com.hcmute.lms.lmsapi.dto.UserPrincipal;
 
 /**

@@ -1,8 +1,8 @@
 package com.hcmute.lms.lmsapi.repository;
 
-import com.hcmute.lms.lmsapi.document.Role;
+import com.hcmute.lms.lmsapi.enums.Role;
 import com.hcmute.lms.lmsapi.document.User;
-import com.hcmute.lms.lmsapi.document.UserStatus;
+import com.hcmute.lms.lmsapi.enums.UserStatus;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
 import org.springframework.stereotype.Repository;

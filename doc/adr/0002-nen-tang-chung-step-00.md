@@ -36,7 +36,8 @@ com.hcmute.lms.lmsapi
 │   └── impl/               # Hiện thực nghiệp vụ: Triển khai logic tính toán chuẩn đầu ra, transaction
 ├── repository/             # Tầng Data Access (Trừu tượng): Interface kế thừa MongoRepository & Custom
 │   └── impl/               # Hiện thực truy vấn phức tạp: Triển khai MongoTemplate cho truy vấn nâng cao
-├── document/               # Domain Models: Các thực thể MongoDB Document và Enum dữ liệu
+├── document/               # Domain Models: Các thực thể MongoDB Document và đối tượng nhúng
+├── enums/                  # Enum nghiệp vụ dùng chung giữa các tầng: Role, UserStatus, AuditAction, AccessType
 ├── mapper/                 # Trừu tượng chuyển đổi dữ liệu & làm sạch dữ liệu nhạy cảm (Sanitization)
 │   └── impl/               # Hiện thực chuyển đổi DTO <-> Document, che giấu mật khẩu/token
 ├── exception/              # Ngoại lệ nghiệp vụ (AppException, ErrorCode) & GlobalExceptionHandler
