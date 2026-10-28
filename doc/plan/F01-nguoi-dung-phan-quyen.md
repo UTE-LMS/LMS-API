@@ -120,6 +120,9 @@ Ghi chú:
 
 - Không làm: Đăng ký tự do, quên mật khẩu qua email, đăng nhập mạng xã hội, phân quyền suy diễn theo `programIds` cho `canAccessSection` (hạn chế đã biết của F01).
 - Nợ kỹ thuật: Rate limit cho endpoint đăng nhập, cơ chế khóa bi quan/write-conflict ép buộc cho guard ADMIN đồng thời (ghi vào `doc/tech-debt.md`).
+- Chuyển giao cho F02: F01 chỉ có `canAccessSection` (quyền trên lớp). Quyền trên CTĐT (ví dụ `QA_OFFICER` xác nhận
+  `program_versions`/PLO/PI theo `scope.programIds`, xem ADR 0004) cần hàm kiểm tra riêng (ví dụ `canAccessProgram`,
+  fail-closed) do F02 bổ sung, kèm việc ánh xạ CTĐT → lớp để vai trò chỉ có `programIds` không bị 403 trên lớp.
 - US-04 (Màn hình xem nhật ký kiểm toán) và NEW-03 (Giao diện sinh viên xem kết quả) thuộc các giai đoạn mở rộng tiếp theo.
 
 ## 10. Để vấn đáp

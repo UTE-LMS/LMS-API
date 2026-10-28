@@ -22,7 +22,8 @@ public enum Role {
     DEPARTMENT_HEAD,
 
     /**
-     * Cán bộ bảo đảm chất lượng: quyền xem kết quả đo lường trong phạm vi phụ trách.
+     * Cán bộ bảo đảm chất lượng: quyền xem kết quả đo lường trong phạm vi phụ trách; đề xuất là người xác nhận
+     * nội dung CTĐT, PLO, PI (F02 / US-08, chờ Q08, xem ADR 0004).
      */
     QA_OFFICER,
 

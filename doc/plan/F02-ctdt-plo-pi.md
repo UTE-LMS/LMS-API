@@ -43,6 +43,9 @@ Quản lý khung chuẩn đầu ra cấp chương trình: chương trình, phiê
 6. **I/R/M ≠ trọng số.** `course_pi_contributions` chỉ là thiết kế sư phạm; cấm ánh xạ I=1, R=2, M=3. Ô trống của ma trận = **không có bản ghi**.
 7. `targetPassRate` là mục tiêu cấp lớp/khóa của PI, để `null` cho tới khi Khoa xác nhận; không đặt mặc định.
 8. `program_versions.applicableCohorts` để trống tới khi trả lời Q01.
+9. **Người xác nhận nội dung là `QA_OFFICER`** **[ĐỀ XUẤT, chờ Q08; xem ADR 0004]**: chỉ `QA_OFFICER` được đổi
+   `verification.status` của `program_versions`, `plos`, `pis`. `PROGRAM_MANAGER` soạn nội dung nhưng không tự xác nhận
+   (tách người soạn khỏi người xác nhận). `ADMIN` không có quyền này.
 
 ## 5. Stories và acceptance criteria (nháp)
 
@@ -62,6 +65,8 @@ Quản lý khung chuẩn đầu ra cấp chương trình: chương trình, phiê
 | US-07/AC-3 | `courseId`/`piId` không thuộc `programVersionId` đó → 422 |
 | US-07/AC-4 | Không API nào trả "trọng số" suy từ I/R/M (kiểm tra bằng test hợp đồng DTO) |
 | US-08/AC-1 (MR) | Đổi `verification.status` ghi `verifiedBy`, `verifiedAt`; `VERIFIED` cần có người xác nhận |
+| US-08/AC-2 (MR) | `QA_OFFICER` đổi `verification.status` của phiên bản CTĐT, PLO, PI → thành công; ghi `verifiedBy` = người gọi |
+| US-08/AC-3 (MR) | `PROGRAM_MANAGER`, `ADMIN` và các vai trò còn lại gọi API xác nhận → 403; chưa đăng nhập → 401 |
 
 ## 6. API đề xuất **[ĐỀ XUẤT]**
 
@@ -72,7 +77,7 @@ Quản lý khung chuẩn đầu ra cấp chương trình: chương trình, phiê
 | GET/POST/PUT | `/api/program-versions/{pvId}/plos`, `.../plos/{id}` | như trên |
 | GET/POST/PUT | `/api/program-versions/{pvId}/pis`, `.../pis/{id}` | như trên |
 | GET/POST/DELETE | `/api/program-versions/{pvId}/pi-contributions` | như trên |
-| PUT | `.../plos/{id}/verification`, `.../pis/{id}/verification` (US-08) | PROGRAM_MANAGER |
+| PUT | `/api/program-versions/{id}/verification`, `.../plos/{id}/verification`, `.../pis/{id}/verification` (US-08) | QA_OFFICER **[ĐỀ XUẤT, chờ Q08]** |
 
 ## 7. Kiểm tra tham chiếu ở service (không có khóa ngoại)
 
@@ -87,7 +92,7 @@ thứ tự hiển thị khác thứ tự mã; ma trận trùng; chuyển trạng
 ## 9. Không làm / chưa quyết
 
 - Không điền nguyên văn PLO/PI; không suy mức PLO từ PI; không quy đổi I/R/M.
-- Chờ: Q01 (khóa áp dụng), Q03 (thang năng lực), Q08 (ai xác nhận nội dung). Việc 11 trong kế hoạch: đối chiếu CTĐT gốc để trích nguyên văn (người làm, không phải LLM).
+- Chờ: Q01 (khóa áp dụng), Q03 (thang năng lực), Q08 (ai xác nhận nội dung; đề xuất tạm `QA_OFFICER`, xem ADR 0004). Việc 11 trong kế hoạch: đối chiếu CTĐT gốc để trích nguyên văn (người làm, không phải LLM).
 - Seed mặc định của script (7 PLO, 17 PI, 4 dòng I/R/M) là dữ liệu khởi tạo; API không được phụ thuộc vào việc seed đã có.
 
 ## 10. Để vấn đáp
