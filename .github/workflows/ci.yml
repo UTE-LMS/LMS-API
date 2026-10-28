@@ -9,6 +9,12 @@ on:
 permissions:
   contents: read
 
+# Commit mới lên cùng nhánh/PR thì hủy lần chạy CI cũ chưa xong. Tách theo event để run `push` không hủy
+# nhầm run `pull_request` (check bắt buộc của PR). Riêng `main` không hủy để mỗi lần merge đều có kết quả.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 jobs:
   build-test:
     runs-on: ubuntu-latest
@@ -37,20 +43,35 @@ jobs:
             mongo:8.0 \
             mongod --replSet rs0 --bind_ip_all
 
+          # Chờ có giới hạn: container chết hoặc quá hạn thì in log mongod và fail, không lặp vô hạn
+          wait_for() {
+            local description="$1"; shift
+            local attempt
+            for attempt in $(seq 1 60); do
+              if [ "$(docker inspect -f '{{.State.Running}}' mongodb)" != "true" ]; then
+                echo "::error::MongoDB container stopped while waiting for: $description"
+                docker logs mongodb
+                exit 1
+              fi
+              if "$@"; then return 0; fi
+              echo "Waiting for $description ($attempt/60)..."
+              sleep 1
+            done
+            echo "::error::Timed out waiting for: $description"
+            docker logs mongodb
+            exit 1
+          }
+          mongo_ping() { docker exec mongodb mongosh --quiet --eval "db.adminCommand('ping').ok" | grep -q 1; }
+          mongo_primary() { docker exec mongodb mongosh --quiet --eval "db.hello().isWritablePrimary" | grep -q true; }
+
           echo ">>> 2. Waiting for MongoDB server to accept ping..."
-          until docker exec mongodb mongosh --quiet --eval "db.adminCommand('ping').ok" | grep -q 1; do
-            echo "Waiting for mongod to accept ping..."
-            sleep 1
-          done
+          wait_for "mongod to accept ping" mongo_ping
 
           echo ">>> 3. Initiating replica set rs0..."
           docker exec mongodb mongosh --quiet --eval "rs.initiate({ _id: 'rs0', members: [{ _id: 0, host: 'localhost:27017' }] })"
 
           echo ">>> 4. Waiting for replica set primary to become writable..."
-          until docker exec mongodb mongosh --quiet --eval "db.hello().isWritablePrimary" | grep -q true; do
-            echo "Waiting for replica set primary election..."
-            sleep 1
-          done
+          wait_for "replica set primary election" mongo_primary
 
           echo ">>> 5. Importing schema validators and initial data into learning_outcomes..."
           docker cp doc/database_import.js mongodb:/tmp/database_import.js
