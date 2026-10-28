@@ -134,7 +134,7 @@ Mọi tham số, cấu hình và thư viện được lựa chọn trong F01 đ�
 1. **Danh mục 7 vai trò người dùng trong hệ thống:**
    - Được trích xuất từ Quy chế tổ chức và hoạt động của Trường Đại học Sư phạm Kỹ thuật TP.HCM (HCMUTE) và mô hình quản trị đào tạo theo chuẩn OBE:
      - `ADMIN`: Quản trị viên kỹ thuật hệ thống.
-     - `PROGRAM_MANAGER`: Trưởng chương trình đào tạo / Trưởng khoa (phụ trách CTĐT).
+     - `PROGRAM_MANAGER`: Trưởng / Chủ nhiệm chương trình đào tạo (phụ trách CTĐT, không đồng nhất với Trưởng khoa).
      - `DEPARTMENT_HEAD`: Trưởng bộ môn (duyệt ma trận đề thi và phân công giảng dạy).
      - `QA_OFFICER`: Chuyên viên phòng Đảm bảo chất lượng (giám sát, kiểm định chuẩn đầu ra).
      - `LECTURER`: Giảng viên trực tiếp giảng dạy và đánh giá lớp học phần.
@@ -180,7 +180,7 @@ Mọi tham số, cấu hình và thư viện được lựa chọn trong F01 đ�
 ### Trả lời — Góc nhìn Sinh viên Kinh doanh số (IBS):
 
 1. **Nếu bỏ phân định rạch ròi giữa READ và WRITE:**
-   - Xung đột thẩm quyền nghiêm trọng trong vận hành nhà trường: Các cán bộ kiểm định (`QA_OFFICER`) hoặc Trưởng khoa (`PROGRAM_MANAGER`) trong quá trình xem báo cáo có thể vô tình hoặc cố ý can thiệp vào bảng điểm của giảng viên. Điều này vi phạm nghiêm trọng Quy chế đào tạo của Bộ GD&ĐT về tính độc lập và trách nhiệm của giảng viên trực tiếp chấm thi.
+   - Xung đột thẩm quyền nghiêm trọng trong vận hành nhà trường: Các cán bộ kiểm định (`QA_OFFICER`) hoặc Trưởng chương trình đào tạo (`PROGRAM_MANAGER`) trong quá trình xem báo cáo có thể vô tình hoặc cố ý can thiệp vào bảng điểm của giảng viên. Điều này vi phạm nghiêm trọng Quy chế đào tạo của Bộ GD&ĐT về tính độc lập và trách nhiệm của giảng viên trực tiếp chấm thi.
 
 2. **Nếu bỏ quy tắc `lecturerIds` độc lập:**
    - Quy trình phân công giảng viên dạy thay hoặc dạy phối hợp bị đình trệ: Phòng Đào tạo sẽ không thể phân công giảng viên một cách linh hoạt mà phải gửi văn bản yêu cầu Quản trị viên cập nhật lại cấu trúc phân quyền hệ thống cho từng giảng viên. Chi phí vận hành hành chính tăng vọt và làm chậm tiến độ công bố điểm cho sinh viên.

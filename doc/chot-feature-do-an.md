@@ -66,7 +66,7 @@ Cột "Đề xuất" phân biệt story gốc (giữ nguyên ưu tiên) với th
 | US-05 | Chương trình và phiên bản CTĐT | **C** | `(programId, version)` duy nhất; có `totalCredits`, `durationYears` |
 | US-06 | 7 PLO, 17 PI theo mã | **C** | Nhận diện bằng mã; `category`, `displayOrder`; không tự điền nguyên văn |
 | US-07 | Ma trận học phần đóng góp PI (I/R/M) | **C** | I/R/M chỉ là thiết kế sư phạm, không là trọng số |
-| US-08 | Quy trình xác nhận nội dung | MR | Trạng thái `verification` vẫn có trong dữ liệu; chỉ làm màn hình luồng xác nhận nếu còn thời gian |
+| US-08 | Quy trình xác nhận nội dung | MR | Trạng thái `verification` vẫn có trong dữ liệu; chỉ làm màn hình luồng xác nhận nếu còn thời gian. Người xác nhận CTĐT, PLO, PI: `QA_OFFICER` **[ĐỀ XUẤT, chờ Q08; ADR 0004]** |
 
 ### E03 Học phần, CLO (F03)
 
@@ -190,7 +190,8 @@ Vai trò là bên *chủ trì* thao tác; backend kiểm tra theo `roleAssignmen
 | Thao tác | ADMIN | PROGRAM_MANAGER | DEPARTMENT_HEAD | QA_OFFICER | LECTURER | VIEWER |
 |---|---|---|---|---|---|---|
 | Quản lý người dùng | ✔ | | | | | |
-| CTĐT, PLO/PI, ma trận I/R/M, học phần, đề cương, CLO, liên kết CLO–PI | | ✔ | | | | |
+| Soạn CTĐT, PLO/PI, ma trận I/R/M, học phần, đề cương, CLO, liên kết CLO–PI | | ✔ | | | | |
+| Xác nhận nội dung phiên bản CTĐT, PLO, PI (`verification`, US-08; ADR 0004) | | | | ✔ | | |
 | Lập và gửi duyệt bài đánh giá lớp | | | | | ✔ | |
 | Duyệt / từ chối ma trận đề thi | | | ✔ | | | |
 | Nhập điểm, xác nhận lô | | | | | ✔ (lớp mình) | |
