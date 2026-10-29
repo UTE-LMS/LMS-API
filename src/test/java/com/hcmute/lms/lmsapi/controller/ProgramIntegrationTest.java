@@ -8,6 +8,7 @@ import com.hcmute.lms.lmsapi.document.ProgramVersion;
 import com.hcmute.lms.lmsapi.document.RoleAssignment;
 import com.hcmute.lms.lmsapi.document.User;
 import com.hcmute.lms.lmsapi.document.UserScope;
+import com.hcmute.lms.lmsapi.document.Verification;
 import com.hcmute.lms.lmsapi.dto.CoursePiContributionRequest;
 import com.hcmute.lms.lmsapi.dto.LoginRequest;
 import com.hcmute.lms.lmsapi.dto.PiRequest;
@@ -397,6 +398,7 @@ class ProgramIntegrationTest {
                 .programVersionId(draftVersion.getId())
                 .code("PLO2")
                 .displayOrder(2)
+                .verification(Verification.builder().status(VerificationStatus.NEEDS_CLARIFICATION).build())
                 .build());
 
         mockMvc.perform(put("/api/v1/program-versions/" + draftVersion.getId() + "/plos/" + plo.getId() + "/verification")
@@ -411,6 +413,7 @@ class ProgramIntegrationTest {
                 .ploId(plo.getId())
                 .code("PI2.1")
                 .displayOrder(3)
+                .verification(Verification.builder().status(VerificationStatus.NEEDS_CLARIFICATION).build())
                 .build());
 
         mockMvc.perform(put("/api/v1/program-versions/" + draftVersion.getId() + "/pis/" + pi.getId() + "/verification")
