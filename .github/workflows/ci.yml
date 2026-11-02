@@ -116,7 +116,8 @@ jobs:
 
   # ---------------------------------------------------------------------------------------------------------
   # Chặng 3 — Test + cổng coverage. Giữ cách dựng MongoDB replica set rs0 của CI cũ (kernel, SERVER-121912/125742).
-  # `verify` gồm cổng JaCoCo ≥ 70% do pom.xml (PR chore/f00-static-analysis) định nghĩa; dưới 70% thì job đỏ.
+  # `verify` gồm cổng JaCoCo ≥ 70% khai báo trong pom.xml. Lưu ý: ở pom hiện tại cổng đặt haltOnFailure=false nên CHƯA chặn;
+  # cần nhóm static-analysis bỏ cờ này (không sửa ở đây vì pom.xml thuộc nhóm khác).
   # ---------------------------------------------------------------------------------------------------------
   test:
     name: 3 · Test and coverage gate

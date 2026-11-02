@@ -22,7 +22,7 @@ quét bảo mật, chưa có chỗ triển khai.
 |---|---|---|---|
 | `build` | 1 | – | `./mvnw -DskipTests package`, tải JAR lên artifact |
 | `lint` | 2 | build | `./mvnw -DskipTests spotless:check spotbugs:check`; Sonar chỉ khi có `SONAR_TOKEN` |
-| `test` | 3 | build | MongoDB 8.0 replica set `rs0` + `./mvnw verify` (gồm cổng JaCoCo ≥ 70%); tải báo cáo JaCoCo và surefire |
+| `test` | 3 | build | MongoDB 8.0 replica set `rs0` + `./mvnw verify` (cổng JaCoCo ≥ 70% khai trong `pom.xml`, hiện `haltOnFailure=false` nên chưa chặn); tải báo cáo JaCoCo và surefire |
 | `secret-scan` | 4a | – | gitleaks CLI quét toàn bộ lịch sử Git |
 | `dependency-scan` | 4b | build | Trivy `rootfs` trên JAR, fail khi có HIGH/CRITICAL đã có bản vá |
 | `package-image` | 5 | lint, test, secret-scan, dependency-scan | build image, Trivy quét image, đẩy GHCR (chỉ main/tag) |
@@ -131,14 +131,16 @@ Không được khai báo là đã quét Sonar cho tới khi có lần chạy th
 - Tích cực: pipeline có 9 job (6 chặng), mỗi chặng có thể xem và chạy lại độc lập; image được quét trước khi đẩy; rollback có quy trình
   và đã chạy thử cục bộ; không còn khóa ghi cứng trong workflow.
 - **Pipeline sẽ đỏ trong một số tình huống, đúng và có chủ đích:**
-  1. Chặng `lint` đỏ cho tới khi PR `chore/f00-static-analysis` (thêm Spotless/SpotBugs/JaCoCo vào `pom.xml`) vào main.
-  2. Chặng `test` thiếu thư mục báo cáo JaCoCo (`target/site/jacoco/`) cho tới khi PR đó vào main (bước tải artifact báo lỗi thay vì bỏ qua).
+  1. Chặng `lint` đỏ cho tới khi PR `chore/f00-static-analysis` (thêm Spotless/SpotBugs vào `pom.xml`) vào main: lần chạy đầu trên GitHub báo
+     `No plugin found for prefix 'spotless'`.
+  2. Cổng coverage chưa thực sự chặn: `pom.xml` trên main đã có JaCoCo với luật LINE ≥ 0,70 nhưng đặt `haltOnFailure=false`, nên `verify` xanh dù dưới ngưỡng.
+     Báo cáo JaCoCo vẫn được tạo và tải lên artifact. Cần nhóm static-analysis đặt `haltOnFailure=true`; CI này không tự sửa vì `pom.xml` thuộc nhóm khác.
   3. Chặng `dependency-scan` và `package-image` đỏ với Spring Boot **4.1.0**: Trivy báo 11 lỗ hổng HIGH/CRITICAL đã có bản vá
      (tomcat-embed-core 11.0.22, spring-webmvc 7.0.8, jackson-core/-databind 3.1.4…). Dựng thử cục bộ trên bản sao với parent
      **4.1.2** (Maven Central có 4.1.1 và 4.1.2) thì image quét sạch (0 HIGH/CRITICAL, Alpine 3.24.3 cũng 0); mới chỉ dựng và quét, chưa chạy test với bản đó. Cần người
      sở hữu `pom.xml` nâng patch và chạy `./mvnw verify` đầy đủ. ADR này **không** giảm ngưỡng hay thêm `.trivyignore` để né.
-- Rủi ro còn lại: chưa có lần chạy nào trên GitHub (các bước dùng `actions/cache` GHA, đăng nhập GHCR, tải artifact giữa job, Trivy
-  trên runner chưa được kiểm chứng ngoài actionlint); staging chưa có nền tảng; MongoDB staging chưa bật xác thực (chỉ mở trong mạng compose).
+- Rủi ro còn lại: các bước của chặng 5 (bộ nhớ đệm GHA, đăng nhập và đẩy GHCR, Trivy image trên runner) chưa từng chạy trên GitHub vì chặng 5 bị
+  bỏ qua do chặng trước đỏ; staging chưa có nền tảng; MongoDB staging chưa bật xác thực (chỉ mở trong mạng compose).
 
 ## 5. Đã kiểm chứng và chưa kiểm chứng
 
@@ -148,7 +150,9 @@ chạy image với MongoDB replica set (cổng 27020): `/actuator/health` UP, `/
 `rollback.sh` hai chiều); gitleaks trên lịch sử `origin/main`; Trivy quét image và JAR (kết quả ở QĐ-3, mục 4);
 `actionlint 1.7.12` và `shellcheck 0.11.0` không báo lỗi.
 
-Chưa kiểm chứng: bất kỳ lần chạy nào trên GitHub Actions (thời gian commit → image **chưa đo**); đẩy GHCR; bước Sonar; OWASP Dependency-Check
+Lần chạy đầu trên GitHub Actions (push `chore/f00-ci-cd`, 2026-11-02): `build` xanh (~49 s), `secret-scan` xanh (~6 s), `test` xanh (~97 s, MongoDB rs0 dựng được, đã tải 3 artifact gồm `jacoco-report`), `lint` đỏ (thiếu plugin Spotless, như dự đoán), `dependency-scan` đỏ (đúng 11 lỗ hổng HIGH/CRITICAL như cục bộ), `package-image` và các chặng staging bị bỏ qua. Số giây lấy từ thời điểm bắt đầu/kết thúc job do GitHub ghi, chưa phải thời gian commit → image.
+
+Chưa kiểm chứng: chặng 5 chạy thật (thời gian commit → image **chưa đo**); đẩy GHCR; bước Sonar; OWASP Dependency-Check
 (không dùng); `deploy-staging`/`smoke-staging`/`rollback-staging` trên máy chủ thật (chưa có); `./mvnw verify` với Spotless/SpotBugs/JaCoCo
 (thuộc PR khác); smoke test `rootfs` sau khi nâng Spring Boot.
 
