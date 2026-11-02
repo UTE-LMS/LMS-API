@@ -11,13 +11,12 @@ import com.hcmute.lms.lmsapi.document.RoleAssignment;
 import com.hcmute.lms.lmsapi.document.User;
 import com.hcmute.lms.lmsapi.document.UserScope;
 import com.hcmute.lms.lmsapi.dto.CreateUserRequest;
-import com.hcmute.lms.lmsapi.dto.LoginRequest;
 import com.hcmute.lms.lmsapi.dto.UpdateUserRequest;
 import com.hcmute.lms.lmsapi.dto.UpdateUserStatusRequest;
 import com.hcmute.lms.lmsapi.enums.Role;
 import com.hcmute.lms.lmsapi.enums.UserStatus;
 import com.hcmute.lms.lmsapi.repository.UserRepository;
-import com.jayway.jsonpath.JsonPath;
+import com.hcmute.lms.lmsapi.support.ApiTestSupport;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
@@ -28,11 +27,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 import tools.jackson.databind.ObjectMapper;
@@ -142,17 +139,7 @@ class UserIntegrationTest {
   }
 
   private String obtainAccessToken(String username, String password) throws Exception {
-    LoginRequest request = new LoginRequest(username, password);
-    MvcResult result =
-        mockMvc
-            .perform(
-                post("/api/v1/auth/login")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request)))
-            .andExpect(status().isOk())
-            .andReturn();
-
-    return JsonPath.read(result.getResponse().getContentAsString(), "$.accessToken");
+    return ApiTestSupport.obtainAccessToken(mockMvc, objectMapper, username, password);
   }
 
   // =========================================================================
@@ -197,12 +184,8 @@ class UserIntegrationTest {
               .roleAssignments(List.of(RoleAssignment.builder().role(Role.STUDENT).build()))
               .build();
 
-      mockMvc
-          .perform(
-              post("/api/v1/users")
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + lecturerToken)
-                  .contentType(MediaType.APPLICATION_JSON)
-                  .content(objectMapper.writeValueAsString(request)))
+      ApiTestSupport.performJson(
+              mockMvc, objectMapper, post("/api/v1/users"), lecturerToken, request)
           .andExpect(status().isForbidden())
           .andExpect(jsonPath("$.status").value(403))
           .andExpect(jsonPath("$.code").value("FORBIDDEN"));
@@ -219,12 +202,12 @@ class UserIntegrationTest {
               .roleAssignments(List.of(RoleAssignment.builder().role(Role.LECTURER).build()))
               .build();
 
-      mockMvc
-          .perform(
-              put("/api/v1/users/" + targetUser.getId())
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + lecturerToken)
-                  .contentType(MediaType.APPLICATION_JSON)
-                  .content(objectMapper.writeValueAsString(request)))
+      ApiTestSupport.performJson(
+              mockMvc,
+              objectMapper,
+              put("/api/v1/users/" + targetUser.getId()),
+              lecturerToken,
+              request)
           .andExpect(status().isForbidden())
           .andExpect(jsonPath("$.status").value(403))
           .andExpect(jsonPath("$.code").value("FORBIDDEN"));
@@ -236,12 +219,12 @@ class UserIntegrationTest {
     void nonAdmin_UpdateStatus_Returns403() throws Exception {
       UpdateUserStatusRequest request = new UpdateUserStatusRequest(UserStatus.LOCKED);
 
-      mockMvc
-          .perform(
-              put("/api/v1/users/" + targetUser.getId() + "/status")
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + lecturerToken)
-                  .contentType(MediaType.APPLICATION_JSON)
-                  .content(objectMapper.writeValueAsString(request)))
+      ApiTestSupport.performJson(
+              mockMvc,
+              objectMapper,
+              put("/api/v1/users/" + targetUser.getId() + "/status"),
+              lecturerToken,
+              request)
           .andExpect(status().isForbidden())
           .andExpect(jsonPath("$.status").value(403))
           .andExpect(jsonPath("$.code").value("FORBIDDEN"));
@@ -336,12 +319,7 @@ class UserIntegrationTest {
               .roleAssignments(List.of(RoleAssignment.builder().role(Role.LECTURER).build()))
               .build();
 
-      mockMvc
-          .perform(
-              post("/api/v1/users")
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
-                  .contentType(MediaType.APPLICATION_JSON)
-                  .content(objectMapper.writeValueAsString(request)))
+      ApiTestSupport.performJson(mockMvc, objectMapper, post("/api/v1/users"), adminToken, request)
           .andExpect(status().isCreated())
           .andExpect(jsonPath("$.id").isNotEmpty())
           .andExpect(jsonPath("$.username").value("created_test_user"))
@@ -363,15 +341,9 @@ class UserIntegrationTest {
               .roleAssignments(List.of(RoleAssignment.builder().role(Role.STUDENT).build()))
               .build();
 
-      mockMvc
-          .perform(
-              post("/api/v1/users")
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
-                  .contentType(MediaType.APPLICATION_JSON)
-                  .content(objectMapper.writeValueAsString(request)))
-          .andExpect(status().isConflict())
-          .andExpect(jsonPath("$.status").value(409))
-          .andExpect(jsonPath("$.code").value("CONFLICT"));
+      ApiTestSupport.expectConflict(
+          ApiTestSupport.performJson(
+              mockMvc, objectMapper, post("/api/v1/users"), adminToken, request));
     }
 
     @Test
@@ -386,15 +358,9 @@ class UserIntegrationTest {
               .roleAssignments(List.of(RoleAssignment.builder().role(Role.STUDENT).build()))
               .build();
 
-      mockMvc
-          .perform(
-              post("/api/v1/users")
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
-                  .contentType(MediaType.APPLICATION_JSON)
-                  .content(objectMapper.writeValueAsString(request)))
-          .andExpect(status().isConflict())
-          .andExpect(jsonPath("$.status").value(409))
-          .andExpect(jsonPath("$.code").value("CONFLICT"));
+      ApiTestSupport.expectConflict(
+          ApiTestSupport.performJson(
+              mockMvc, objectMapper, post("/api/v1/users"), adminToken, request));
     }
 
     @Test
@@ -431,12 +397,12 @@ class UserIntegrationTest {
               .roleAssignments(List.of(RoleAssignment.builder().role(Role.LECTURER).build()))
               .build();
 
-      mockMvc
-          .perform(
-              put("/api/v1/users/" + targetUser.getId())
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
-                  .contentType(MediaType.APPLICATION_JSON)
-                  .content(objectMapper.writeValueAsString(request)))
+      ApiTestSupport.performJson(
+              mockMvc,
+              objectMapper,
+              put("/api/v1/users/" + targetUser.getId()),
+              adminToken,
+              request)
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.username").value(TARGET_USERNAME)) // username giữ nguyên
           .andExpect(jsonPath("$.email").value("target_new_email@hcmute.edu.vn"))
@@ -466,16 +432,10 @@ class UserIntegrationTest {
                           .build()))
               .build();
 
-      mockMvc
-          .perform(
-              post("/api/v1/users")
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
-                  .contentType(MediaType.APPLICATION_JSON)
-                  .content(objectMapper.writeValueAsString(request)))
-          .andExpect(status().isUnprocessableEntity())
-          .andExpect(jsonPath("$.status").value(422))
-          .andExpect(jsonPath("$.code").value("BUSINESS_RULE_VIOLATION"))
-          .andExpect(jsonPath("$.message").value(containsString("SCOPE_NOT_FOUND")));
+      ApiTestSupport.expectBusinessRuleViolation(
+          ApiTestSupport.performJson(
+              mockMvc, objectMapper, post("/api/v1/users"), adminToken, request),
+          "SCOPE_NOT_FOUND");
     }
   }
 
@@ -492,12 +452,12 @@ class UserIntegrationTest {
     void adminSelfLock_Returns422() throws Exception {
       UpdateUserStatusRequest lockRequest = new UpdateUserStatusRequest(UserStatus.LOCKED);
 
-      mockMvc
-          .perform(
-              put("/api/v1/users/" + adminUser.getId() + "/status")
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
-                  .contentType(MediaType.APPLICATION_JSON)
-                  .content(objectMapper.writeValueAsString(lockRequest)))
+      ApiTestSupport.performJson(
+              mockMvc,
+              objectMapper,
+              put("/api/v1/users/" + adminUser.getId() + "/status"),
+              adminToken,
+              lockRequest)
           .andExpect(status().isUnprocessableEntity())
           .andExpect(jsonPath("$.status").value(422))
           .andExpect(jsonPath("$.code").value("BUSINESS_RULE_VIOLATION"))
@@ -516,12 +476,12 @@ class UserIntegrationTest {
                   List.of(RoleAssignment.builder().role(Role.LECTURER).build())) // gỡ ADMIN
               .build();
 
-      mockMvc
-          .perform(
-              put("/api/v1/users/" + adminUser.getId())
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
-                  .contentType(MediaType.APPLICATION_JSON)
-                  .content(objectMapper.writeValueAsString(demotionRequest)))
+      ApiTestSupport.performJson(
+              mockMvc,
+              objectMapper,
+              put("/api/v1/users/" + adminUser.getId()),
+              adminToken,
+              demotionRequest)
           .andExpect(status().isUnprocessableEntity())
           .andExpect(jsonPath("$.status").value(422))
           .andExpect(jsonPath("$.code").value("BUSINESS_RULE_VIOLATION"))
@@ -554,12 +514,12 @@ class UserIntegrationTest {
 
       // 3. ADMIN khóa tài khoản target user qua PUT /api/v1/users/{id}/status sang LOCKED
       UpdateUserStatusRequest lockRequest = new UpdateUserStatusRequest(UserStatus.LOCKED);
-      mockMvc
-          .perform(
-              put("/api/v1/users/" + targetUser.getId() + "/status")
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
-                  .contentType(MediaType.APPLICATION_JSON)
-                  .content(objectMapper.writeValueAsString(lockRequest)))
+      ApiTestSupport.performJson(
+              mockMvc,
+              objectMapper,
+              put("/api/v1/users/" + targetUser.getId() + "/status"),
+              adminToken,
+              lockRequest)
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.status").value("LOCKED"));
 
@@ -573,12 +533,12 @@ class UserIntegrationTest {
 
       // 5. ADMIN mở khóa lại tài khoản target user sang ACTIVE
       UpdateUserStatusRequest unlockRequest = new UpdateUserStatusRequest(UserStatus.ACTIVE);
-      mockMvc
-          .perform(
-              put("/api/v1/users/" + targetUser.getId() + "/status")
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
-                  .contentType(MediaType.APPLICATION_JSON)
-                  .content(objectMapper.writeValueAsString(unlockRequest)))
+      ApiTestSupport.performJson(
+              mockMvc,
+              objectMapper,
+              put("/api/v1/users/" + targetUser.getId() + "/status"),
+              adminToken,
+              unlockRequest)
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.status").value("ACTIVE"));
 

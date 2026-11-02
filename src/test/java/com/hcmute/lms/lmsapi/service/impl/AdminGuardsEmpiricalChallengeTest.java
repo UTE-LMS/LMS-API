@@ -129,6 +129,29 @@ class AdminGuardsEmpiricalChallengeTest {
             .build();
   }
 
+  private static UpdateUserRequest lecturerOnlyRequest(String email, String fullName) {
+    return UpdateUserRequest.builder()
+        .email(email)
+        .fullName(fullName)
+        .roleAssignments(List.of(RoleAssignment.builder().role(Role.LECTURER).build()))
+        .build();
+  }
+
+  private void stubNonAdminLockSucceeds() {
+    when(userRepository.findById(NON_ADMIN_ID)).thenReturn(Optional.of(nonAdminUser));
+    when(userRepository.save(any(User.class))).thenReturn(nonAdminUser);
+    when(userRepository.incrementTokenVersion(NON_ADMIN_ID)).thenReturn(1L);
+    when(userMapper.toResponse(any(User.class))).thenReturn(mockResponse);
+  }
+
+  private void expectSelfDemotionRejected(UpdateUserRequest demotionRequest) {
+    assertThatThrownBy(
+            () -> userService.updateUser(CURRENT_ADMIN_ID, demotionRequest, CURRENT_ADMIN_ID))
+        .isInstanceOf(BusinessRuleViolationException.class)
+        .hasMessageContaining("ADMIN_GUARD")
+        .hasMessageContaining("tự gỡ bỏ vai trò ADMIN của chính mình");
+  }
+
   // =========================================================================
   // GUARD 1: SELF-LOCK PREVENTION
   // =========================================================================
@@ -176,10 +199,7 @@ class AdminGuardsEmpiricalChallengeTest {
     @DisplayName(
         "Challenger 1.3: Admin locking a non-self non-admin user must succeed and increment tokenVersion")
     void lockOtherNonAdmin_Succeeds() {
-      when(userRepository.findById(NON_ADMIN_ID)).thenReturn(Optional.of(nonAdminUser));
-      when(userRepository.save(any(User.class))).thenReturn(nonAdminUser);
-      when(userRepository.incrementTokenVersion(NON_ADMIN_ID)).thenReturn(1L);
-      when(userMapper.toResponse(any(User.class))).thenReturn(mockResponse);
+      stubNonAdminLockSucceeds();
 
       UpdateUserStatusRequest lockRequest = new UpdateUserStatusRequest(UserStatus.LOCKED);
 
@@ -204,18 +224,9 @@ class AdminGuardsEmpiricalChallengeTest {
       when(userRepository.findById(CURRENT_ADMIN_ID)).thenReturn(Optional.of(currentAdmin));
       doNothing().when(scopeValidationService).validateRoleAssignments(any());
 
-      UpdateUserRequest demotionRequest =
-          UpdateUserRequest.builder()
-              .email("admin@hcmute.edu.vn")
-              .fullName("Admin Name")
-              .roleAssignments(List.of(RoleAssignment.builder().role(Role.LECTURER).build()))
-              .build();
+      UpdateUserRequest demotionRequest = lecturerOnlyRequest("admin@hcmute.edu.vn", "Admin Name");
 
-      assertThatThrownBy(
-              () -> userService.updateUser(CURRENT_ADMIN_ID, demotionRequest, CURRENT_ADMIN_ID))
-          .isInstanceOf(BusinessRuleViolationException.class)
-          .hasMessageContaining("ADMIN_GUARD")
-          .hasMessageContaining("tự gỡ bỏ vai trò ADMIN của chính mình");
+      expectSelfDemotionRejected(demotionRequest);
 
       verify(userRepository, never()).save(any(User.class));
     }
@@ -233,18 +244,9 @@ class AdminGuardsEmpiricalChallengeTest {
       when(userRepository.findById(CURRENT_ADMIN_ID)).thenReturn(Optional.of(currentAdmin));
       doNothing().when(scopeValidationService).validateRoleAssignments(any());
 
-      UpdateUserRequest demotionRequest =
-          UpdateUserRequest.builder()
-              .email("admin@hcmute.edu.vn")
-              .fullName("Admin Name")
-              .roleAssignments(List.of(RoleAssignment.builder().role(Role.LECTURER).build()))
-              .build();
+      UpdateUserRequest demotionRequest = lecturerOnlyRequest("admin@hcmute.edu.vn", "Admin Name");
 
-      assertThatThrownBy(
-              () -> userService.updateUser(CURRENT_ADMIN_ID, demotionRequest, CURRENT_ADMIN_ID))
-          .isInstanceOf(BusinessRuleViolationException.class)
-          .hasMessageContaining("ADMIN_GUARD")
-          .hasMessageContaining("tự gỡ bỏ vai trò ADMIN của chính mình");
+      expectSelfDemotionRejected(demotionRequest);
 
       verify(userRepository, never()).save(any(User.class));
     }
@@ -347,10 +349,7 @@ class AdminGuardsEmpiricalChallengeTest {
     @DisplayName(
         "Challenger 3A.4: Locking non-admin user when active admin count == 1 is permitted")
     void lockNonAdmin_WhenActiveAdminCountIs1_Succeeds() {
-      when(userRepository.findById(NON_ADMIN_ID)).thenReturn(Optional.of(nonAdminUser));
-      when(userRepository.save(any(User.class))).thenReturn(nonAdminUser);
-      when(userRepository.incrementTokenVersion(NON_ADMIN_ID)).thenReturn(1L);
-      when(userMapper.toResponse(any(User.class))).thenReturn(mockResponse);
+      stubNonAdminLockSucceeds();
 
       UpdateUserStatusRequest lockRequest = new UpdateUserStatusRequest(UserStatus.LOCKED);
 
@@ -381,11 +380,7 @@ class AdminGuardsEmpiricalChallengeTest {
           .thenReturn(activeAdminCount);
 
       UpdateUserRequest demotionRequest =
-          UpdateUserRequest.builder()
-              .email("other_admin@hcmute.edu.vn")
-              .fullName("Other Admin")
-              .roleAssignments(List.of(RoleAssignment.builder().role(Role.LECTURER).build()))
-              .build();
+          lecturerOnlyRequest("other_admin@hcmute.edu.vn", "Other Admin");
 
       assertThatThrownBy(
               () -> userService.updateUser(OTHER_ADMIN_ID, demotionRequest, CURRENT_ADMIN_ID))
@@ -407,11 +402,7 @@ class AdminGuardsEmpiricalChallengeTest {
       when(userMapper.toResponse(any(User.class))).thenReturn(mockResponse);
 
       UpdateUserRequest demotionRequest =
-          UpdateUserRequest.builder()
-              .email("other_admin@hcmute.edu.vn")
-              .fullName("Other Admin")
-              .roleAssignments(List.of(RoleAssignment.builder().role(Role.LECTURER).build()))
-              .build();
+          lecturerOnlyRequest("other_admin@hcmute.edu.vn", "Other Admin");
 
       UserResponse response =
           userService.updateUser(OTHER_ADMIN_ID, demotionRequest, CURRENT_ADMIN_ID);
@@ -431,11 +422,7 @@ class AdminGuardsEmpiricalChallengeTest {
       when(userMapper.toResponse(any(User.class))).thenReturn(mockResponse);
 
       UpdateUserRequest demotionRequest =
-          UpdateUserRequest.builder()
-              .email("other_admin@hcmute.edu.vn")
-              .fullName("Other Admin")
-              .roleAssignments(List.of(RoleAssignment.builder().role(Role.LECTURER).build()))
-              .build();
+          lecturerOnlyRequest("other_admin@hcmute.edu.vn", "Other Admin");
 
       UserResponse response =
           userService.updateUser(OTHER_ADMIN_ID, demotionRequest, CURRENT_ADMIN_ID);

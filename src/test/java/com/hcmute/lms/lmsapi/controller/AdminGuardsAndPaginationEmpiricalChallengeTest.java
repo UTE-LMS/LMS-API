@@ -4,20 +4,18 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.hcmute.lms.lmsapi.document.RoleAssignment;
 import com.hcmute.lms.lmsapi.document.User;
-import com.hcmute.lms.lmsapi.dto.LoginRequest;
 import com.hcmute.lms.lmsapi.dto.UpdateUserRequest;
 import com.hcmute.lms.lmsapi.dto.UpdateUserStatusRequest;
 import com.hcmute.lms.lmsapi.enums.Role;
 import com.hcmute.lms.lmsapi.enums.UserStatus;
 import com.hcmute.lms.lmsapi.repository.UserRepository;
-import com.jayway.jsonpath.JsonPath;
+import com.hcmute.lms.lmsapi.support.ApiTestSupport;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -32,11 +30,9 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 import tools.jackson.databind.ObjectMapper;
@@ -130,17 +126,7 @@ public class AdminGuardsAndPaginationEmpiricalChallengeTest {
   }
 
   private String obtainAccessToken(String username, String password) throws Exception {
-    LoginRequest request = new LoginRequest(username, password);
-    MvcResult result =
-        mockMvc
-            .perform(
-                post("/api/v1/auth/login")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request)))
-            .andExpect(status().isOk())
-            .andReturn();
-
-    return JsonPath.read(result.getResponse().getContentAsString(), "$.accessToken");
+    return ApiTestSupport.obtainAccessToken(mockMvc, objectMapper, username, password);
   }
 
   // =========================================================================
@@ -155,12 +141,12 @@ public class AdminGuardsAndPaginationEmpiricalChallengeTest {
     void adminSelfLock_MustReturn422() throws Exception {
       UpdateUserStatusRequest lockRequest = new UpdateUserStatusRequest(UserStatus.LOCKED);
 
-      mockMvc
-          .perform(
-              put("/api/v1/users/" + primaryAdmin.getId() + "/status")
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + primaryAdminToken)
-                  .contentType(MediaType.APPLICATION_JSON)
-                  .content(objectMapper.writeValueAsString(lockRequest)))
+      ApiTestSupport.performJson(
+              mockMvc,
+              objectMapper,
+              put("/api/v1/users/" + primaryAdmin.getId() + "/status"),
+              primaryAdminToken,
+              lockRequest)
           .andExpect(status().isUnprocessableEntity())
           .andExpect(jsonPath("$.status").value(422))
           .andExpect(jsonPath("$.code").value("BUSINESS_RULE_VIOLATION"))
@@ -192,12 +178,12 @@ public class AdminGuardsAndPaginationEmpiricalChallengeTest {
               .roleAssignments(List.of(RoleAssignment.builder().role(Role.LECTURER).build()))
               .build();
 
-      mockMvc
-          .perform(
-              put("/api/v1/users/" + primaryAdmin.getId())
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + primaryAdminToken)
-                  .contentType(MediaType.APPLICATION_JSON)
-                  .content(objectMapper.writeValueAsString(demotionRequest)))
+      ApiTestSupport.performJson(
+              mockMvc,
+              objectMapper,
+              put("/api/v1/users/" + primaryAdmin.getId()),
+              primaryAdminToken,
+              demotionRequest)
           .andExpect(status().isUnprocessableEntity())
           .andExpect(jsonPath("$.status").value(422))
           .andExpect(jsonPath("$.code").value("BUSINESS_RULE_VIOLATION"))
@@ -225,12 +211,12 @@ public class AdminGuardsAndPaginationEmpiricalChallengeTest {
                       RoleAssignment.builder().role(Role.VIEWER).build()))
               .build();
 
-      mockMvc
-          .perform(
-              put("/api/v1/users/" + primaryAdmin.getId())
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + primaryAdminToken)
-                  .contentType(MediaType.APPLICATION_JSON)
-                  .content(objectMapper.writeValueAsString(updateRequest)))
+      ApiTestSupport.performJson(
+              mockMvc,
+              objectMapper,
+              put("/api/v1/users/" + primaryAdmin.getId()),
+              primaryAdminToken,
+              updateRequest)
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.fullName").value("Updated Admin FullName"))
           .andExpect(jsonPath("$.roleAssignments", hasSize(2)));
@@ -244,12 +230,12 @@ public class AdminGuardsAndPaginationEmpiricalChallengeTest {
     void nonAdmin_AttemptLock_Returns403() throws Exception {
       UpdateUserStatusRequest lockRequest = new UpdateUserStatusRequest(UserStatus.LOCKED);
 
-      mockMvc
-          .perform(
-              put("/api/v1/users/" + targetLecturer.getId() + "/status")
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + lecturerToken)
-                  .contentType(MediaType.APPLICATION_JSON)
-                  .content(objectMapper.writeValueAsString(lockRequest)))
+      ApiTestSupport.performJson(
+              mockMvc,
+              objectMapper,
+              put("/api/v1/users/" + targetLecturer.getId() + "/status"),
+              lecturerToken,
+              lockRequest)
           .andExpect(status().isForbidden())
           .andExpect(jsonPath("$.status").value(403))
           .andExpect(jsonPath("$.code").value("FORBIDDEN"));

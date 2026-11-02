@@ -10,12 +10,11 @@ import com.hcmute.lms.lmsapi.document.CourseSection;
 import com.hcmute.lms.lmsapi.document.RoleAssignment;
 import com.hcmute.lms.lmsapi.document.User;
 import com.hcmute.lms.lmsapi.document.UserScope;
-import com.hcmute.lms.lmsapi.dto.LoginRequest;
 import com.hcmute.lms.lmsapi.enums.Role;
 import com.hcmute.lms.lmsapi.enums.UserStatus;
 import com.hcmute.lms.lmsapi.repository.CourseSectionRepository;
 import com.hcmute.lms.lmsapi.repository.UserRepository;
-import com.jayway.jsonpath.JsonPath;
+import com.hcmute.lms.lmsapi.support.ApiTestSupport;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -30,7 +29,6 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers;
 import org.springframework.test.web.servlet.MockMvc;
@@ -156,17 +154,21 @@ public class ScopeDynamicReloadAndEdgeCasesEmpiricalChallengeTest {
   }
 
   private String obtainAccessToken(String username, String password) throws Exception {
-    LoginRequest request = new LoginRequest(username, password);
-    MvcResult result =
-        mockMvc
-            .perform(
-                post("/api/v1/auth/login")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request)))
-            .andExpect(status().isOk())
-            .andReturn();
+    return ApiTestSupport.obtainAccessToken(mockMvc, objectMapper, username, password);
+  }
 
-    return JsonPath.read(result.getResponse().getContentAsString(), "$.accessToken");
+  /** Với token cũ: READ/WRITE Section A và danh sách người dùng đều phải bị từ chối 403. */
+  private void expectAllProtectedEndpointsForbidden(String token) throws Exception {
+    ApiTestSupport.expectForbidden(
+        mockMvc,
+        get("/api/v1/test/sections/" + SECTION_A_ID)
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + token));
+    ApiTestSupport.expectForbidden(
+        mockMvc,
+        post("/api/v1/test/sections/" + SECTION_A_ID + "/grades")
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + token));
+    ApiTestSupport.expectForbidden(
+        mockMvc, get("/api/v1/users").header(HttpHeaders.AUTHORIZATION, "Bearer " + token));
   }
 
   // =========================================================================
@@ -223,13 +225,10 @@ public class ScopeDynamicReloadAndEdgeCasesEmpiricalChallengeTest {
 
       // Giai đoạn 2: Dùng LẠI CHÍNH TOKEN CŨ (không login lại), gọi READ Section A -> BẮT BUỘC NHẬN
       // 403 FORBIDDEN
-      mockMvc
-          .perform(
-              get("/api/v1/test/sections/" + SECTION_A_ID)
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
-          .andExpect(status().isForbidden())
-          .andExpect(jsonPath("$.code").value("FORBIDDEN"))
-          .andExpect(jsonPath("$.status").value(403));
+      ApiTestSupport.expectForbidden(
+          mockMvc,
+          get("/api/v1/test/sections/" + SECTION_A_ID)
+              .header(HttpHeaders.AUTHORIZATION, "Bearer " + token));
 
       // WRITE Section A cũng phải bị từ chối 403
       mockMvc
@@ -305,13 +304,10 @@ public class ScopeDynamicReloadAndEdgeCasesEmpiricalChallengeTest {
 
       // Giai đoạn 2: Dùng lại token cũ:
       // - WRITE lập tức thất bại với HTTP 403 FORBIDDEN
-      mockMvc
-          .perform(
-              post("/api/v1/test/sections/" + SECTION_A_ID + "/grades")
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
-          .andExpect(status().isForbidden())
-          .andExpect(jsonPath("$.code").value("FORBIDDEN"))
-          .andExpect(jsonPath("$.status").value(403));
+      ApiTestSupport.expectForbidden(
+          mockMvc,
+          post("/api/v1/test/sections/" + SECTION_A_ID + "/grades")
+              .header(HttpHeaders.AUTHORIZATION, "Bearer " + token));
 
       // - READ tiếp tục thành công với HTTP 200 OK theo quy tắc VIEWER scope rỗng (đọc toàn hệ
       // thống)
@@ -405,29 +401,7 @@ public class ScopeDynamicReloadAndEdgeCasesEmpiricalChallengeTest {
 
       // Bước 3: Dùng LẠI CHÍNH TOKEN CŨ, toàn bộ các truy cập được bảo vệ đều phải bị từ chối 403
       // 3.1. READ endpoint trên mock section controller
-      mockMvc
-          .perform(
-              get("/api/v1/test/sections/" + SECTION_A_ID)
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
-          .andExpect(status().isForbidden())
-          .andExpect(jsonPath("$.code").value("FORBIDDEN"))
-          .andExpect(jsonPath("$.status").value(403));
-
-      // 3.2. WRITE endpoint trên mock section controller
-      mockMvc
-          .perform(
-              post("/api/v1/test/sections/" + SECTION_A_ID + "/grades")
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
-          .andExpect(status().isForbidden())
-          .andExpect(jsonPath("$.code").value("FORBIDDEN"))
-          .andExpect(jsonPath("$.status").value(403));
-
-      // 3.3. Endpoint quản lý người dùng UserController (yêu cầu hasRole('ADMIN'))
-      mockMvc
-          .perform(get("/api/v1/users").header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
-          .andExpect(status().isForbidden())
-          .andExpect(jsonPath("$.code").value("FORBIDDEN"))
-          .andExpect(jsonPath("$.status").value(403));
+      expectAllProtectedEndpointsForbidden(token);
     }
 
     @Test
@@ -468,27 +442,7 @@ public class ScopeDynamicReloadAndEdgeCasesEmpiricalChallengeTest {
 
       // Bước 3: Với token cũ: cả READ và WRITE trên Section A, cùng GET /api/v1/users đều phải lập
       // tức thất bại 403
-      mockMvc
-          .perform(
-              get("/api/v1/test/sections/" + SECTION_A_ID)
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
-          .andExpect(status().isForbidden())
-          .andExpect(jsonPath("$.code").value("FORBIDDEN"))
-          .andExpect(jsonPath("$.status").value(403));
-
-      mockMvc
-          .perform(
-              post("/api/v1/test/sections/" + SECTION_A_ID + "/grades")
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
-          .andExpect(status().isForbidden())
-          .andExpect(jsonPath("$.code").value("FORBIDDEN"))
-          .andExpect(jsonPath("$.status").value(403));
-
-      mockMvc
-          .perform(get("/api/v1/users").header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
-          .andExpect(status().isForbidden())
-          .andExpect(jsonPath("$.code").value("FORBIDDEN"))
-          .andExpect(jsonPath("$.status").value(403));
+      expectAllProtectedEndpointsForbidden(token);
     }
   }
 

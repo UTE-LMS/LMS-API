@@ -20,7 +20,7 @@ import com.hcmute.lms.lmsapi.enums.Role;
 import com.hcmute.lms.lmsapi.enums.UserStatus;
 import com.hcmute.lms.lmsapi.repository.UserRepository;
 import com.hcmute.lms.lmsapi.service.AuthSessionService;
-import com.jayway.jsonpath.JsonPath;
+import com.hcmute.lms.lmsapi.support.ApiTestSupport;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
@@ -42,7 +42,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.server.resource.InvalidBearerTokenException;
 import org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 import tools.jackson.databind.ObjectMapper;
@@ -172,17 +171,7 @@ public class UserSecurityAndIntegrityEmpiricalChallengeTest {
   }
 
   private String obtainAccessToken(String username, String password) throws Exception {
-    LoginRequest request = new LoginRequest(username, password);
-    MvcResult result =
-        mockMvc
-            .perform(
-                post("/api/v1/auth/login")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request)))
-            .andExpect(status().isOk())
-            .andReturn();
-
-    return JsonPath.read(result.getResponse().getContentAsString(), "$.accessToken");
+    return ApiTestSupport.obtainAccessToken(mockMvc, objectMapper, username, password);
   }
 
   // =========================================================================
@@ -386,16 +375,10 @@ public class UserSecurityAndIntegrityEmpiricalChallengeTest {
                           .build()))
               .build();
 
-      mockMvc
-          .perform(
-              post("/api/v1/users")
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
-                  .contentType(MediaType.APPLICATION_JSON)
-                  .content(objectMapper.writeValueAsString(request)))
-          .andExpect(status().isUnprocessableEntity())
-          .andExpect(jsonPath("$.status").value(422))
-          .andExpect(jsonPath("$.code").value("BUSINESS_RULE_VIOLATION"))
-          .andExpect(jsonPath("$.message").value(containsString("SCOPE_NOT_FOUND")))
+      ApiTestSupport.expectBusinessRuleViolation(
+              ApiTestSupport.performJson(
+                  mockMvc, objectMapper, post("/api/v1/users"), adminToken, request),
+              "SCOPE_NOT_FOUND")
           .andExpect(jsonPath("$.message").value(containsString(nonExistentProgId)));
     }
 
@@ -419,16 +402,10 @@ public class UserSecurityAndIntegrityEmpiricalChallengeTest {
                           .build()))
               .build();
 
-      mockMvc
-          .perform(
-              post("/api/v1/users")
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
-                  .contentType(MediaType.APPLICATION_JSON)
-                  .content(objectMapper.writeValueAsString(request)))
-          .andExpect(status().isUnprocessableEntity())
-          .andExpect(jsonPath("$.status").value(422))
-          .andExpect(jsonPath("$.code").value("BUSINESS_RULE_VIOLATION"))
-          .andExpect(jsonPath("$.message").value(containsString("SCOPE_NOT_FOUND")))
+      ApiTestSupport.expectBusinessRuleViolation(
+              ApiTestSupport.performJson(
+                  mockMvc, objectMapper, post("/api/v1/users"), adminToken, request),
+              "SCOPE_NOT_FOUND")
           .andExpect(jsonPath("$.message").value(containsString(nonExistentCourseId)));
     }
 
@@ -452,16 +429,10 @@ public class UserSecurityAndIntegrityEmpiricalChallengeTest {
                           .build()))
               .build();
 
-      mockMvc
-          .perform(
-              post("/api/v1/users")
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
-                  .contentType(MediaType.APPLICATION_JSON)
-                  .content(objectMapper.writeValueAsString(request)))
-          .andExpect(status().isUnprocessableEntity())
-          .andExpect(jsonPath("$.status").value(422))
-          .andExpect(jsonPath("$.code").value("BUSINESS_RULE_VIOLATION"))
-          .andExpect(jsonPath("$.message").value(containsString("SCOPE_NOT_FOUND")))
+      ApiTestSupport.expectBusinessRuleViolation(
+              ApiTestSupport.performJson(
+                  mockMvc, objectMapper, post("/api/v1/users"), adminToken, request),
+              "SCOPE_NOT_FOUND")
           .andExpect(jsonPath("$.message").value(containsString(nonExistentSectionId)));
     }
 
@@ -482,16 +453,14 @@ public class UserSecurityAndIntegrityEmpiricalChallengeTest {
                           .build()))
               .build();
 
-      mockMvc
-          .perform(
-              put("/api/v1/users/" + targetUser.getId())
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
-                  .contentType(MediaType.APPLICATION_JSON)
-                  .content(objectMapper.writeValueAsString(request)))
-          .andExpect(status().isUnprocessableEntity())
-          .andExpect(jsonPath("$.status").value(422))
-          .andExpect(jsonPath("$.code").value("BUSINESS_RULE_VIOLATION"))
-          .andExpect(jsonPath("$.message").value(containsString("SCOPE_NOT_FOUND")))
+      ApiTestSupport.expectBusinessRuleViolation(
+              ApiTestSupport.performJson(
+                  mockMvc,
+                  objectMapper,
+                  put("/api/v1/users/" + targetUser.getId()),
+                  adminToken,
+                  request),
+              "SCOPE_NOT_FOUND")
           .andExpect(jsonPath("$.message").value(containsString(nonExistentProgId)));
     }
 
@@ -513,16 +482,14 @@ public class UserSecurityAndIntegrityEmpiricalChallengeTest {
                           .build()))
               .build();
 
-      mockMvc
-          .perform(
-              put("/api/v1/users/" + targetUser.getId())
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
-                  .contentType(MediaType.APPLICATION_JSON)
-                  .content(objectMapper.writeValueAsString(request)))
-          .andExpect(status().isUnprocessableEntity())
-          .andExpect(jsonPath("$.status").value(422))
-          .andExpect(jsonPath("$.code").value("BUSINESS_RULE_VIOLATION"))
-          .andExpect(jsonPath("$.message").value(containsString("SCOPE_NOT_FOUND")))
+      ApiTestSupport.expectBusinessRuleViolation(
+              ApiTestSupport.performJson(
+                  mockMvc,
+                  objectMapper,
+                  put("/api/v1/users/" + targetUser.getId()),
+                  adminToken,
+                  request),
+              "SCOPE_NOT_FOUND")
           .andExpect(jsonPath("$.message").value(containsString(nonExistentCourseId)));
     }
 
@@ -543,16 +510,14 @@ public class UserSecurityAndIntegrityEmpiricalChallengeTest {
                           .build()))
               .build();
 
-      mockMvc
-          .perform(
-              put("/api/v1/users/" + targetUser.getId())
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
-                  .contentType(MediaType.APPLICATION_JSON)
-                  .content(objectMapper.writeValueAsString(request)))
-          .andExpect(status().isUnprocessableEntity())
-          .andExpect(jsonPath("$.status").value(422))
-          .andExpect(jsonPath("$.code").value("BUSINESS_RULE_VIOLATION"))
-          .andExpect(jsonPath("$.message").value(containsString("SCOPE_NOT_FOUND")))
+      ApiTestSupport.expectBusinessRuleViolation(
+              ApiTestSupport.performJson(
+                  mockMvc,
+                  objectMapper,
+                  put("/api/v1/users/" + targetUser.getId()),
+                  adminToken,
+                  request),
+              "SCOPE_NOT_FOUND")
           .andExpect(jsonPath("$.message").value(containsString(nonExistentSecId)));
     }
 
@@ -578,16 +543,14 @@ public class UserSecurityAndIntegrityEmpiricalChallengeTest {
                           .build()))
               .build();
 
-      mockMvc
-          .perform(
-              put("/api/v1/users/" + targetUser.getId())
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
-                  .contentType(MediaType.APPLICATION_JSON)
-                  .content(objectMapper.writeValueAsString(request)))
-          .andExpect(status().isUnprocessableEntity())
-          .andExpect(jsonPath("$.status").value(422))
-          .andExpect(jsonPath("$.code").value("BUSINESS_RULE_VIOLATION"))
-          .andExpect(jsonPath("$.message").value(containsString("SCOPE_NOT_FOUND")));
+      ApiTestSupport.expectBusinessRuleViolation(
+          ApiTestSupport.performJson(
+              mockMvc,
+              objectMapper,
+              put("/api/v1/users/" + targetUser.getId()),
+              adminToken,
+              request),
+          "SCOPE_NOT_FOUND");
     }
 
     @Test
@@ -636,12 +599,8 @@ public class UserSecurityAndIntegrityEmpiricalChallengeTest {
                           .build()))
               .build();
 
-      mockMvc
-          .perform(
-              post("/api/v1/users")
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
-                  .contentType(MediaType.APPLICATION_JSON)
-                  .content(objectMapper.writeValueAsString(postRequest)))
+      ApiTestSupport.performJson(
+              mockMvc, objectMapper, post("/api/v1/users"), adminToken, postRequest)
           .andExpect(status().isCreated())
           .andExpect(jsonPath("$.username").value(CREATED_USERNAME));
 
@@ -663,12 +622,12 @@ public class UserSecurityAndIntegrityEmpiricalChallengeTest {
                           .build()))
               .build();
 
-      mockMvc
-          .perform(
-              put("/api/v1/users/" + targetUser.getId())
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
-                  .contentType(MediaType.APPLICATION_JSON)
-                  .content(objectMapper.writeValueAsString(putRequest)))
+      ApiTestSupport.performJson(
+              mockMvc,
+              objectMapper,
+              put("/api/v1/users/" + targetUser.getId()),
+              adminToken,
+              putRequest)
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.email").value(PREFIX + "target_valid@hcmute.edu.vn"));
     }
@@ -694,12 +653,12 @@ public class UserSecurityAndIntegrityEmpiricalChallengeTest {
                           .build()))
               .build();
 
-      mockMvc
-          .perform(
-              put("/api/v1/users/" + targetUser.getId())
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
-                  .contentType(MediaType.APPLICATION_JSON)
-                  .content(objectMapper.writeValueAsString(request)))
+      ApiTestSupport.performJson(
+              mockMvc,
+              objectMapper,
+              put("/api/v1/users/" + targetUser.getId()),
+              adminToken,
+              request)
           .andExpect(status().isOk());
     }
   }
@@ -729,12 +688,12 @@ public class UserSecurityAndIntegrityEmpiricalChallengeTest {
 
       // Bước 3: Admin khóa tài khoản target user -> PUT /api/v1/users/{id}/status sang LOCKED
       UpdateUserStatusRequest lockRequest = new UpdateUserStatusRequest(UserStatus.LOCKED);
-      mockMvc
-          .perform(
-              put("/api/v1/users/" + targetUser.getId() + "/status")
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
-                  .contentType(MediaType.APPLICATION_JSON)
-                  .content(objectMapper.writeValueAsString(lockRequest)))
+      ApiTestSupport.performJson(
+              mockMvc,
+              objectMapper,
+              put("/api/v1/users/" + targetUser.getId() + "/status"),
+              adminToken,
+              lockRequest)
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.status").value("LOCKED"));
 
@@ -752,12 +711,12 @@ public class UserSecurityAndIntegrityEmpiricalChallengeTest {
 
       // Bước 6: Admin mở khóa lại tài khoản target user sang ACTIVE
       UpdateUserStatusRequest unlockRequest = new UpdateUserStatusRequest(UserStatus.ACTIVE);
-      mockMvc
-          .perform(
-              put("/api/v1/users/" + targetUser.getId() + "/status")
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
-                  .contentType(MediaType.APPLICATION_JSON)
-                  .content(objectMapper.writeValueAsString(unlockRequest)))
+      ApiTestSupport.performJson(
+              mockMvc,
+              objectMapper,
+              put("/api/v1/users/" + targetUser.getId() + "/status"),
+              adminToken,
+              unlockRequest)
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.status").value("ACTIVE"));
 
@@ -797,12 +756,12 @@ public class UserSecurityAndIntegrityEmpiricalChallengeTest {
     void loginAttempt_whileAccountIsLocked_failsWith401Unauthorized() throws Exception {
       // Khóa tài khoản
       UpdateUserStatusRequest lockRequest = new UpdateUserStatusRequest(UserStatus.LOCKED);
-      mockMvc
-          .perform(
-              put("/api/v1/users/" + targetUser.getId() + "/status")
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
-                  .contentType(MediaType.APPLICATION_JSON)
-                  .content(objectMapper.writeValueAsString(lockRequest)))
+      ApiTestSupport.performJson(
+              mockMvc,
+              objectMapper,
+              put("/api/v1/users/" + targetUser.getId() + "/status"),
+              adminToken,
+              lockRequest)
           .andExpect(status().isOk());
 
       // Đăng nhập với mật khẩu đúng khi tài khoản đang LOCKED -> từ chối 401 với thông điệp chung

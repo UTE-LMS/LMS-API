@@ -36,6 +36,8 @@
         <spotbugs-maven-plugin.version>4.10.5.0</spotbugs-maven-plugin.version>
         <maven-pmd-plugin.version>3.28.0</maven-pmd-plugin.version>
         <sonar-maven-plugin.version>5.8.0.7211</sonar-maven-plugin.version>
+        <!-- true: cổng CPD áp cho cả src/main và src/test. Chỉ đo mã production: -Dcpd.includeTests=false -->
+        <cpd.includeTests>true</cpd.includeTests>
 
         <!-- SonarCloud: token KHÔNG nằm trong repo, scanner đọc biến môi trường SONAR_TOKEN. -->
         <sonar.host.url>https://sonarcloud.io</sonar.host.url>
@@ -147,8 +149,7 @@
                     <configuration>
                         <language>java</language>
                         <minimumTokens>100</minimumTokens>
-                        <!-- Cổng chặn trùng lặp áp cho mã production (src/main). Trùng lặp trong test được đo riêng bằng doc/quality/cpd-density.sh, xem doc/quality/README.md. -->
-                        <includeTests>false</includeTests>
+                        <includeTests>${cpd.includeTests}</includeTests>
                         <failOnViolation>true</failOnViolation>
                         <printFailingErrors>true</printFailingErrors>
                     </configuration>

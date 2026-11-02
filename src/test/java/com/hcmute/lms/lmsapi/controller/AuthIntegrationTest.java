@@ -18,6 +18,7 @@ import com.hcmute.lms.lmsapi.enums.Role;
 import com.hcmute.lms.lmsapi.enums.UserStatus;
 import com.hcmute.lms.lmsapi.repository.AuditLogRepository;
 import com.hcmute.lms.lmsapi.repository.UserRepository;
+import com.hcmute.lms.lmsapi.support.ApiTestSupport;
 import com.jayway.jsonpath.JsonPath;
 import java.time.Instant;
 import java.util.List;
@@ -189,12 +190,8 @@ class AuthIntegrationTest {
       String expiredToken =
           "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE1MTYyMzkwMjIsImsubiI6IjEyMzQ1In0.invalid_signature";
 
-      mockMvc
-          .perform(
-              post("/api/v1/auth/login")
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + expiredToken)
-                  .contentType(MediaType.APPLICATION_JSON)
-                  .content(objectMapper.writeValueAsString(request)))
+      ApiTestSupport.performJson(
+              mockMvc, objectMapper, post("/api/v1/auth/login"), expiredToken, request)
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.accessToken").isNotEmpty())
           .andExpect(jsonPath("$.tokenType").value("Bearer"))
@@ -491,16 +488,6 @@ class AuthIntegrationTest {
   // =========================================================================
 
   private String obtainAccessToken(String username, String password) throws Exception {
-    LoginRequest request = new LoginRequest(username, password);
-    MvcResult result =
-        mockMvc
-            .perform(
-                post("/api/v1/auth/login")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request)))
-            .andExpect(status().isOk())
-            .andReturn();
-
-    return JsonPath.read(result.getResponse().getContentAsString(), "$.accessToken");
+    return ApiTestSupport.obtainAccessToken(mockMvc, objectMapper, username, password);
   }
 }

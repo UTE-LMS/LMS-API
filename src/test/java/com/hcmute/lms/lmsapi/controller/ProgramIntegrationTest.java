@@ -37,6 +37,7 @@ import com.hcmute.lms.lmsapi.repository.PloRepository;
 import com.hcmute.lms.lmsapi.repository.ProgramRepository;
 import com.hcmute.lms.lmsapi.repository.ProgramVersionRepository;
 import com.hcmute.lms.lmsapi.repository.UserRepository;
+import com.hcmute.lms.lmsapi.support.ApiTestSupport;
 import com.jayway.jsonpath.JsonPath;
 import java.time.Instant;
 import java.util.List;
@@ -223,29 +224,17 @@ class ProgramIntegrationTest {
     ProgramRequest request =
         ProgramRequest.builder().code("F02_NEW_" + SUFFIX).name("Chương trình mới").build();
 
-    mockMvc
-        .perform(
-            post("/api/v1/programs")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + lecturerToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
+    ApiTestSupport.performJson(
+            mockMvc, objectMapper, post("/api/v1/programs"), lecturerToken, request)
         .andExpect(status().isForbidden());
 
-    mockMvc
-        .perform(
-            post("/api/v1/programs")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + managerToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
+    ApiTestSupport.performJson(
+            mockMvc, objectMapper, post("/api/v1/programs"), managerToken, request)
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.code").value("F02_NEW_" + SUFFIX));
 
-    mockMvc
-        .perform(
-            post("/api/v1/programs")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + managerToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
+    ApiTestSupport.performJson(
+            mockMvc, objectMapper, post("/api/v1/programs"), managerToken, request)
         .andExpect(status().isConflict());
 
     mockMvc
@@ -258,12 +247,8 @@ class ProgramIntegrationTest {
 
     ProgramVersionRequest missingProgram =
         ProgramVersionRequest.builder().programId("671dcba5f123456789abc777").version("X").build();
-    mockMvc
-        .perform(
-            post("/api/v1/program-versions")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + managerToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(missingProgram)))
+    ApiTestSupport.performJson(
+            mockMvc, objectMapper, post("/api/v1/program-versions"), managerToken, missingProgram)
         .andExpect(status().isUnprocessableEntity());
 
     ProgramVersionUpdateRequest backward =
@@ -271,12 +256,12 @@ class ProgramIntegrationTest {
             .version(activeVersion.getVersion())
             .status(ProgramVersionStatus.DRAFT)
             .build();
-    mockMvc
-        .perform(
-            put("/api/v1/program-versions/" + activeVersion.getId())
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + managerToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(backward)))
+    ApiTestSupport.performJson(
+            mockMvc,
+            objectMapper,
+            put("/api/v1/program-versions/" + activeVersion.getId()),
+            managerToken,
+            backward)
         .andExpect(status().isUnprocessableEntity());
 
     ProgramVersionUpdateRequest forward =
@@ -284,12 +269,12 @@ class ProgramIntegrationTest {
             .version(draftVersion.getVersion())
             .status(ProgramVersionStatus.ACTIVE)
             .build();
-    mockMvc
-        .perform(
-            put("/api/v1/program-versions/" + draftVersion.getId())
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + managerToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(forward)))
+    ApiTestSupport.performJson(
+            mockMvc,
+            objectMapper,
+            put("/api/v1/program-versions/" + draftVersion.getId()),
+            managerToken,
+            forward)
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.status").value("ACTIVE"));
   }
@@ -298,12 +283,12 @@ class ProgramIntegrationTest {
   @DisplayName("PLO/PI/I-R-M: validate mã, ràng buộc PLO-PI, trùng lặp và chặn xóa PLO còn PI")
   void ploPiAndContributionFlow() throws Exception {
     PloRequest invalid = PloRequest.builder().code("PLO0").displayOrder(1).build();
-    mockMvc
-        .perform(
-            post("/api/v1/program-versions/" + draftVersion.getId() + "/plos")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + managerToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(invalid)))
+    ApiTestSupport.performJson(
+            mockMvc,
+            objectMapper,
+            post("/api/v1/program-versions/" + draftVersion.getId() + "/plos"),
+            managerToken,
+            invalid)
         .andExpect(status().isBadRequest());
 
     PloRequest ploRequest =
@@ -315,33 +300,33 @@ class ProgramIntegrationTest {
             .build();
 
     MvcResult ploResult =
-        mockMvc
-            .perform(
-                post("/api/v1/program-versions/" + draftVersion.getId() + "/plos")
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + managerToken)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(ploRequest)))
+        ApiTestSupport.performJson(
+                mockMvc,
+                objectMapper,
+                post("/api/v1/program-versions/" + draftVersion.getId() + "/plos"),
+                managerToken,
+                ploRequest)
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.verification.status").value("NEEDS_CLARIFICATION"))
             .andReturn();
     String ploId = JsonPath.read(ploResult.getResponse().getContentAsString(), "$.id");
 
-    mockMvc
-        .perform(
-            post("/api/v1/program-versions/" + draftVersion.getId() + "/plos")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + managerToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(ploRequest)))
+    ApiTestSupport.performJson(
+            mockMvc,
+            objectMapper,
+            post("/api/v1/program-versions/" + draftVersion.getId() + "/plos"),
+            managerToken,
+            ploRequest)
         .andExpect(status().isConflict());
 
     PiRequest wrongPlo =
         PiRequest.builder().ploId("671dcba5f123456789abc778").code("PI1.1").displayOrder(1).build();
-    mockMvc
-        .perform(
-            post("/api/v1/program-versions/" + draftVersion.getId() + "/pis")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + managerToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(wrongPlo)))
+    ApiTestSupport.performJson(
+            mockMvc,
+            objectMapper,
+            post("/api/v1/program-versions/" + draftVersion.getId() + "/pis"),
+            managerToken,
+            wrongPlo)
         .andExpect(status().isUnprocessableEntity());
 
     PiRequest piRequest =
@@ -353,12 +338,12 @@ class ProgramIntegrationTest {
             .targetPassRate(0.8)
             .build();
     MvcResult piResult =
-        mockMvc
-            .perform(
-                post("/api/v1/program-versions/" + draftVersion.getId() + "/pis")
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + managerToken)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(piRequest)))
+        ApiTestSupport.performJson(
+                mockMvc,
+                objectMapper,
+                post("/api/v1/program-versions/" + draftVersion.getId() + "/pis"),
+                managerToken,
+                piRequest)
             .andExpect(status().isCreated())
             .andReturn();
     String piId = JsonPath.read(piResult.getResponse().getContentAsString(), "$.id");
@@ -369,20 +354,20 @@ class ProgramIntegrationTest {
             .piId(piId)
             .contribution(PiContributionType.R)
             .build();
-    mockMvc
-        .perform(
-            post("/api/v1/program-versions/" + draftVersion.getId() + "/pi-contributions")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + managerToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(contributionRequest)))
+    ApiTestSupport.performJson(
+            mockMvc,
+            objectMapper,
+            post("/api/v1/program-versions/" + draftVersion.getId() + "/pi-contributions"),
+            managerToken,
+            contributionRequest)
         .andExpect(status().isCreated());
 
-    mockMvc
-        .perform(
-            post("/api/v1/program-versions/" + draftVersion.getId() + "/pi-contributions")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + managerToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(contributionRequest)))
+    ApiTestSupport.performJson(
+            mockMvc,
+            objectMapper,
+            post("/api/v1/program-versions/" + draftVersion.getId() + "/pi-contributions"),
+            managerToken,
+            contributionRequest)
         .andExpect(status().isConflict());
 
     mockMvc

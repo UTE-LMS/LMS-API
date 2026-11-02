@@ -9,12 +9,11 @@ import com.hcmute.lms.lmsapi.document.CourseSection;
 import com.hcmute.lms.lmsapi.document.RoleAssignment;
 import com.hcmute.lms.lmsapi.document.User;
 import com.hcmute.lms.lmsapi.document.UserScope;
-import com.hcmute.lms.lmsapi.dto.LoginRequest;
 import com.hcmute.lms.lmsapi.enums.Role;
 import com.hcmute.lms.lmsapi.enums.UserStatus;
 import com.hcmute.lms.lmsapi.repository.CourseSectionRepository;
 import com.hcmute.lms.lmsapi.repository.UserRepository;
-import com.jayway.jsonpath.JsonPath;
+import com.hcmute.lms.lmsapi.support.ApiTestSupport;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
@@ -27,11 +26,9 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 import tools.jackson.databind.ObjectMapper;
@@ -136,16 +133,41 @@ class ScopeAuthorizationMatrixIntegrationTest {
 
   /** Tiện ích đăng nhập và lấy JWT Access Token cho một tài khoản. */
   private String loginAndGetToken(String username, String password) throws Exception {
-    LoginRequest request = new LoginRequest(username, password);
-    MvcResult result =
-        mockMvc
-            .perform(
-                post("/api/v1/auth/login")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request)))
-            .andExpect(status().isOk())
-            .andReturn();
-    return JsonPath.read(result.getResponse().getContentAsString(), "$.accessToken");
+    return ApiTestSupport.obtainAccessToken(mockMvc, objectMapper, username, password);
+  }
+
+  /** READ và WRITE trên TARGET_SECTION_ID đều được phép (200, SUCCESS, thông báo tương ứng). */
+  private void expectReadAndWriteGranted(String token) throws Exception {
+    mockMvc
+        .perform(
+            get("/api/v1/test/sections/" + TARGET_SECTION_ID)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("SUCCESS"))
+        .andExpect(jsonPath("$.message").value("READ access granted"));
+    mockMvc
+        .perform(
+            post("/api/v1/test/sections/" + TARGET_SECTION_ID + "/grades")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("SUCCESS"))
+        .andExpect(jsonPath("$.message").value("WRITE access granted"));
+  }
+
+  /** READ được phép (200, SUCCESS) nhưng WRITE bị cấm (403, FORBIDDEN). */
+  private void expectReadGrantedWriteForbidden(String token) throws Exception {
+    mockMvc
+        .perform(
+            get("/api/v1/test/sections/" + TARGET_SECTION_ID)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("SUCCESS"));
+    mockMvc
+        .perform(
+            post("/api/v1/test/sections/" + TARGET_SECTION_ID + "/grades")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("FORBIDDEN"));
   }
 
   /** Tiện ích tạo nhanh User thử nghiệm và trả về Access Token. */
@@ -216,21 +238,7 @@ class ScopeAuthorizationMatrixIntegrationTest {
     void admin_ReadAndWrite_Success() throws Exception {
       String token = createUserAndGetToken("test_sec_admin", Role.ADMIN, null);
 
-      mockMvc
-          .perform(
-              get("/api/v1/test/sections/" + TARGET_SECTION_ID)
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
-          .andExpect(status().isOk())
-          .andExpect(jsonPath("$.status").value("SUCCESS"))
-          .andExpect(jsonPath("$.message").value("READ access granted"));
-
-      mockMvc
-          .perform(
-              post("/api/v1/test/sections/" + TARGET_SECTION_ID + "/grades")
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
-          .andExpect(status().isOk())
-          .andExpect(jsonPath("$.status").value("SUCCESS"))
-          .andExpect(jsonPath("$.message").value("WRITE access granted"));
+      expectReadAndWriteGranted(token);
     }
 
     @Test
@@ -309,20 +317,7 @@ class ScopeAuthorizationMatrixIntegrationTest {
       String token = createUserAndGetToken(username, role, scope);
 
       // READ: Cho phép 200 OK vì courseId khớp scope
-      mockMvc
-          .perform(
-              get("/api/v1/test/sections/" + TARGET_SECTION_ID)
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
-          .andExpect(status().isOk())
-          .andExpect(jsonPath("$.status").value("SUCCESS"));
-
-      // WRITE: Tuyệt đối bị cấm (403 FORBIDDEN)
-      mockMvc
-          .perform(
-              post("/api/v1/test/sections/" + TARGET_SECTION_ID + "/grades")
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
-          .andExpect(status().isForbidden())
-          .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+      expectReadGrantedWriteForbidden(token);
     }
 
     @Test
@@ -331,19 +326,7 @@ class ScopeAuthorizationMatrixIntegrationTest {
     void viewer_StrictEmptyScope_ReadOk_WriteForbidden() throws Exception {
       String token = createUserAndGetToken("test_sec_viewer_empty", Role.VIEWER, null);
 
-      mockMvc
-          .perform(
-              get("/api/v1/test/sections/" + TARGET_SECTION_ID)
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
-          .andExpect(status().isOk())
-          .andExpect(jsonPath("$.status").value("SUCCESS"));
-
-      mockMvc
-          .perform(
-              post("/api/v1/test/sections/" + TARGET_SECTION_ID + "/grades")
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
-          .andExpect(status().isForbidden())
-          .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+      expectReadGrantedWriteForbidden(token);
     }
 
     @Test
@@ -469,21 +452,7 @@ class ScopeAuthorizationMatrixIntegrationTest {
       // Giai đoạn 2: Gọi lại API bằng CHÍNH TOKEN CŨ (không login lại), hệ thống nạp lại
       // UserPrincipal từ DB
       // -> Lập tức có quyền READ (200 OK) và WRITE (200 OK)
-      mockMvc
-          .perform(
-              get("/api/v1/test/sections/" + TARGET_SECTION_ID)
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
-          .andExpect(status().isOk())
-          .andExpect(jsonPath("$.status").value("SUCCESS"))
-          .andExpect(jsonPath("$.message").value("READ access granted"));
-
-      mockMvc
-          .perform(
-              post("/api/v1/test/sections/" + TARGET_SECTION_ID + "/grades")
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
-          .andExpect(status().isOk())
-          .andExpect(jsonPath("$.status").value("SUCCESS"))
-          .andExpect(jsonPath("$.message").value("WRITE access granted"));
+      expectReadAndWriteGranted(token);
 
       // Bước 3: Quản trị viên hạ quyền người dùng xuống VIEWER (scope rỗng)
       user.setRoleAssignments(
