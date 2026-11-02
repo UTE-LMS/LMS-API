@@ -74,7 +74,6 @@ public class AdminGuardsAndPaginationEmpiricalChallengeTest {
   private final List<String> createdUsernames = Collections.synchronizedList(new ArrayList<>());
 
   private User primaryAdmin;
-  private User secondaryAdmin;
   private User targetLecturer;
 
   private String primaryAdminToken;
@@ -90,7 +89,7 @@ public class AdminGuardsAndPaginationEmpiricalChallengeTest {
     cleanupData();
 
     primaryAdmin = createTestUser("admin1", Role.ADMIN, UserStatus.ACTIVE);
-    secondaryAdmin = createTestUser("admin2", Role.ADMIN, UserStatus.ACTIVE);
+    createTestUser("admin2", Role.ADMIN, UserStatus.ACTIVE);
     targetLecturer = createTestUser("lecturer", Role.LECTURER, UserStatus.ACTIVE);
 
     primaryAdminToken = obtainAccessToken(primaryAdmin.getUsername(), RAW_PASSWORD);

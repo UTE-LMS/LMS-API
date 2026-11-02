@@ -77,9 +77,6 @@ public class BearerTokenResolverAndSecurityChallengerTest {
   private static final String CHALLENGE_LOCKED_USER = "challenger_sec_locked";
   private static final String CHALLENGE_PASSWORD = "ChallengePassword123!";
 
-  private User activeUser;
-  private User lockedUser;
-
   @BeforeEach
   void setUp() {
     this.mockMvc =
@@ -90,38 +87,36 @@ public class BearerTokenResolverAndSecurityChallengerTest {
 
     cleanup();
 
-    activeUser =
-        userRepository.save(
-            User.builder()
-                .username(CHALLENGE_ACTIVE_USER)
-                .email("challenger_active@hcmute.edu.vn")
-                .passwordHash(passwordEncoder.encode(CHALLENGE_PASSWORD))
-                .fullName("[DỮ LIỆU THỬ NGHIỆM] Challenger Active User")
-                .status(UserStatus.ACTIVE)
-                .tokenVersion(0L)
-                .roleAssignments(
-                    List.of(
-                        RoleAssignment.builder()
-                            .role(Role.LECTURER)
-                            .scope(UserScope.builder().build())
-                            .build()))
-                .createdAt(Instant.now())
-                .updatedAt(Instant.now())
-                .build());
+    userRepository.save(
+        User.builder()
+            .username(CHALLENGE_ACTIVE_USER)
+            .email("challenger_active@hcmute.edu.vn")
+            .passwordHash(passwordEncoder.encode(CHALLENGE_PASSWORD))
+            .fullName("[DỮ LIỆU THỬ NGHIỆM] Challenger Active User")
+            .status(UserStatus.ACTIVE)
+            .tokenVersion(0L)
+            .roleAssignments(
+                List.of(
+                    RoleAssignment.builder()
+                        .role(Role.LECTURER)
+                        .scope(UserScope.builder().build())
+                        .build()))
+            .createdAt(Instant.now())
+            .updatedAt(Instant.now())
+            .build());
 
-    lockedUser =
-        userRepository.save(
-            User.builder()
-                .username(CHALLENGE_LOCKED_USER)
-                .email("challenger_locked@hcmute.edu.vn")
-                .passwordHash(passwordEncoder.encode(CHALLENGE_PASSWORD))
-                .fullName("[DỮ LIỆU THỬ NGHIỆM] Challenger Locked User")
-                .status(UserStatus.LOCKED)
-                .tokenVersion(0L)
-                .roleAssignments(List.of(RoleAssignment.builder().role(Role.STUDENT).build()))
-                .createdAt(Instant.now())
-                .updatedAt(Instant.now())
-                .build());
+    userRepository.save(
+        User.builder()
+            .username(CHALLENGE_LOCKED_USER)
+            .email("challenger_locked@hcmute.edu.vn")
+            .passwordHash(passwordEncoder.encode(CHALLENGE_PASSWORD))
+            .fullName("[DỮ LIỆU THỬ NGHIỆM] Challenger Locked User")
+            .status(UserStatus.LOCKED)
+            .tokenVersion(0L)
+            .roleAssignments(List.of(RoleAssignment.builder().role(Role.STUDENT).build()))
+            .createdAt(Instant.now())
+            .updatedAt(Instant.now())
+            .build());
   }
 
   @AfterEach

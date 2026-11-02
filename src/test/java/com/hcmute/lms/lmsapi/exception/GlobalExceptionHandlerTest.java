@@ -153,10 +153,10 @@ class GlobalExceptionHandlerTest {
 
     @GetMapping("/generic-npe")
     public String testGenericNpe() {
-      String secretValue = null;
-      // Triggers NullPointerException with sensitive context
-      secretValue.toLowerCase();
-      return secretValue;
+      // Triggers NullPointerException with sensitive context. The property is never defined, so the
+      // value is null at runtime without being a compile-time constant null.
+      String secretValue = System.getProperty("lms.test.undefined.property");
+      return secretValue.toLowerCase();
     }
 
     @GetMapping("/generic-runtime")

@@ -61,7 +61,6 @@ class UserIntegrationTest {
   private MockMvc mockMvc;
 
   private User adminUser;
-  private User lecturerUser;
   private User targetUser;
 
   private static final String ADMIN_USERNAME = "test_user_admin";
@@ -97,19 +96,18 @@ class UserIntegrationTest {
                 .build());
 
     // 2. Tạo tài khoản LECTURER (non-admin)
-    lecturerUser =
-        userRepository.save(
-            User.builder()
-                .username(LECTURER_USERNAME)
-                .email("lecturer_user@hcmute.edu.vn")
-                .passwordHash(passwordEncoder.encode(RAW_PASSWORD))
-                .fullName("[DỮ LIỆU THỬ NGHIỆM] Giảng Viên")
-                .status(UserStatus.ACTIVE)
-                .tokenVersion(0L)
-                .roleAssignments(List.of(RoleAssignment.builder().role(Role.LECTURER).build()))
-                .createdAt(Instant.now())
-                .updatedAt(Instant.now())
-                .build());
+    userRepository.save(
+        User.builder()
+            .username(LECTURER_USERNAME)
+            .email("lecturer_user@hcmute.edu.vn")
+            .passwordHash(passwordEncoder.encode(RAW_PASSWORD))
+            .fullName("[DỮ LIỆU THỬ NGHIỆM] Giảng Viên")
+            .status(UserStatus.ACTIVE)
+            .tokenVersion(0L)
+            .roleAssignments(List.of(RoleAssignment.builder().role(Role.LECTURER).build()))
+            .createdAt(Instant.now())
+            .updatedAt(Instant.now())
+            .build());
 
     // 3. Tạo tài khoản TARGET dùng cho kiểm thử cập nhật/khóa
     targetUser =

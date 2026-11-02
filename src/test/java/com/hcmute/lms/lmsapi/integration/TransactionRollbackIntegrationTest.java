@@ -154,13 +154,12 @@ public class TransactionRollbackIntegrationTest {
    * (@Transactional).
    */
   @TestComponent
-  public static class TransactionalBusinessTestService {
+  static class TransactionalBusinessTestService {
 
     private final MongoTemplate mongoTemplate;
     private final AuditService auditService;
 
-    public TransactionalBusinessTestService(
-        MongoTemplate mongoTemplate, AuditService auditService) {
+    TransactionalBusinessTestService(MongoTemplate mongoTemplate, AuditService auditService) {
       this.mongoTemplate = mongoTemplate;
       this.auditService = auditService;
     }

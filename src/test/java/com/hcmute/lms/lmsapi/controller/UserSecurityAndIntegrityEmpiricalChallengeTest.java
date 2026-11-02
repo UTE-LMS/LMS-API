@@ -89,7 +89,6 @@ public class UserSecurityAndIntegrityEmpiricalChallengeTest {
 
   private MockMvc mockMvc;
 
-  private User adminUser;
   private User targetUser;
   private String adminToken;
 
@@ -103,19 +102,18 @@ public class UserSecurityAndIntegrityEmpiricalChallengeTest {
     cleanupData();
 
     // 1. Tạo ADMIN test user
-    adminUser =
-        userRepository.save(
-            User.builder()
-                .username(ADMIN_USERNAME)
-                .email(PREFIX + "admin@hcmute.edu.vn")
-                .passwordHash(passwordEncoder.encode(RAW_PASSWORD))
-                .fullName("[DỮ LIỆU THỬ NGHIỆM] Challenger Admin")
-                .status(UserStatus.ACTIVE)
-                .tokenVersion(0L)
-                .roleAssignments(List.of(RoleAssignment.builder().role(Role.ADMIN).build()))
-                .createdAt(Instant.now())
-                .updatedAt(Instant.now())
-                .build());
+    userRepository.save(
+        User.builder()
+            .username(ADMIN_USERNAME)
+            .email(PREFIX + "admin@hcmute.edu.vn")
+            .passwordHash(passwordEncoder.encode(RAW_PASSWORD))
+            .fullName("[DỮ LIỆU THỬ NGHIỆM] Challenger Admin")
+            .status(UserStatus.ACTIVE)
+            .tokenVersion(0L)
+            .roleAssignments(List.of(RoleAssignment.builder().role(Role.ADMIN).build()))
+            .createdAt(Instant.now())
+            .updatedAt(Instant.now())
+            .build());
 
     // 2. Tạo TARGET test user
     targetUser =
@@ -203,14 +201,14 @@ public class UserSecurityAndIntegrityEmpiricalChallengeTest {
       String tamperedUsername = PREFIX + "tampered_username";
       String rawJsonWithTamperedUsername =
           """
-                    {
-                        "username": "%s",
-                        "email": "%starget_updated@hcmute.edu.vn",
-                        "fullName": "Victim Updated Name",
-                        "roleAssignments": [
-                            { "role": "LECTURER" }
-                        ]
-                    }
+                    {\
+                        "username": "%s",\
+                        "email": "%starget_updated@hcmute.edu.vn",\
+                        "fullName": "Victim Updated Name",\
+                        "roleAssignments": [\
+                            { "role": "LECTURER" }\
+                        ]\
+                    }\
                     """
               .formatted(tamperedUsername, PREFIX);
 
@@ -256,15 +254,15 @@ public class UserSecurityAndIntegrityEmpiricalChallengeTest {
       String maliciousPassword = "MaliciousHackedPassword999!";
       String rawJsonWithPassword =
           """
-                    {
-                        "password": "%s",
-                        "passwordHash": "$2a$10$maliciousFakeHashValueHere1234567890abcdef",
-                        "email": "%starget_pw@hcmute.edu.vn",
-                        "fullName": "Tamper PW Name",
-                        "roleAssignments": [
-                            { "role": "LECTURER" }
-                        ]
-                    }
+                    {\
+                        "password": "%s",\
+                        "passwordHash": "$2a$10$maliciousFakeHashValueHere1234567890abcdef",\
+                        "email": "%starget_pw@hcmute.edu.vn",\
+                        "fullName": "Tamper PW Name",\
+                        "roleAssignments": [\
+                            { "role": "LECTURER" }\
+                        ]\
+                    }\
                     """
               .formatted(maliciousPassword, PREFIX);
 
@@ -302,15 +300,15 @@ public class UserSecurityAndIntegrityEmpiricalChallengeTest {
         throws Exception {
       String rawJsonWithStatusAndVersion =
           """
-                    {
-                        "status": "LOCKED",
-                        "tokenVersion": 9999,
-                        "email": "%starget_ver@hcmute.edu.vn",
-                        "fullName": "Tamper Version Name",
-                        "roleAssignments": [
-                            { "role": "LECTURER" }
-                        ]
-                    }
+                    {\
+                        "status": "LOCKED",\
+                        "tokenVersion": 9999,\
+                        "email": "%starget_ver@hcmute.edu.vn",\
+                        "fullName": "Tamper Version Name",\
+                        "roleAssignments": [\
+                            { "role": "LECTURER" }\
+                        ]\
+                    }\
                     """
               .formatted(PREFIX);
 
@@ -336,14 +334,14 @@ public class UserSecurityAndIntegrityEmpiricalChallengeTest {
       String fakeId = "671dcba5f123456789999999";
       String rawJsonWithFakeId =
           """
-                    {
-                        "id": "%s",
-                        "email": "%starget_id@hcmute.edu.vn",
-                        "fullName": "Tamper ID Name",
-                        "roleAssignments": [
-                            { "role": "LECTURER" }
-                        ]
-                    }
+                    {\
+                        "id": "%s",\
+                        "email": "%starget_id@hcmute.edu.vn",\
+                        "fullName": "Tamper ID Name",\
+                        "roleAssignments": [\
+                            { "role": "LECTURER" }\
+                        ]\
+                    }\
                     """
               .formatted(fakeId, PREFIX);
 

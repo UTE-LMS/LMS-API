@@ -63,7 +63,6 @@ class ScopeAuthorizationMatrixIntegrationTest {
   private static final String OTHER_SECTION_ID = "671dcba5f123456789abc999";
   private static final String COMMON_PASSWORD = "Password123!";
 
-  private CourseSection savedCourseSection;
   private String lecturerAssignedUserId;
 
   @BeforeEach
@@ -93,18 +92,17 @@ class ScopeAuthorizationMatrixIntegrationTest {
     this.lecturerAssignedUserId = assignedLecturer.getId();
 
     // 2. Tạo CourseSection thử nghiệm trong CSDL
-    savedCourseSection =
-        courseSectionRepository.save(
-            CourseSection.builder()
-                .id(TARGET_SECTION_ID)
-                .code("SE401.T01")
-                .courseId(TARGET_COURSE_ID)
-                .syllabusId("671dcba5f123456789abc222")
-                .termId("671dcba5f123456789abc333")
-                .lecturerIds(List.of(lecturerAssignedUserId))
-                .enrolledCount(40)
-                .status("OPEN")
-                .build());
+    courseSectionRepository.save(
+        CourseSection.builder()
+            .id(TARGET_SECTION_ID)
+            .code("SE401.T01")
+            .courseId(TARGET_COURSE_ID)
+            .syllabusId("671dcba5f123456789abc222")
+            .termId("671dcba5f123456789abc333")
+            .lecturerIds(List.of(lecturerAssignedUserId))
+            .enrolledCount(40)
+            .status("OPEN")
+            .build());
   }
 
   @AfterEach

@@ -148,13 +148,11 @@ public class ProgramVersionServiceImpl implements ProgramVersionService {
     if (next == null || next == current) {
       return;
     }
-    if (current == null) {
-      if (next != ProgramVersionStatus.DRAFT) {
-        throw invalidTransition(current, next);
-      }
-      return;
-    }
-    if (next.ordinal() != current.ordinal() + 1) {
+    boolean allowed =
+        current == null
+            ? next == ProgramVersionStatus.DRAFT
+            : next.ordinal() == current.ordinal() + 1;
+    if (!allowed) {
       throw invalidTransition(current, next);
     }
   }

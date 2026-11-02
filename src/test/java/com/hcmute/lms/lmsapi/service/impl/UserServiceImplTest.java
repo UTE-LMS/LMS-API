@@ -36,7 +36,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -59,7 +58,7 @@ class UserServiceImplTest {
 
   @Mock private ScopeValidationService scopeValidationService;
 
-  @InjectMocks private UserServiceImpl userService;
+  private UserServiceImpl userService;
 
   private static final String ADMIN_ID = "671dcba5f123456789abcd01";
   private static final String TARGET_USER_ID = "671dcba5f123456789abcd02";
@@ -70,6 +69,14 @@ class UserServiceImplTest {
 
   @BeforeEach
   void setUp() {
+    userService =
+        new UserServiceImpl(
+            userRepository,
+            userMapper,
+            passwordEncoder,
+            passwordPolicyValidator,
+            scopeValidationService);
+
     sampleTargetUser =
         User.builder()
             .id(TARGET_USER_ID)

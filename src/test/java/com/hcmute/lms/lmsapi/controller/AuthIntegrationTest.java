@@ -61,7 +61,6 @@ class AuthIntegrationTest {
   private MockMvc mockMvc;
 
   private User testActiveUser;
-  private User testLockedUser;
 
   private static final String ACTIVE_USERNAME = "test_auth_active";
   private static final String LOCKED_USERNAME = "test_auth_locked";
@@ -100,19 +99,18 @@ class AuthIntegrationTest {
                 .build());
 
     // 2. Tạo người dùng LOCKED thử nghiệm
-    testLockedUser =
-        userRepository.save(
-            User.builder()
-                .username(LOCKED_USERNAME)
-                .email("test_locked@hcmute.edu.vn")
-                .passwordHash(passwordEncoder.encode(RAW_PASSWORD))
-                .fullName("[DỮ LIỆU THỬ NGHIỆM] Tài khoản bị khóa")
-                .status(UserStatus.LOCKED)
-                .tokenVersion(0L)
-                .roleAssignments(List.of(RoleAssignment.builder().role(Role.STUDENT).build()))
-                .createdAt(Instant.now())
-                .updatedAt(Instant.now())
-                .build());
+    userRepository.save(
+        User.builder()
+            .username(LOCKED_USERNAME)
+            .email("test_locked@hcmute.edu.vn")
+            .passwordHash(passwordEncoder.encode(RAW_PASSWORD))
+            .fullName("[DỮ LIỆU THỬ NGHIỆM] Tài khoản bị khóa")
+            .status(UserStatus.LOCKED)
+            .tokenVersion(0L)
+            .roleAssignments(List.of(RoleAssignment.builder().role(Role.STUDENT).build()))
+            .createdAt(Instant.now())
+            .updatedAt(Instant.now())
+            .build());
   }
 
   @AfterEach

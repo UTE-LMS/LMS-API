@@ -134,17 +134,15 @@ public class AuthTimingAndRevocationEmpiricalChallengeTest {
       LoginRequest request = new LoginRequest(nonExistentUsername, DEFAULT_PASSWORD);
 
       long start = System.nanoTime();
-      MvcResult result =
-          mockMvc
-              .perform(
-                  post("/api/v1/auth/login")
-                      .contentType(MediaType.APPLICATION_JSON)
-                      .content(objectMapper.writeValueAsString(request)))
-              .andExpect(status().isUnauthorized())
-              .andExpect(jsonPath("$.status").value(401))
-              .andExpect(jsonPath("$.code").value("UNAUTHORIZED"))
-              .andExpect(jsonPath("$.message").value("Tên đăng nhập hoặc mật khẩu không chính xác"))
-              .andReturn();
+      mockMvc
+          .perform(
+              post("/api/v1/auth/login")
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(objectMapper.writeValueAsString(request)))
+          .andExpect(status().isUnauthorized())
+          .andExpect(jsonPath("$.status").value(401))
+          .andExpect(jsonPath("$.code").value("UNAUTHORIZED"))
+          .andExpect(jsonPath("$.message").value("Tên đăng nhập hoặc mật khẩu không chính xác"));
       long elapsedMillis = (System.nanoTime() - start) / 1_000_000;
 
       // BCrypt round 10 calculation guarantees at least 15ms of CPU work.

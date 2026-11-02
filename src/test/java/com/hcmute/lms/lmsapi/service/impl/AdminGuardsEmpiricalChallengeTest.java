@@ -32,7 +32,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -59,7 +58,7 @@ class AdminGuardsEmpiricalChallengeTest {
 
   @Mock private ScopeValidationService scopeValidationService;
 
-  @InjectMocks private UserServiceImpl userService;
+  private UserServiceImpl userService;
 
   private static final String CURRENT_ADMIN_ID = "671dcba5f123456789abcd01";
   private static final String OTHER_ADMIN_ID = "671dcba5f123456789abcd02";
@@ -72,6 +71,14 @@ class AdminGuardsEmpiricalChallengeTest {
 
   @BeforeEach
   void setUp() {
+    userService =
+        new UserServiceImpl(
+            userRepository,
+            userMapper,
+            passwordEncoder,
+            passwordPolicyValidator,
+            scopeValidationService);
+
     currentAdmin =
         User.builder()
             .id(CURRENT_ADMIN_ID)

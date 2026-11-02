@@ -135,6 +135,11 @@ public class UserRepositoryCustomConcurrencyChallengerTest {
     assertThat(doneLatch.await(30, TimeUnit.SECONDS)).isTrue();
     executor.shutdown();
 
+    // Surface any exception thrown inside a worker thread instead of silently dropping it
+    for (Future<?> future : futures) {
+      future.get(10, TimeUnit.SECONDS);
+    }
+
     // Assert: Cả 100 luồng đều phải cập nhật thành công (modified == 1)
     assertThat(successfulIncrements.get())
         .as("Mọi thao tác $inc đồng thời đều phải cập nhật thành công")
