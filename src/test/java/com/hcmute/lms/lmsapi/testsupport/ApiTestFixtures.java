@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
+import lombok.RequiredArgsConstructor;
 import org.bson.types.ObjectId;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
@@ -44,31 +45,27 @@ import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
  * <p>Token JWT được ký trực tiếp bằng {@link JwtEncoder} của ứng dụng, không đi qua {@code
  * /auth/login}, nên không sinh thêm dòng {@code audit_logs} ngoài ý muốn.
  */
+@RequiredArgsConstructor
 public final class ApiTestFixtures {
 
   /** Nhãn bắt buộc cho dữ liệu giả (CLAUDE.md quy tắc 2, plan README bất biến 11). */
   public static final String LABEL = "[DỮ LIỆU THỬ NGHIỆM]";
 
   private final MongoTemplate mongo;
+  private final PasswordEncoder passwordEncoder;
   private final JwtEncoder jwtEncoder;
   private final JwtConfig jwtConfig;
   private final String runId = UUID.randomUUID().toString().replace("-", "").substring(0, 10);
-  private final PasswordEncoder passwordEncoder;
-  private final String passwordHash;
+  private String passwordHash;
   private final AtomicInteger sequence = new AtomicInteger();
   private final List<String> extraUsernames = new ArrayList<>();
 
-  /** Tạo bộ fixture mới; băm mật khẩu ngẫu nhiên đúng một lần để các user fixture dùng chung. */
-  public ApiTestFixtures(
-      MongoTemplate mongo,
-      PasswordEncoder passwordEncoder,
-      JwtEncoder jwtEncoder,
-      JwtConfig jwtConfig) {
-    this.mongo = mongo;
-    this.jwtEncoder = jwtEncoder;
-    this.jwtConfig = jwtConfig;
-    this.passwordEncoder = passwordEncoder;
-    this.passwordHash = passwordEncoder.encode("Pw-" + UUID.randomUUID());
+  /** Băm mật khẩu ngẫu nhiên đúng một lần cho mỗi bộ fixture; các user fixture dùng chung. */
+  private synchronized String sharedPasswordHash() {
+    if (passwordHash == null) {
+      passwordHash = passwordEncoder.encode("Pw-" + UUID.randomUUID());
+    }
+    return passwordHash;
   }
 
   /** Mã chạy riêng của test này, dùng để dựng tên không đụng nhau. */
@@ -117,7 +114,7 @@ public final class ApiTestFixtures {
         User.builder()
             .username(username)
             .email(username + "@itest.invalid")
-            .passwordHash(passwordHash)
+            .passwordHash(sharedPasswordHash())
             .fullName(LABEL + " " + username)
             .status(UserStatus.ACTIVE)
             .tokenVersion(0L)
@@ -140,8 +137,7 @@ public final class ApiTestFixtures {
             .build();
     String token =
         jwtEncoder
-            .encode(
-                JwtEncoderParameters.from(JwsHeader.with(MacAlgorithm.HS256).build(), claims))
+            .encode(JwtEncoderParameters.from(JwsHeader.with(MacAlgorithm.HS256).build(), claims))
             .getTokenValue();
     return "Bearer " + token;
   }
@@ -248,8 +244,7 @@ public final class ApiTestFixtures {
     String codePrefix = "^ITEST-" + runId.toUpperCase() + "-";
     List<String> programIds = ids("programs", Criteria.where("code").regex(codePrefix));
     List<ObjectId> programOids = programIds.stream().map(ObjectId::new).toList();
-    List<String> versionIds =
-        ids("program_versions", Criteria.where("programId").in(programOids));
+    List<String> versionIds = ids("program_versions", Criteria.where("programId").in(programOids));
     List<ObjectId> versionOids = versionIds.stream().map(ObjectId::new).toList();
 
     removeIn("course_pi_contributions", "programVersionId", versionOids);
@@ -260,8 +255,7 @@ public final class ApiTestFixtures {
     mongo.remove(query(Criteria.where("code").regex(codePrefix)), "courses");
     mongo.remove(query(Criteria.where("code").regex(codePrefix)), "course_sections");
 
-    List<String> userIds =
-        ids("users", Criteria.where("username").regex("^itest_" + runId + "_"));
+    List<String> userIds = ids("users", Criteria.where("username").regex("^itest_" + runId + "_"));
     List<ObjectId> userOids = userIds.stream().map(ObjectId::new).toList();
     removeIn("audit_logs", "userId", userOids);
     mongo.remove(query(Criteria.where("username").regex("^itest_" + runId + "_")), "users");

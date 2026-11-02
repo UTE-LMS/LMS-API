@@ -101,7 +101,8 @@ class UserApiBoundaryIntegrationTest extends IntegrationTestBase {
       value = Role.class,
       names = {"ADMIN"},
       mode = EnumSource.Mode.EXCLUDE)
-  @DisplayName("US-02/AC-4: mọi vai trò khác ADMIN gọi API quản lý người dùng -> 403, dữ liệu không đổi")
+  @DisplayName(
+      "US-02/AC-4: mọi vai trò khác ADMIN gọi API quản lý người dùng -> 403, dữ liệu không đổi")
   void nonAdminRolesAreForbiddenOnUserManagement(Role role) throws Exception {
     String bearer = fixtures.bearerFor(role, null);
     User target = fixtures.user(Role.LECTURER, null);
@@ -183,7 +184,8 @@ class UserApiBoundaryIntegrationTest extends IntegrationTestBase {
   }
 
   @Test
-  @DisplayName("US-02/AC-1 (biên): mật khẩu tiếng Việt đo bằng byte UTF-8: 24 chữ 'ế' = 72 byte hợp lệ, 25 chữ = 75 byte bị 400")
+  @DisplayName(
+      "US-02/AC-1 (biên): mật khẩu tiếng Việt đo bằng byte UTF-8: 24 chữ 'ế' = 72 byte hợp lệ, 25 chữ = 75 byte bị 400")
   void passwordIsMeasuredInUtf8Bytes() throws Exception {
     // 'ế' (U+1EBF) chiếm 3 byte UTF-8: 24 x 3 = 72, 25 x 3 = 75.
     CreateUserRequest atLimit = createRequest(fixtures.username("vn"));
@@ -196,7 +198,8 @@ class UserApiBoundaryIntegrationTest extends IntegrationTestBase {
   }
 
   @Test
-  @DisplayName("US-02/AC-1: username và email được lưu chữ thường; trùng khác hoa/thường vẫn là 409 (US-02/AC-2)")
+  @DisplayName(
+      "US-02/AC-1: username và email được lưu chữ thường; trùng khác hoa/thường vẫn là 409 (US-02/AC-2)")
   void usernameAndEmailAreLowercased() throws Exception {
     String lower = fixtures.username("case");
     CreateUserRequest mixed = createRequest(lower.toUpperCase());
@@ -222,7 +225,8 @@ class UserApiBoundaryIntegrationTest extends IntegrationTestBase {
   }
 
   @Test
-  @DisplayName("US-02/AC-1 (âm): trường thừa status, tokenVersion, passwordHash, id trong body bị bỏ qua")
+  @DisplayName(
+      "US-02/AC-1 (âm): trường thừa status, tokenVersion, passwordHash, id trong body bị bỏ qua")
   void createUserIgnoresPrivilegedExtraFields() throws Exception {
     String username = fixtures.username("mass");
     String forgedId = ApiTestFixtures.missingId();
@@ -257,7 +261,8 @@ class UserApiBoundaryIntegrationTest extends IntegrationTestBase {
   }
 
   @Test
-  @DisplayName("US-02/AC-1 (âm): roleAssignments rỗng/null, vai trò lạ, email sai, thiếu họ tên -> 400")
+  @DisplayName(
+      "US-02/AC-1 (âm): roleAssignments rỗng/null, vai trò lạ, email sai, thiếu họ tên -> 400")
   void createUserValidation() throws Exception {
     CreateUserRequest noRoles = createRequest(fixtures.username("v"));
     noRoles.setRoleAssignments(List.of());
@@ -268,8 +273,14 @@ class UserApiBoundaryIntegrationTest extends IntegrationTestBase {
 
     String name = fixtures.username("v");
     String unknownRole =
-        "{\"username\":\"" + name + "\",\"email\":\"" + name + "@itest.invalid\","
-            + "\"password\":\"" + VALID_PASSWORD + "\",\"fullName\":\"x\","
+        "{\"username\":\""
+            + name
+            + "\",\"email\":\""
+            + name
+            + "@itest.invalid\","
+            + "\"password\":\""
+            + VALID_PASSWORD
+            + "\",\"fullName\":\"x\","
             + "\"roleAssignments\":[{\"role\":\"SUPERUSER\"}]}";
     mockMvc.perform(postAs(admin, USERS, unknownRole)).andExpect(status().isBadRequest());
 
@@ -312,7 +323,8 @@ class UserApiBoundaryIntegrationTest extends IntegrationTestBase {
 
   @ParameterizedTest(name = "{0} -> 400")
   @ValueSource(strings = {"abc", "12345", "zzzzzzzzzzzzzzzzzzzzzzzz", "671dcba5f123456789abc7777"})
-  @DisplayName("US-40 (biên): ObjectId sai định dạng ở path của GET/PUT /users/{id}[/status] -> 400, không 500")
+  @DisplayName(
+      "US-40 (biên): ObjectId sai định dạng ở path của GET/PUT /users/{id}[/status] -> 400, không 500")
   void malformedUserIds(String id) throws Exception {
     UpdateUserRequest update =
         UpdateUserRequest.builder()
@@ -331,7 +343,8 @@ class UserApiBoundaryIntegrationTest extends IntegrationTestBase {
   }
 
   @Test
-  @DisplayName("US-40: ObjectId hợp lệ nhưng không có user -> 404; trạng thái ngoài enum hoặc thiếu -> 400")
+  @DisplayName(
+      "US-40: ObjectId hợp lệ nhưng không có user -> 404; trạng thái ngoài enum hoặc thiếu -> 400")
   void unknownUserAndInvalidStatusBodies() throws Exception {
     String missing = ApiTestFixtures.missingId();
     mockMvc
@@ -357,7 +370,8 @@ class UserApiBoundaryIntegrationTest extends IntegrationTestBase {
   // ------------------------------------------------------------------ US-01/AC-4: nhật ký
 
   @Test
-  @DisplayName("US-01/AC-4: log của đăng nhập đúng, sai mật khẩu và tài khoản khóa không chứa mật khẩu hay băm")
+  @DisplayName(
+      "US-01/AC-4: log của đăng nhập đúng, sai mật khẩu và tài khoản khóa không chứa mật khẩu hay băm")
   void logsNeverContainPasswordOrHash(CapturedOutput output) throws Exception {
     String secret = "Bi-mat-chi-co-trong-test-77";
     User user = fixtures.userWithPassword(Role.LECTURER, null, secret);

@@ -104,7 +104,8 @@ class ProgramApiIntegrationTest extends IntegrationTestBase {
   }
 
   @Test
-  @DisplayName("US-05 (biên): mã 65 ký tự, tên 256 ký tự, level 101 ký tự -> 400 với đúng trường lỗi")
+  @DisplayName(
+      "US-05 (biên): mã 65 ký tự, tên 256 ký tự, level 101 ký tự -> 400 với đúng trường lỗi")
   void createProgram_lengthOverflow() throws Exception {
     ProgramRequest longCode = request("C".repeat(65));
     mockMvc
@@ -128,7 +129,8 @@ class ProgramApiIntegrationTest extends IntegrationTestBase {
   }
 
   @Test
-  @DisplayName("US-40/AC-1: body rỗng, {} , JSON hỏng; mã/tên chỉ gồm khoảng trắng -> 400 VALIDATION_ERROR")
+  @DisplayName(
+      "US-40/AC-1: body rỗng, {} , JSON hỏng; mã/tên chỉ gồm khoảng trắng -> 400 VALIDATION_ERROR")
   void createProgram_invalidBodies() throws Exception {
     mockMvc
         .perform(postAs(manager, PROGRAMS, null))
@@ -209,7 +211,8 @@ class ProgramApiIntegrationTest extends IntegrationTestBase {
   }
 
   @Test
-  @DisplayName("US-02/AC-6 (áp dụng cho F02): size = 1 trả đúng 1 phần tử; totalPages = ceil(total / size)")
+  @DisplayName(
+      "US-02/AC-6 (áp dụng cho F02): size = 1 trả đúng 1 phần tử; totalPages = ceil(total / size)")
   void paginationEnvelopeIsConsistent() throws Exception {
     fixtures.program();
     fixtures.program();
@@ -284,8 +287,7 @@ class ProgramApiIntegrationTest extends IntegrationTestBase {
     boolean mayWrite = role == Role.PROGRAM_MANAGER;
     var create = mockMvc.perform(postAs(bearer, PROGRAMS, request(fixtures.code("PRG"))));
     var update =
-        mockMvc.perform(
-            putAs(bearer, PROGRAM_BY_ID, request(program.getCode()), program.getId()));
+        mockMvc.perform(putAs(bearer, PROGRAM_BY_ID, request(program.getCode()), program.getId()));
     if (mayWrite) {
       create.andExpect(status().isCreated());
       update.andExpect(status().isOk());

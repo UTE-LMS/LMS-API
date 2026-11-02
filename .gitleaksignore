@@ -9,3 +9,13 @@
 # Hai JWT giả có chữ ký cố ý sai ("invalid_signature") dùng làm dữ liệu đầu vào ca âm trong AuthIntegrationTest.
 53e72431057a6a932cbc200145efdc131c20a1db:src/test/java/com/hcmute/lms/lmsapi/controller/AuthIntegrationTest.java:jwt:189
 53e72431057a6a932cbc200145efdc131c20a1db:src/test/java/com/hcmute/lms/lmsapi/controller/AuthIntegrationTest.java:jwt:402
+
+# --- Bổ sung 2026-11-02 (sau khi PR #61, #62 vào main) — CẦN NGƯỜI DÙNG XÁC NHẬN KHI REVIEW PR NÀY ---
+# Hai JWT giả ở trên (chữ ký cố ý sai) bị gitleaks báo lại với fingerprint mới, vì commit định dạng lại tệp (cde7f3d,
+# PR #62) đã dời dòng 189 -> 192 và 402 -> 434. Cùng nội dung, cùng lý do như hai dòng đã được chấp nhận ở trên.
+cde7f3dc0c0229172f542192ffef86865892aa64:src/test/java/com/hcmute/lms/lmsapi/controller/AuthIntegrationTest.java:jwt:192
+cde7f3dc0c0229172f542192ffef86865892aa64:src/test/java/com/hcmute/lms/lmsapi/controller/AuthIntegrationTest.java:jwt:434
+
+# Mật khẩu giả của test ("Bi-mat-chi-co-trong-test-77", biến `secret` trong UserApiBoundaryIntegrationTest) dùng để chứng minh
+# log đăng nhập KHÔNG chứa mật khẩu (US-01/AC-4). Chuỗi tự sinh cho test, không phải khóa hay mật khẩu của hệ thống nào.
+e5793ba7c545eced1bc38b852c026b0f74fd00df:src/test/java/com/hcmute/lms/lmsapi/controller/UserApiBoundaryIntegrationTest.java:generic-api-key:362

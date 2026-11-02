@@ -34,7 +34,8 @@ import org.springframework.stereotype.Component;
  */
 @Slf4j
 @Component
-// Order 1: chạy trước DemoDataSeeder (Order 2, profile demo) vì seeder này chỉ hoạt động khi users rỗng.
+// Order 1: chạy trước DemoDataSeeder (Order 2, profile demo) vì seeder này chỉ hoạt động khi users
+// rỗng.
 @Order(1)
 @RequiredArgsConstructor
 public class InitialAdminSeeder implements ApplicationRunner {

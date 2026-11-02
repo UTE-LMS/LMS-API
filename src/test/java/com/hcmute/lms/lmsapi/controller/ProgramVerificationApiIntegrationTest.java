@@ -28,6 +28,7 @@ import com.hcmute.lms.lmsapi.testsupport.RoleScopeMatrix.Case;
 import com.hcmute.lms.lmsapi.testsupport.RoleScopeMatrix.Targets;
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -76,7 +77,8 @@ class ProgramVerificationApiIntegrationTest extends IntegrationTestBase {
   // ------------------------------------------------------------------ US-08/AC-1, AC-2
 
   @Test
-  @DisplayName("US-08/AC-1: QA đổi verification ghi verifiedBy = người gọi và verifiedAt = thời điểm gọi")
+  @DisplayName(
+      "US-08/AC-1: QA đổi verification ghi verifiedBy = người gọi và verifiedAt = thời điểm gọi")
   void verifyVersion_recordsVerifierAndTimestamp() throws Exception {
     User qa = qaInScope();
     Instant before = Instant.now().minusSeconds(1);
@@ -84,7 +86,10 @@ class ProgramVerificationApiIntegrationTest extends IntegrationTestBase {
     MvcResult result =
         mockMvc
             .perform(
-                putAs(fixtures.bearer(qa), VERSION_VERIFY, verified(ApiTestFixtures.LABEL + " ok"),
+                putAs(
+                    fixtures.bearer(qa),
+                    VERSION_VERIFY,
+                    verified(ApiTestFixtures.LABEL + " ok"),
                     version.getId()))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.verification.status").value("VERIFIED"))
@@ -94,7 +99,9 @@ class ProgramVerificationApiIntegrationTest extends IntegrationTestBase {
 
     Instant verifiedAt = Instant.parse(read(result, "$.verification.verifiedAt"));
     assertThat(verifiedAt).isBetween(before, Instant.now().plusSeconds(1));
-    var stored = mongo().findById(version.getId(), ProgramVersion.class).getVerification();
+    var stored =
+        Objects.requireNonNull(mongo().findById(version.getId(), ProgramVersion.class))
+            .getVerification();
     assertThat(stored.getStatus()).isEqualTo(VerificationStatus.VERIFIED);
     assertThat(stored.getVerifiedBy()).isEqualTo(qa.getId());
   }
@@ -122,27 +129,30 @@ class ProgramVerificationApiIntegrationTest extends IntegrationTestBase {
 
   // ------------------------------------------------------------------ US-08/AC-3: ma trận
 
-  /** Chỉ QA_OFFICER có programIds chứa CTĐT được ghi verification (cột write); mọi người đọc được. */
+  /**
+   * Chỉ QA_OFFICER có programIds chứa CTĐT được ghi verification (cột write); mọi người đọc được.
+   */
   static Stream<Case> verificationMatrix() {
     return RoleScopeMatrix.cases(
-            row(Role.QA_OFFICER, PROGRAM_MATCH, true, true),
-            row(Role.QA_OFFICER, NULL_SCOPE, true, false),
-            row(Role.QA_OFFICER, EMPTY_ARRAYS, true, false),
-            row(Role.QA_OFFICER, OTHER_RESOURCES, true, false),
-            row(Role.ADMIN, NULL_SCOPE, true, false),
-            row(Role.ADMIN, PROGRAM_MATCH, true, false),
-            row(Role.PROGRAM_MANAGER, PROGRAM_MATCH, true, false),
-            row(Role.PROGRAM_MANAGER, NULL_SCOPE, true, false),
-            row(Role.DEPARTMENT_HEAD, PROGRAM_MATCH, true, false),
-            row(Role.LECTURER, PROGRAM_MATCH, true, false),
-            row(Role.VIEWER, NULL_SCOPE, true, false),
-            row(Role.VIEWER, PROGRAM_MATCH, true, false),
-            row(Role.STUDENT, NULL_SCOPE, true, false));
+        row(Role.QA_OFFICER, PROGRAM_MATCH, true, true),
+        row(Role.QA_OFFICER, NULL_SCOPE, true, false),
+        row(Role.QA_OFFICER, EMPTY_ARRAYS, true, false),
+        row(Role.QA_OFFICER, OTHER_RESOURCES, true, false),
+        row(Role.ADMIN, NULL_SCOPE, true, false),
+        row(Role.ADMIN, PROGRAM_MATCH, true, false),
+        row(Role.PROGRAM_MANAGER, PROGRAM_MATCH, true, false),
+        row(Role.PROGRAM_MANAGER, NULL_SCOPE, true, false),
+        row(Role.DEPARTMENT_HEAD, PROGRAM_MATCH, true, false),
+        row(Role.LECTURER, PROGRAM_MATCH, true, false),
+        row(Role.VIEWER, NULL_SCOPE, true, false),
+        row(Role.VIEWER, PROGRAM_MATCH, true, false),
+        row(Role.STUDENT, NULL_SCOPE, true, false));
   }
 
   @ParameterizedTest(name = "{0}")
   @MethodSource("verificationMatrix")
-  @DisplayName("US-08/AC-3: ma trận vai trò x phạm vi cho verification (đọc: mọi người; ghi: QA trong CTĐT)")
+  @DisplayName(
+      "US-08/AC-3: ma trận vai trò x phạm vi cho verification (đọc: mọi người; ghi: QA trong CTĐT)")
   void roleScopeVerificationMatches(Case matrixCase) throws Exception {
     Targets targets = new Targets(program.getId(), ApiTestFixtures.missingId(), null);
     User user = fixtures.user(matrixCase.role(), matrixCase.scope(targets));
@@ -173,8 +183,7 @@ class ProgramVerificationApiIntegrationTest extends IntegrationTestBase {
   @DisplayName("US-08/AC-3: mọi vai trò khác QA_OFFICER (kể cả ADMIN) gọi xác nhận PLO/PI -> 403")
   void nonQaRolesAreForbiddenOnPloAndPi(Role role) throws Exception {
     String bearer =
-        fixtures.bearerFor(
-            role, UserScope.builder().programIds(List.of(program.getId())).build());
+        fixtures.bearerFor(role, UserScope.builder().programIds(List.of(program.getId())).build());
 
     mockMvc
         .perform(putAs(bearer, PLO_VERIFY, verified("x"), version.getId(), plo.getId()))
@@ -220,7 +229,8 @@ class ProgramVerificationApiIntegrationTest extends IntegrationTestBase {
   // ------------------------------------------------------------------ ca âm / biên
 
   @Test
-  @DisplayName("US-08 (âm): thiếu status, status ngoài enum, body rỗng, ghi chú > 2000 ký tự -> 400")
+  @DisplayName(
+      "US-08 (âm): thiếu status, status ngoài enum, body rỗng, ghi chú > 2000 ký tự -> 400")
   void invalidBodies() throws Exception {
     String qa = fixtures.bearer(qaInScope());
     mockMvc
@@ -255,7 +265,8 @@ class ProgramVerificationApiIntegrationTest extends IntegrationTestBase {
   }
 
   @Test
-  @DisplayName("US-08 (âm): id không tồn tại -> 404; sai định dạng -> 400; PLO/PI của phiên bản khác -> 404")
+  @DisplayName(
+      "US-08 (âm): id không tồn tại -> 404; sai định dạng -> 400; PLO/PI của phiên bản khác -> 404")
   void unknownMalformedAndForeignIds() throws Exception {
     String qa = fixtures.bearer(qaInScope());
     mockMvc

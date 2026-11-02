@@ -30,8 +30,8 @@ import tools.jackson.databind.ObjectMapper;
  * <p>Chạy {@code @SpringBootTest} đầy đủ (Security, Jackson, Mongo) trên MongoDB replica set thật
  * lấy từ {@code MONGODB_URI} (xem README và ADR 0008); không dùng Testcontainers (ADR 0002). Mỗi
  * test có một {@link ApiTestFixtures} riêng, tự dọn ở {@code @AfterEach}, nên các test không phụ
- * thuộc thứ tự chạy. Lớp con chỉ khai báo kịch bản, không lặp lại việc dựng MockMvc, token, dọn
- * dữ liệu.
+ * thuộc thứ tự chạy. Lớp con chỉ khai báo kịch bản, không lặp lại việc dựng MockMvc, token, dọn dữ
+ * liệu.
  */
 @SpringBootTest
 public abstract class IntegrationTestBase {

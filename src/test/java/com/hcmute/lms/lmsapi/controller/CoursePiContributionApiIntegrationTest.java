@@ -119,8 +119,7 @@ class CoursePiContributionApiIntegrationTest extends IntegrationTestBase {
   @DisplayName("US-07/AC-2 (biên): cùng học phần và PI ở phiên bản CTĐT khác không bị coi là trùng")
   void sameCourseAndPiInOtherVersionIsAllowed() throws Exception {
     mockMvc.perform(postAs(manager, ROWS, request(PiContributionType.I), version.getId()));
-    ProgramVersion other =
-        fixtures.programVersion(fixtures.program(), ProgramVersionStatus.DRAFT);
+    ProgramVersion other = fixtures.programVersion(fixtures.program(), ProgramVersionStatus.DRAFT);
     Pi otherPi = fixtures.pi(other, fixtures.plo(other, "PLO1", 1), "PI1.1", 1);
     CoursePiContributionRequest body =
         CoursePiContributionRequest.builder()
@@ -152,8 +151,7 @@ class CoursePiContributionApiIntegrationTest extends IntegrationTestBase {
   @Test
   @DisplayName("US-07/AC-2: contribution là số hoặc thiếu -> 400 (I/R/M không đổi thành 1/2/3)")
   void numericOrMissingContributionIsBadRequest() throws Exception {
-    String prefix =
-        "{\"courseId\":\"" + course.getId() + "\",\"piId\":\"" + pi.getId() + "\"";
+    String prefix = "{\"courseId\":\"" + course.getId() + "\",\"piId\":\"" + pi.getId() + "\"";
     mockMvc
         .perform(postAs(manager, ROWS, prefix + ",\"contribution\":2}", version.getId()))
         .andExpect(status().isBadRequest());
@@ -168,8 +166,7 @@ class CoursePiContributionApiIntegrationTest extends IntegrationTestBase {
   @Test
   @DisplayName("US-07/AC-3: piId thuộc phiên bản CTĐT khác -> 422 dù PI có thật")
   void piFromOtherVersionIsUnprocessable() throws Exception {
-    ProgramVersion other =
-        fixtures.programVersion(fixtures.program(), ProgramVersionStatus.DRAFT);
+    ProgramVersion other = fixtures.programVersion(fixtures.program(), ProgramVersionStatus.DRAFT);
     Pi foreignPi = fixtures.pi(other, fixtures.plo(other, "PLO1", 1), "PI1.1", 1);
     CoursePiContributionRequest body =
         CoursePiContributionRequest.builder()
@@ -209,7 +206,8 @@ class CoursePiContributionApiIntegrationTest extends IntegrationTestBase {
   }
 
   @Test
-  @DisplayName("US-07/AC-3 (âm): courseId/piId sai định dạng -> 400; phiên bản không tồn tại -> 404")
+  @DisplayName(
+      "US-07/AC-3 (âm): courseId/piId sai định dạng -> 400; phiên bản không tồn tại -> 404")
   void malformedIdsAndUnknownVersion() throws Exception {
     CoursePiContributionRequest badCourse =
         CoursePiContributionRequest.builder()
@@ -237,9 +235,7 @@ class CoursePiContributionApiIntegrationTest extends IntegrationTestBase {
         .perform(postAs(manager, ROWS, null, version.getId()))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
-    mockMvc
-        .perform(postAs(manager, ROWS, "{", version.getId()))
-        .andExpect(status().isBadRequest());
+    mockMvc.perform(postAs(manager, ROWS, "{", version.getId())).andExpect(status().isBadRequest());
     mockMvc
         .perform(postAs(manager, ROWS, "{}", version.getId()))
         .andExpect(status().isBadRequest())
@@ -253,10 +249,8 @@ class CoursePiContributionApiIntegrationTest extends IntegrationTestBase {
   @Test
   @DisplayName("US-07: xóa dòng ma trận -> 204; xóa lại -> 404; dòng của phiên bản khác -> 404")
   void deleteRow() throws Exception {
-    CoursePiContribution row =
-        fixtures.contribution(version, course, pi, PiContributionType.R);
-    ProgramVersion other =
-        fixtures.programVersion(fixtures.program(), ProgramVersionStatus.DRAFT);
+    CoursePiContribution row = fixtures.contribution(version, course, pi, PiContributionType.R);
+    ProgramVersion other = fixtures.programVersion(fixtures.program(), ProgramVersionStatus.DRAFT);
 
     mockMvc
         .perform(deleteAs(manager, ROW_BY_ID, other.getId(), row.getId()))
@@ -280,8 +274,7 @@ class CoursePiContributionApiIntegrationTest extends IntegrationTestBase {
   @Test
   @DisplayName("US-03/AC-2: không đăng nhập -> 401 trên GET, POST, DELETE ma trận")
   void anonymousIsUnauthorized() throws Exception {
-    CoursePiContribution row =
-        fixtures.contribution(version, course, pi, PiContributionType.I);
+    CoursePiContribution row = fixtures.contribution(version, course, pi, PiContributionType.I);
     mockMvc.perform(getAs(null, ROWS, version.getId())).andExpect(status().isUnauthorized());
     mockMvc
         .perform(postAs(null, ROWS, request(PiContributionType.I), version.getId()))
@@ -299,8 +292,7 @@ class CoursePiContributionApiIntegrationTest extends IntegrationTestBase {
   @DisplayName("F02 mục 6: chỉ PROGRAM_MANAGER ghi ma trận; vai trò khác -> 403, đọc vẫn được")
   void onlyProgramManagerMayWrite(Role role) throws Exception {
     String bearer = fixtures.bearerFor(role, null);
-    CoursePiContribution row =
-        fixtures.contribution(version, course, pi, PiContributionType.I);
+    CoursePiContribution row = fixtures.contribution(version, course, pi, PiContributionType.I);
 
     mockMvc
         .perform(postAs(bearer, ROWS, request(PiContributionType.M), version.getId()))

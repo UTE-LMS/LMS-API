@@ -34,6 +34,7 @@ import com.hcmute.lms.lmsapi.validator.PasswordPolicyValidator;
 import com.jayway.jsonpath.JsonPath;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.bson.types.ObjectId;
@@ -151,7 +152,8 @@ class DemoDataSeederTest {
   }
 
   private static void purge(MongoTemplate mongo, String key) {
-    // Chốt an toàn: chỉ xóa theo key ngẫu nhiên do chính test sinh ra, không bao giờ theo key tùy ý.
+    // Chốt an toàn: chỉ xóa theo key ngẫu nhiên do chính test sinh ra, không bao giờ theo key tùy
+    // ý.
     assertThat(key).matches("itest[0-9a-f]{8}");
     String upper = "^" + key.toUpperCase() + "-";
     List<ObjectId> programIds =
@@ -162,9 +164,7 @@ class DemoDataSeederTest {
         programIds.isEmpty()
             ? List.of()
             : mongo
-                .find(
-                    Query.query(Criteria.where("programId").in(programIds)),
-                    ProgramVersion.class)
+                .find(Query.query(Criteria.where("programId").in(programIds)), ProgramVersion.class)
                 .stream()
                 .map(v -> new ObjectId(v.getId()))
                 .toList();
@@ -180,28 +180,39 @@ class DemoDataSeederTest {
     mongo.remove(Query.query(Criteria.where("username").regex("^" + key + "\\.")), "users");
   }
 
+  private Program findProgram(DemoDataSeeder seeder) {
+    return Objects.requireNonNull(
+        mongo.findOne(Query.query(Criteria.where("code").is(seeder.programCode())), Program.class),
+        "chương trình demo chưa được seed");
+  }
+
+  private ProgramVersion findVersion(Program program) {
+    return Objects.requireNonNull(
+        mongo.findOne(
+            Query.query(Criteria.where("programId").is(new ObjectId(program.getId()))),
+            ProgramVersion.class),
+        "phiên bản CTĐT demo chưa được seed");
+  }
+
   private long countRecords(DemoDataSeeder seeder) {
     Program program =
-        mongo.findOne(
-            Query.query(Criteria.where("code").is(seeder.programCode())), Program.class);
+        mongo.findOne(Query.query(Criteria.where("code").is(seeder.programCode())), Program.class);
     if (program == null) {
       return 0;
     }
-    ProgramVersion version =
-        mongo.findOne(
-            Query.query(Criteria.where("programId").is(new ObjectId(program.getId()))),
-            ProgramVersion.class);
+    ProgramVersion version = findVersion(program);
     ObjectId versionId = new ObjectId(version.getId());
     Query byVersion = Query.query(Criteria.where("programVersionId").is(versionId));
     return 1
-        + mongo.count(Query.query(Criteria.where("programId").is(new ObjectId(program.getId()))),
+        + mongo.count(
+            Query.query(Criteria.where("programId").is(new ObjectId(program.getId()))),
             ProgramVersion.class)
         + mongo.count(byVersion, Plo.class)
         + mongo.count(byVersion, Pi.class)
         + mongo.count(byVersion, CoursePiContribution.class)
         + mongo.count(Query.query(Criteria.where("code").is(seeder.courseCode())), Course.class)
         + mongo.count(
-            Query.query(Criteria.where("username").regex("^" + seeder.username("") )), User.class);
+            Query.query(Criteria.where("username").regex("^" + seeder.username(""))), User.class);
   }
 
   // ------------------------------------------------------------------ profile
@@ -213,8 +224,7 @@ class DemoDataSeederTest {
     DemoDataSeeder bean = applicationContext.getBean(DemoDataSeeder.class);
     assertThat(bean.programCode()).isEqualTo(CONTEXT_KEY.toUpperCase() + "-CTDT-THU-NGHIEM");
     assertThat(
-            mongo.exists(
-                Query.query(Criteria.where("code").is(bean.programCode())), Program.class))
+            mongo.exists(Query.query(Criteria.where("code").is(bean.programCode())), Program.class))
         .isTrue();
     assertThat(userRepository.existsByUsername(bean.username("admin"))).isTrue();
   }
@@ -222,7 +232,8 @@ class DemoDataSeederTest {
   // ------------------------------------------------------------------ nội dung và nhãn
 
   @Test
-  @DisplayName("Issue #17: tạo đủ 17 bản ghi, mọi bản ghi mang nhãn DỮ LIỆU THỬ NGHIỆM, không có dữ liệu thật")
+  @DisplayName(
+      "Issue #17: tạo đủ 17 bản ghi, mọi bản ghi mang nhãn DỮ LIỆU THỬ NGHIỆM, không có dữ liệu thật")
   void seedsLabelledRecords() {
     DemoDataSeeder seeder = seeder(freshKey(), PASSWORD);
 
@@ -233,16 +244,12 @@ class DemoDataSeederTest {
     assertThat(first.usersSeeded()).isTrue();
 
     Program program =
-        mongo.findOne(
-            Query.query(Criteria.where("code").is(seeder.programCode())), Program.class);
+        mongo.findOne(Query.query(Criteria.where("code").is(seeder.programCode())), Program.class);
     assertThat(program.getName()).startsWith(LABEL);
     assertThat(program.getLevel()).isNull();
     assertThat(program.getDegree()).isNull();
 
-    ProgramVersion version =
-        mongo.findOne(
-            Query.query(Criteria.where("programId").is(new ObjectId(program.getId()))),
-            ProgramVersion.class);
+    ProgramVersion version = findVersion(program);
     assertThat(version.getVersion()).isEqualTo(seeder.versionCode());
     assertThat(version.getStatus()).isEqualTo(ProgramVersionStatus.DRAFT);
     assertThat(version.getTotalCredits()).as("số tín chỉ chưa được cung cấp").isNull();
@@ -288,8 +295,7 @@ class DemoDataSeederTest {
 
     List<CoursePiContribution> matrix =
         contributionRepository.findByProgramVersionIdOrderByCourseIdAscPiIdAsc(version.getId());
-    Map<String, String> piCodeById =
-        pis.stream().collect(Collectors.toMap(Pi::getId, Pi::getCode));
+    Map<String, String> piCodeById = pis.stream().collect(Collectors.toMap(Pi::getId, Pi::getCode));
     assertThat(
             matrix.stream()
                 .collect(
@@ -303,7 +309,8 @@ class DemoDataSeederTest {
   }
 
   @Test
-  @DisplayName("Issue #17: mỗi vai trò dùng trong cam kết có đúng một người dùng demo, nhãn trong họ tên")
+  @DisplayName(
+      "Issue #17: mỗi vai trò dùng trong cam kết có đúng một người dùng demo, nhãn trong họ tên")
   void seedsOneLabelledUserPerCommittedRole() {
     DemoDataSeeder seeder = seeder(freshKey(), PASSWORD);
     seeder.seed();
@@ -356,11 +363,7 @@ class DemoDataSeederTest {
     ProgramVersion version =
         programVersionRepository
             .findByProgramId(
-                mongo.findOne(
-                        Query.query(Criteria.where("code").is(seeder.programCode())),
-                        Program.class)
-                    .getId(),
-                org.springframework.data.domain.Pageable.unpaged())
+                findProgram(seeder).getId(), org.springframework.data.domain.Pageable.unpaged())
             .getContent()
             .get(0);
     Plo plo = ploRepository.findByProgramVersionIdOrderByDisplayOrderAsc(version.getId()).get(0);
@@ -379,7 +382,8 @@ class DemoDataSeederTest {
   // ------------------------------------------------------------------ mật khẩu thiếu / sai
 
   @Test
-  @DisplayName("Issue #17: thiếu DEMO_USER_PASSWORD -> không tạo người dùng nào (không có mật khẩu mặc định), vẫn seed CTĐT")
+  @DisplayName(
+      "Issue #17: thiếu DEMO_USER_PASSWORD -> không tạo người dùng nào (không có mật khẩu mặc định), vẫn seed CTĐT")
   void missingPasswordSkipsUsers() {
     DemoDataSeeder seeder = seeder(freshKey(), "");
 
@@ -395,7 +399,8 @@ class DemoDataSeederTest {
   }
 
   @Test
-  @DisplayName("Issue #17: mật khẩu vi phạm chính sách 8-72 byte -> bỏ qua người dùng, không băm mật khẩu yếu")
+  @DisplayName(
+      "Issue #17: mật khẩu vi phạm chính sách 8-72 byte -> bỏ qua người dùng, không băm mật khẩu yếu")
   void invalidPasswordSkipsUsers() {
     for (String bad : new String[] {"short7!", "a".repeat(73)}) {
       DemoDataSeeder seeder = seeder(freshKey(), bad);
@@ -415,17 +420,13 @@ class DemoDataSeederTest {
   // ------------------------------------------------------------------ dùng được qua API
 
   @Test
-  @DisplayName("Issue #17: người dùng seed đăng nhập được; QA xác nhận được PLO demo; manager thêm được PLO; viewer không ghi được")
+  @DisplayName(
+      "Issue #17: người dùng seed đăng nhập được; QA xác nhận được PLO demo; manager thêm được PLO; viewer không ghi được")
   void seededUsersWorkEndToEnd() throws Exception {
     DemoDataSeeder seeder = applicationContext.getBean(DemoDataSeeder.class);
     seeder.seed();
-    Program program =
-        mongo.findOne(
-            Query.query(Criteria.where("code").is(seeder.programCode())), Program.class);
-    ProgramVersion version =
-        mongo.findOne(
-            Query.query(Criteria.where("programId").is(new ObjectId(program.getId()))),
-            ProgramVersion.class);
+    Program program = findProgram(seeder);
+    ProgramVersion version = findVersion(program);
     Plo plo = ploRepository.findByProgramVersionIdOrderByDisplayOrderAsc(version.getId()).get(0);
 
     String qa = login(seeder.username("qa"));

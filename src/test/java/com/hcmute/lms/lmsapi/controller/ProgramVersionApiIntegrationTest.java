@@ -55,7 +55,8 @@ class ProgramVersionApiIntegrationTest extends IntegrationTestBase {
   // ------------------------------------------------------------------ US-05/AC-1
 
   @Test
-  @DisplayName("US-05/AC-1: tạo phiên bản mới thành công, status = DRAFT, chưa xác nhận, không tự điền")
+  @DisplayName(
+      "US-05/AC-1: tạo phiên bản mới thành công, status = DRAFT, chưa xác nhận, không tự điền")
   void createVersion_defaultsToDraftAndUnverified() throws Exception {
     MvcResult result =
         mockMvc
@@ -79,7 +80,8 @@ class ProgramVersionApiIntegrationTest extends IntegrationTestBase {
   }
 
   @Test
-  @DisplayName("US-05/AC-1: trường thừa (id, status, verification) trong body bị bỏ qua, không mass-assign")
+  @DisplayName(
+      "US-05/AC-1: trường thừa (id, status, verification) trong body bị bỏ qua, không mass-assign")
   void createVersion_extraFieldsAreIgnored() throws Exception {
     String forgedId = ApiTestFixtures.missingId();
     String body =
@@ -137,7 +139,8 @@ class ProgramVersionApiIntegrationTest extends IntegrationTestBase {
   // ------------------------------------------------------------------ US-05/AC-2
 
   @Test
-  @DisplayName("US-05/AC-2: trùng (programId, version) -> 409 CONFLICT, kể cả khi khác khoảng trắng")
+  @DisplayName(
+      "US-05/AC-2: trùng (programId, version) -> 409 CONFLICT, kể cả khi khác khoảng trắng")
   void createVersion_duplicateIsConflict() throws Exception {
     mockMvc.perform(postAs(manager, VERSIONS, request("V-DUP"))).andExpect(status().isCreated());
 
@@ -319,8 +322,7 @@ class ProgramVersionApiIntegrationTest extends IntegrationTestBase {
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.code").value("NOT_FOUND"));
     mockMvc
-        .perform(
-            putAs(manager, VERSION_BY_ID, "{\"version\":\"x\"}", ApiTestFixtures.missingId()))
+        .perform(putAs(manager, VERSION_BY_ID, "{\"version\":\"x\"}", ApiTestFixtures.missingId()))
         .andExpect(status().isNotFound());
   }
 
@@ -347,7 +349,8 @@ class ProgramVersionApiIntegrationTest extends IntegrationTestBase {
       value = Role.class,
       names = {"PROGRAM_MANAGER"},
       mode = EnumSource.Mode.EXCLUDE)
-  @DisplayName("F02 mục 6: chỉ PROGRAM_MANAGER được ghi; vai trò khác (kể cả ADMIN) -> 403, đọc vẫn được")
+  @DisplayName(
+      "F02 mục 6: chỉ PROGRAM_MANAGER được ghi; vai trò khác (kể cả ADMIN) -> 403, đọc vẫn được")
   void onlyProgramManagerMayWrite(Role role) throws Exception {
     String bearer = fixtures.bearerFor(role, null);
     mockMvc
@@ -362,7 +365,8 @@ class ProgramVersionApiIntegrationTest extends IntegrationTestBase {
   // ------------------------------------------------------------------ phân trang
 
   @Test
-  @DisplayName("US-02/AC-6 (áp dụng cho F02): phân trang biên trên danh sách phiên bản của một CTĐT")
+  @DisplayName(
+      "US-02/AC-6 (áp dụng cho F02): phân trang biên trên danh sách phiên bản của một CTĐT")
   void listVersions_paginationBoundaries() throws Exception {
     // Ba phiên bản, sắp theo version tăng dần: V-A < V-B < V-C.
     for (String v : new String[] {"V-C", "V-A", "V-B"}) {
