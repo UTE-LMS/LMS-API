@@ -263,15 +263,34 @@
                             <goal>check</goal>
                         </goals>
                         <configuration>
-                            <haltOnFailure>false</haltOnFailure>
+                            <haltOnFailure>true</haltOnFailure>
+                            <!--
+                                Mô-đun lõi (Rubric TC2.5): nghiệp vụ, API, phân quyền/bảo mật. Mẫu này khớp TÊN TỆP
+                                .class (dạng đường dẫn). Không đặt mẫu trong <rule><includes>: ở đó JaCoCo so với
+                                tên gói/bundle dạng dấu chấm nên mẫu dạng đường dẫn không khớp gì và cổng không
+                                bao giờ fail (đã kiểm chứng: đặt ngưỡng 0.99 vẫn BUILD SUCCESS).
+                            -->
+                            <includes>
+                                <include>com/hcmute/lms/lmsapi/service/impl/*</include>
+                                <include>com/hcmute/lms/lmsapi/controller/*</include>
+                                <include>com/hcmute/lms/lmsapi/filter/*</include>
+                                <include>com/hcmute/lms/lmsapi/config/*</include>
+                            </includes>
                             <rules>
+                                <!-- Gộp toàn bộ mô-đun lõi: >= 70% dòng lệnh. -->
+                                <rule>
+                                    <element>BUNDLE</element>
+                                    <limits>
+                                        <limit>
+                                            <counter>LINE</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.70</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                                <!-- Từng gói lõi cũng phải >= 70%, tránh một gói tốt che gói yếu. -->
                                 <rule>
                                     <element>PACKAGE</element>
-                                    <includes>
-                                        <include>com/hcmute/lms/lmsapi/service/impl/**</include>
-                                        <include>com/hcmute/lms/lmsapi/controller/**</include>
-                                        <include>com/hcmute/lms/lmsapi/filter/**</include>
-                                    </includes>
                                     <limits>
                                         <limit>
                                             <counter>LINE</counter>
