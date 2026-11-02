@@ -159,7 +159,7 @@ flowchart LR
 | Chặng | Job | Ghi chú |
 |---|---|---|
 | 1 | `build` | `./mvnw -DskipTests package` |
-| 2 | `lint` | `spotless:check spotbugs:check` (cấu hình trong `pom.xml` của nhóm static-analysis); Sonar chỉ chạy khi có secret `SONAR_TOKEN` — **chưa có token nên chưa quét Sonar** |
+| 2 | `lint` | `test-compile spotless:check spotbugs:check pmd:cpd-check` (cấu hình trong `pom.xml` của nhóm static-analysis); Sonar chỉ chạy khi có secret `SONAR_TOKEN` — **chưa có token nên chưa quét Sonar** |
 | 3 | `test` | MongoDB 8.0 replica set `rs0` + `./mvnw verify` (cổng JaCoCo ≥ 70% có trong `pom.xml` nhưng đang `haltOnFailure=false` nên chưa chặn); báo cáo JaCoCo là artifact `jacoco-report` |
 | 4 | `secret-scan`, `dependency-scan` | gitleaks (toàn bộ lịch sử); Trivy trên JAR |
 | 5 | `package-image` | build image, Trivy quét image, đẩy GHCR **chỉ** khi push vào `main` hoặc tag `v*.*.*`; PR chỉ build + quét |

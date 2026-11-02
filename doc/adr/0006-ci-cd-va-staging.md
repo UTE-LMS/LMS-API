@@ -21,7 +21,7 @@ quét bảo mật, chưa có chỗ triển khai.
 | Job | Chặng | Phụ thuộc | Nội dung |
 |---|---|---|---|
 | `build` | 1 | – | `./mvnw -DskipTests package`, tải JAR lên artifact |
-| `lint` | 2 | build | `./mvnw -DskipTests spotless:check spotbugs:check`; Sonar chỉ khi có `SONAR_TOKEN` |
+| `lint` | 2 | build | `./mvnw -DskipTests test-compile spotless:check spotbugs:check pmd:cpd-check`; Sonar chỉ khi có `SONAR_TOKEN` |
 | `test` | 3 | build | MongoDB 8.0 replica set `rs0` + `./mvnw verify` (cổng JaCoCo ≥ 70% khai trong `pom.xml`, hiện `haltOnFailure=false` nên chưa chặn); tải báo cáo JaCoCo và surefire |
 | `secret-scan` | 4a | – | gitleaks CLI quét toàn bộ lịch sử Git |
 | `dependency-scan` | 4b | build | Trivy `rootfs` trên JAR, fail khi có HIGH/CRITICAL đã có bản vá |
