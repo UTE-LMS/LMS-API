@@ -1,0 +1,33 @@
+# Chỉ gửi vào build context những gì Dockerfile ứng dụng cần: pom.xml, mvnw, .mvn, src.
+# Danh sách chặn (không dùng "*" ) để thêm file mới vào src/ không phải sửa lại.
+.git
+.gitignore
+.gitattributes
+.github
+.claude
+.idea
+.vscode
+.sts4-cache
+*.iml
+target
+build
+HELP.md
+AGENTS.md
+CLAUDE.md
+README.md
+doc
+docker
+deploy
+logsAI
+
+# Cấu hình cục bộ/bí mật tuyệt đối không vào image (image dùng application.properties.example)
+**/application.properties
+**/application-*.properties
+.env
+.env.*
+**/.env
+**/.env.*
+*.pem
+*.key
+*.p12
+*.jks
