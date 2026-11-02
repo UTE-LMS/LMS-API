@@ -1,0 +1,4 @@
+# Bỏ qua commit định dạng hàng loạt khi chạy git blame (ADR 0005).
+# Bật: git config blame.ignoreRevsFile .git-blame-ignore-revs
+# style: format all Java sources with google-java-format
+cde7f3dc0c0229172f542192ffef86865892aa64
