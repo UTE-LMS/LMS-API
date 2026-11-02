@@ -1,0 +1,80 @@
+# Staging LMS-API: ứng dụng + MongoDB 8 replica set một node (rs0).
+# Chạy qua deploy.sh (truyền IMAGE_TAG), không gọi `docker compose up` trực tiếp. Xem doc/deploy/staging.md.
+#
+# Vì sao không dùng image docker/mongo (dùng cho phát triển): image đó quảng bá thành viên replica set là
+# "localhost:<cổng>", đúng khi client chạy cùng máy nhưng sai khi ứng dụng ở container khác. Ở đây thành viên được
+# đăng ký là "mongo:27017" (tên dịch vụ trong mạng compose) và CSDL ban đầu nạp bằng dịch vụ mongo-init.
+name: lms-staging
+
+services:
+  mongo:
+    image: mongo:8.0
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
+    restart: unless-stopped
+    volumes:
+      - mongo-data:/data/db
+      - mongo-config:/data/configdb
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --eval \"db.adminCommand('ping').ok\" | grep -q 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 10s
+    logging: &log-rotation
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    # KHÔNG publish cổng 27017 ra máy chủ: MongoDB chưa bật xác thực nên chỉ truy cập được từ mạng compose.
+
+  # Dịch vụ chạy một lần: khởi tạo replica set nếu chưa có, rồi nạp doc/database_import.js (chạy lại an toàn,
+  # không xóa dữ liệu). Dấu $$ là cách viết ký tự $ trong compose.
+  mongo-init:
+    image: mongo:8.0
+    restart: "no"
+    depends_on:
+      mongo:
+        condition: service_healthy
+    environment:
+      LOMS_DB: learning_outcomes
+    volumes:
+      - ../../doc/database_import.js:/opt/loms/database_import.js:ro
+    entrypoint:
+      - bash
+      - -c
+      - |
+        set -euo pipefail
+        mongosh --host mongo --quiet --eval "
+          try { rs.status() }
+          catch (e) { rs.initiate({ _id: 'rs0', members: [{ _id: 0, host: 'mongo:27017' }] }) }
+        " > /dev/null
+        until mongosh --host mongo --quiet --eval 'db.hello().isWritablePrimary' | grep -q true; do sleep 1; done
+        mongosh "mongodb://mongo:27017/?replicaSet=rs0" --quiet --file /opt/loms/database_import.js
+        echo ">>> mongo-init: replica set rs0 sẵn sàng và CSDL đã được nạp"
+    logging: *log-rotation
+
+  app:
+    image: ${IMAGE_REPO:?Đặt IMAGE_REPO trong .env}:${IMAGE_TAG:?IMAGE_TAG do deploy.sh truyền vào}
+    restart: unless-stopped
+    depends_on:
+      mongo-init:
+        condition: service_completed_successfully
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    environment:
+      # Danh sách biến: doc/deploy/staging.md và src/main/resources/application.properties.example.
+      MONGODB_URI: ${MONGODB_URI:-mongodb://mongo:27017/learning_outcomes?replicaSet=rs0}
+      JWT_SECRET: ${JWT_SECRET:?Đặt JWT_SECRET trong .env (tối thiểu 32 byte)}
+      INITIAL_ADMIN_USERNAME: ${INITIAL_ADMIN_USERNAME:-}
+      INITIAL_ADMIN_EMAIL: ${INITIAL_ADMIN_EMAIL:-}
+      INITIAL_ADMIN_PASSWORD: ${INITIAL_ADMIN_PASSWORD:-}
+      APP_CORS_ALLOWED_ORIGINS: ${APP_CORS_ALLOWED_ORIGINS:-}
+      # Staging công khai: /actuator/health chỉ trả UP/DOWN, không kèm chi tiết thành phần (mẫu cấu hình đang để always).
+      MANAGEMENT_ENDPOINT_HEALTH_SHOWDETAILS: never
+      # Log JSON (ECS) một dòng một sự kiện, có correlationId, để công cụ gom log đọc được.
+      LOGGING_STRUCTURED_FORMAT_CONSOLE: ${LOGGING_STRUCTURED_FORMAT_CONSOLE:-ecs}
+    logging: *log-rotation
+
+volumes:
+  mongo-data:
+  mongo-config:

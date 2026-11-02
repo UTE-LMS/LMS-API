@@ -1,0 +1,11 @@
+# Ngoại lệ gitleaks theo fingerprint (commit:file:rule:dòng), CHỈ cho 3 phát hiện dương tính giả trong lịch sử đã có
+# trên main khi bật quét (2026-11-02). Không dùng allowlist theo đường dẫn/regex để không che secret thật về sau.
+# Mỗi dòng phải kèm lý do; thêm dòng mới chỉ sau khi người dùng xác nhận đó không phải secret thật.
+
+# Khóa HMAC thử nghiệm trong ci.yml cũ (base64 của chuỗi "secret-key-for-testing-purposes-only-32bytes"), chỉ dùng trong
+# CI để chạy test, không bảo vệ dữ liệu thật. Workflow hiện tại sinh khóa ngẫu nhiên mỗi lần chạy nên không còn dòng này.
+137c184fb500313226f4aea60e0d97e7dd28d146:.github/workflows/ci.yml:generic-api-key:68
+
+# Hai JWT giả có chữ ký cố ý sai ("invalid_signature") dùng làm dữ liệu đầu vào ca âm trong AuthIntegrationTest.
+53e72431057a6a932cbc200145efdc131c20a1db:src/test/java/com/hcmute/lms/lmsapi/controller/AuthIntegrationTest.java:jwt:189
+53e72431057a6a932cbc200145efdc131c20a1db:src/test/java/com/hcmute/lms/lmsapi/controller/AuthIntegrationTest.java:jwt:402

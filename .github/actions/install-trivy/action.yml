@@ -1,0 +1,33 @@
+name: Install Trivy
+description: >
+  Tải binary Trivy theo phiên bản ghim và kiểm tra SHA-256 trước khi chạy. Không dùng aquasecurity/trivy-action
+  để giảm rủi ro chuỗi cung ứng (xem doc/adr/0006-ci-cd-va-staging.md). Khi nâng phiên bản, đổi CẢ HAI giá trị
+  version và sha256 (lấy sha256 từ file trivy_<version>_checksums.txt của bản phát hành).
+
+inputs:
+  version:
+    description: Phiên bản Trivy (không có tiền tố v)
+    default: "0.76.1"
+  sha256:
+    description: SHA-256 của trivy_<version>_Linux-64bit.tar.gz
+    default: "c7cbe3137fb8a48a17574bede3dd6beb16742d1e9772929940fc90082c39d9c0"
+
+runs:
+  using: composite
+  steps:
+    - name: Download and verify Trivy
+      shell: bash
+      env:
+        TRIVY_VERSION: ${{ inputs.version }}
+        TRIVY_SHA256: ${{ inputs.sha256 }}
+      run: |
+        set -euo pipefail
+        archive="trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+        dir="${RUNNER_TEMP}/trivy"
+        mkdir -p "$dir"
+        curl -fsSL --retry 3 -o "${dir}/${archive}" \
+          "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/${archive}"
+        echo "${TRIVY_SHA256}  ${dir}/${archive}" | sha256sum --check --strict -
+        tar -xzf "${dir}/${archive}" -C "$dir" trivy
+        echo "$dir" >> "$GITHUB_PATH"
+        "${dir}/trivy" --version
