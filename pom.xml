@@ -28,6 +28,18 @@
     </scm>
     <properties>
         <java.version>25</java.version>
+
+        <!-- Phiên bản công cụ chất lượng (ADR 0005, doc/quality/README.md). Ghim cụ thể, không dùng LATEST. -->
+        <jacoco.version>0.8.15</jacoco.version>
+        <spotless.version>3.10.4</spotless.version>
+        <google-java-format.version>1.36.1</google-java-format.version>
+        <spotbugs-maven-plugin.version>4.10.5.0</spotbugs-maven-plugin.version>
+        <maven-pmd-plugin.version>3.28.0</maven-pmd-plugin.version>
+        <sonar-maven-plugin.version>5.8.0.7211</sonar-maven-plugin.version>
+
+        <!-- SonarCloud: token KHÔNG nằm trong repo, scanner đọc biến môi trường SONAR_TOKEN. -->
+        <sonar.host.url>https://sonarcloud.io</sonar.host.url>
+        <sonar.coverage.jacoco.xmlReportPaths>${project.build.directory}/site/jacoco/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
     </properties>
     <dependencies>
         <dependency>
@@ -107,6 +119,65 @@
     </dependencies>
 
     <build>
+        <!--
+            Công cụ chất lượng (TD-07, TD-08; ADR 0005). Khai báo cấu hình tại đây để gọi trực tiếp được:
+              ./mvnw -B -ntp -DskipTests spotless:check spotbugs:check
+            Việc gắn vào pha verify nằm ở khối plugins bên dưới.
+        -->
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <!-- Định dạng theo Google Java Style (doc/coding-convention.md §2). Giấy phép Apache-2.0. -->
+                    <groupId>com.diffplug.spotless</groupId>
+                    <artifactId>spotless-maven-plugin</artifactId>
+                    <version>${spotless.version}</version>
+                    <configuration>
+                        <java>
+                            <includes>
+                                <include>src/main/java/**/*.java</include>
+                                <include>src/test/java/**/*.java</include>
+                            </includes>
+                            <googleJavaFormat>
+                                <version>${google-java-format.version}</version>
+                                <style>GOOGLE</style>
+                            </googleJavaFormat>
+                            <removeUnusedImports/>
+                        </java>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <!-- Phát hiện lỗi tiềm ẩn trên bytecode. Giấy phép LGPL-2.1 (công cụ chạy lúc build, không đóng gói). -->
+                    <groupId>com.github.spotbugs</groupId>
+                    <artifactId>spotbugs-maven-plugin</artifactId>
+                    <version>${spotbugs-maven-plugin.version}</version>
+                    <configuration>
+                        <effort>Max</effort>
+                        <threshold>Medium</threshold>
+                        <failOnError>true</failOnError>
+                        <includeTests>true</includeTests>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <!-- Chỉ dùng goal cpd-check (đo trùng lặp bằng PMD CPD). Giấy phép Apache-2.0 / BSD-style (PMD). -->
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-pmd-plugin</artifactId>
+                    <version>${maven-pmd-plugin.version}</version>
+                    <configuration>
+                        <language>java</language>
+                        <minimumTokens>100</minimumTokens>
+                        <includeTests>true</includeTests>
+                        <failOnViolation>true</failOnViolation>
+                        <printFailingErrors>true</printFailingErrors>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <!-- Đẩy kết quả lên SonarCloud khi chạy `sonar:sonar` (cần SONAR_TOKEN trong môi trường). Giấy phép LGPL-3.0. -->
+                    <groupId>org.sonarsource.scanner.maven</groupId>
+                    <artifactId>sonar-maven-plugin</artifactId>
+                    <version>${sonar-maven-plugin.version}</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
         <plugins>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
@@ -170,7 +241,7 @@
             <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
-                <version>0.8.15</version>
+                <version>${jacoco.version}</version>
                 <executions>
                     <execution>
                         <id>prepare-agent</id>
