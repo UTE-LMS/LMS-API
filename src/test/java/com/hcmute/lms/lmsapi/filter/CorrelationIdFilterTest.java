@@ -6,11 +6,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import java.io.IOException;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.MDC;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -127,5 +130,53 @@ public class CorrelationIdFilterTest {
 
     // MDC must be completely cleared despite unhandled exception
     assertThat(MDC.get(CorrelationIdFilter.MDC_KEY)).isNull();
+  }
+
+  @ParameterizedTest(name = "[{index}] unsafe client id is replaced: {0}")
+  @ValueSource(
+      strings = {
+        "abc\r\nSet-Cookie: session=evil",
+        "id with spaces",
+        "<script>alert(1)</script>",
+        "id;drop",
+        "tiếng-việt"
+      })
+  @DisplayName(
+      "US-39 (correlationId, chưa có AC): client ID with CR/LF or unsafe characters is replaced by a UUID")
+  void testUnsafeHeaderReplacedWithUuid(String unsafeId) throws ServletException, IOException {
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    request.addHeader(CorrelationIdFilter.CORRELATION_ID_HEADER, unsafeId);
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    AtomicReference<String> mdcDuringChain = new AtomicReference<>();
+
+    filter.doFilter(
+        request, response, (req, res) -> mdcDuringChain.set(MDC.get(CorrelationIdFilter.MDC_KEY)));
+
+    String headerValue = response.getHeader(CorrelationIdFilter.CORRELATION_ID_HEADER);
+    assertThat(headerValue).isNotEqualTo(unsafeId);
+    assertThat(UUID.fromString(headerValue)).isNotNull();
+    assertThat(mdcDuringChain.get()).isEqualTo(headerValue);
+  }
+
+  @Test
+  @DisplayName(
+      "US-39 (correlationId, chưa có AC): boundary - 128 chars accepted, 129 chars replaced by a UUID")
+  void testLengthBoundary() throws ServletException, IOException {
+    String maxLength = "a".repeat(128);
+    MockHttpServletRequest okRequest = new MockHttpServletRequest();
+    okRequest.addHeader(CorrelationIdFilter.CORRELATION_ID_HEADER, maxLength);
+    MockHttpServletResponse okResponse = new MockHttpServletResponse();
+    filter.doFilter(okRequest, okResponse, (req, res) -> {});
+    assertThat(okResponse.getHeader(CorrelationIdFilter.CORRELATION_ID_HEADER))
+        .isEqualTo(maxLength);
+
+    String tooLong = "a".repeat(129);
+    MockHttpServletRequest longRequest = new MockHttpServletRequest();
+    longRequest.addHeader(CorrelationIdFilter.CORRELATION_ID_HEADER, tooLong);
+    MockHttpServletResponse longResponse = new MockHttpServletResponse();
+    filter.doFilter(longRequest, longResponse, (req, res) -> {});
+    String replaced = longResponse.getHeader(CorrelationIdFilter.CORRELATION_ID_HEADER);
+    assertThat(replaced).isNotEqualTo(tooLong);
+    assertThat(UUID.fromString(replaced)).isNotNull();
   }
 }
