@@ -24,9 +24,9 @@ $$\text{Điểm từng Item (Câu hỏi/Rubric)} \longrightarrow \text{CLO} \lon
 
 ---
 
-## 2. BẢN ĐỒ KIẾN TRÚC VÀ QUAN HỆ 30 COLLECTIONS
+## 2. BẢN ĐỒ KIẾN TRÚC VÀ QUAN HỆ 29 COLLECTIONS
 
-Cơ sở dữ liệu bao gồm 30 collections được phân chia thành 8 phân hệ chức năng:
+Cơ sở dữ liệu bao gồm 29 collections được phân chia thành 8 phân hệ chức năng (đã loại bỏ ml_experiments do ML ngoài phạm vi đồ án):
 
 ```
 [NHÓM A: Người dùng] 
@@ -60,7 +60,7 @@ Cơ sở dữ liệu bao gồm 30 collections được phân chia thành 8 phân
 [NHÓM H: Báo cáo, Giám sát & Cải tiến]
   reports ──< improvement_actions
   audit_logs
-  ml_experiments (Tùy chọn)
+  (ml_experiments: Đã loại bỏ, ngoài phạm vi)
 ```
 
 ---
@@ -458,9 +458,9 @@ Quản lý cấu trúc bài thi, đóng vai trò bản đặc tả (Blueprint) v
 * **Fields:** `_id`, `at`: `Date`, `userId`: `ObjectId`, `action`: `Enum["SCORE_UPDATE", "IMPORT_CONFIRM", "ASSESSMENT_APPROVE", "ASSESSMENT_REJECT", "RUN_CALCULATION", "RULE_CONFIRM", "LOGIN"]`, `entity`: `{ collection: String, id: ObjectId }`, `before`: `Object`, `after`: `Object`, `reason`: `String`, `ip`: `String`.
 * **Indexes:** `{ "entity.collection": 1, "entity.id": 1 }`, `{ userId: 1, at: -1 }`.
 
-#### 3.30. `ml_experiments` (Tùy chọn)
-* **Fields:** `_id`, `name`: `String`, `type`: `Enum["BLOOM_CLASSIFICATION", "EARLY_WARNING"]`, `datasetSnapshot`: `Object`, `model`: `Object`, `metrics`: `Object`, `status`: `Enum["TRAINING", "EVALUATED", "DEPLOYED"]`, `disclaimer`: `String`.
-* **Business Rule:** Chỉ lưu kết quả hỗ trợ phân tích; nghiêm cấm tự động ghi đè kết quả vào `student_results`.
+#### 3.30. `ml_experiments` (Đã loại bỏ — Ngoài phạm vi đồ án)
+* **Trạng thái:** Đã loại bỏ hoàn toàn khỏi thiết kế CSDL và `database_import.js` (xem TD-06).
+* **Lý do:** ML không nằm trong phạm vi cam kết của đồ án; không triển khai collection, mã nguồn hay dependency liên quan.
 
 ---
 

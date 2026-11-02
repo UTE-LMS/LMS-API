@@ -20,7 +20,7 @@ tính vào cam kết), **K** = không làm.
 | Story cam kết (C) | **32** | 31 story trong backlog gốc + 1 story mới do CSDL v0.5 (NEW-01) |
 | Mục tiêu mở rộng (MR) | 11 | Gồm 8 story gốc và 3 story mới (NEW-02 đến NEW-04) |
 | Không làm (K) | 8 | Mục 4 |
-| Collection dùng | 29 | `ml_experiments` có trong CSDL nhưng không dùng |
+| Collection dùng | 29 | CSDL gồm 29 collection (đã bỏ hoàn toàn `ml_experiments` khỏi script CSDL và tài liệu, xem TD-06) |
 
 Khối lượng 32 story cho hai người trong khoảng 10 tuần lập trình là **nặng**. Thay vì cắt ngay, mục 5 đặt thứ tự cắt
 theo từng cổng để quyết định có căn cứ. Nếu hai bạn muốn cam kết nhẹ hơn trước khi ký, hạ US-33 và US-38 xuống MR
@@ -158,7 +158,7 @@ Cột "Đề xuất" phân biệt story gốc (giữ nguyên ưu tiên) với th
 | Tổ chức thi, sinh đề; duyệt **nội dung** đề thi | Ngoài phạm vi đã chốt. NEW-01 chỉ duyệt ma trận ánh xạ chuẩn đầu ra, không duyệt nội dung câu hỏi |
 | Xuất phôi in đề thi (`assessments.exportedFiles`) | Thuộc khâu tổ chức thi. Trường vẫn nằm trong CSDL nhưng không có tính năng. **[CHỜ GVHD]** |
 | Lưu bài làm của sinh viên | Chỉ lưu điểm và tham chiếu tệp điểm gốc |
-| Machine Learning (`ml_experiments`) | Ngoài phạm vi hiện tại |
+| Machine Learning (`ml_experiments`) | Ngoài phạm vi đồ án; đã loại bỏ collection `ml_experiments` khỏi `database_import.js` (TD-06) |
 | Quy đổi I/R/M thành hệ số (`pi.useIrmAsWeight`, `irmWeights`) | Trái bất biến "I/R/M ≠ trọng số". Engine luôn coi cờ này là `false`; không đặt giá trị mẫu. Chỉ xem lại khi Khoa xác nhận (Q18) |
 | Collection bộ môn (`departments`) | **Đã chốt loại bỏ (Q17):** Không tạo collection này, lược bỏ `courses.departmentId`. Phân quyền `DEPARTMENT_HEAD` kiểm soát trực tiếp qua `scope.courseIds` |
 | Đo CLO/PI khi chỉ có điểm tổng (`dataGranularity = TOTAL_ONLY`) | Không đo được CLO/PI. Nếu dữ liệu thật chỉ có điểm tổng thì phải đổi phạm vi bằng ADR trước K1 |

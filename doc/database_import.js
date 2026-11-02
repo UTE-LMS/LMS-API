@@ -18,7 +18,7 @@
  *      $env:LOMS_DB = "learning_outcomes"; mongosh --file database_import.js
  *
  *  SCRIPT LÀM GÌ:
- *   1. Tạo 30 collection kèm quy tắc kiểm tra cấu trúc ($jsonSchema) và index.
+ *   1. Tạo 29 collection kèm quy tắc kiểm tra cấu trúc ($jsonSchema) và index.
  *   2. Nạp dữ liệu khởi tạo lấy từ tài liệu: 7 PLO, 17 PI, ma trận I/R/M của học phần
  *      OOPR230279 (trang 46) và khung quy tắc đo lường bản nháp.
  *   Ngân hàng câu hỏi (question_banks, question_categories, questions) được tạo rỗng:
@@ -647,15 +647,6 @@ const COLLECTIONS = {
       entity: OBJ, before: OBJ_N, after: OBJ_N, reason: STR_N, ip: STR_N
     }),
     indexes: [[{ 'entity.collection': 1, 'entity.id': 1, at: -1 }], [{ userId: 1, at: -1 }]]
-  },
-
-  ml_experiments: {
-    validator: schema(['name', 'status'], {
-      name: STR, type: { enum: ['BLOOM_CLASSIFICATION', 'EARLY_WARNING', null] },
-      datasetSnapshot: OBJ_N, features: arr(STR), model: OBJ_N, metrics: OBJ_N,
-      status: en('TRAINING', 'EVALUATED', 'DEPLOYED'), disclaimer: STR_N
-    }),
-    indexes: [[{ name: 1 }]]
   }
 };
 

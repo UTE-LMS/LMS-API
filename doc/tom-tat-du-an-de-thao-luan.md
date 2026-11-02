@@ -45,7 +45,7 @@ Ba đặc điểm bắt buộc của kết quả:
 |---|---|
 | Tổ chức thi, sinh đề, duyệt **nội dung** đề thi, xuất phôi in đề | Ngân hàng câu hỏi chỉ là **danh mục câu hỏi của đề đã thi**. Từ CSDL v0.5 có *duyệt ma trận đề thi* (ánh xạ CLO–PI) bởi Trưởng bộ môn: **[CHỜ GVHD, Q11]**, xem NEW-01 |
 | Lưu bài làm của sinh viên | Chỉ lưu điểm và tham chiếu về file điểm gốc |
-| Machine Learning | Không viết mã, collection hay dependency ML (`ml_experiments` không dùng) |
+| Machine Learning | Ngoài phạm vi; không viết mã, collection hay dependency ML (đã loại bỏ hoàn toàn collection `ml_experiments`, xem TD-06) |
 | Quản lý "minh chứng" như danh mục dữ liệu | Chỉ lưu tệp điểm gốc và tham chiếu; nguồn của PLO/PI/CLO chỉ ghi ngắn trong khối `source` |
 | Kết luận mức đạt của toàn CTĐT | Báo cáo ghi rõ "chưa đủ dữ liệu để kết luận toàn chương trình" khi áp dụng |
 | Thay thế quy trình đo lường chính thức của Khoa | Hệ thống là công cụ hỗ trợ, quy tắc do Khoa xác nhận |
@@ -106,7 +106,7 @@ Backlog: **44 story = 33 Must + 9 Should + 2 Could** (40 story gốc + 4 story m
 
 ---
 
-## 3. Mô hình dữ liệu (MongoDB, 30 collection: 29 chính + 1 tùy chọn không dùng)
+## 3. Mô hình dữ liệu (MongoDB, 29 collection chính, đã bỏ ml_experiments)
 
 Thiết kế CSDL **v0.5** (cập nhật 2026-10-23 theo `PLO_DB_UPDATE.md`) trong `GiaiThich_CoSoDuLieu.md` là **nguồn ưu tiên** khi các tài liệu lệch nhau. Tóm tắt thay đổi so với v0.4: `GiaiThich_CoSoDuLieu.md` §0.
 

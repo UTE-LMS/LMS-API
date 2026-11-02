@@ -38,8 +38,8 @@ Frontend: repo riêng `LMS-UI` (Angular 21 + TypeScript).
    máy khác, ví dụ `set MONGODB_URI=mongodb://localhost:27018/learning_outcomes?replicaSet=rs0`.
 
 2. **MongoDB + nạp CSDL ban đầu** — chọn một trong hai cách (xem mục [MongoDB bằng Docker](#mongodb-bằng-docker)
-   và [MongoDB cài sẵn trên máy](#mongodb-cài-sẵn-trên-máy)). Script dựng **30 collection** (thiết kế CSDL v0.5,
-   29 collection dùng + `ml_experiments` không dùng) kèm validator và chỉ mục. Dữ liệu khởi tạo gồm 1 chương trình,
+   và [MongoDB cài sẵn trên máy](#mongodb-cài-sẵn-trên-máy)). Script dựng **29 collection** (thiết kế CSDL v0.5,
+   đã loại bỏ `ml_experiments` do ML nằm ngoài phạm vi đồ án) kèm validator và chỉ mục. Dữ liệu khởi tạo gồm 1 chương trình,
    7 PLO, 17 PI, 1 học phần, 4 dòng ma trận I/R/M và một bản quy tắc đo lường nháp (ngưỡng/trọng số để trống).
    Chi tiết: `doc/GiaiThich_CoSoDuLieu.md` §7, §9 (tóm tắt thay đổi v0.4 → v0.5 ở §0).
 

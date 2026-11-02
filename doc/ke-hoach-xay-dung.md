@@ -93,7 +93,7 @@ Angular (LMS-UI) ──HTTPS/JSON──> Spring Boot API ──> MongoDB (replic
 | `improvement` | `improvement_actions` | F08 |
 | `audit` | `audit_logs` | xuyên suốt |
 
-CSDL v0.5 có 30 collection; dùng **29 collection chính** (không dùng `ml_experiments`). Một số trường v0.5 có trong
+CSDL v0.5 gồm **29 collection chính** (đã loại bỏ collection `ml_experiments` khỏi `database_import.js` do ML ngoài phạm vi đồ án, xem TD-06). Một số trường v0.5 có trong
 CSDL nhưng chưa có tính năng: `assessments.exportedFiles`; riêng `courses.departmentId` và collection `departments` đã chốt loại bỏ (Q17),
 `pi.useIrmAsWeight`/`irmWeights` (engine luôn coi là `false`, Q18).
 
