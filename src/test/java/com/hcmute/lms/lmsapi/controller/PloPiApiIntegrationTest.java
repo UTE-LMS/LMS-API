@@ -113,8 +113,7 @@ class PloPiApiIntegrationTest extends IntegrationTestBase {
   @Test
   @DisplayName("US-06/AC-2: PI có ploId thuộc phiên bản CTĐT khác -> 422, dù PLO đó có thật")
   void createPi_ploFromOtherVersionIsUnprocessable() throws Exception {
-    ProgramVersion other =
-        fixtures.programVersion(fixtures.program(), ProgramVersionStatus.DRAFT);
+    ProgramVersion other = fixtures.programVersion(fixtures.program(), ProgramVersionStatus.DRAFT);
     Plo ploInOther = fixtures.plo(other, "PLO1", 1);
 
     mockMvc
@@ -129,10 +128,7 @@ class PloPiApiIntegrationTest extends IntegrationTestBase {
     mockMvc
         .perform(
             postAs(
-                manager,
-                PIS,
-                piRequest(ApiTestFixtures.missingId(), "PI1.1", 1),
-                version.getId()))
+                manager, PIS, piRequest(ApiTestFixtures.missingId(), "PI1.1", 1), version.getId()))
         .andExpect(status().isUnprocessableEntity());
     mockMvc
         .perform(postAs(manager, PIS, piRequest("not-an-id", "PI1.1", 1), version.getId()))
@@ -141,7 +137,8 @@ class PloPiApiIntegrationTest extends IntegrationTestBase {
   }
 
   @Test
-  @DisplayName("US-06/AC-2 (dương): PI cùng phiên bản với PLO -> 201, trả đúng ploId và programVersionId")
+  @DisplayName(
+      "US-06/AC-2 (dương): PI cùng phiên bản với PLO -> 201, trả đúng ploId và programVersionId")
   void createPi_samePloVersionSucceeds() throws Exception {
     Plo plo = fixtures.plo(version, "PLO1", 1);
     mockMvc
@@ -214,15 +211,14 @@ class PloPiApiIntegrationTest extends IntegrationTestBase {
   // ------------------------------------------------------------------ US-06/AC-4: thứ tự
 
   @Test
-  @DisplayName("US-06/AC-4: danh sách PLO/PI sắp theo displayOrder, không theo code hay thứ tự chèn")
+  @DisplayName(
+      "US-06/AC-4: danh sách PLO/PI sắp theo displayOrder, không theo code hay thứ tự chèn")
   void list_sortedByDisplayOrder() throws Exception {
     // Thứ tự chèn: PLO3, PLO1, PLO2. displayOrder: 1, 3, 2. Thứ tự kỳ vọng theo displayOrder:
     // PLO3 (1), PLO2 (2), PLO1 (3) - khác cả thứ tự chèn lẫn thứ tự mã.
     mockMvc.perform(postAs(manager, PLOS, ploRequest("PLO3", 1), version.getId()));
     MvcResult plo1 =
-        mockMvc
-            .perform(postAs(manager, PLOS, ploRequest("PLO1", 3), version.getId()))
-            .andReturn();
+        mockMvc.perform(postAs(manager, PLOS, ploRequest("PLO1", 3), version.getId())).andReturn();
     mockMvc.perform(postAs(manager, PLOS, ploRequest("PLO2", 2), version.getId()));
 
     mockMvc
@@ -242,7 +238,8 @@ class PloPiApiIntegrationTest extends IntegrationTestBase {
   // ------------------------------------------------------------------ US-06/AC-5: nội dung gốc
 
   @Test
-  @DisplayName("US-06/AC-5: PLO/PI không có contentOriginal vẫn hợp lệ, chưa VERIFIED, không tự điền")
+  @DisplayName(
+      "US-06/AC-5: PLO/PI không có contentOriginal vẫn hợp lệ, chưa VERIFIED, không tự điền")
   void create_withoutOriginalContentIsUnverified() throws Exception {
     MvcResult plo =
         mockMvc
@@ -266,7 +263,8 @@ class PloPiApiIntegrationTest extends IntegrationTestBase {
   }
 
   @Test
-  @DisplayName("US-06/AC-5: body cố tình gửi verification = VERIFIED bị bỏ qua (chỉ QA_OFFICER được xác nhận)")
+  @DisplayName(
+      "US-06/AC-5: body cố tình gửi verification = VERIFIED bị bỏ qua (chỉ QA_OFFICER được xác nhận)")
   void create_forgedVerificationIsIgnored() throws Exception {
     String body =
         "{\"code\":\"PLO1\",\"displayOrder\":1,"
@@ -281,7 +279,8 @@ class PloPiApiIntegrationTest extends IntegrationTestBase {
   // ------------------------------------------------------------------ trùng khóa, tham chiếu
 
   @Test
-  @DisplayName("US-40/AC-3: trùng (programVersionId, code) -> 409 CONFLICT; cùng mã ở phiên bản khác thì được")
+  @DisplayName(
+      "US-40/AC-3: trùng (programVersionId, code) -> 409 CONFLICT; cùng mã ở phiên bản khác thì được")
   void duplicateCodes() throws Exception {
     mockMvc
         .perform(postAs(manager, PLOS, ploRequest("PLO1", 1), version.getId()))
@@ -299,8 +298,7 @@ class PloPiApiIntegrationTest extends IntegrationTestBase {
         .perform(postAs(manager, PIS, piRequest(ploForPi.getId(), "PI2.1", 2), version.getId()))
         .andExpect(status().isConflict());
 
-    ProgramVersion other =
-        fixtures.programVersion(fixtures.program(), ProgramVersionStatus.DRAFT);
+    ProgramVersion other = fixtures.programVersion(fixtures.program(), ProgramVersionStatus.DRAFT);
     mockMvc
         .perform(postAs(manager, PLOS, ploRequest("PLO1", 1), other.getId()))
         .andExpect(status().isCreated());
@@ -366,7 +364,8 @@ class PloPiApiIntegrationTest extends IntegrationTestBase {
   }
 
   @Test
-  @DisplayName("F02 mục 7: xóa PI còn clo_pi_links tham chiếu -> 422, gỡ liên kết xong mới xóa được")
+  @DisplayName(
+      "F02 mục 7: xóa PI còn clo_pi_links tham chiếu -> 422, gỡ liên kết xong mới xóa được")
   void deletePi_referencedByCloPiLink() throws Exception {
     Plo plo = fixtures.plo(version, "PLO1", 1);
     Pi pi = fixtures.pi(version, plo, "PI1.1", 1);
@@ -396,7 +395,8 @@ class PloPiApiIntegrationTest extends IntegrationTestBase {
   // ------------------------------------------------------------------ phiên bản không phải DRAFT
 
   @Test
-  @DisplayName("F02 mục 4.3: phiên bản ACTIVE không cho tạo/sửa/xóa PLO, PI (422), nhưng vẫn đọc được")
+  @DisplayName(
+      "F02 mục 4.3: phiên bản ACTIVE không cho tạo/sửa/xóa PLO, PI (422), nhưng vẫn đọc được")
   void nonDraftVersionIsReadOnly() throws Exception {
     ProgramVersion active =
         fixtures.programVersion(fixtures.program(), ProgramVersionStatus.ACTIVE);
@@ -471,10 +471,10 @@ class PloPiApiIntegrationTest extends IntegrationTestBase {
   }
 
   @Test
-  @DisplayName("US-40 (biên): PLO của phiên bản khác không truy cập được qua path của phiên bản này")
+  @DisplayName(
+      "US-40 (biên): PLO của phiên bản khác không truy cập được qua path của phiên bản này")
   void ploIsScopedToItsVersion() throws Exception {
-    ProgramVersion other =
-        fixtures.programVersion(fixtures.program(), ProgramVersionStatus.DRAFT);
+    ProgramVersion other = fixtures.programVersion(fixtures.program(), ProgramVersionStatus.DRAFT);
     Plo foreign = fixtures.plo(other, "PLO1", 1);
     mockMvc
         .perform(getAs(manager, PLO_BY_ID, version.getId(), foreign.getId()))
@@ -492,9 +492,7 @@ class PloPiApiIntegrationTest extends IntegrationTestBase {
         .perform(postAs(manager, PLOS, null, version.getId()))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
-    mockMvc
-        .perform(postAs(manager, PLOS, "[", version.getId()))
-        .andExpect(status().isBadRequest());
+    mockMvc.perform(postAs(manager, PLOS, "[", version.getId())).andExpect(status().isBadRequest());
     mockMvc
         .perform(postAs(manager, PLOS, "{}", version.getId()))
         .andExpect(status().isBadRequest())
@@ -551,7 +549,8 @@ class PloPiApiIntegrationTest extends IntegrationTestBase {
       value = Role.class,
       names = {"PROGRAM_MANAGER"},
       mode = EnumSource.Mode.EXCLUDE)
-  @DisplayName("F02 mục 6: chỉ PROGRAM_MANAGER ghi PLO/PI; vai trò khác -> 403 và dữ liệu không đổi")
+  @DisplayName(
+      "F02 mục 6: chỉ PROGRAM_MANAGER ghi PLO/PI; vai trò khác -> 403 và dữ liệu không đổi")
   void onlyProgramManagerMayWrite(Role role) throws Exception {
     String bearer = fixtures.bearerFor(role, null);
     Plo plo = fixtures.plo(version, "PLO1", 1);

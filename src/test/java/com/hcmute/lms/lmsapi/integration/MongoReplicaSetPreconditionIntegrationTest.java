@@ -21,7 +21,8 @@ class MongoReplicaSetPreconditionIntegrationTest extends IntegrationTestBase {
   @Autowired private MongoTransactionManager transactionManager;
 
   @Test
-  @DisplayName("US-39/AC-2: MONGODB_URI trỏ tới replica set có primary ghi được (không phải standalone)")
+  @DisplayName(
+      "US-39/AC-2: MONGODB_URI trỏ tới replica set có primary ghi được (không phải standalone)")
   void connectionIsAWritableReplicaSetPrimary() {
     Document hello = mongo().executeCommand(new Document("hello", 1));
 

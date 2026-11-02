@@ -17,7 +17,8 @@ class DemoDataSeederProfileOffTest {
   @Autowired private ApplicationContext applicationContext;
 
   @Test
-  @DisplayName("Issue #17: context mặc định không có bean DemoDataSeeder trong các ApplicationRunner")
+  @DisplayName(
+      "Issue #17: context mặc định không có bean DemoDataSeeder trong các ApplicationRunner")
   void seederBeanIsAbsentWithoutDemoProfile() {
     assertThat(applicationContext.getEnvironment().getActiveProfiles()).doesNotContain("demo");
     assertThat(applicationContext.getBeansOfType(DemoDataSeeder.class)).isEmpty();

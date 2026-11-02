@@ -115,7 +115,8 @@ class ApiContractIntegrationTest extends IntegrationTestBase {
   // ------------------------------------------------------------------ JSON F01
 
   @Test
-  @DisplayName("US-01/AC-4: phản hồi login, /me, /users không có passwordHash, tokenVersion hay băm BCrypt")
+  @DisplayName(
+      "US-01/AC-4: phản hồi login, /me, /users không có passwordHash, tokenVersion hay băm BCrypt")
   void f01ResponsesDoNotLeakSecrets() throws Exception {
     String rawPassword = "Mat-khau-thu-nghiem-1";
     User user = fixtures.userWithPassword(Role.ADMIN, null, rawPassword);
@@ -143,7 +144,8 @@ class ApiContractIntegrationTest extends IntegrationTestBase {
   // ------------------------------------------------------------------ JSON F02
 
   @Test
-  @DisplayName("Hợp đồng F02: tập khóa JSON của CTĐT/phiên bản/PLO/PI/ma trận đúng bảng trường trong kế hoạch")
+  @DisplayName(
+      "Hợp đồng F02: tập khóa JSON của CTĐT/phiên bản/PLO/PI/ma trận đúng bảng trường trong kế hoạch")
   void f02ResponsesMatchDocumentedFields() throws Exception {
     String bearer = fixtures.bearerFor(Role.VIEWER, null);
     Program program = fixtures.program();
@@ -160,17 +162,40 @@ class ApiContractIntegrationTest extends IntegrationTestBase {
         .containsExactlyInAnyOrder("id", "code", "name", "level", "degree");
     assertThat(topKeys(mockMvc.perform(getAs(bearer, "/api/v1/program-versions/{id}", pv))))
         .containsExactlyInAnyOrder(
-            "id", "programId", "version", "totalCredits", "durationYears", "applicableCohorts",
-            "status", "verification");
+            "id",
+            "programId",
+            "version",
+            "totalCredits",
+            "durationYears",
+            "applicableCohorts",
+            "status",
+            "verification");
     assertThat(topKeys(mockMvc.perform(getAs(bearer, ploUrl, pv, plo.getId()))))
         .containsExactlyInAnyOrder(
-            "id", "programVersionId", "code", "displayOrder", "category", "contentOriginal",
-            "contentSummary", "capabilityLevelRaw", "verification", "reviewNote");
+            "id",
+            "programVersionId",
+            "code",
+            "displayOrder",
+            "category",
+            "contentOriginal",
+            "contentSummary",
+            "capabilityLevelRaw",
+            "verification",
+            "reviewNote");
     assertThat(topKeys(mockMvc.perform(getAs(bearer, piUrl, pv, pi.getId()))))
         .containsExactlyInAnyOrder(
-            "id", "programVersionId", "ploId", "code", "displayOrder", "nameOriginalTerm",
-            "contentOriginal", "contentShort", "capabilityLevelRaw", "targetPassRate",
-            "verification", "reviewNote");
+            "id",
+            "programVersionId",
+            "ploId",
+            "code",
+            "displayOrder",
+            "nameOriginalTerm",
+            "contentOriginal",
+            "contentShort",
+            "capabilityLevelRaw",
+            "targetPassRate",
+            "verification",
+            "reviewNote");
 
     String matrixJson =
         body(mockMvc.perform(getAs(bearer, "/api/v1/program-versions/{v}/pi-contributions", pv)));
@@ -182,7 +207,8 @@ class ApiContractIntegrationTest extends IntegrationTestBase {
   }
 
   @Test
-  @DisplayName("US-07/AC-4: không API nào trả trọng số suy từ I/R/M (khóa weight/score/coefficient/ratio)")
+  @DisplayName(
+      "US-07/AC-4: không API nào trả trọng số suy từ I/R/M (khóa weight/score/coefficient/ratio)")
   void matrixNeverExposesWeights() throws Exception {
     String bearer = fixtures.bearerFor(Role.VIEWER, null);
     ProgramVersion version =

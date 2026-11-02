@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.hcmute.lms.lmsapi.document.AuditEntity;
 import com.hcmute.lms.lmsapi.document.AuditLog;
+import com.hcmute.lms.lmsapi.document.RoleAssignment;
 import com.hcmute.lms.lmsapi.document.User;
 import com.hcmute.lms.lmsapi.enums.AuditAction;
 import com.hcmute.lms.lmsapi.enums.Role;
@@ -12,10 +13,10 @@ import com.hcmute.lms.lmsapi.enums.UserStatus;
 import com.hcmute.lms.lmsapi.repository.AuditLogRepository;
 import com.hcmute.lms.lmsapi.repository.UserRepository;
 import com.hcmute.lms.lmsapi.service.AuditService;
-import com.hcmute.lms.lmsapi.document.RoleAssignment;
 import com.hcmute.lms.lmsapi.testsupport.IntegrationTestBase;
 import java.time.Instant;
 import java.util.List;
+import lombok.RequiredArgsConstructor;
 import org.bson.types.ObjectId;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -40,7 +41,8 @@ class TransactionRollbackOnDuplicateKeyIntegrationTest extends IntegrationTestBa
   @Autowired private AuditLogRepository auditLogRepository;
 
   @Test
-  @DisplayName("US-39/AC-2: DuplicateKeyException giữa transaction -> user, audit ghi trước đó đều không còn")
+  @DisplayName(
+      "US-39/AC-2: DuplicateKeyException giữa transaction -> user, audit ghi trước đó đều không còn")
   void duplicateKeyRollsBackEarlierWritesAndAudit() {
     String username = fixtures.username("tx");
     String firstId = new ObjectId().toHexString();
@@ -57,14 +59,14 @@ class TransactionRollbackOnDuplicateKeyIntegrationTest extends IntegrationTestBa
   }
 
   @Test
-  @DisplayName("US-39/AC-2 (đối chứng): cùng thao tác nhưng username khác nhau -> cả hai user và audit được commit")
+  @DisplayName(
+      "US-39/AC-2 (đối chứng): cùng thao tác nhưng username khác nhau -> cả hai user và audit được commit")
   void withoutDuplicateEverythingCommits() {
     String firstId = new ObjectId().toHexString();
 
     operation.createTwo(fixtures.username("tx"), fixtures.username("tx"), firstId);
 
-    assertThat(
-            auditLogRepository.findByEntityCollectionAndEntityIdOrderByAtDesc("users", firstId))
+    assertThat(auditLogRepository.findByEntityCollectionAndEntityIdOrderByAtDesc("users", firstId))
         .hasSize(1);
     auditLogRepository.deleteAll(
         auditLogRepository.findByEntityCollectionAndEntityIdOrderByAtDesc("users", firstId));
@@ -72,15 +74,11 @@ class TransactionRollbackOnDuplicateKeyIntegrationTest extends IntegrationTestBa
 
   /** Thao tác nghiệp vụ giả có @Transactional: ghi user, ghi audit, rồi ghi user thứ hai. */
   @TestComponent
+  @RequiredArgsConstructor
   public static class DuplicateKeyOperation {
 
     private final MongoTemplate mongoTemplate;
     private final AuditService auditService;
-
-    public DuplicateKeyOperation(MongoTemplate mongoTemplate, AuditService auditService) {
-      this.mongoTemplate = mongoTemplate;
-      this.auditService = auditService;
-    }
 
     @Transactional
     public void createTwiceWithSameUsername(String username, String firstId) {

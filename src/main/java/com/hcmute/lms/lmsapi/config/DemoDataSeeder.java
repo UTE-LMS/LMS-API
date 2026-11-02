@@ -46,10 +46,9 @@ import org.springframework.stereotype.Component;
 /**
  * Seeder dữ liệu thử nghiệm cho demo (issue #17), chỉ chạy khi Spring profile {@code demo} bật.
  *
- * <p>Chỉ tạo cho các collection đã có mã: {@code users} (mỗi vai trò dùng trong cam kết một
- * người), {@code programs}, {@code program_versions}, {@code plos}, {@code pis}, {@code courses} và
- * {@code course_pi_contributions}. Chưa có học phần/CLO, bài đánh giá, lớp, điểm vì chưa có mã
- * (F03-F05b).
+ * <p>Chỉ tạo cho các collection đã có mã: {@code users} (mỗi vai trò dùng trong cam kết một người),
+ * {@code programs}, {@code program_versions}, {@code plos}, {@code pis}, {@code courses} và {@code
+ * course_pi_contributions}. Chưa có học phần/CLO, bài đánh giá, lớp, điểm vì chưa có mã (F03-F05b).
  *
  * <p>Nguyên tắc (CLAUDE.md quy tắc 2, plan README mục 5):
  *
@@ -69,7 +68,7 @@ import org.springframework.stereotype.Component;
 @Component
 @Profile("demo")
 @Order(DemoDataSeeder.ORDER)
-public class DemoDataSeeder implements ApplicationRunner {
+public final class DemoDataSeeder implements ApplicationRunner {
 
   /** Chạy sau {@code InitialAdminSeeder} (Order 1) để không làm nó thấy users đã có dữ liệu. */
   public static final int ORDER = 2;
