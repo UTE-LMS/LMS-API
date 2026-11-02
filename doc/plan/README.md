@@ -55,7 +55,7 @@ là mức Must/Should/Could của `ke-hoach-xay-dung.md`; hai nguồn lệch ở
 
 ## 3. Nguồn sự thật và thứ tự ưu tiên khi tài liệu lệch nhau
 
-1. `doc/database_import.js`: validator `$jsonSchema`, enum, chỉ mục **thực tế** của 30 collection. Đây là hợp đồng dữ liệu.
+1. `doc/database_import.js`: validator `$jsonSchema`, enum, chỉ mục **thực tế** của 29 collection (đã bỏ `ml_experiments` do ML ngoài phạm vi đồ án). Đây là hợp đồng dữ liệu.
 2. `doc/GiaiThich_CoSoDuLieu.md` (v0.5): ý nghĩa nghiệp vụ, 14 nguyên tắc (§2), từng collection (§4), câu hỏi Q01–Q23 (§8).
 3. `doc/chot-feature-do-an.md` rồi `doc/ke-hoach-xay-dung.md`: phạm vi và ưu tiên.
 4. `doc/PLO_DB_UPDATE.md`: đặc tả nguồn của v0.5. **Chỉ lấy nội dung dữ liệu và công thức (§3, §4)**; dòng đầu của file ghi

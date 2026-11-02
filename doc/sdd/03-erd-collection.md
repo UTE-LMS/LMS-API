@@ -149,7 +149,7 @@ một bên phải đối chiếu bên kia. Script là "hợp đồng dữ liệu
 
 `program_courses`, `syllabi`, `clos`, `clo_pi_links`, `question_banks`, `question_categories`, `questions`, `assessments`,
 `terms`, `students`, `enrollments`, `import_batches`, `import_row_errors`, `scores`, `measurement_rules`, `calculation_runs`,
-`student_results`, `aggregate_results`, `reports`, `improvement_actions`, `ml_experiments` (tùy chọn, ML ngoài phạm vi, TD-06).
+`student_results`, `aggregate_results`, `reports`, `improvement_actions` (collection `ml_experiments` đã loại bỏ hoàn toàn khỏi CSDL do ML ngoài phạm vi đồ án, TD-06).
 
 Hai điều cần biết:
 - `ProgramReferenceRepositoryImpl.existsPiReference` đọc thẳng ba collection **theo tên chuỗi** (`clo_pi_links`, `questions`,

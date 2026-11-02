@@ -57,11 +57,11 @@ Tài liệu mô tả chi tiết các collection của cơ sở dữ liệu Mongo
 | 11 | Angular không truy cập MongoDB; backend kiểm tra quyền, dữ liệu và thực hiện công thức đo lường | Phân quyền theo `users.roleAssignments`; công thức đọc từ `measurement_rules` |
 | 12 | PI gắn cho câu hỏi chỉ được chọn trong ánh xạ CLO–PI đã duyệt của chính CLO đó; không cho gắn tùy ý | Dịch vụ kiểm tra cặp (CLO, PI) có trong `clo_pi_links`; chạy tính chính thức yêu cầu liên kết đã `VERIFIED` |
 | 13 | Chỉ thu thập thông tin cần thiết, ưu tiên mã sinh viên thay thế; không lưu bài làm của sinh viên | `students.studentRef` |
-| 14 | Kết quả học máy (nếu có) chỉ hỗ trợ, không thay kết quả chính thức | `ml_experiments` tách riêng, không ghi vào `student_results` |
+| 14 | Không triển khai học máy (Machine Learning) | Đồ án không thực hiện ML; loại bỏ collection `ml_experiments`, không ghi dữ liệu thử nghiệm ML vào CSDL |
 
-# 3. Tổng quan: 30 collection chia thành 8 nhóm
+# 3. Tổng quan: 29 collection chia thành 8 nhóm
 
-Gồm **29 collection chính** và **1 collection tùy chọn** (`ml_experiments`).
+Gồm **29 collection chính** (đã loại bỏ collection tùy chọn `ml_experiments` do ML nằm ngoài phạm vi đồ án, xem TD-06).
 
 | **Nhóm** | **Collection** |
 |---|---|
@@ -72,7 +72,7 @@ Gồm **29 collection chính** và **1 collection tùy chọn** (`ml_experiments
 | E. Học kỳ, lớp, sinh viên | `terms`, `course_sections`, `students`, `enrollments` |
 | F. Nhập điểm | `import_batches`, `import_row_errors`, `scores` |
 | G. Đo lường | `measurement_rules`, `calculation_runs`, `student_results`, `aggregate_results` |
-| H. Báo cáo, cải tiến, hỗ trợ | `reports`, `improvement_actions`, `audit_logs`, `ml_experiments` (tùy chọn) |
+| H. Báo cáo, cải tiến, hỗ trợ | `reports`, `improvement_actions`, `audit_logs` |
 
 ## Sơ đồ quan hệ chính
 
@@ -545,9 +545,9 @@ Mọi ngưỡng/mục tiêu nằm trong 0–1. Chỉ quy tắc `CONFIRMED` mới
 
 Ghi lại: sửa điểm (`SCORE_UPDATE`, kèm giá trị trước/sau và lý do), xác nhận nhập (`IMPORT_CONFIRM`), duyệt/từ chối ma trận đề thi (`ASSESSMENT_APPROVE`, `ASSESSMENT_REJECT`), chạy tính (`RUN_CALCULATION`), xác nhận quy tắc (`RULE_CONFIRM`), đăng nhập. Trường: `at`, `userId`, `action`, `entity {collection, id}`, `before`, `after`, `reason`, `ip`.
 
-### 4.30 ml_experiments (tùy chọn) — thử nghiệm học máy
+### 4.30 ml_experiments — ĐÃ LOẠI BỎ (ngoài phạm vi đồ án)
 
-`name`, `type` (`BLOOM_CLASSIFICATION` / `EARLY_WARNING`), `datasetSnapshot`, `features`, `model`, `metrics`, `status` (`TRAINING` / `EVALUATED` / `DEPLOYED`), `disclaimer`. Kết quả chỉ mang tính hỗ trợ, không ghi vào `student_results`. Có thể bỏ nếu đồ án không thực hiện phần ML.
+Đồ án đã xác nhận **không thực hiện Machine Learning** trong phạm vi nghiên cứu và phát triển. Collection `ml_experiments` đã được loại bỏ hoàn toàn khỏi CSDL (`database_import.js`) và hệ thống (xem TD-06). Không tạo mã, validator, index hay dữ liệu cho collection này.
 
 # 5. Luồng dữ liệu và ví dụ truy vết
 

@@ -64,9 +64,9 @@ Các bất biến dưới đây **chính là** mục tiêu đã thống nhất; 
   lần tính.
 - `contentOriginal` của PLO/PI/CLO để trống tới khi đối chiếu bản gốc; `verification.status` mặc định
   `UNVERIFIED`/`NEEDS_CLARIFICATION`. Agent không tự điền nguyên văn từ trí nhớ.
-- ML **ngoài phạm vi hiện tại** (người dùng đã chốt). Không tạo mã, dependency hay dữ liệu ML. Collection
-  `ml_experiments` là tùy chọn trong thiết kế và `database_import.js` vẫn có khai báo quy tắc kiểm tra cho nó
-  (không dùng tới); nếu sau này đưa ML vào thì kết quả ML tách riêng, không ghi vào `student_results`.
+- ML **ngoài phạm vi đồ án** (người dùng đã chốt). Không tạo mã, dependency hay dữ liệu ML. Collection
+  `ml_experiments` đã bị loại bỏ hoàn toàn khỏi `database_import.js` và tài liệu CSDL (TD-06); hệ thống
+  gồm 29 collection chính, không làm tới ML hay `ml_experiments`.
 - Khi `GiaiThich_CoSoDuLieu.md` lệch với `Misa.md`/`BS.md`, theo `GiaiThich_CoSoDuLieu.md`.
 
 ## Riêng tư

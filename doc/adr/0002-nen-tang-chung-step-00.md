@@ -84,7 +84,7 @@ com.hcmute.lms.lmsapi
 - **Lý do KHÔNG sử dụng Testcontainers:**
   1. Tránh bổ sung thêm các dependency nặng (`testcontainers-bom`, `mongodb-testcontainers`) vào `pom.xml`, giữ mã nguồn tinh gọn và giải trình rõ ràng trong hội đồng bảo vệ.
   2. Testcontainers đòi hỏi quyền truy cập trực tiếp vào Docker daemon socket (`/var/run/docker.sock`), thường xuyên phát sinh lỗi cấp quyền hoặc không tương thích trên các môi trường máy trạm Windows của sinh viên và CI runner.
-  3. Đảm bảo tính nhất quán tuyệt đối giữa môi trường phát triển cục bộ và môi trường CI: Cả hai đều dùng chung Docker image `mongo:8.0` chạy Replica Set `rs0`, được nạp trước cấu trúc 30 collection và `$jsonSchema` validator từ `doc/database_import.js`.
+  3. Đảm bảo tính nhất quán tuyệt đối giữa môi trường phát triển cục bộ và môi trường CI: Cả hai đều dùng chung Docker image `mongo:8.0` chạy Replica Set `rs0`, được nạp trước cấu trúc 29 collection và `$jsonSchema` validator từ `doc/database_import.js` (đã loại bỏ `ml_experiments` do ML ngoài phạm vi đồ án).
 
 ---
 
