@@ -165,7 +165,8 @@
                     <configuration>
                         <language>java</language>
                         <minimumTokens>100</minimumTokens>
-                        <includeTests>true</includeTests>
+                        <!-- Cổng chặn trùng lặp áp cho mã production (src/main). Trùng lặp trong test được đo riêng bằng doc/quality/cpd-density.sh, xem doc/quality/README.md. -->
+                        <includeTests>false</includeTests>
                         <failOnViolation>true</failOnViolation>
                         <printFailingErrors>true</printFailingErrors>
                     </configuration>
@@ -301,6 +302,46 @@
                                 </rule>
                             </rules>
                         </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- Cổng chất lượng gắn vào pha verify: ./mvnw -B -ntp verify chạy đủ (ADR 0005). -->
+            <plugin>
+                <groupId>com.diffplug.spotless</groupId>
+                <artifactId>spotless-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>spotless-check</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>com.github.spotbugs</groupId>
+                <artifactId>spotbugs-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>spotbugs-check</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-pmd-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>cpd-check</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>cpd-check</goal>
+                        </goals>
                     </execution>
                 </executions>
             </plugin>
