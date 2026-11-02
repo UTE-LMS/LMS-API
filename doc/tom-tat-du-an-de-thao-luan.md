@@ -151,9 +151,9 @@ quy tắc `DRAFT` để trống ngưỡng). Image Docker `lms-mongo` (`docker/mo
 README).
 
 **Chuỗi nghiệp vụ v0.5 có thêm bước duyệt:** … → lập bài đánh giá bản lớp (`DRAFT`) → gửi duyệt (`SUBMITTED`) →
-Trưởng bộ môn duyệt (`APPROVED`, khóa `items`) hoặc từ chối (`REJECTED`) → mới được nhập điểm (`SCORE_ENTERED`). Ba chỗ
-lệch với phạm vi/nguyên tắc cũ đang chờ GVHD/Khoa: duyệt ma trận đề thi và `exportedFiles` (Q11), `departmentId` chưa
-có collection bộ môn (Q17), `irmWeights` quy đổi I/R/M (Q18; engine luôn coi `useIrmAsWeight = false`).
+Trưởng bộ môn duyệt (`APPROVED`, khóa `items`) hoặc từ chối (`REJECTED`) → mới được nhập điểm (`SCORE_ENTERED`). Hai chỗ
+lệch với phạm vi/nguyên tắc cũ đang chờ GVHD/Khoa: duyệt ma trận đề thi (Q11) và `irmWeights` quy đổi I/R/M (Q18; engine luôn coi `useIrmAsWeight = false`). *Riêng Q17 đã chốt:* không tạo collection `departments`, bỏ `courses.departmentId`, giữ `DEPARTMENT_HEAD` duyệt theo `scope.courseIds`.
+
 
 ---
 
@@ -355,7 +355,7 @@ Nguồn: `GiaiThich_CoSoDuLieu.md` §8. Không chọn một đáp án rồi vi�
 | Q14 | Khi nào Khoa cung cấp ánh xạ CLO–PI đã duyệt của các học phần thử nghiệm | Chưa hỏi | `clo_pi_links` |
 | Q15 | Khi một câu đo nhiều cặp CLO–PI, điểm chia thế nào | Chưa hỏi (thiết kế hiện chọn chia theo phần, tổng bằng 1) | `outcomeMappings.weight` |
 | Q16 | Cấu trúc chương/chủ đề ngân hàng câu hỏi; nguồn nhập (Moodle hay Excel) | Chưa hỏi | `question_categories`, `import_batches` |
-| Q17 | Bộ môn: có cần collection `departments` không, hay `courses.departmentId` chỉ là mã tham chiếu | Chưa hỏi (v0.5 thêm trường, chưa có collection) | `courses.departmentId`; phạm vi duyệt của `DEPARTMENT_HEAD` |
+| Q17 | Bộ môn: có cần collection `departments` không, hay `courses.departmentId` chỉ là mã tham chiếu | **Đã chốt:** KHÔNG tạo collection `departments`, bỏ `courses.departmentId`. Giữ vai trò `DEPARTMENT_HEAD` duyệt theo `scope.courseIds` | `courses`; phạm vi duyệt của `DEPARTMENT_HEAD` qua `UserScope.courseIds` |
 | Q18 | Có cho quy đổi I/R/M thành hệ số khi tổng hợp PI từ CLO không, và giá trị | Chưa hỏi. Mặc định **không** (`useIrmAsWeight = false`) | `pi.useIrmAsWeight`, `pi.irmWeights` |
 | Q19 | Phương pháp mặc định: `pi.aggregationMethod`, `plo.method`, `reimportPolicy` | Chưa hỏi | `measurement_rules`, `import_batches` |
 | Q20 | Công thức CLO/học phần còn thiếu: `WEIGHTED_ITEMS` và trọng số câu hỏi; vai trò `weightInCourse`/`defaultWeight`; cấp COURSE khi `requireAllCloPass = false`; điểm tiêu chí rubric | Chưa hỏi (chi tiết: `plan/F06` §9) | `measurement_rules`, `assessments`, `clos.measurement` |

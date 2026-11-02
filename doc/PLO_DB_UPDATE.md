@@ -138,7 +138,7 @@ Phiên bản CTĐT tương ứng với các khóa tuyển sinh.
 
 #### 3.6. `courses`
 Danh mục học phần gốc (Abstract Course).
-* **Fields:** `_id`, `code` (`String`, unique, e.g., `"OOPR230279"`), `name` (`String`), `credits` (`Int`), `departmentId` (`ObjectId`), `createdAt`, `updatedAt`.
+* **Fields:** `_id`, `code` (`String`, unique, e.g., `"OOPR230279"`), `name` (`String`), `credits` (`Int`), `extra` (`Object`), `createdAt`, `updatedAt`. *(Đã chốt Q17: Không tạo collection `departments`, bỏ trường `departmentId`).*
 * **Indexes:** `{ code: 1 }` (unique).
 
 #### 3.7. `program_courses`

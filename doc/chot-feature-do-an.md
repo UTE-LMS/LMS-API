@@ -160,7 +160,7 @@ Cột "Đề xuất" phân biệt story gốc (giữ nguyên ưu tiên) với th
 | Lưu bài làm của sinh viên | Chỉ lưu điểm và tham chiếu tệp điểm gốc |
 | Machine Learning (`ml_experiments`) | Ngoài phạm vi hiện tại |
 | Quy đổi I/R/M thành hệ số (`pi.useIrmAsWeight`, `irmWeights`) | Trái bất biến "I/R/M ≠ trọng số". Engine luôn coi cờ này là `false`; không đặt giá trị mẫu. Chỉ xem lại khi Khoa xác nhận (Q18) |
-| Collection bộ môn (`departments`) | Chưa có trong thiết kế; `courses.departmentId` chỉ là trường chờ (Q17) |
+| Collection bộ môn (`departments`) | **Đã chốt loại bỏ (Q17):** Không tạo collection này, lược bỏ `courses.departmentId`. Phân quyền `DEPARTMENT_HEAD` kiểm soát trực tiếp qua `scope.courseIds` |
 | Đo CLO/PI khi chỉ có điểm tổng (`dataGranularity = TOTAL_ONLY`) | Không đo được CLO/PI. Nếu dữ liệu thật chỉ có điểm tổng thì phải đổi phạm vi bằng ADR trước K1 |
 | Nhập câu hỏi từ Excel/Moodle (US-17), đồng bộ trực tiếp với Moodle, xuất PDF | Giữ phạm vi chặt; tránh phình to |
 

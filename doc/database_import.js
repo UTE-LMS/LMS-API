@@ -161,7 +161,6 @@ const COLLECTIONS = {
   courses: {
     validator: schema(['code', 'name'], {
       code: STR, name: STR, credits: INT_N,
-      departmentId: OID_N,                   // bộ môn quản lý; chưa có collection departments (xem GiaiThich §8, Q17)
       extra: OBJ_N
     }),
     indexes: [[{ code: 1 }, { unique: true }]]

@@ -109,7 +109,7 @@ mọi chuyển trạng thái hợp lệ và không hợp lệ; sửa `items` khi
 
 - Không làm: sinh đề, duyệt nội dung câu hỏi, xuất phôi in (`exportedFiles`), nhập câu hỏi từ Excel/Moodle (US-17).
 - **Chờ GVHD (Q11):** có giữ NEW-01 và vai trò `DEPARTMENT_HEAD` không → quyết bằng ADR 0001 **trước khi code NEW-01**.
-- Chờ Khoa: Q15 (cách chia điểm khi một câu đo nhiều cặp), Q16 (cấu trúc ngân hàng), Q17 (phạm vi duyệt của Trưởng bộ môn theo bộ môn).
+- Chờ Khoa: Q15 (cách chia điểm khi một câu đo nhiều cặp), Q16 (cấu trúc ngân hàng). *(Riêng Q17 đã chốt: không tạo collection `departments`, phạm vi duyệt của `DEPARTMENT_HEAD` kiểm soát trực tiếp qua `scope.courseIds`).*
 - US-13/14 xuống MR: item khai báo trực tiếp trong `assessments.items[]` đã đủ để đo; ngân hàng chỉ là tiện ích tái sử dụng.
 
 ## 10. Để vấn đáp
