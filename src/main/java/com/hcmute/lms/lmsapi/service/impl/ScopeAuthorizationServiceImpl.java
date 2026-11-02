@@ -64,6 +64,53 @@ public class ScopeAuthorizationServiceImpl implements ScopeAuthorizationService 
         return false;
     }
 
+    @Override
+    public boolean canAccessProgram(UserPrincipal principal, String programId, AccessType accessType) {
+        if (principal == null || programId == null || programId.isBlank() || accessType == null) {
+            log.debug("canAccessProgram: Fail-closed due to null or blank parameters (principal={}, programId={}, accessType={})",
+                    principal != null ? principal.getUsername() : null, programId, accessType);
+            return false;
+        }
+
+        if (principal.getRoleAssignments() == null || principal.getRoleAssignments().isEmpty()) {
+            log.debug("canAccessProgram: Fail-closed - user [{}] has no role assignments", principal.getUsername());
+            return false;
+        }
+
+        for (RoleAssignment assignment : principal.getRoleAssignments()) {
+            if (checkProgramAssignment(assignment, programId, accessType)) {
+                log.debug("canAccessProgram: Access GRANTED to user [{}] for program [{}] with accessType [{}] via role [{}]",
+                        principal.getUsername(), programId, accessType, assignment.getRole());
+                return true;
+            }
+        }
+
+        log.debug("canAccessProgram: Access DENIED to user [{}] for program [{}] with accessType [{}]",
+                principal.getUsername(), programId, accessType);
+        return false;
+    }
+
+    private boolean checkProgramAssignment(RoleAssignment assignment, String programId, AccessType accessType) {
+        if (assignment == null || assignment.getRole() == null) {
+            return false;
+        }
+
+        UserScope scope = assignment.getScope();
+        return switch (assignment.getRole()) {
+            case ADMIN -> true;
+            case PROGRAM_MANAGER, QA_OFFICER -> matchesProgramScope(scope, programId);
+            case VIEWER -> accessType == AccessType.READ
+                    && (isStrictEmptyScope(scope) || matchesProgramScope(scope, programId));
+            case DEPARTMENT_HEAD, LECTURER, STUDENT -> false;
+        };
+    }
+
+    private boolean matchesProgramScope(UserScope scope, String programId) {
+        return scope != null
+                && scope.getProgramIds() != null
+                && scope.getProgramIds().contains(programId.trim());
+    }
+
     /**
      * Kiểm tra quyền truy cập của một phân công vai trò cụ thể trên lớp học phần theo ma trận ADR 0003.
      */

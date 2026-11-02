@@ -19,4 +19,6 @@ public interface ScopeAuthorizationService {
      * @return {@code true} nếu người dùng được cấp quyền truy cập; {@code false} nếu bị từ chối (fail-closed)
      */
     boolean canAccessSection(UserPrincipal principal, String sectionId, AccessType accessType);
+
+    boolean canAccessProgram(UserPrincipal principal, String programId, AccessType accessType);
 }

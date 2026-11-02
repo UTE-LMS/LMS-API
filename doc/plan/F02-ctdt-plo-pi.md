@@ -1,7 +1,7 @@
 # F02 — CTĐT, PLO, PI và ma trận I/R/M
 
 Story: **US-05** chương trình + phiên bản (C), **US-06** 7 PLO / 17 PI theo mã (C), **US-07** ma trận học phần đóng góp PI
-(C), **US-08** quy trình xác nhận nội dung (MR). Giai đoạn P2. Chủ trì đề xuất: IBS (IT hỗ trợ). Package: `program`.
+(C), **US-08** quy trình xác nhận nội dung (MR). Giai đoạn P2. Chủ trì đề xuất: IBS (IT hỗ trợ). Package: theo ADR 0002 (package-by-layer ở cấp gốc `com.hcmute.lms.lmsapi`), không dùng package con `program`.
 Phụ thuộc: `00-nen-tang-chung.md`, `F01`.
 
 ## 1. Mục tiêu
@@ -70,14 +70,16 @@ Quản lý khung chuẩn đầu ra cấp chương trình: chương trình, phiê
 
 ## 6. API đề xuất **[ĐỀ XUẤT]**
 
+Tiền tố thực tế: `/api/v1` (theo F01 và ADR 0002), không phải `/api`.
+
 | Phương thức | Đường dẫn | Quyền |
 |---|---|---|
-| GET/POST/PUT | `/api/programs`, `/api/programs/{id}` | đọc: mọi vai trò; ghi: PROGRAM_MANAGER |
-| GET/POST/PUT | `/api/program-versions`, `/api/program-versions/{id}` | như trên |
-| GET/POST/PUT | `/api/program-versions/{pvId}/plos`, `.../plos/{id}` | như trên |
-| GET/POST/PUT | `/api/program-versions/{pvId}/pis`, `.../pis/{id}` | như trên |
-| GET/POST/DELETE | `/api/program-versions/{pvId}/pi-contributions` | như trên |
-| PUT | `/api/program-versions/{id}/verification`, `.../plos/{id}/verification`, `.../pis/{id}/verification` (US-08) | QA_OFFICER **[ĐỀ XUẤT, chờ Q08]** |
+| GET/POST/PUT | `/api/v1/programs`, `/api/v1/programs/{id}` | đọc: mọi vai trò; ghi: PROGRAM_MANAGER |
+| GET/POST/PUT | `/api/v1/program-versions`, `/api/v1/program-versions/{id}` | như trên |
+| GET/POST/PUT | `/api/v1/program-versions/{pvId}/plos`, `.../plos/{id}` | như trên |
+| GET/POST/PUT | `/api/v1/program-versions/{pvId}/pis`, `.../pis/{id}` | như trên |
+| GET/POST/DELETE | `/api/v1/program-versions/{pvId}/pi-contributions` | như trên |
+| PUT | `/api/v1/program-versions/{id}/verification`, `.../plos/{id}/verification`, `.../pis/{id}/verification` (US-08) | QA_OFFICER **[ĐỀ XUẤT, chờ Q08]** |
 
 ## 7. Kiểm tra tham chiếu ở service (không có khóa ngoại)
 
