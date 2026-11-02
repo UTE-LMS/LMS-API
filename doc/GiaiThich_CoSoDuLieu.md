@@ -13,7 +13,7 @@ v0.5 cập nhật theo `PLO_DB_UPDATE.md`. Số collection không đổi (30). C
 | **Nhóm thay đổi** | **Nội dung** |
 |---|---|
 | Vai trò | Thêm `DEPARTMENT_HEAD` (Trưởng bộ môn, duyệt ma trận đề thi) và `STUDENT` (chỉ đọc kết quả của chính mình); `scope` có cấu trúc `{programIds, courseIds, sectionIds}` |
-| CTĐT | `program_versions`: `totalCredits`, `durationYears`. `plos`: `category` (GENERAL/SPECIALIZED/UNSPECIFIED), mã PLO/PI không bắt đầu bằng số 0. `courses`: `departmentId`. `program_courses.type`: `REQUIRED` → `COMPULSORY` |
+| CTĐT | `program_versions`: `totalCredits`, `durationYears`. `plos`: `category` (GENERAL/SPECIALIZED/UNSPECIFIED), mã PLO/PI không bắt đầu bằng số 0. `program_courses.type`: `REQUIRED` → `COMPULSORY` |
 | CLO | `clos.measurement` đổi tên: `weightInCourse` → `defaultWeight`, `passThreshold` → `defaultPassThreshold` |
 | Bài đánh giá | `assessments` có quy trình duyệt (`status`, `isLocked`, `approval`), `totalPoints`, `coverageSummary`, `exportedFiles`; đổi bộ giá trị `type`, `phase`; `items[].orderIndex`, `items[].externalRef` thành chuỗi |
 | Sinh viên | `students`: `userId`, `email`, `majorCode`, `status`; `enrollments.enrolledAt` |
@@ -22,7 +22,7 @@ v0.5 cập nhật theo `PLO_DB_UPDATE.md`. Số collection không đổi (30). C
 | Cải tiến | `improvement_actions` thêm `programVersionId`, `rootCause`, `expectedTarget`, `targetTermId`, `evaluation` (đánh giá hiệu quả), mức `CRITICAL` |
 | Nhật ký | `audit_logs.action` thêm `ASSESSMENT_APPROVE`, `ASSESSMENT_REJECT` |
 
-**Ba điểm lệch với phạm vi/nguyên tắc cũ, cần GVHD xác nhận (xem Q11, Q17, Q18 ở mục 8):** (1) quy trình duyệt ma trận đề thi và `exportedFiles` (xuất phôi in) chạm vào phạm vi "không duyệt đề"; (2) `departmentId` trỏ tới bộ môn nhưng chưa có collection bộ môn; (3) `irmWeights` cho phép quy đổi I/R/M thành hệ số, trái nguyên tắc 5 nếu bật.
+**Hai điểm lệch với phạm vi/nguyên tắc cũ, cần GVHD xác nhận (xem Q11, Q18 ở mục 8; Q17 đã chốt):** (1) quy trình duyệt ma trận đề thi và `exportedFiles` (xuất phôi in) chạm vào phạm vi "không duyệt đề" (Q11); (2) `irmWeights` cho phép quy đổi I/R/M thành hệ số, trái nguyên tắc 5 nếu bật (Q18). *Riêng Q17 đã chốt:* không tạo collection `departments`, bỏ trường `courses.departmentId`; vai trò `DEPARTMENT_HEAD` phụ trách duyệt theo danh sách môn học được phân công trong `scope.courseIds`.
 
 # 1. Mục đích và phạm vi
 
@@ -195,7 +195,7 @@ Học phần là *môn học có mã và nội dung xác định*, khác với *
 | **Trường** | **Ý nghĩa** |
 |---|---|
 | `code`, `name`, `credits` | Mã (ví dụ `OOPR230279`), tên, số tín chỉ (số nguyên) |
-| `departmentId` | Bộ môn quản lý học phần. Hiện **chưa có collection bộ môn** nên chỉ là ObjectId để trống (Q17) |
+| `extra` | Thông tin mở rộng tùy chọn (Map key-value). *Lưu ý (Q17 chốt):* Không tạo collection `departments` và bỏ trường `departmentId`. Trưởng bộ môn (`DEPARTMENT_HEAD`) quản lý học phần trực tiếp thông qua `scope.courseIds`. |
 
 **Chỉ mục:** `code` duy nhất. **Khởi tạo:** học phần `OOPR230279 — Lập trình hướng đối tượng` (các học phần thử nghiệm khác sẽ nhập khi Khoa xác nhận danh sách).
 
@@ -636,7 +636,7 @@ Danh sách này được theo dõi bằng tài liệu của dự án, không lư
 | Q14 | Khi nào Khoa cung cấp ánh xạ CLO–PI đã duyệt của các học phần thử nghiệm | Chưa hỏi | `clo_pi_links` — cần có trước khi gán ánh xạ cho câu hỏi |
 | Q15 | Khi một câu đo nhiều cặp CLO–PI, điểm của câu được chia thế nào (chia theo phần, tổng bằng 1; hay mỗi cặp tính trọn điểm) | Chưa hỏi | `outcomeMappings.weight`; thiết kế hiện chọn cách chia, tổng bằng 1 |
 | Q16 | Cấu trúc chương/chủ đề của ngân hàng câu hỏi từng học phần; nguồn nhập câu hỏi (Moodle hay Excel) | Chưa hỏi | `question_categories`, `import_batches` |
-| Q17 | Bộ môn: có cần collection `departments` không, hay `courses.departmentId` chỉ là mã tham chiếu | Chưa hỏi (v0.5 thêm trường, chưa có collection) | `courses.departmentId`; phạm vi duyệt của `DEPARTMENT_HEAD` |
+| Q17 | Bộ môn: có cần collection `departments` không, hay `courses.departmentId` chỉ là mã tham chiếu | **Đã chốt:** KHÔNG tạo collection `departments`, bỏ trường `courses.departmentId`. Giữ vai trò `DEPARTMENT_HEAD` duyệt ma trận đề thi trực tiếp theo danh sách môn học trong `scope.courseIds` | `courses`; phạm vi duyệt của `DEPARTMENT_HEAD` qua `UserScope.courseIds` |
 | Q18 | Khoa có cho quy đổi I/R/M thành hệ số khi tổng hợp PI từ CLO không, và giá trị hệ số | Chưa hỏi. Mặc định **không** (`useIrmAsWeight = false`); không đặt giá trị mẫu | `pi.useIrmAsWeight`, `pi.irmWeights` |
 | Q19 | Chọn phương pháp mặc định: `pi.aggregationMethod`, `plo.method`, `reimportPolicy` | Chưa hỏi | `measurement_rules`, `import_batches` |
 | Q20 | Công thức CLO/học phần còn thiếu: (a) `clo.method = WEIGHTED_ITEMS` và nguồn trọng số từng câu hỏi (lược đồ chưa có); (b) vai trò của `assessments.weightInCourse` và `clos.measurement.defaultWeight` (có trong CSDL nhưng không dùng trong công thức); (c) cấp COURSE: `value`/`passed` khi `requireAllCloPass = false`; (d) `rawScore` của tiêu chí rubric lấy từ đâu | Chưa hỏi. Chi tiết: `doc/plan/F06-do-luong.md` §9 (CT-01, 02, 03, 11) | `measurement_rules.clo/course`, `assessments.items[]`, `clos.measurement` |

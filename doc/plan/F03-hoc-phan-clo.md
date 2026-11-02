@@ -18,7 +18,7 @@ sau này phải bám vào (câu hỏi chỉ được đo cặp (CLO, PI) có tro
 
 | Collection | Trường chính |
 |---|---|
-| `courses` | `code` (duy nhất), `name`, `credits` (int), `departmentId` (chỉ là ObjectId chờ, Q17), `extra` |
+| `courses` | `code` (duy nhất), `name`, `credits` (int), `extra`. *(Q17 đã chốt: không tạo collection `departments`, bỏ `departmentId`)* |
 | `program_courses` | `programVersionId`, `courseId`, `semester`, `credits`, `type` (`COMPULSORY`/`ELECTIVE`), `category` (`FOUNDATION`, `MAJOR_FOUNDATION`, `SPECIALIZED`, `CAPSTONE_PROJECT`, `THESIS`), `prerequisiteCourseIds[]` |
 | `syllabi` | `courseId`, `version`, `effectiveFromTermId`, `effectiveToTermId` (null được), `status` (`DRAFT`/`CONFIRMED`/`ARCHIVED`), `verification`. Duy nhất `(courseId, version)` |
 | `clos` | `syllabusId`, `courseId`, `code` (`^CLO[0-9]+$`), `contentOriginal`, `bloomLevel` (1–6), `bloomNote`, `measurement` (`{ defaultWeight, defaultPassThreshold }`, null cho tới khi Khoa xác nhận), `verification`. Duy nhất `(syllabusId, code)` |
@@ -84,7 +84,7 @@ Mã CLO trùng trong/ngoài đề cương; `bloomLevel` biên (0,1,6,7); liên k
 ## 9. Không làm / chưa quyết
 
 - Không điền nguyên văn CLO, không tự suy ánh xạ CLO–PI từ nội dung (Q14: Khoa cung cấp ánh xạ đã duyệt).
-- Chờ: Q02 (khi nào có đề cương chính thức), Q12 (tỷ trọng/ngưỡng từng CLO), Q14, Q17 (`departmentId`).
+- Chờ: Q02 (khi nào có đề cương chính thức), Q12 (tỷ trọng/ngưỡng từng CLO), Q14. *(Riêng Q17 đã chốt: không tạo collection `departments`, bỏ `departmentId`).*
 - Nếu có phương án nhập hàng loạt đề cương từ tệp: ngoài phạm vi, cần ADR.
 
 ## 10. Để vấn đáp

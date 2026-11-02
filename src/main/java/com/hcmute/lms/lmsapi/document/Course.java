@@ -9,7 +9,6 @@ import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.index.CompoundIndexes;
 import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.mongodb.core.mapping.Field;
-import org.springframework.data.mongodb.core.mapping.FieldType;
 
 import java.util.Map;
 
@@ -34,9 +33,6 @@ public class Course {
 
     @Field("credits")
     private Integer credits;
-
-    @Field(name = "departmentId", targetType = FieldType.OBJECT_ID)
-    private String departmentId;
 
     @Field("extra")
     private Map<String, Object> extra;

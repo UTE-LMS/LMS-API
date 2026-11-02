@@ -22,7 +22,7 @@ Nguồn: `Rubric_Do_An_Mon_Hoc_CNPM_V2-1.docx.md`, `BS.md`, `Misa.md`, `GiaiThic
 - Hai tài liệu lệch nhau thì **theo `GiaiThich_CoSoDuLieu.md`** (thiết kế CSDL).
 - Hai sinh viên **không phân công cứng nhắc**, hỗ trợ chéo tự do.
 - Thiết kế CSDL **v0.5** (theo `PLO_DB_UPDATE.md`) là bản hiện hành. Riêng ba điểm lệch phạm vi/nguyên tắc của v0.5 (duyệt
-  ma trận đề thi, `departmentId`, `irmWeights`) **vẫn chờ GVHD/Khoa xác nhận** (Q11, Q17, Q18).
+  ma trận đề thi, `irmWeights`) **vẫn chờ GVHD/Khoa xác nhận** (Q11, Q18; Q17 đã chốt bỏ collection `departments` và bỏ `courses.departmentId`).
 
 **Quy ước đọc**
 - **[ĐỀ XUẤT]**: ý của người soạn, chưa được Khoa/GVHD xác nhận; không đưa vào hồ sơ như số liệu thật.
@@ -94,7 +94,7 @@ Angular (LMS-UI) ──HTTPS/JSON──> Spring Boot API ──> MongoDB (replic
 | `audit` | `audit_logs` | xuyên suốt |
 
 CSDL v0.5 có 30 collection; dùng **29 collection chính** (không dùng `ml_experiments`). Một số trường v0.5 có trong
-CSDL nhưng chưa có tính năng: `assessments.exportedFiles`, `courses.departmentId` (chưa có collection bộ môn, Q17),
+CSDL nhưng chưa có tính năng: `assessments.exportedFiles`; riêng `courses.departmentId` và collection `departments` đã chốt loại bỏ (Q17),
 `pi.useIrmAsWeight`/`irmWeights` (engine luôn coi là `false`, Q18).
 
 **Quyết định kiến trúc cần ghi ADR** (`doc/adr/`): cơ chế xác thực (JWT hay session); cách đọc tệp điểm
@@ -334,7 +334,7 @@ trung xong trước T14. Mục tiêu: build xanh ≥ 90%, commit → staging ≤
 | R8 | **Lịch sử Git thiếu các tuần đầu.** Mỗi repo chỉ có 1 commit trước kỳ, nên nếu T1–T4 không có commit thì tối đa 15/19 ≈ 79% số tuần có commit, đạt Mức 4 (≥ 75%) chứ không đạt Mức 5 (≥ 90%) cho chỉ số này | Trung bình | Commit đều từ T5 trở đi. Không sửa ngày commit hay tạo commit giả để "lấp" các tuần trước. Nếu đã có công việc ở T1–T4 (đọc tài liệu, `doc/`), commit chúng ngay với ngày thật; báo cáo tiến độ T1–T4 (nếu có) là minh chứng bổ sung |
 | R9 | Lộ dữ liệu sinh viên hoặc secret | Cao | `studentRef`, dữ liệu giả, gitleaks trong CI, `.gitignore` đúng |
 | R10 | **Chậm tiến độ**: T5 mà code mới là scaffold; P0–P2 bị nén còn 5 tuần | Cao | Giữ thứ tự: nền tảng → K1 → danh mục lõi; ưu tiên Must; hỗ trợ chéo để không chờ nhau; cắt Should trước, rồi tới Could, không cắt kiểm thử |
-| R11 | **CSDL v0.5 chạm phạm vi:** duyệt ma trận đề thi (NEW-01), `exportedFiles`, `irmWeights`, `departmentId` đi ngoài phạm vi "không duyệt đề" và nguyên tắc "I/R/M ≠ trọng số" (Q11, Q17, Q18). Nếu GVHD/Khoa không đồng ý, mã và test của NEW-01 phải sửa | Trung bình | Hỏi GVHD trước khi code NEW-01 (hạn trước P3, T8). Phương án dự phòng đã ghi ở mục 1: bỏ bước Trưởng bộ môn, giữ khóa `items`. `irmWeights`: engine luôn coi `useIrmAsWeight = false`. Ghi ADR (`adr/0001`) |
+| R11 | **CSDL v0.5 chạm phạm vi:** duyệt ma trận đề thi (NEW-01), `exportedFiles`, `irmWeights` đi ngoài phạm vi "không duyệt đề" và nguyên tắc "I/R/M ≠ trọng số" (Q11, Q18; riêng Q17 đã chốt bỏ collection `departments` và bỏ `departmentId`, giữ `DEPARTMENT_HEAD` duyệt theo `scope.courseIds`). Nếu GVHD/Khoa không đồng ý, mã và test của NEW-01 phải sửa | Trung bình | Hỏi GVHD trước khi code NEW-01 (hạn trước P3, T8). Phương án dự phòng đã ghi ở mục 1: bỏ bước Trưởng bộ môn, giữ khóa `items`. `irmWeights`: engine luôn coi `useIrmAsWeight = false`. Ghi ADR (`adr/0001`) |
 | R12 | **Công thức đo lường còn thiếu:** `PLO_DB_UPDATE.md` chỉ có công thức CLO (§4.1) và PI (§4.2). Chưa có công thức cấp PLO, cấp học phần khi `requireAllCloPass = false`, `WEIGHTED_ITEMS`, gộp PI qua nhiều học phần, định nghĩa `minCoverage`/mẫu số, ưu tiên ngưỡng (Q20–Q23; danh sách CT-01…CT-11 ở `plan/F06-do-luong.md` §9) | **Cao** | Hỏi GVHD/Khoa sớm (trước P4, T10); trong lúc chờ chỉ cài CLO và PI theo công thức đã có, phần còn lại trả 422, không tự bịa. Nếu không có trả lời trước K3: báo cáo PLO ở chế độ không chính thức hoặc cắt phạm vi PLO bằng ADR |
 
 ---
@@ -377,8 +377,8 @@ trung xong trước T14. Mục tiêu: build xanh ≥ 90%, commit → staging ≤
 4. Tập story đưa vào bản cam kết Bước 3 (mục 3, cuối).
 5. Con số KPI và NFR (mục 8).
 6. Java 25 hay LTS; nơi đặt staging; SSR của UI.
-7. **NEW-01 (duyệt ma trận đề thi) có nằm trong phạm vi không** (Q11) và có giữ vai trò `DEPARTMENT_HEAD`; có cần
-   collection `departments` (Q17). Hỏi GVHD trước P3.
+7. **NEW-01 (duyệt ma trận đề thi) có nằm trong phạm vi không** (Q11) và có giữ vai trò `DEPARTMENT_HEAD`. *(Riêng Q17 đã chốt: không làm collection `departments`, bỏ `courses.departmentId`, giữ `DEPARTMENT_HEAD` quản lý theo `scope.courseIds`).*
+   Hỏi GVHD trước P3 về NEW-01.
 8. Phương pháp mặc định của engine: `pi.aggregationMethod`, `plo.method`, `reimportPolicy` (Q19); có cho quy đổi I/R/M
    không (Q18, mặc định không).
 9. **Công thức đo lường còn thiếu (Q20–Q23):** cấp PLO, cấp học phần khi `requireAllCloPass = false`, `WEIGHTED_ITEMS`, gộp PI qua nhiều học phần, thiếu dữ liệu/ngưỡng trong công thức. Danh sách đầy đủ để hỏi GVHD: `plan/F06-do-luong.md` §9. Hạn đề xuất: trước P4 (T10).
