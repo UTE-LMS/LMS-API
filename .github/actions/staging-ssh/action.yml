@@ -1,0 +1,53 @@
+name: Configure SSH to staging
+description: >
+  KHUNG CHỜ NỀN TẢNG STAGING (chưa chọn nền tảng, Q06/Q07): giả định staging là một máy chủ Linux có Docker và truy
+  cập được qua SSH. Ghi khóa riêng và known_hosts vào ~/.ssh và tạo bí danh `staging` để các bước sau gọi `ssh staging`.
+  Xác thực máy chủ nghiêm ngặt (StrictHostKeyChecking=yes), không chấp nhận khóa máy chủ lạ.
+
+inputs:
+  host:
+    description: Địa chỉ máy chủ staging (biến STAGING_HOST)
+    required: true
+  user:
+    description: Tài khoản SSH (biến STAGING_USER)
+    required: true
+  port:
+    description: Cổng SSH
+    default: "22"
+  private-key:
+    description: Khóa riêng SSH, lấy từ secret STAGING_SSH_PRIVATE_KEY
+    required: true
+  known-hosts:
+    description: Nội dung known_hosts của máy chủ, lấy từ secret STAGING_SSH_KNOWN_HOSTS (kết quả `ssh-keyscan`)
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Write SSH key, known_hosts and config
+      shell: bash
+      env:
+        SSH_HOST: ${{ inputs.host }}
+        SSH_USER: ${{ inputs.user }}
+        SSH_PORT: ${{ inputs.port }}
+        SSH_KEY: ${{ inputs.private-key }}
+        SSH_KNOWN_HOSTS: ${{ inputs.known-hosts }}
+      run: |
+        set -euo pipefail
+        install -d -m 700 "$HOME/.ssh"
+        printf '%s\n' "$SSH_KEY" > "$HOME/.ssh/id_staging"
+        printf '%s\n' "$SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts_staging"
+        chmod 600 "$HOME/.ssh/id_staging" "$HOME/.ssh/known_hosts_staging"
+        cat > "$HOME/.ssh/config" <<EOF
+        Host staging
+          HostName ${SSH_HOST}
+          User ${SSH_USER}
+          Port ${SSH_PORT}
+          IdentityFile ${HOME}/.ssh/id_staging
+          IdentitiesOnly yes
+          UserKnownHostsFile ${HOME}/.ssh/known_hosts_staging
+          StrictHostKeyChecking yes
+          BatchMode yes
+          ServerAliveInterval 15
+        EOF
+        chmod 600 "$HOME/.ssh/config"

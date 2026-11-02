@@ -1,13 +1,22 @@
 name: CI
 
+# Pipeline LMS-API (ADR 0006). Các chặng và phụ thuộc:
+#   build ─┬─> lint ──────────┐
+#          ├─> test (+JaCoCo) ┤
+#          └─> dependency-scan┼─> package-image (build, Trivy image, push GHCR khi ở main/tag)
+#   secret-scan ─────────────┘        └─> deploy-staging ─> smoke-staging ─> rollback-staging (chỉ khi smoke lỗi)
+# deploy-staging/smoke-staging/rollback-staging chỉ chạy ở main khi biến repository STAGING_ENABLED == 'true'.
+# Không có continue-on-error, không có `|| true`: bước lỗi làm job đỏ, job đỏ chặn các chặng phụ thuộc.
+
 on:
   push:
     branches: ['**']
+    tags: ['v*.*.*']
   pull_request:
     branches: ['**']
 
-permissions:
-  contents: read
+# Mặc định không cấp quyền nào; mỗi job tự khai quyền tối thiểu của mình.
+permissions: {}
 
 # Commit mới lên cùng nhánh/PR thì hủy lần chạy CI cũ chưa xong. Tách theo event để run `push` không hủy
 # nhầm run `pull_request` (check bắt buộc của PR). Riêng `main` không hủy để mỗi lần merge đều có kết quả.
@@ -16,16 +25,114 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
-  build-test:
+  # ---------------------------------------------------------------------------------------------------------
+  # Chặng 1 — Build: biên dịch + đóng gói JAR (chưa chạy test). Hỏng ở đây thì dừng sớm, không tốn chặng sau.
+  # ---------------------------------------------------------------------------------------------------------
+  build:
+    name: 1 · Build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Setup Java 25 (Temurin)
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+
+      # mvnw được lưu với mode 100644 trong git nên cần quyền thực thi trên runner Linux
+      - name: Make Maven wrapper executable
+        run: chmod +x mvnw
+
+      - name: Compile and package (tests run in stage 3)
+        run: ./mvnw -B -ntp -DskipTests package
+
+      # JAR này là đầu vào của chặng quét phụ thuộc (dependency-scan).
+      - name: Upload application JAR
+        uses: actions/upload-artifact@v7
+        with:
+          name: lms-api-jar
+          path: target/LMS-API-*.jar
+          if-no-files-found: error
+          retention-days: 7
+
+  # ---------------------------------------------------------------------------------------------------------
+  # Chặng 2 — Lint + phân tích tĩnh.
+  # Phụ thuộc cấu hình plugin trong pom.xml của PR chore/f00-static-analysis (Spotless + SpotBugs). Cho tới khi
+  # PR đó vào main, chặng này đỏ vì chưa có plugin: đó là hành vi đúng, không được làm mềm.
+  # ---------------------------------------------------------------------------------------------------------
+  lint:
+    name: 2 · Lint and static analysis
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      # Có giá trị thì mới chạy Sonar. Không có secret (như hiện tại) thì bước Sonar bị BỎ QUA và KHÔNG có kết quả Sonar.
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # Sonar cần lịch sử để xác định "new code"
+
+      - name: Setup Java 25 (Temurin)
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+
+      - name: Make Maven wrapper executable
+        run: chmod +x mvnw
+
+      - name: Spotless check and SpotBugs
+        run: ./mvnw -B -ntp -DskipTests spotless:check spotbugs:check
+
+      - name: SonarQube/SonarCloud analysis
+        if: ${{ env.SONAR_TOKEN != '' }}
+        env:
+          SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL || 'https://sonarcloud.io' }}
+          SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION }}
+          SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
+        run: |
+          ./mvnw -B -ntp -DskipTests compile org.sonarsource.scanner.maven:sonar-maven-plugin:5.8.0.7211:sonar \
+            -Dsonar.host.url="$SONAR_HOST_URL" \
+            -Dsonar.organization="$SONAR_ORGANIZATION" \
+            -Dsonar.projectKey="$SONAR_PROJECT_KEY" \
+            -Dsonar.qualitygate.wait=true
+
+      - name: Report that Sonar was skipped
+        if: ${{ env.SONAR_TOKEN == '' }}
+        run: |
+          echo "::notice title=Sonar skipped::Chưa có secret SONAR_TOKEN nên KHÔNG chạy Sonar. Không được coi là đã quét Sonar."
+          echo "Sonar: BỎ QUA (chưa có secret SONAR_TOKEN). Chưa có kết quả Sonar." >> "$GITHUB_STEP_SUMMARY"
+
+  # ---------------------------------------------------------------------------------------------------------
+  # Chặng 3 — Test + cổng coverage. Giữ cách dựng MongoDB replica set rs0 của CI cũ (kernel, SERVER-121912/125742).
+  # `verify` gồm cổng JaCoCo ≥ 70% do pom.xml (PR chore/f00-static-analysis) định nghĩa; dưới 70% thì job đỏ.
+  # ---------------------------------------------------------------------------------------------------------
+  test:
+    name: 3 · Test and coverage gate
+    needs: build
     # Không dùng ubuntu-latest: runner có kernel Linux 6.19 đến 7.0.13 làm mongod 8.x thoát ngay khi khởi động
     # (SERVER-121912, SERVER-125742). Ghim image 22.04 để tránh kernel đó.
     runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Java 25 (Temurin)
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "25"
@@ -86,12 +193,341 @@ jobs:
       - name: Prepare application configuration
         run: cp src/main/resources/application.properties.example src/main/resources/application.properties
 
-      - name: Build and test with Maven verify
+      # Khóa JWT thử nghiệm sinh ngẫu nhiên cho mỗi lần chạy (không ghi cứng trong repo, tránh bị quét secret báo).
+      - name: Generate throwaway JWT secret
+        run: |
+          secret="$(openssl rand -base64 48)"
+          echo "::add-mask::${secret}"
+          echo "JWT_SECRET=${secret}" >> "$GITHUB_ENV"
+
+      - name: Verify (build, tests, JaCoCo coverage gate)
         env:
           SPRING_MONGODB_URI: mongodb://localhost:27017/learning_outcomes?replicaSet=rs0
           MONGODB_URI: mongodb://localhost:27017/learning_outcomes?replicaSet=rs0
-          JWT_SECRET: "c2VjcmV0LWtleS1mb3ItdGVzdGluZy1wdXJwb3Nlcy1vbmx5LTMyYnl0ZXM="
           INITIAL_ADMIN_USERNAME: ""
           INITIAL_ADMIN_EMAIL: ""
           INITIAL_ADMIN_PASSWORD: ""
-        run: ./mvnw -B verify
+        run: ./mvnw -B -ntp verify
+
+      # Hai báo cáo tải lên kể cả khi verify đỏ để xem được nguyên nhân. Báo cáo JaCoCo là minh chứng coverage.
+      - name: Upload JaCoCo coverage report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: jacoco-report
+          path: target/site/jacoco/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload test reports
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: surefire-reports
+          path: target/surefire-reports/
+          if-no-files-found: error
+          retention-days: 14
+
+  # ---------------------------------------------------------------------------------------------------------
+  # Chặng 4a — Quét secret trên toàn bộ lịch sử Git.
+  # Dùng binary gitleaks CLI ghim phiên bản + SHA-256, KHÔNG dùng gitleaks/gitleaks-action vì action đó đòi license
+  # trả phí với repo thuộc tổ chức GitHub (UTE-LMS). Ngoại lệ có chủ đích nằm trong .gitleaksignore (theo fingerprint).
+  # ---------------------------------------------------------------------------------------------------------
+  secret-scan:
+    name: 4a · Secret scan (gitleaks)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      GITLEAKS_VERSION: "8.30.1"
+      GITLEAKS_SHA256: "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb"
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Install gitleaks (pinned, checksum verified)
+        run: |
+          set -euo pipefail
+          archive="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -fsSL --retry 3 -o "${RUNNER_TEMP}/${archive}" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${archive}"
+          echo "${GITLEAKS_SHA256}  ${RUNNER_TEMP}/${archive}" | sha256sum --check --strict -
+          mkdir -p "${RUNNER_TEMP}/gitleaks"
+          tar -xzf "${RUNNER_TEMP}/${archive}" -C "${RUNNER_TEMP}/gitleaks" gitleaks
+          echo "${RUNNER_TEMP}/gitleaks" >> "$GITHUB_PATH"
+
+      # Quét mọi commit đi tới HEAD đang checkout (lịch sử của nhánh/PR), che giá trị bị phát hiện trong log.
+      - name: Scan Git history for secrets
+        run: gitleaks git --redact --verbose --log-opts="HEAD" .
+
+  # ---------------------------------------------------------------------------------------------------------
+  # Chặng 4b — Quét phụ thuộc (SCA) trên JAR vừa build bằng Trivy. Dùng `rootfs` chứ không dùng `fs`: `trivy fs`
+  # KHÔNG phân tích file .jar nên báo "sạch" giả (đã kiểm chứng khi chạy thử).
+  # ---------------------------------------------------------------------------------------------------------
+  dependency-scan:
+    name: 4b · Dependency scan (Trivy)
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Download application JAR
+        uses: actions/download-artifact@v8
+        with:
+          name: lms-api-jar
+          path: scan-input
+
+      - name: Install Trivy (pinned, checksum verified)
+        uses: ./.github/actions/install-trivy
+
+      # Fail khi có lỗ hổng HIGH/CRITICAL đã có bản vá. Lỗ hổng chưa có bản vá (ignore-unfixed) không chặn,
+      # nhưng vẫn được liệt kê ở báo cáo bên dưới.
+      - name: Scan JAR dependencies (HIGH, CRITICAL)
+        run: |
+          trivy rootfs --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed \
+            --exit-code 1 --no-progress scan-input
+
+  # ---------------------------------------------------------------------------------------------------------
+  # Chặng 5 — Đóng gói Docker, gắn phiên bản, quét Trivy image, rồi đẩy GHCR.
+  # PR: chỉ build + quét (không đẩy). Đẩy lên GHCR chỉ khi push vào main hoặc tag v*.*.*.
+  # Tag: sha-<7 ký tự commit> (bất biến, dùng để deploy/rollback) và <YYYYMMDD>-<7 ký tự commit>
+  # (hoặc số semver khi push tag vX.Y.Z). Không dùng `latest` để rollback luôn trỏ đúng một bản.
+  # ---------------------------------------------------------------------------------------------------------
+  package-image:
+    name: 5 · Package Docker image
+    needs: [lint, test, secret-scan, dependency-scan]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    env:
+      PUSH_IMAGE: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) }}
+    outputs:
+      image-tag: ${{ steps.ver.outputs.sha_tag }}
+      version: ${{ steps.ver.outputs.version }}
+      sha7: ${{ steps.ver.outputs.sha7 }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Compute version tags
+        id: ver
+        run: |
+          sha7="${GITHUB_SHA::7}"
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            version="${GITHUB_REF_NAME#v}"
+          else
+            version="$(date -u +%Y%m%d)-${sha7}"
+          fi
+          {
+            echo "sha7=${sha7}"
+            echo "sha_tag=sha-${sha7}"
+            echo "version=${version}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Compute image metadata
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ghcr.io/${{ github.repository }}
+          flavor: latest=false
+          tags: |
+            type=raw,value=${{ steps.ver.outputs.sha_tag }}
+            type=raw,value=${{ steps.ver.outputs.version }}
+
+      # Build một lần vào docker daemon cục bộ để quét TRƯỚC khi đẩy lên registry.
+      - name: Build image (local, for scanning)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          load: true
+          push: false
+          tags: lms-api:ci
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            APP_VERSION=${{ steps.ver.outputs.version }}
+            VCS_REF=${{ github.sha }}
+          provenance: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Install Trivy (pinned, checksum verified)
+        uses: ./.github/actions/install-trivy
+
+      - name: Scan image with Trivy (HIGH, CRITICAL)
+        run: |
+          trivy image --scanners vuln,secret --severity HIGH,CRITICAL --ignore-unfixed \
+            --exit-code 1 --no-progress lms-api:ci
+
+      - name: Log in to GHCR
+        if: ${{ env.PUSH_IMAGE == 'true' }}
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Cùng Dockerfile, cùng build-args, lớp đã nằm trong cache nên bước này chỉ gắn tag và đẩy.
+      - name: Push image to GHCR
+        if: ${{ env.PUSH_IMAGE == 'true' }}
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            APP_VERSION=${{ steps.ver.outputs.version }}
+            VCS_REF=${{ github.sha }}
+          provenance: false
+          cache-from: type=gha
+
+      # Thời gian đo thật của lần chạy này, tính từ thời điểm commit đến lúc image đã đẩy xong (gồm cả thời gian chờ
+      # runner). Mốc commit lấy từ sự kiện push; không có số liệu nào được ghi sẵn trong tài liệu.
+      - name: Report commit-to-image time
+        if: ${{ env.PUSH_IMAGE == 'true' && github.event_name == 'push' }}
+        env:
+          COMMIT_TIMESTAMP: ${{ github.event.head_commit.timestamp }}
+        run: |
+          {
+            echo "### Image"
+            echo '```'
+            echo "${{ steps.meta.outputs.tags }}"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ -n "${COMMIT_TIMESTAMP}" ]; then
+            elapsed=$(( $(date -u +%s) - $(date -u -d "${COMMIT_TIMESTAMP}" +%s) ))
+            echo "Commit -> image trên GHCR: ${elapsed}s (mục tiêu ≤ 900s)" | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+
+  # ---------------------------------------------------------------------------------------------------------
+  # Chặng 6 — Triển khai staging. KHUNG CHỜ NỀN TẢNG (Q06/Q07): chỉ chạy khi biến repository STAGING_ENABLED == 'true'.
+  # Hiện chưa chọn nền tảng nên job này bị bỏ qua (skipped), KHÔNG phải đã triển khai. Giả định tạm: staging là máy chủ
+  # Linux có Docker, truy cập bằng SSH. Chi tiết và danh sách secret/variable: doc/deploy/staging.md.
+  # Secret của môi trường `staging`: STAGING_SSH_PRIVATE_KEY, STAGING_SSH_KNOWN_HOSTS, và (tùy chọn) các biến
+  # ứng dụng nằm trên máy chủ trong deploy/staging/.env, không đi qua workflow.
+  # ---------------------------------------------------------------------------------------------------------
+  deploy-staging:
+    name: 6 · Deploy to staging
+    needs: package-image
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.STAGING_ENABLED == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment:
+      name: staging
+      url: ${{ vars.STAGING_URL }}
+    permissions:
+      contents: read
+      packages: read
+    concurrency:
+      group: staging-deploy
+      cancel-in-progress: false
+    env:
+      STAGING_DEPLOY_DIR: ${{ vars.STAGING_DEPLOY_DIR || 'lms-api' }}
+      IMAGE_TAG: ${{ needs.package-image.outputs.image-tag }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Configure SSH
+        uses: ./.github/actions/staging-ssh
+        with:
+          host: ${{ vars.STAGING_HOST }}
+          user: ${{ vars.STAGING_USER }}
+          port: ${{ vars.STAGING_SSH_PORT || '22' }}
+          private-key: ${{ secrets.STAGING_SSH_PRIVATE_KEY }}
+          known-hosts: ${{ secrets.STAGING_SSH_KNOWN_HOSTS }}
+
+      # Chỉ chép thư mục deploy/staging và script nạp CSDL; KHÔNG chép/ghi đè deploy/staging/.env trên máy chủ.
+      - name: Upload deploy files
+        run: |
+          # shellcheck disable=SC2029 # mở rộng biến ở phía runner là chủ ý
+          tar czf - --exclude='.env' deploy/staging doc/database_import.js \
+            | ssh staging "mkdir -p '${STAGING_DEPLOY_DIR}' && tar xzf - -C '${STAGING_DEPLOY_DIR}'"
+
+      # Đăng nhập GHCR trên máy chủ bằng GITHUB_TOKEN của job (hết hạn khi job kết thúc), truyền qua stdin.
+      - name: Log in to GHCR on the host
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
+        run: |
+          # shellcheck disable=SC2029 # mở rộng biến ở phía runner là chủ ý
+          printf '%s' "$GHCR_TOKEN" | ssh staging "docker login ghcr.io -u '${GHCR_USER}' --password-stdin"
+
+      # deploy.sh tự rollback về bản trước và trả mã khác 0 nếu /actuator/health không UP trong thời gian chờ.
+      - name: Deploy (pull, up, wait for health, auto-rollback on failure)
+        run: |
+          # Tên image GHCR luôn viết thường, khớp với tag mà chặng 5 đã đẩy.
+          image_repo="ghcr.io/${GITHUB_REPOSITORY,,}"
+          # shellcheck disable=SC2029 # mở rộng biến ở phía runner là chủ ý
+          ssh staging "cd '${STAGING_DEPLOY_DIR}/deploy/staging' && chmod +x deploy.sh rollback.sh smoke.sh lib.sh \
+            && IMAGE_REPO='${image_repo}' ./deploy.sh '${IMAGE_TAG}'"
+
+      - name: Log out of GHCR on the host
+        if: ${{ always() }}
+        run: ssh staging "docker logout ghcr.io"
+
+  smoke-staging:
+    name: 6b · Smoke test staging
+    needs: [package-image, deploy-staging]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      # STAGING_URL là địa chỉ công khai của staging (biến repository, chưa có vì chưa chọn nền tảng).
+      - name: Smoke test
+        env:
+          STAGING_URL: ${{ vars.STAGING_URL }}
+          EXPECTED_SHA7: ${{ needs.package-image.outputs.sha7 }}
+        run: bash deploy/staging/smoke.sh "$STAGING_URL" "$EXPECTED_SHA7"
+
+  # Smoke đỏ nghĩa là bản vừa deploy "UP" nhưng sai: quay về bản trước. Job này vẫn để workflow đỏ (smoke đã đỏ).
+  rollback-staging:
+    name: 6c · Roll back staging after failed smoke
+    needs: [deploy-staging, smoke-staging]
+    if: ${{ always() && needs.smoke-staging.result == 'failure' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment:
+      name: staging
+      url: ${{ vars.STAGING_URL }}
+    permissions:
+      contents: read
+    concurrency:
+      group: staging-deploy
+      cancel-in-progress: false
+    env:
+      STAGING_DEPLOY_DIR: ${{ vars.STAGING_DEPLOY_DIR || 'lms-api' }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Configure SSH
+        uses: ./.github/actions/staging-ssh
+        with:
+          host: ${{ vars.STAGING_HOST }}
+          user: ${{ vars.STAGING_USER }}
+          port: ${{ vars.STAGING_SSH_PORT || '22' }}
+          private-key: ${{ secrets.STAGING_SSH_PRIVATE_KEY }}
+          known-hosts: ${{ secrets.STAGING_SSH_KNOWN_HOSTS }}
+
+      - name: Roll back to previous version
+        run: |
+          image_repo="ghcr.io/${GITHUB_REPOSITORY,,}"
+          # shellcheck disable=SC2029 # mở rộng biến ở phía runner là chủ ý
+          ssh staging "cd '${STAGING_DEPLOY_DIR}/deploy/staging' && IMAGE_REPO='${image_repo}' ./rollback.sh"
