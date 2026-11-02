@@ -5,13 +5,15 @@ package com.hcmute.lms.lmsapi.enums;
  */
 public enum AccessType {
 
-    /**
-     * Hành vi Đọc dữ liệu: Xem thông tin lớp học, danh sách sinh viên ghi danh, bảng điểm và kết quả đo lường.
-     */
-    READ,
+  /**
+   * Hành vi Đọc dữ liệu: Xem thông tin lớp học, danh sách sinh viên ghi danh, bảng điểm và kết quả
+   * đo lường.
+   */
+  READ,
 
-    /**
-     * Hành vi Ghi dữ liệu: Nhập điểm sinh viên, cập nhật điểm, lập và chỉnh sửa bài đánh giá của lớp học phần.
-     */
-    WRITE
+  /**
+   * Hành vi Ghi dữ liệu: Nhập điểm sinh viên, cập nhật điểm, lập và chỉnh sửa bài đánh giá của lớp
+   * học phần.
+   */
+  WRITE
 }

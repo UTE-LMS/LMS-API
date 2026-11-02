@@ -9,9 +9,9 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface ProgramVersionRepository extends MongoRepository<ProgramVersion, String> {
 
-    Page<ProgramVersion> findByProgramId(String programId, Pageable pageable);
+  Page<ProgramVersion> findByProgramId(String programId, Pageable pageable);
 
-    boolean existsByProgramIdAndVersion(String programId, String version);
+  boolean existsByProgramIdAndVersion(String programId, String version);
 
-    boolean existsByProgramIdAndVersionAndIdNot(String programId, String version, String id);
+  boolean existsByProgramIdAndVersionAndIdNot(String programId, String version, String id);
 }

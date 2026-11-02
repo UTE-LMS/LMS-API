@@ -12,10 +12,10 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class CoursePiContributionResponse {
 
-    private String id;
-    private String programVersionId;
-    private String courseId;
-    private String piId;
-    private PiContributionType contribution;
-    private VerificationResponse verification;
+  private String id;
+  private String programVersionId;
+  private String courseId;
+  private String piId;
+  private PiContributionType contribution;
+  private VerificationResponse verification;
 }

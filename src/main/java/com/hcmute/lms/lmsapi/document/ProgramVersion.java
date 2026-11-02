@@ -1,6 +1,9 @@
 package com.hcmute.lms.lmsapi.document;
 
 import com.hcmute.lms.lmsapi.enums.ProgramVersionStatus;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -12,45 +15,43 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.mongodb.core.mapping.Field;
 import org.springframework.data.mongodb.core.mapping.FieldType;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "program_versions")
 @CompoundIndexes({
-    @CompoundIndex(name = "program_version_unique_idx", def = "{'programId': 1, 'version': 1}", unique = true)
+  @CompoundIndex(
+      name = "program_version_unique_idx",
+      def = "{'programId': 1, 'version': 1}",
+      unique = true)
 })
 public class ProgramVersion {
 
-    @Id
-    private String id;
+  @Id private String id;
 
-    @Field(name = "programId", targetType = FieldType.OBJECT_ID)
-    private String programId;
+  @Field(name = "programId", targetType = FieldType.OBJECT_ID)
+  private String programId;
 
-    @Field("version")
-    private String version;
+  @Field("version")
+  private String version;
 
-    @Builder.Default
-    @Field("applicableCohorts")
-    private List<String> applicableCohorts = new ArrayList<>();
+  @Builder.Default
+  @Field("applicableCohorts")
+  private List<String> applicableCohorts = new ArrayList<>();
 
-    @Field("totalCredits")
-    private Integer totalCredits;
+  @Field("totalCredits")
+  private Integer totalCredits;
 
-    @Field("durationYears")
-    private Double durationYears;
+  @Field("durationYears")
+  private Double durationYears;
 
-    @Field("status")
-    private ProgramVersionStatus status;
+  @Field("status")
+  private ProgramVersionStatus status;
 
-    @Field("verification")
-    private Verification verification;
+  @Field("verification")
+  private Verification verification;
 
-    @Field("extra")
-    private Map<String, Object> extra;
+  @Field("extra")
+  private Map<String, Object> extra;
 }
