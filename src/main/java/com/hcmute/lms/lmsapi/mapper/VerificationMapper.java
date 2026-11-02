@@ -5,5 +5,5 @@ import com.hcmute.lms.lmsapi.dto.VerificationResponse;
 
 public interface VerificationMapper {
 
-    VerificationResponse toResponse(Verification verification);
+  VerificationResponse toResponse(Verification verification);
 }

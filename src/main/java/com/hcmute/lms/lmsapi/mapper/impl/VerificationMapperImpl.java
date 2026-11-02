@@ -8,16 +8,16 @@ import org.springframework.stereotype.Component;
 @Component
 public class VerificationMapperImpl implements VerificationMapper {
 
-    @Override
-    public VerificationResponse toResponse(Verification verification) {
-        if (verification == null) {
-            return null;
-        }
-        return VerificationResponse.builder()
-                .status(verification.getStatus())
-                .verifiedBy(verification.getVerifiedBy())
-                .verifiedAt(verification.getVerifiedAt())
-                .note(verification.getNote())
-                .build();
+  @Override
+  public VerificationResponse toResponse(Verification verification) {
+    if (verification == null) {
+      return null;
     }
+    return VerificationResponse.builder()
+        .status(verification.getStatus())
+        .verifiedBy(verification.getVerifiedBy())
+        .verifiedAt(verification.getVerifiedAt())
+        .note(verification.getNote())
+        .build();
+  }
 }

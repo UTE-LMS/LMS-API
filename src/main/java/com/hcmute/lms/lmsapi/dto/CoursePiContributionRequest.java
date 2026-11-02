@@ -15,14 +15,14 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class CoursePiContributionRequest {
 
-    @NotBlank(message = "ID học phần không được để trống")
-    @Pattern(regexp = "^[0-9a-fA-F]{24}$", message = "ID học phần phải là ObjectId 24 ký tự hex")
-    private String courseId;
+  @NotBlank(message = "ID học phần không được để trống")
+  @Pattern(regexp = "^[0-9a-fA-F]{24}$", message = "ID học phần phải là ObjectId 24 ký tự hex")
+  private String courseId;
 
-    @NotBlank(message = "ID PI không được để trống")
-    @Pattern(regexp = "^[0-9a-fA-F]{24}$", message = "ID PI phải là ObjectId 24 ký tự hex")
-    private String piId;
+  @NotBlank(message = "ID PI không được để trống")
+  @Pattern(regexp = "^[0-9a-fA-F]{24}$", message = "ID PI phải là ObjectId 24 ký tự hex")
+  private String piId;
 
-    @NotNull(message = "Mức đóng góp không được để trống")
-    private PiContributionType contribution;
+  @NotNull(message = "Mức đóng góp không được để trống")
+  private PiContributionType contribution;
 }

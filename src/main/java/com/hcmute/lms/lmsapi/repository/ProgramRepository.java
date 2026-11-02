@@ -7,7 +7,7 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface ProgramRepository extends MongoRepository<Program, String> {
 
-    boolean existsByCode(String code);
+  boolean existsByCode(String code);
 
-    boolean existsByCodeAndIdNot(String code, String id);
+  boolean existsByCodeAndIdNot(String code, String id);
 }

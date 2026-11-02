@@ -17,44 +17,46 @@ import org.springframework.data.mongodb.core.mapping.FieldType;
 @AllArgsConstructor
 @Document(collection = "pis")
 @CompoundIndexes({
-    @CompoundIndex(name = "program_version_code_unique_idx", def = "{'programVersionId': 1, 'code': 1}", unique = true),
-    @CompoundIndex(name = "plo_id_idx", def = "{'ploId': 1}")
+  @CompoundIndex(
+      name = "program_version_code_unique_idx",
+      def = "{'programVersionId': 1, 'code': 1}",
+      unique = true),
+  @CompoundIndex(name = "plo_id_idx", def = "{'ploId': 1}")
 })
 public class Pi {
 
-    @Id
-    private String id;
+  @Id private String id;
 
-    @Field(name = "programVersionId", targetType = FieldType.OBJECT_ID)
-    private String programVersionId;
+  @Field(name = "programVersionId", targetType = FieldType.OBJECT_ID)
+  private String programVersionId;
 
-    @Field(name = "ploId", targetType = FieldType.OBJECT_ID)
-    private String ploId;
+  @Field(name = "ploId", targetType = FieldType.OBJECT_ID)
+  private String ploId;
 
-    @Field("code")
-    private String code;
+  @Field("code")
+  private String code;
 
-    @Field("displayOrder")
-    private Integer displayOrder;
+  @Field("displayOrder")
+  private Integer displayOrder;
 
-    @Field("nameOriginalTerm")
-    private String nameOriginalTerm;
+  @Field("nameOriginalTerm")
+  private String nameOriginalTerm;
 
-    @Field("contentOriginal")
-    private String contentOriginal;
+  @Field("contentOriginal")
+  private String contentOriginal;
 
-    @Field("contentShort")
-    private String contentShort;
+  @Field("contentShort")
+  private String contentShort;
 
-    @Field("capabilityLevelRaw")
-    private Integer capabilityLevelRaw;
+  @Field("capabilityLevelRaw")
+  private Integer capabilityLevelRaw;
 
-    @Field("targetPassRate")
-    private Double targetPassRate;
+  @Field("targetPassRate")
+  private Double targetPassRate;
 
-    @Field("verification")
-    private Verification verification;
+  @Field("verification")
+  private Verification verification;
 
-    @Field("reviewNote")
-    private String reviewNote;
+  @Field("reviewNote")
+  private String reviewNote;
 }

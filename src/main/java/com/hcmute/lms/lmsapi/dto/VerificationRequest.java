@@ -14,9 +14,9 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class VerificationRequest {
 
-    @NotNull(message = "Trạng thái xác nhận không được để trống")
-    private VerificationStatus status;
+  @NotNull(message = "Trạng thái xác nhận không được để trống")
+  private VerificationStatus status;
 
-    @Size(max = 2000, message = "Ghi chú xác nhận tối đa 2000 ký tự")
-    private String note;
+  @Size(max = 2000, message = "Ghi chú xác nhận tối đa 2000 ký tự")
+  private String note;
 }

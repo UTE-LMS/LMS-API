@@ -5,7 +5,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>4.1.0</version>
+        <version>4.1.2</version>
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
     <groupId>com.hcmute.lms</groupId>
@@ -28,6 +28,20 @@
     </scm>
     <properties>
         <java.version>25</java.version>
+
+        <!-- Phiên bản công cụ chất lượng (ADR 0005, doc/quality/README.md). Ghim cụ thể, không dùng LATEST. -->
+        <jacoco.version>0.8.15</jacoco.version>
+        <spotless.version>3.10.4</spotless.version>
+        <google-java-format.version>1.36.1</google-java-format.version>
+        <spotbugs-maven-plugin.version>4.10.5.0</spotbugs-maven-plugin.version>
+        <maven-pmd-plugin.version>3.28.0</maven-pmd-plugin.version>
+        <sonar-maven-plugin.version>5.8.0.7211</sonar-maven-plugin.version>
+        <!-- true: cổng CPD áp cho cả src/main và src/test. Chỉ đo mã production: -Dcpd.includeTests=false -->
+        <cpd.includeTests>true</cpd.includeTests>
+
+        <!-- SonarCloud: token KHÔNG nằm trong repo, scanner đọc biến môi trường SONAR_TOKEN. -->
+        <sonar.host.url>https://sonarcloud.io</sonar.host.url>
+        <sonar.coverage.jacoco.xmlReportPaths>${project.build.directory}/site/jacoco/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
     </properties>
     <dependencies>
         <dependency>
@@ -37,10 +51,6 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-mail</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -57,10 +67,6 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webmvc</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-websocket</artifactId>
         </dependency>
 
         <dependency>
@@ -81,11 +87,6 @@
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-mail-test</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security-test</artifactId>
             <scope>test</scope>
         </dependency>
@@ -99,14 +100,68 @@
             <artifactId>spring-boot-starter-webmvc-test</artifactId>
             <scope>test</scope>
         </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-websocket-test</artifactId>
-            <scope>test</scope>
-        </dependency>
     </dependencies>
 
     <build>
+        <!--
+            Công cụ chất lượng (TD-07, TD-08; ADR 0005). Khai báo cấu hình tại đây để gọi trực tiếp được:
+              ./mvnw -B -ntp -DskipTests spotless:check spotbugs:check
+            Việc gắn vào pha verify nằm ở khối plugins bên dưới.
+        -->
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <!-- Định dạng theo Google Java Style (doc/coding-convention.md §2). Giấy phép Apache-2.0. -->
+                    <groupId>com.diffplug.spotless</groupId>
+                    <artifactId>spotless-maven-plugin</artifactId>
+                    <version>${spotless.version}</version>
+                    <configuration>
+                        <java>
+                            <includes>
+                                <include>src/main/java/**/*.java</include>
+                                <include>src/test/java/**/*.java</include>
+                            </includes>
+                            <googleJavaFormat>
+                                <version>${google-java-format.version}</version>
+                                <style>GOOGLE</style>
+                            </googleJavaFormat>
+                            <removeUnusedImports/>
+                        </java>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <!-- Phát hiện lỗi tiềm ẩn trên bytecode. Giấy phép LGPL-2.1 (công cụ chạy lúc build, không đóng gói). -->
+                    <groupId>com.github.spotbugs</groupId>
+                    <artifactId>spotbugs-maven-plugin</artifactId>
+                    <version>${spotbugs-maven-plugin.version}</version>
+                    <configuration>
+                        <effort>Max</effort>
+                        <threshold>Medium</threshold>
+                        <failOnError>true</failOnError>
+                        <includeTests>true</includeTests>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <!-- Chỉ dùng goal cpd-check (đo trùng lặp bằng PMD CPD). Giấy phép Apache-2.0 / BSD-style (PMD). -->
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-pmd-plugin</artifactId>
+                    <version>${maven-pmd-plugin.version}</version>
+                    <configuration>
+                        <language>java</language>
+                        <minimumTokens>100</minimumTokens>
+                        <includeTests>${cpd.includeTests}</includeTests>
+                        <failOnViolation>true</failOnViolation>
+                        <printFailingErrors>true</printFailingErrors>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <!-- Đẩy kết quả lên SonarCloud khi chạy `sonar:sonar` (cần SONAR_TOKEN trong môi trường). Giấy phép LGPL-3.0. -->
+                    <groupId>org.sonarsource.scanner.maven</groupId>
+                    <artifactId>sonar-maven-plugin</artifactId>
+                    <version>${sonar-maven-plugin.version}</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
         <plugins>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
@@ -170,7 +225,7 @@
             <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
-                <version>0.8.15</version>
+                <version>${jacoco.version}</version>
                 <executions>
                     <execution>
                         <id>prepare-agent</id>
@@ -192,15 +247,34 @@
                             <goal>check</goal>
                         </goals>
                         <configuration>
-                            <haltOnFailure>false</haltOnFailure>
+                            <haltOnFailure>true</haltOnFailure>
+                            <!--
+                                Mô-đun lõi (Rubric TC2.5): nghiệp vụ, API, phân quyền/bảo mật. Mẫu này khớp TÊN TỆP
+                                .class (dạng đường dẫn). Không đặt mẫu trong <rule><includes>: ở đó JaCoCo so với
+                                tên gói/bundle dạng dấu chấm nên mẫu dạng đường dẫn không khớp gì và cổng không
+                                bao giờ fail (đã kiểm chứng: đặt ngưỡng 0.99 vẫn BUILD SUCCESS).
+                            -->
+                            <includes>
+                                <include>com/hcmute/lms/lmsapi/service/impl/*</include>
+                                <include>com/hcmute/lms/lmsapi/controller/*</include>
+                                <include>com/hcmute/lms/lmsapi/filter/*</include>
+                                <include>com/hcmute/lms/lmsapi/config/*</include>
+                            </includes>
                             <rules>
+                                <!-- Gộp toàn bộ mô-đun lõi: >= 70% dòng lệnh. -->
+                                <rule>
+                                    <element>BUNDLE</element>
+                                    <limits>
+                                        <limit>
+                                            <counter>LINE</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.70</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                                <!-- Từng gói lõi cũng phải >= 70%, tránh một gói tốt che gói yếu. -->
                                 <rule>
                                     <element>PACKAGE</element>
-                                    <includes>
-                                        <include>com/hcmute/lms/lmsapi/service/impl/**</include>
-                                        <include>com/hcmute/lms/lmsapi/controller/**</include>
-                                        <include>com/hcmute/lms/lmsapi/filter/**</include>
-                                    </includes>
                                     <limits>
                                         <limit>
                                             <counter>LINE</counter>
@@ -211,6 +285,46 @@
                                 </rule>
                             </rules>
                         </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- Cổng chất lượng gắn vào pha verify: ./mvnw -B -ntp verify chạy đủ (ADR 0005). -->
+            <plugin>
+                <groupId>com.diffplug.spotless</groupId>
+                <artifactId>spotless-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>spotless-check</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>com.github.spotbugs</groupId>
+                <artifactId>spotbugs-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>spotbugs-check</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-pmd-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>cpd-check</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>cpd-check</goal>
+                        </goals>
                     </execution>
                 </executions>
             </plugin>
