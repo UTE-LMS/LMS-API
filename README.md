@@ -125,6 +125,57 @@ mvnw.cmd verify      # build + test
 Hiện chỉ có một test khởi động ngữ cảnh (`LmsApiApplicationTests`); test nghiệp vụ sẽ được bổ sung theo
 `doc/ke-hoach-xay-dung.md`. Kết quả CI và coverage sẽ được công bố khi pipeline đầy đủ.
 
+## Docker, CI/CD và triển khai
+
+### Chạy ứng dụng bằng Docker
+
+`Dockerfile` ở gốc repo dựng image đa tầng (build JDK 25 Temurin, chạy JRE 25 Alpine, user không phải root,
+`HEALTHCHECK` tới `/actuator/health`). Không có secret trong image; mọi cấu hình đi qua biến môi trường
+(`application.properties.example`). Ví dụ chạy cạnh container MongoDB của mục trên (dùng chung mạng của container Mongo để
+địa chỉ `localhost:27017` mà replica set quảng bá vẫn đúng):
+
+```
+docker build -t lms-api:local .
+docker run -d --name lms-api --network container:lms-mongo -e JWT_SECRET=<chuỗi ngẫu nhiên >= 32 byte> lms-api:local
+```
+
+Cổng 8080 khi đó nằm trên container `lms-mongo`, nên cần publish `-p 8080:8080` lúc tạo container Mongo.
+
+### Pipeline CI (`.github/workflows/ci.yml`)
+
+```mermaid
+flowchart LR
+  build[1 Build] --> lint[2 Lint + SpotBugs]
+  build --> test[3 Test + JaCoCo >= 70%]
+  build --> dep[4b Quet phu thuoc<br/>Trivy]
+  sec[4a Quet secret<br/>gitleaks] --> img
+  lint --> img
+  test --> img
+  dep --> img[5 Docker image<br/>Trivy image, push GHCR]
+  img --> dep6[6 Deploy staging]
+  dep6 --> smoke[6b Smoke] --> rb[6c Rollback neu smoke do]
+```
+
+| Chặng | Job | Ghi chú |
+|---|---|---|
+| 1 | `build` | `./mvnw -DskipTests package` |
+| 2 | `lint` | `spotless:check spotbugs:check` (cấu hình trong `pom.xml` của nhóm static-analysis); Sonar chỉ chạy khi có secret `SONAR_TOKEN` — **chưa có token nên chưa quét Sonar** |
+| 3 | `test` | MongoDB 8.0 replica set `rs0` + `./mvnw verify` (gồm cổng JaCoCo ≥ 70%); báo cáo JaCoCo là artifact `jacoco-report` |
+| 4 | `secret-scan`, `dependency-scan` | gitleaks (toàn bộ lịch sử); Trivy trên JAR |
+| 5 | `package-image` | build image, Trivy quét image, đẩy GHCR **chỉ** khi push vào `main` hoặc tag `v*.*.*`; PR chỉ build + quét |
+| 6 | `deploy-staging`, `smoke-staging`, `rollback-staging` | chỉ ở `main` và khi biến repository `STAGING_ENABLED == 'true'`; **hiện chưa có nền tảng staging nên bị bỏ qua** |
+
+Tag image: `sha-<7 ký tự commit>` (dùng để deploy/rollback) và `<YYYYMMDD>-<7 ký tự commit>`; không có `latest`.
+Thời gian commit → image: **chưa đo** (chưa có lần chạy trên GitHub; workflow ghi số thật vào job summary khi chạy trên `main`).
+Chặng `lint` phụ thuộc PR `chore/f00-static-analysis`, và chặng 4b/5 phụ thuộc phiên bản Spring Boot đủ mới để Trivy không báo
+HIGH/CRITICAL; chi tiết ở `doc/adr/0006-ci-cd-va-staging.md`.
+
+### Staging
+
+Khung triển khai (Docker Compose, `deploy.sh`, `rollback.sh`, `smoke.sh`) ở `deploy/staging/`, hướng dẫn đầy đủ ở
+`doc/deploy/staging.md`: quy trình, health check (US-39), rollback, xem log, cảnh báo, danh sách biến môi trường, secret/variable cần tạo.
+Nền tảng staging chưa được chọn (Q06, Q07) nên chưa có môi trường chạy thật.
+
 ## Cấu trúc
 
 Dự án áp dụng mô hình kiến trúc phân tầng 3 lớp (**Package-by-Layer**) trực tiếp dưới `com.hcmute.lms.lmsapi` kết hợp các package `.impl` và interface trừu tượng nhằm tuân thủ nghiêm ngặt 5 nguyên lý **SOLID**:
@@ -146,6 +197,9 @@ src/main/java/com/hcmute/lms/lmsapi/
 
 src/main/resources/     # Cấu hình môi trường (application.properties.example)
 docker/mongo/           # Cấu hình Docker MongoDB replica set dev
+Dockerfile              # Image ứng dụng (đa tầng, user không root)
+deploy/staging/         # Khung triển khai staging: compose, deploy.sh, rollback.sh, smoke.sh
+.github/                # Workflow CI (ci.yml) và composite action (install-trivy, staging-ssh)
 doc/                    # Tài liệu kỹ thuật, kiến trúc ADR, kế hoạch thực hiện
 logsAI/                 # Nhật ký sử dụng AI (Rubric TC2.3)
 ```
@@ -157,7 +211,8 @@ logsAI/                 # Nhật ký sử dụng AI (Rubric TC2.3)
 - `doc/ke-hoach-xay-dung.md` — kế hoạch v0.3, backlog, lộ trình, rủi ro; `doc/plan/` — kế hoạch tách theo từng feature (F01…F08) để giao cho LLM hỗ trợ code.
 - `doc/chot-feature-do-an.md` — đề xuất chốt danh sách tính năng (chưa ký); `doc/tom-tat-du-an-de-thao-luan.md` — tóm tắt để thảo luận.
 - `doc/cam-ket-san-pham-metric.md` — bản cam kết Bước 3 (dự thảo).
-- `doc/adr/` — quyết định thiết kế (ADR 0001: duyệt ma trận đề thi, đang chờ GVHD).
+- `doc/adr/` — quyết định thiết kế (ADR 0001: duyệt ma trận đề thi, đang chờ GVHD; ADR 0006: CI/CD và staging).
+- `doc/deploy/staging.md` — triển khai staging, health check, rollback, log, biến môi trường.
 - `doc/coding-convention.md`, `doc/tech-debt.md`, `doc/rubric-checklist.md`.
 - `doc/BS.md`, `doc/Misa.md` — kế hoạch và hướng dẫn đọc CTĐT.
 
