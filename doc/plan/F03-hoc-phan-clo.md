@@ -40,23 +40,23 @@ sau này phải bám vào (câu hỏi chỉ được đo cặp (CLO, PI) có tro
 
 ## 5. Stories và acceptance criteria (nháp)
 
-| ID | AC |
-|---|---|
-| US-09/AC-1 | Tạo `courses` với `code` mới → thành công; trùng `code` → 409 |
-| US-09/AC-2 | Gán học phần vào một `programVersionId` (`program_courses`); trùng `(programVersionId, courseId)` → 409 |
-| US-09/AC-3 | `prerequisiteCourseIds` chứa học phần không tồn tại hoặc chính nó → 422 |
-| US-10/AC-1 | Tạo `syllabi` mới với `(courseId, version)` chưa có, `status = DRAFT`; trùng → 409 |
-| US-10/AC-2 | `effectiveToTermId` không trước `effectiveFromTermId` (nếu có thông tin học kỳ) → 422 |
-| US-10/AC-3 | Đề cương `CONFIRMED` không cho sửa CLO của nó (422); phải tạo phiên bản mới |
-| US-11/AC-1 | Tạo CLO với `code` đúng mẫu, `bloomLevel` 1–6 → thành công |
-| US-11/AC-2 | Hai CLO cùng `code` trong **cùng** đề cương → 409; cùng `code` ở **hai** đề cương khác nhau → hợp lệ |
-| US-11/AC-3 | `bloomLevel` = 0 hoặc 7 → 400 |
-| US-11/AC-4 | `measurement` rỗng/`null` vẫn hợp lệ; giá trị ngoài [0,1] → 400 |
-| US-12/AC-1 | Tạo liên kết `(cloId, piId)` khi `piId` thuộc `programVersionId` của liên kết → thành công |
-| US-12/AC-2 | Trùng `(cloId, piId)` → 409; PI khác `programVersionId` → 422 |
-| US-12/AC-3 | Đổi `verification.status` sang `VERIFIED` ghi người xác nhận và thời điểm |
-| US-12/AC-4 | API ma trận trả CLO × PI kèm trạng thái xác nhận từng ô |
-| US-12/AC-5 | `weight` ngoài (0, 1] → 400; `null` hợp lệ |
+| ID | AC | Trạng thái |
+|---|---|---|
+| US-09/AC-1 | Tạo `courses` với `code` mới → thành công; trùng `code` → 409 | **ĐÃ HOÀN THÀNH (Issue #20)** |
+| US-09/AC-2 | Gán học phần vào một `programVersionId` (`program_courses`); trùng `(programVersionId, courseId)` → 409 | **ĐÃ HOÀN THÀNH (Issue #20)** |
+| US-09/AC-3 | `prerequisiteCourseIds` chứa học phần không tồn tại hoặc chính nó → 422 | **ĐÃ HOÀN THÀNH (Issue #20)** |
+| US-10/AC-1 | Tạo `syllabi` mới với `(courseId, version)` chưa có, `status = DRAFT`; trùng → 409 | Chờ F05a (`terms`), Q02 |
+| US-10/AC-2 | `effectiveToTermId` không trước `effectiveFromTermId` (nếu có thông tin học kỳ) → 422 | Chờ F05a (`terms`), Q02 |
+| US-10/AC-3 | Đề cương `CONFIRMED` không cho sửa CLO của nó (422); phải tạo phiên bản mới | Chờ F05a (`terms`), Q02 |
+| US-11/AC-1 | Tạo CLO với `code` đúng mẫu, `bloomLevel` 1–6 → thành công | Chờ US-10, Q02, Q12 |
+| US-11/AC-2 | Hai CLO cùng `code` trong **cùng** đề cương → 409; cùng `code` ở **hai** đề cương khác nhau → hợp lệ | Chờ US-10, Q02, Q12 |
+| US-11/AC-3 | `bloomLevel` = 0 hoặc 7 → 400 | Chờ US-10, Q02, Q12 |
+| US-11/AC-4 | `measurement` rỗng/`null` vẫn hợp lệ; giá trị ngoài [0,1] → 400 | Chờ US-10, Q02, Q12 |
+| US-12/AC-1 | Tạo liên kết `(cloId, piId)` khi `piId` thuộc `programVersionId` của liên kết → thành công | Chờ US-11, Q14, Q22 |
+| US-12/AC-2 | Trùng `(cloId, piId)` → 409; PI khác `programVersionId` → 422 | Chờ US-11, Q14, Q22 |
+| US-12/AC-3 | Đổi `verification.status` sang `VERIFIED` ghi người xác nhận và thời điểm | Chờ US-11, Q14, Q22 |
+| US-12/AC-4 | API ma trận trả CLO × PI kèm trạng thái xác nhận từng ô | Chờ US-11, Q14, Q22 |
+| US-12/AC-5 | `weight` ngoài (0, 1] → 400; `null` hợp lệ | Chờ US-11, Q14, Q22 |
 
 ## 6. API đề xuất **[ĐỀ XUẤT]**
 
@@ -91,4 +91,4 @@ Mã CLO trùng trong/ngoài đề cương; `bloomLevel` biên (0,1,6,7); liên k
 
 Vì sao CLO nhận diện bằng `_id` chứ không bằng `code`; vì sao có `clo_pi_links` riêng (khung đã duyệt để chặn gán PI tùy ý cho
 câu hỏi); vì sao đề cương phiên bản hóa (đổi CLO không làm sai báo cáo cũ); bỏ kiểm tra "cặp CLO–PI nằm trong liên kết" thì
-một câu hỏi có thể đo PI không liên quan CLO của nó.
+một câu hỏi có thể đo PI không liên quan CLO của nó. Xem chi tiết tại `doc/de-van-dap/f03-hoc-phan-clo.md`.
