@@ -157,3 +157,88 @@ Dưới góc độ quản trị đào tạo và kinh doanh số, US-09 giải qu
 2. **Kết luận đề xuất:**
    - Nhóm IT & IBS đã hoàn thành 100% US-09 (Issue #20) với đầy đủ mã nguồn, unit test, integration test, và tài liệu vấn đáp.
    - Các User Story #21, #22, #23 được tổng kết chi tiết kèm theo các câu hỏi nghiệp vụ đang chờ để Thầy/Cô và Hội đồng định hướng phương án (triển khai F05a trước, hoặc cung cấp mẫu ma trận CLO–PI nghiệm thu).
+
+
+---
+
+## Câu Hỏi 7: Vì sao Chuẩn đầu ra học phần (CLO) phải được nhận diện bằng `_id` thay vì dùng mã nghiệp vụ `code`?
+
+### Trả lời — Góc nhìn Sinh viên Công nghệ thông tin (IT):
+
+1. **Phạm vi Không gian Tên Cục bộ (Local Namespace Scope):**
+   - Mã CLO (như `CLO1`, `CLO2`) không phải là mã định danh toàn cục (Globally Unique Identifier).
+   - Trong cùng một trường đại học, hàng trăm học phần khác nhau đều có `CLO1` (ví dụ: `CLO1` của môn *Lập trình hướng đối tượng* và `CLO1` của môn *Cơ sở dữ liệu*).
+   - Thậm chí trong cùng một học phần, hai phiên bản đề cương khác nhau (ví dụ: `version 2023.1` và `version 2024.1`) đều có `CLO1` nhưng định nghĩa hai chuẩn năng lực hoàn toàn khác nhau.
+2. **Toàn vẹn Khóa Ngoại NoSQL:**
+   - Nếu dùng `code` làm khóa tham chiếu, các collection liên quan như `clo_pi_links`, `questions`, `outcomeMappings`, `student_results` sẽ bị xung đột hoặc phải lưu khóa phức hợp cồng kềnh `(courseId, syllabusVersion, cloCode)`.
+   - Sử dụng MongoDB `_id` (ObjectId 12-byte bất biến) làm Primary Key cho phép trỏ chính xác tuyệt đối tới định nghĩa CLO của đúng phiên bản đề cương mà không bao giờ bị nhầm lẫn. Cặp chỉ mục duy nhất `@CompoundIndex(def = "{'syllabusId': 1, 'code': 1}", unique = true)` bảo đảm trong phạm vi một đề cương không bao giờ có 2 CLO trùng mã (US-11/AC-2).
+
+---
+
+### Trả lời — Góc nhìn Sinh viên Kinh doanh số (IBS):
+
+- Trong thiết kế sư phạm OBE, CLO là đơn vị đo lường cơ bản nhất của một học phần.
+- Việc nhận diện bằng `_id` giúp hệ thống truy vết chính xác sinh viên học ở niên khóa nào, theo đề cương phiên bản nào, và đạt chuẩn đầu ra theo đúng cam kết chuẩn đầu ra tại thời điểm họ học, bảo đảm tính minh chứng phục vụ kiểm định chất lượng (AUN-QA, ABET).
+
+---
+
+## Câu Hỏi 8: Vì sao Đề cương môn học (`syllabi`) phải được phiên bản hóa và áp dụng cơ chế đóng băng (Freeze / Immutability) khi ở trạng thái `CONFIRMED`?
+
+### Trả lời — Góc nhìn Sinh viên Công nghệ thông tin (IT):
+
+1. **Bảo vệ Tính Bất Biến của Dữ liệu Lịch sử (Historical Data Immutability):**
+   - Khi một đề cương đã chuyển sang `CONFIRMED`, nó trở thành căn cứ pháp lý để tổ chức giảng dạy, ra đề thi và đo lường điểm số sinh viên.
+   - Nếu cho phép sửa hoặc xóa CLO của một đề cương đã `CONFIRMED`, các kỳ thi đã diễn ra hoặc bảng điểm của các học kỳ trước tham chiếu tới CLO đó sẽ bị sai lệch, mồ côi hoặc thay đổi kết quả đo lường trong quá khứ.
+2. **Cơ chế Ngăn Chặn ở Tầng Dịch vụ (US-10/AC-3):**
+   - Tại `CloServiceImpl`, mọi hành vi `createClo`, `updateClo`, `deleteClo` đều kiểm tra `syllabus.getStatus() == SyllabusStatus.CONFIRMED`.
+   - Nếu phát hiện đề cương đã `CONFIRMED`, hệ thống lập tức chặn lại và ném `BusinessRuleViolationException` (HTTP 422), buộc người quản lý phải tạo một phiên bản đề cương mới (`Syllabus` mới với version kế tiếp).
+
+---
+
+### Trả lời — Góc nhìn Sinh viên Kinh doanh số (IBS):
+
+- Đề cương môn học là "hợp đồng học tập" giữa Nhà trường, Giảng viên và Sinh viên.
+- Việc đóng băng đề cương đảm bảo tính khách quan trong đánh giá chuẩn đầu ra. Giảng viên không thể tùy tiện thay đổi chuẩn đầu ra giữa chừng để "hợp thức hóa" kết quả thi của sinh viên. Mọi điều chỉnh về mục tiêu đào tạo bắt buộc phải thông qua quy trình tái thẩm định và ban hành phiên bản đề cương mới.
+
+---
+
+## Câu Hỏi 9: Vì sao cần Collection trung gian `clo_pi_links` riêng biệt mà không để giảng viên tự gán PI trực tiếp cho từng câu hỏi kiểm tra?
+
+### Trả lời — Góc nhìn Sinh viên Công nghệ thông tin (IT):
+
+1. **Mô hình Khung Thẩm Định Trước (Pre-approved Governance Matrix):**
+   - Nếu không có bảng liên kết `clo_pi_links`, khi nhập ngân hàng câu hỏi đề thi, giảng viên có thể chọn bất kỳ PI nào trong toàn bộ chương trình đào tạo để gán cho một câu hỏi.
+   - Khi đó, hệ thống không thể kiểm soát tính hợp lệ sư phạm ở tầng dữ liệu.
+2. **Ràng buộc Kiểm tra Hợp Lệ Đa Chiều (Cross-dimensional Validation):**
+   - `clo_pi_links` lưu trữ bộ 4 trường: `(programVersionId, syllabusId, cloId, piId)`.
+   - Thuật toán tại `CloPiLinkServiceImpl` kiểm tra: `cloId` phải thuộc về đúng `syllabusId`, và `piId` phải thuộc về đúng `programVersionId` (US-12/AC-2).
+   - Khi giảng viên ra câu hỏi ở phân hệ F04/F05b, API chỉ cho phép chọn cặp (CLO, PI) đã tồn tại trong danh sách `clo_pi_links` đã được phê duyệt (`verification.status = VERIFIED`). Bỏ qua kiểm tra này sẽ dẫn tới việc một câu hỏi đo lường một chỉ số PI không hề liên quan gì đến nội dung học phần.
+
+---
+
+### Trả lời — Góc nhìn Sinh viên Kinh doanh số (IBS):
+
+- **Nguyên tắc Đồng bộ Sư phạm (Constructive Alignment) của GS. John Biggs:** Mục tiêu bài thi (Assessment Tasks) phải đo Chuẩn đầu ra học phần (CLO), và CLO phải đóng góp trực tiếp vào Chỉ số hiệu năng (PI) của CTĐT đã được Hội đồng Khoa học phê duyệt.
+- `clo_pi_links` chính là bản số hóa "Ma trận ánh xạ chuẩn đầu ra môn học vào chuẩn đầu ra chương trình". Giảng viên giảng dạy môn học không có thẩm quyền tự ý thay đổi mối liên kết này, mà phải tuân thủ tuyệt đối khung ma trận do Bộ môn và Khoa ban hành.
+
+---
+
+## Câu Hỏi 10: Các nội dung chưa được xác nhận (Q02, Q12, Q14, Q22, F05a) được hệ thống xử lý như thế nào để đảm bảo tính toàn vẹn và trung thực học thuật (Rule 2)?
+
+### Trả lời — Góc nhìn Sinh viên Công nghệ thông tin & Kinh doanh số:
+
+1. **Q02 (Đề cương chính thức từ Khoa):**
+   - Khoa chưa ban hành văn bản chính thức các đề cương môn học thử nghiệm.
+   - **Xử lý:** Trường `contentOriginal` của CLO cho phép để trống chuỗi rỗng `""` hoặc do người dùng truyền vào khi khai báo. Tuyệt đối không tự bịa đặt nội dung câu chữ CLO vào mã nguồn hay database seed.
+2. **Q12 (Tỷ trọng và ngưỡng đạt CLO):**
+   - Khoa chưa cung cấp tỷ lệ % và ngưỡng điểm tối thiểu để đạt từng CLO.
+   - **Xử lý:** Trường `clos.measurement` (`defaultWeight`, `defaultPassThreshold`) được thiết kế cho phép `null` (US-11/AC-4). Hệ thống không áp đặt các con số tùy tiện (như 60% hay 20/40/40). Nếu người dùng truyền giá trị thì bắt buộc phải nằm trong đoạn $[0, 1]$.
+3. **Q14 (Bảng ánh xạ CLO-PI được duyệt):**
+   - Khoa chưa ban hành bảng ma trận nghiệm thu giữa CLO của các môn thử nghiệm và 17 PI.
+   - **Xử lý:** Toàn bộ liên kết `clo_pi_links` chỉ được lưu khi người quản trị chủ động thiết lập qua API. Hệ thống không tự động suy diễn liên kết dựa trên từ khóa ngữ nghĩa câu chữ (NLP Inference).
+4. **Q22 (Công thức trọng số weight CLO-PI):**
+   - Chưa có văn bản xác nhận công thức tính trọng số khi chuyển đổi kết quả từ CLO lên PI theo phương pháp `FROM_CLOS`.
+   - **Xử lý:** Trường `weight` trong `clo_pi_links` được phép để `null` (US-12/AC-5). Nếu có truyền thì kiểm tra biên $0 < weight \le 1.0$.
+5. **F05a (Collection `terms`):**
+   - Phân hệ quản lý học kỳ `terms` (F05a / Issue #28) chưa được triển khai.
+   - **Xử lý:** `effectiveFromTermId` và `effectiveToTermId` trong `syllabi` cho phép nhận `ObjectId` hợp lệ hoặc để `null`. Ràng buộc so sánh niên khóa `effectiveTo >= effectiveFrom` được ghi nhận chờ kết nối với collection `terms` khi hoàn thiện F05a.

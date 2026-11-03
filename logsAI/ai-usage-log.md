@@ -202,3 +202,44 @@ Phần này chuẩn bị sẵn câu trả lời khoa học, chuẩn mực cho 4 
   - PMD CPD duplication check: 0 duplications found.
   - JaCoCo coverage: Vượt ngưỡng kiểm định.
   - Toàn bộ test suite dự án: 870/870 tests passed (0 failures, 0 errors).
+
+
+---
+
+## Phiên #17 — 2026-11-03: Hiện thực hóa phân hệ F03 các nội dung liên quan đến CLO (US-10, US-11, US-12)
+
+- **Sinh viên yêu cầu:** TinMH (IT) / minhat5
+- **Mục tiêu:**
+  1. Hiện thực hóa các thành phần liên quan đến CLO trong `doc/plan/F03-hoc-phan-clo.md`:
+     - Quản lý đề cương môn học theo phiên bản (`syllabi` - US-10).
+     - Quản lý chuẩn đầu ra học phần (`clos` - US-11).
+     - Quản lý liên kết CLO-PI và ma trận CLO x PI (`clo_pi_links` - US-12).
+  2. Xử lý nghiêm ngặt các nội dung chưa được xác nhận để tránh làm sai:
+     - Q02: Không tự seed văn bản đề cương từ trí nhớ; `contentOriginal` để trống chuỗi rỗng `""` hoặc nhận từ client.
+     - Q12: Không gán giá trị mặc định cho `clos.measurement`; để `null` cho tới khi Khoa xác nhận.
+     - Q14: Không tự suy diễn hay gán ma trận CLO-PI giả định.
+     - Q22: `weight` trong `clo_pi_links` được phép `null`.
+     - F05a: Chưa có `terms` nên chưa so sánh thời gian thực tế `effectiveTo >= effectiveFrom`.
+  3. Cài đặt các Entity NoSQL MongoDB:
+     - `Syllabus` (`syllabi`) với compound unique index `{'courseId': 1, 'version': 1}`.
+     - `Clo` (`clos`) với compound unique index `{'syllabusId': 1, 'code': 1}`.
+     - `CloPiLink` (`clo_pi_links`) với compound unique index `{'cloId': 1, 'piId': 1}`.
+  4. Cài đặt DTOs, Mappers, Repositories, Services và Controllers cho:
+     - `/api/v1/courses/{courseId}/syllabi`, `/api/v1/syllabi/{id}/status`
+     - `/api/v1/syllabi/{syllabusId}/clos`, `/api/v1/clos/{id}`
+     - `/api/v1/syllabi/{syllabusId}/clo-pi-links`, `/api/v1/clo-pi-links/{id}`, `/api/v1/syllabi/{syllabusId}/clo-pi-matrix`, `/api/v1/clo-pi-links/{id}/verification`
+  5. Ràng buộc toàn vẹn và nghiệp vụ:
+     - Đề cương `CONFIRMED` đóng băng (freeze) không cho sửa/xóa/thêm CLO (HTTP 422 - US-10/AC-3).
+     - Restrict Delete: Chặn xóa CLO khi đã có trong liên kết `clo_pi_links` (HTTP 422).
+     - Regex mã CLO: `^CLO[0-9]+$` và bloomLevel 1-6 (HTTP 400).
+     - Scope Authorization cho `QA_OFFICER` khi thẩm định liên kết ma trận (HTTP 403 khi out-of-scope).
+  6. Kiểm thử tự động:
+     - Unit tests: `SyllabusServiceImplTest` (9 tests), `CloServiceImplTest` (10 tests), `CloPiLinkServiceImplTest` (7 tests).
+     - Validation tests: `CloValidationTest` (5 tests).
+     - MockMvc Integration tests: `CloIntegrationTest` (4 tests) chạy trên MongoDB Replica Set thật `rs0`.
+  7. Bổ sung hồ sơ vấn đáp `doc/de-van-dap/f03-hoc-phan-clo.md` giải thích lý do nhận diện CLO bằng `_id`, phiên bản hóa đề cương, và collection `clo_pi_links`.
+- **Kết quả kiểm định chất lượng (DoD):**
+  - Spotless formatting: 255 files clean.
+  - SpotBugs: 0 bugs found.
+  - PMD CPD: 0 duplications found.
+  - Test suites: 35/35 new tests passed; toàn bộ test suite dự án đạt 100%.
