@@ -7,6 +7,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.hcmute.lms.lmsapi.document.Syllabus;
+import com.hcmute.lms.lmsapi.document.Term;
 import com.hcmute.lms.lmsapi.dto.SyllabusRequest;
 import com.hcmute.lms.lmsapi.dto.SyllabusResponse;
 import com.hcmute.lms.lmsapi.enums.SyllabusStatus;
@@ -17,6 +18,9 @@ import com.hcmute.lms.lmsapi.exception.ResourceNotFoundException;
 import com.hcmute.lms.lmsapi.mapper.SyllabusMapper;
 import com.hcmute.lms.lmsapi.repository.CourseRepository;
 import com.hcmute.lms.lmsapi.repository.SyllabusRepository;
+import com.hcmute.lms.lmsapi.repository.TermRepository;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
 import org.bson.types.ObjectId;
@@ -35,12 +39,15 @@ class SyllabusServiceImplTest {
 
   @Mock private SyllabusRepository syllabusRepository;
   @Mock private CourseRepository courseRepository;
+  @Mock private TermRepository termRepository;
   @Mock private SyllabusMapper syllabusMapper;
 
   @InjectMocks private SyllabusServiceImpl syllabusService;
 
   private String courseId;
   private String syllabusId;
+  private String fromTermId;
+  private String toTermId;
   private Syllabus syllabus;
   private SyllabusRequest request;
   private SyllabusResponse response;
@@ -49,6 +56,8 @@ class SyllabusServiceImplTest {
   void setUp() {
     courseId = new ObjectId().toHexString();
     syllabusId = new ObjectId().toHexString();
+    fromTermId = new ObjectId().toHexString();
+    toTermId = new ObjectId().toHexString();
 
     syllabus =
         Syllabus.builder()
@@ -150,6 +159,74 @@ class SyllabusServiceImplTest {
     SyllabusResponse result = syllabusService.createSyllabus(courseId, request);
     assertThat(result).isNotNull();
     assertThat(result.getVersion()).isEqualTo("2024.1");
+    verify(syllabusRepository).save(syllabus);
+  }
+
+  @Test
+  @DisplayName(
+      "US-10/AC-2: effectiveFromTermId không tồn tại -> ném ResourceNotFoundException (404)")
+  void createSyllabus_FromTermNotFound_ThrowsNotFound() {
+    request.setEffectiveFromTermId(fromTermId);
+    when(courseRepository.existsById(courseId)).thenReturn(true);
+    when(syllabusRepository.existsByCourseIdAndVersion(courseId, "2024.1")).thenReturn(false);
+    when(termRepository.findById(fromTermId)).thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> syllabusService.createSyllabus(courseId, request))
+        .isInstanceOf(ResourceNotFoundException.class)
+        .hasMessageContaining("effectiveFromTermId");
+  }
+
+  @Test
+  @DisplayName(
+      "US-10/AC-2: effectiveToTermId trước effectiveFromTermId -> ném BusinessRuleViolationException (422)")
+  void createSyllabus_EffectiveToBeforeFrom_ThrowsException() {
+    Instant now = Instant.parse("2026-01-01T00:00:00Z");
+    Term fromTerm =
+        Term.builder()
+            .id(fromTermId)
+            .code("2026-HK2")
+            .startDate(now.plus(180, ChronoUnit.DAYS))
+            .build();
+    Term toTerm = Term.builder().id(toTermId).code("2026-HK1").startDate(now).build();
+
+    request.setEffectiveFromTermId(fromTermId);
+    request.setEffectiveToTermId(toTermId);
+
+    when(courseRepository.existsById(courseId)).thenReturn(true);
+    when(syllabusRepository.existsByCourseIdAndVersion(courseId, "2024.1")).thenReturn(false);
+    when(termRepository.findById(fromTermId)).thenReturn(Optional.of(fromTerm));
+    when(termRepository.findById(toTermId)).thenReturn(Optional.of(toTerm));
+
+    assertThatThrownBy(() -> syllabusService.createSyllabus(courseId, request))
+        .isInstanceOf(BusinessRuleViolationException.class)
+        .hasMessageContaining("effectiveToTermId không được trước effectiveFromTermId");
+  }
+
+  @Test
+  @DisplayName("US-10/AC-2: effectiveToTermId sau effectiveFromTermId -> hợp lệ và tạo thành công")
+  void createSyllabus_ValidEffectiveTerms_Success() {
+    Instant now = Instant.parse("2026-01-01T00:00:00Z");
+    Term fromTerm = Term.builder().id(fromTermId).code("2026-HK1").startDate(now).build();
+    Term toTerm =
+        Term.builder()
+            .id(toTermId)
+            .code("2026-HK2")
+            .startDate(now.plus(180, ChronoUnit.DAYS))
+            .build();
+
+    request.setEffectiveFromTermId(fromTermId);
+    request.setEffectiveToTermId(toTermId);
+
+    when(courseRepository.existsById(courseId)).thenReturn(true);
+    when(syllabusRepository.existsByCourseIdAndVersion(courseId, "2024.1")).thenReturn(false);
+    when(termRepository.findById(fromTermId)).thenReturn(Optional.of(fromTerm));
+    when(termRepository.findById(toTermId)).thenReturn(Optional.of(toTerm));
+    when(syllabusMapper.toDocument(courseId, request)).thenReturn(syllabus);
+    when(syllabusRepository.save(syllabus)).thenReturn(syllabus);
+    when(syllabusMapper.toResponse(syllabus)).thenReturn(response);
+
+    SyllabusResponse result = syllabusService.createSyllabus(courseId, request);
+    assertThat(result).isNotNull();
     verify(syllabusRepository).save(syllabus);
   }
 

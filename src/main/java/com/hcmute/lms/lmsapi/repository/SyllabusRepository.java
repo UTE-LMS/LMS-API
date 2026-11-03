@@ -15,4 +15,6 @@ public interface SyllabusRepository extends MongoRepository<Syllabus, String> {
   List<Syllabus> findByCourseIdOrderByVersionAsc(String courseId);
 
   boolean existsByCourseId(String courseId);
+
+  boolean existsByEffectiveFromTermIdOrEffectiveToTermId(String fromTermId, String toTermId);
 }

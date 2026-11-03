@@ -2,7 +2,7 @@
 
 Story: **US-09** học phần + vị trí trong CTĐT (C), **US-10** đề cương theo phiên bản (C), **US-11** CLO thuộc một đề cương (C),
 **US-12** liên kết CLO–PI và xác nhận (C). Giai đoạn P2. Chủ trì đề xuất: IBS (IT hỗ trợ). Package: `course`.
-Phụ thuộc: `00`, `F01`, `F02` (cần `program_versions`, `pis`).
+Phụ thuộc: `00`, `F01`, `F02` (cần `program_versions`, `pis`), `F05a` (`terms`).
 
 ## 1. Mục tiêu
 
@@ -19,7 +19,7 @@ sau này phải bám vào (câu hỏi chỉ được đo cặp (CLO, PI) có tro
 | Collection | Trường chính |
 |---|---|
 | `courses` | `code` (duy nhất), `name`, `credits` (int), `extra`. *(Q17 đã chốt: không tạo collection `departments`, bỏ `departmentId`)* |
-| `program_courses` | `programVersionId`, `courseId`, `semester`, `credits`, `type` (`COMPULSORY`/`ELECTIVE`), `category` (`FOUNDATION`, `MAJOR_FOUNDATION`, `SPECIALIZED`, `CAPSTONE_PROJECT`, `THESIS`), `prerequisiteCourseIds[]` |
+| `program_courses` | `programVersionId`, `courseId`, `semester`, `credits`, `type` (`COMPULSORY`/`ELECTIVE`), `category` (`FOUNDATION`, `MAJOR_FOUNDATION`, `SPECIALIZED`, `CAPSTONE_PROJECT`, `THESIS`), `prerequisiteCourseIds[]`, `previousCourseIds[]` |
 | `syllabi` | `courseId`, `version`, `effectiveFromTermId`, `effectiveToTermId` (null được), `status` (`DRAFT`/`CONFIRMED`/`ARCHIVED`), `verification`. Duy nhất `(courseId, version)` |
 | `clos` | `syllabusId`, `courseId`, `code` (`^CLO[0-9]+$`), `contentOriginal`, `bloomLevel` (1–6), `bloomNote`, `measurement` (`{ defaultWeight, defaultPassThreshold }`, null cho tới khi Khoa xác nhận), `verification`. Duy nhất `(syllabusId, code)` |
 | `clo_pi_links` | `cloId`, `piId`, `syllabusId`, `programVersionId`, `weight` (0 < x ≤ 1, null cho tới khi quy tắc xác nhận), `verification`. Duy nhất `(cloId, piId)` |
@@ -44,19 +44,19 @@ sau này phải bám vào (câu hỏi chỉ được đo cặp (CLO, PI) có tro
 |---|---|---|
 | US-09/AC-1 | Tạo `courses` với `code` mới → thành công; trùng `code` → 409 | **ĐÃ HOÀN THÀNH (PR #67)** |
 | US-09/AC-2 | Gán học phần vào một `programVersionId` (`program_courses`); trùng `(programVersionId, courseId)` → 409 | **ĐÃ HOÀN THÀNH (PR #67)** |
-| US-09/AC-3 | `prerequisiteCourseIds` chứa học phần không tồn tại hoặc chính nó → 422 | **ĐÃ HOÀN THÀNH (PR #67)** |
-| US-10/AC-1 | Tạo `syllabi` mới với `(courseId, version)` chưa có, `status = DRAFT`; trùng → 409 | **ĐÃ HOÀN THÀNH** |
-| US-10/AC-2 | `effectiveToTermId` không trước `effectiveFromTermId` (nếu có thông tin học kỳ) → 422 | **TẠM ĐỂ CHỜ F05a** (Chưa có collection `terms` để truy vấn so sánh niên khóa) |
-| US-10/AC-3 | Đề cương `CONFIRMED` không cho sửa CLO của nó (422); phải tạo phiên bản mới | **ĐÃ HOÀN THÀNH** |
-| US-11/AC-1 | Tạo CLO với `code` đúng mẫu, `bloomLevel` 1–6 → thành công | **ĐÃ HOÀN THÀNH** |
-| US-11/AC-2 | Hai CLO cùng `code` trong **cùng** đề cương → 409; cùng `code` ở **hai** đề cương khác nhau → hợp lệ | **ĐÃ HOÀN THÀNH** |
-| US-11/AC-3 | `bloomLevel` = 0 hoặc 7 → 400 | **ĐÃ HOÀN THÀNH** |
-| US-11/AC-4 | `measurement` rỗng/`null` vẫn hợp lệ; giá trị ngoài [0,1] → 400 | **ĐÃ HOÀN THÀNH** |
-| US-12/AC-1 | Tạo liên kết `(cloId, piId)` khi `piId` thuộc `programVersionId` của liên kết → thành công | **ĐÃ HOÀN THÀNH** |
-| US-12/AC-2 | Trùng `(cloId, piId)` → 409; PI khác `programVersionId` → 422 | **ĐÃ HOÀN THÀNH** |
-| US-12/AC-3 | Đổi `verification.status` sang `VERIFIED` ghi người xác nhận và thời điểm | **ĐÃ HOÀN THÀNH** |
-| US-12/AC-4 | API ma trận trả CLO × PI kèm trạng thái xác nhận từng ô | **ĐÃ HOÀN THÀNH** |
-| US-12/AC-5 | `weight` ngoài (0, 1] → 400; `null` hợp lệ | **ĐÃ HOÀN THÀNH** |
+| US-09/AC-3 | `prerequisiteCourseIds` / `previousCourseIds` chứa học phần không tồn tại hoặc chính nó → 422 | **ĐÃ HOÀN THÀNH (PR #67, #68)** |
+| US-10/AC-1 | Tạo `syllabi` mới với `(courseId, version)` chưa có, `status = DRAFT`; trùng → 409 | **ĐÃ HOÀN THÀNH (Issue #21)** |
+| US-10/AC-2 | `effectiveToTermId` không trước `effectiveFromTermId` (nếu có thông tin học kỳ) → 422 | **ĐÃ HOÀN THÀNH (Issue #21)** *(Đã làm trước module `terms` của F05a)* |
+| US-10/AC-3 | Đề cương `CONFIRMED` không cho sửa CLO của nó (422); phải tạo phiên bản mới | **ĐÃ HOÀN THÀNH (Issue #21)** |
+| US-11/AC-1 | Tạo CLO với `code` đúng mẫu, `bloomLevel` 1–6 → thành công | **ĐÃ HOÀN THÀNH (Issue #22)** |
+| US-11/AC-2 | Hai CLO cùng `code` trong **cùng** đề cương → 409; cùng `code` ở **hai** đề cương khác nhau → hợp lệ | **ĐÃ HOÀN THÀNH (Issue #22)** |
+| US-11/AC-3 | `bloomLevel` = 0 hoặc 7 → 400 | **ĐÃ HOÀN THÀNH (Issue #22)** |
+| US-11/AC-4 | `measurement` rỗng/`null` vẫn hợp lệ; giá trị ngoài [0,1] → 400 | **ĐÃ HOÀN THÀNH (Issue #22)** |
+| US-12/AC-1 | Tạo liên kết `(cloId, piId)` khi `piId` thuộc `programVersionId` của liên kết → thành công | **ĐÃ HOÀN THÀNH (Issue #23)** |
+| US-12/AC-2 | Trùng `(cloId, piId)` → 409; PI khác `programVersionId` → 422 | **ĐÃ HOÀN THÀNH (Issue #23)** |
+| US-12/AC-3 | Đổi `verification.status` sang `VERIFIED` ghi người xác nhận và thời điểm | **ĐÃ HOÀN THÀNH (Issue #23)** |
+| US-12/AC-4 | API ma trận trả CLO × PI kèm trạng thái xác nhận từng ô | **ĐÃ HOÀN THÀNH (Issue #23)** |
+| US-12/AC-5 | `weight` ngoài (0, 1] → 400; `null` hợp lệ | **ĐÃ HOÀN THÀNH (Issue #23)** |
 
 ## 6. API đề xuất **[ĐÃ HIỆN THỰC]**
 
@@ -74,7 +74,7 @@ Quyền ghi: ADMIN, PROGRAM_MANAGER; thẩm định: QA_OFFICER (theo phạm vi 
 ## 7. Kiểm tra tham chiếu ở service
 
 `courseId`, `syllabusId`, `programVersionId`, `piId` tồn tại; `clos.courseId` = `syllabi.courseId`; liên kết khớp
-`syllabusId`/`programVersionId` của CLO và PI; `effective*TermId` trỏ `terms` (F05a) khi có giá trị.
+`syllabusId`/`programVersionId` của CLO và PI; `effective*TermId` trỏ `terms` (F05a) khi có giá trị; kiểm tra `effectiveToTermId` không được trước `effectiveFromTermId`.
 
 ## 8. Test bắt buộc
 
@@ -87,10 +87,10 @@ Mã CLO trùng trong/ngoài đề cương; `bloomLevel` biên (0,1,6,7); liên k
 2. **Q12 (Tỷ trọng và ngưỡng đạt CLO):** Chưa có tỷ trọng (`defaultWeight`), ngưỡng đạt (`defaultPassThreshold`) và quy tắc `requireAllCloPass` $\to$ `measurement` mặc định để `null`, không tự đặt số liệu giả (như 20/40/40 hay 60%).
 3. **Q14 (Ánh xạ CLO-PI từ Khoa):** Chưa có bảng ma trận CLO–PI được Khoa ký duyệt $\to$ Không tự suy diễn hay tự seed dữ liệu ánh xạ CLO–PI vào hệ thống.
 4. **Q22 (Công thức trọng số weight CLO-PI):** Chưa có công thức tính trọng số $\to$ Cho phép `weight` để `null`, không bắt buộc tính toán số học.
-5. **F05a (Học kỳ `terms`):** Chưa có collection `terms` $\to$ Chưa kiểm tra so sánh thời gian thực tế `effectiveToTermId >= effectiveFromTermId` theo ngày bắt đầu/kết thúc niên khóa.
+5. **F05a - US-19 & US-20:** Lớp học phần (`course_sections`) và nhập danh sách sinh viên/ghi danh (`students`, `enrollments`) chưa làm trong phạm vi này; US-20 còn chờ Q09 (quy ước mã sinh viên).
 
 ## 10. Để vấn đáp
 
 Vì sao CLO nhận diện bằng `_id` chứ không bằng `code`; vì sao có `clo_pi_links` riêng (khung đã duyệt để chặn gán PI tùy ý cho
 câu hỏi); vì sao đề cương phiên bản hóa (đổi CLO không làm sai báo cáo cũ); bỏ kiểm tra "cặp CLO–PI nằm trong liên kết" thì
-một câu hỏi có thể đo PI không liên quan CLO của nó. Xem chi tiết tại `doc/de-van-dap/f03-hoc-phan-clo.md`.
+một câu hỏi có thể đo PI không liên quan CLO của nó; vì sao phải triển khai trước quản lý `terms` của F05a để kiểm tra tính hợp lệ về thời gian của đề cương. Xem chi tiết tại `doc/de-van-dap/f03-hoc-phan-clo.md`.

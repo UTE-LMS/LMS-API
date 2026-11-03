@@ -27,4 +27,8 @@ public interface CourseSectionRepository extends MongoRepository<CourseSection, 
    * @return true nếu tồn tại, ngược lại false
    */
   boolean existsByCode(String code);
+
+  boolean existsByTermId(String termId);
+
+  boolean existsBySyllabusId(String syllabusId);
 }

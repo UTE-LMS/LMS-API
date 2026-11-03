@@ -1,6 +1,7 @@
 package com.hcmute.lms.lmsapi.service.impl;
 
 import com.hcmute.lms.lmsapi.document.Syllabus;
+import com.hcmute.lms.lmsapi.document.Term;
 import com.hcmute.lms.lmsapi.dto.SyllabusRequest;
 import com.hcmute.lms.lmsapi.dto.SyllabusResponse;
 import com.hcmute.lms.lmsapi.enums.SyllabusStatus;
@@ -11,6 +12,7 @@ import com.hcmute.lms.lmsapi.exception.ResourceNotFoundException;
 import com.hcmute.lms.lmsapi.mapper.SyllabusMapper;
 import com.hcmute.lms.lmsapi.repository.CourseRepository;
 import com.hcmute.lms.lmsapi.repository.SyllabusRepository;
+import com.hcmute.lms.lmsapi.repository.TermRepository;
 import com.hcmute.lms.lmsapi.service.SyllabusService;
 import com.hcmute.lms.lmsapi.util.ObjectIdUtils;
 import java.util.List;
@@ -27,6 +29,7 @@ public class SyllabusServiceImpl implements SyllabusService {
 
   private final SyllabusRepository syllabusRepository;
   private final CourseRepository courseRepository;
+  private final TermRepository termRepository;
   private final SyllabusMapper syllabusMapper;
 
   @Override
@@ -52,12 +55,8 @@ public class SyllabusServiceImpl implements SyllabusService {
               "Đề cương phiên bản [%s] đã tồn tại cho học phần id=[%s]", version, courseId));
     }
 
-    // US-10/AC-2: Nếu cả hai học kỳ được cung cấp, kiểm tra sơ bộ (ràng buộc niên khóa chi tiết chờ
-    // F05a)
-    if (request.getEffectiveFromTermId() != null && request.getEffectiveToTermId() != null) {
-      ObjectIdUtils.requireValid(request.getEffectiveFromTermId(), "effectiveFromTermId");
-      ObjectIdUtils.requireValid(request.getEffectiveToTermId(), "effectiveToTermId");
-    }
+    // US-10/AC-2: Xác thực ràng buộc học kỳ hiệu lực từ collection terms (F05a)
+    validateEffectiveTerms(request.getEffectiveFromTermId(), request.getEffectiveToTermId());
 
     Syllabus syllabus = syllabusMapper.toDocument(courseId, request);
     try {
@@ -99,6 +98,58 @@ public class SyllabusServiceImpl implements SyllabusService {
     log.info(
         "Cập nhật trạng thái đề cương id=[{}] từ [{}] sang [{}]", id, currentStatus, newStatus);
     return syllabusMapper.toResponse(updated);
+  }
+
+  private void validateEffectiveTerms(String fromTermId, String toTermId) {
+    Term fromTerm = null;
+    if (fromTermId != null && !fromTermId.trim().isEmpty()) {
+      ObjectIdUtils.requireValid(fromTermId, "effectiveFromTermId");
+      fromTerm =
+          termRepository
+              .findById(fromTermId)
+              .orElseThrow(
+                  () ->
+                      new ResourceNotFoundException(
+                          "Học kỳ bắt đầu hiệu lực (effectiveFromTermId) không tồn tại: "
+                              + fromTermId));
+    }
+
+    Term toTerm = null;
+    if (toTermId != null && !toTermId.trim().isEmpty()) {
+      ObjectIdUtils.requireValid(toTermId, "effectiveToTermId");
+      toTerm =
+          termRepository
+              .findById(toTermId)
+              .orElseThrow(
+                  () ->
+                      new ResourceNotFoundException(
+                          "Học kỳ kết thúc hiệu lực (effectiveToTermId) không tồn tại: "
+                              + toTermId));
+    }
+
+    // US-10/AC-2: effectiveToTermId không được trước effectiveFromTermId
+    if (fromTerm != null && toTerm != null) {
+      if (fromTerm.getId().equals(toTerm.getId())) {
+        return; // Cùng 1 học kỳ là hợp lệ
+      }
+
+      if (fromTerm.getStartDate() != null && toTerm.getStartDate() != null) {
+        if (toTerm.getStartDate().isBefore(fromTerm.getStartDate())) {
+          throw new BusinessRuleViolationException(
+              "effectiveToTermId không được trước effectiveFromTermId");
+        }
+      } else if (fromTerm.getEndDate() != null && toTerm.getEndDate() != null) {
+        if (toTerm.getEndDate().isBefore(fromTerm.getEndDate())) {
+          throw new BusinessRuleViolationException(
+              "effectiveToTermId không được trước effectiveFromTermId");
+        }
+      } else if (fromTerm.getAcademicYear() != null && toTerm.getAcademicYear() != null) {
+        if (toTerm.getAcademicYear().compareTo(fromTerm.getAcademicYear()) < 0) {
+          throw new BusinessRuleViolationException(
+              "effectiveToTermId không được trước effectiveFromTermId");
+        }
+      }
+    }
   }
 
   private void requireCourse(String courseId) {
