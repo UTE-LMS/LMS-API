@@ -34,7 +34,7 @@ LABEL org.opencontainers.image.title="LMS-API" \
       org.opencontainers.image.revision="${VCS_REF}"
 
 # Người dùng hệ thống, không đăng nhập được, UID cố định để dễ gán quyền volume nếu cần.
-RUN addgroup -S -g 10001 app && adduser -S -u 10001 -G app -H -h /app -s /sbin/nologin app
+RUN apk upgrade --no-cache && addgroup -S -g 10001 app && adduser -S -u 10001 -G app -H -h /app -s /sbin/nologin app
 WORKDIR /app
 COPY --from=build --chown=app:app /workspace/app.jar /app/app.jar
 
