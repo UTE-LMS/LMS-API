@@ -10,6 +10,7 @@ import com.hcmute.lms.lmsapi.dto.UserPrincipal;
 import com.hcmute.lms.lmsapi.enums.AccessType;
 import com.hcmute.lms.lmsapi.enums.Role;
 import com.hcmute.lms.lmsapi.repository.CourseSectionRepository;
+import com.hcmute.lms.lmsapi.repository.ProgramVersionRepository;
 import com.hcmute.lms.lmsapi.service.impl.ScopeAuthorizationServiceImpl;
 import java.util.ArrayList;
 import java.util.List;
@@ -37,6 +38,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class ScopeAuthorizationServiceImplTest {
 
   @Mock private CourseSectionRepository courseSectionRepository;
+  @Mock private ProgramVersionRepository programVersionRepository;
 
   @InjectMocks private ScopeAuthorizationServiceImpl scopeAuthorizationService;
 

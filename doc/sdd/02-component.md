@@ -93,15 +93,15 @@ Bảng endpoint hiện có (đọc từ `@RequestMapping`/`@…Mapping`/`@PreAut
 | `POST /api/v1/auth/logout`, `GET /api/v1/auth/me` | đã đăng nhập |
 | `GET, POST /api/v1/users`; `GET, PUT /api/v1/users/{id}`; `PUT /api/v1/users/{id}/status` | `ADMIN` (cả `SecurityConfig` lẫn `@PreAuthorize`) |
 | `GET /api/v1/programs`, `GET /api/v1/programs/{id}` | đã đăng nhập |
-| `POST /api/v1/programs`, `PUT /api/v1/programs/{id}` | `PROGRAM_MANAGER` |
+| `POST /api/v1/programs`, `PUT /api/v1/programs/{id}` | `ADMIN` (ADR 0005) |
 | `GET /api/v1/program-versions`, `GET /api/v1/program-versions/{id}` | đã đăng nhập |
-| `POST /api/v1/program-versions`, `PUT /api/v1/program-versions/{id}` | `PROGRAM_MANAGER` |
+| `POST /api/v1/program-versions`, `PUT /api/v1/program-versions/{id}` | `PROGRAM_MANAGER` (+ kiểm tra phạm vi chương trình qua SpEL, ADR 0005) |
 | `PUT /api/v1/program-versions/{id}/verification` | `QA_OFFICER` (+ kiểm tra phạm vi ở service) |
 | `GET …/{pvId}/plos`, `GET …/{pvId}/plos/{id}` (tương tự `pis`) | đã đăng nhập |
-| `POST …/{pvId}/plos`, `PUT, DELETE …/{pvId}/plos/{id}` (tương tự `pis`) | `PROGRAM_MANAGER` |
+| `POST …/{pvId}/plos`, `PUT, DELETE …/{pvId}/plos/{id}` (tương tự `pis`) | `PROGRAM_MANAGER` (+ kiểm tra phạm vi chương trình qua SpEL, ADR 0005) |
 | `PUT …/{pvId}/plos/{id}/verification` (tương tự `pis`) | `QA_OFFICER` (+ kiểm tra phạm vi ở service) |
 | `GET …/{pvId}/pi-contributions` | đã đăng nhập |
-| `POST …/{pvId}/pi-contributions`, `DELETE …/{pvId}/pi-contributions/{id}` | `PROGRAM_MANAGER` |
+| `POST …/{pvId}/pi-contributions`, `DELETE …/{pvId}/pi-contributions/{id}` | `PROGRAM_MANAGER` (+ kiểm tra phạm vi chương trình qua SpEL, ADR 0005) |
 | `GET /actuator/health`, `/actuator/health/**`, `/actuator/info` | công khai (`SecurityConfig`); các endpoint actuator khác cần token và không được mở (`management.endpoints.web.exposure.include=health,info`) |
 
 ## 3. Phụ thuộc giữa các package (tự tính từ `import`)

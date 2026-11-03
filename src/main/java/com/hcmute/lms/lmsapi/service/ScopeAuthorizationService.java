@@ -5,8 +5,8 @@ import com.hcmute.lms.lmsapi.enums.AccessType;
 
 /**
  * Service kiểm tra phân quyền truy cập tài nguyên lớp học phần theo vai trò và phạm vi (F01 / US-03
- * / ADR 0003). Áp dụng ma trận phân quyền vai trò × phạm vi × READ/WRITE, quy tắc lecturerIds độc
- * lập, định nghĩa scope rỗng nghiêm ngặt và nguyên lý fail-closed.
+ * / ADR 0003, ADR 0004, ADR 0005). Áp dụng ma trận phân quyền vai trò × phạm vi × READ/WRITE, quy
+ * tắc lecturerIds độc lập, định nghĩa scope rỗng nghiêm ngặt và nguyên lý fail-closed.
  */
 public interface ScopeAuthorizationService {
 
@@ -22,4 +22,7 @@ public interface ScopeAuthorizationService {
   boolean canAccessSection(UserPrincipal principal, String sectionId, AccessType accessType);
 
   boolean canAccessProgram(UserPrincipal principal, String programId, AccessType accessType);
+
+  boolean canAccessProgramVersion(
+      UserPrincipal principal, String programVersionId, AccessType accessType);
 }

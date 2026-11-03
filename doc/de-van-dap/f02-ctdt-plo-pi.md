@@ -300,10 +300,11 @@ Toàn bộ các tham số và quy tắc kỹ thuật trong F02 đều xuất ph�
 | Tài nguyên & Hành vi | Đường dẫn API | `PROGRAM_MANAGER` | `QA_OFFICER` | `ADMIN` | `LECTURER` / `VIEWER` / `STUDENT` |
 |---|---|---|---|---|---|
 | **Xem danh mục CTĐT & Phiên bản** | `GET /api/v1/programs/**`, `GET /api/v1/program-versions/**` | **CHO PHÉP** | **CHO PHÉP** | **CHO PHÉP** | **CHO PHÉP** (Chỉ đọc) |
-| **Tạo/Sửa CTĐT & Phiên bản** | `POST/PUT /api/v1/programs/**`, `POST/PUT /api/v1/program-versions/**` | **CHO PHÉP** | **TỪ CHỐI (403)** | **TỪ CHỐI (403)** | **TỪ CHỐI (403)** |
-| **Đổi trạng thái Phiên bản (DRAFT $\to$ ACTIVE $\to$ ARCHIVED)** | `PUT /api/v1/program-versions/{id}/status` | **CHO PHÉP** | **TỪ CHỐI (403)** | **TỪ CHỐI (403)** | **TỪ CHỐI (403)** |
-| **Tạo/Sửa/Xóa PLO & PI** | `POST/PUT/DELETE .../plos/**`, `POST/PUT/DELETE .../pis/**` | **CHO PHÉP** (Khi phiên bản còn `DRAFT`) | **TỪ CHỐI (403)** | **TỪ CHỐI (403)** | **TỪ CHỐI (403)** |
-| **Thiết lập Ma trận I/R/M** | `POST/DELETE .../pi-contributions/**` | **CHO PHÉP** | **TỪ CHỐI (403)** | **TỪ CHỐI (403)** | **TỪ CHỐI (403)** |
+| **Khởi tạo/Sửa Ngành đào tạo (Master Data)** | `POST/PUT /api/v1/programs/**` | **TỪ CHỐI (403)** | **TỪ CHỐI (403)** | **CHO PHÉP** (ADR 0005) | **TỪ CHỐI (403)** |
+| **Tạo/Sửa Phiên bản CTĐT** | `POST/PUT /api/v1/program-versions/**` | **CHO PHÉP** (Nếu thuộc `scope.programIds`) | **TỪ CHỐI (403)** | **TỪ CHỐI (403)** | **TỪ CHỐI (403)** |
+| **Đổi trạng thái Phiên bản (DRAFT $\to$ ACTIVE $\to$ ARCHIVED)** | `PUT /api/v1/program-versions/{id}/status` | **CHO PHÉP** (Nếu thuộc `scope.programIds`) | **TỪ CHỐI (403)** | **TỪ CHỐI (403)** | **TỪ CHỐI (403)** |
+| **Tạo/Sửa/Xóa PLO & PI** | `POST/PUT/DELETE .../plos/**`, `POST/PUT/DELETE .../pis/**` | **CHO PHÉP** (DRAFT & đúng `scope.programIds`) | **TỪ CHỐI (403)** | **TỪ CHỐI (403)** | **TỪ CHỐI (403)** |
+| **Thiết lập Ma trận I/R/M** | `POST/DELETE .../pi-contributions/**` | **CHO PHÉP** (DRAFT & đúng `scope.programIds`) | **TỪ CHỐI (403)** | **TỪ CHỐI (403)** | **TỪ CHỐI (403)** |
 | **Thẩm định Chất lượng (US-08)** | `PUT .../verification` (trên version, plo, pi) | **TỪ CHỐI (403)** | **CHO PHÉP** (Nếu thuộc `scope.programIds`) | **TỪ CHỐI (403)** | **TỪ CHỐI (403)** |
 
 ---

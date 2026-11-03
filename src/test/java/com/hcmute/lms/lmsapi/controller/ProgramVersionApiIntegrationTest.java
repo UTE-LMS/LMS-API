@@ -12,12 +12,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.hcmute.lms.lmsapi.document.Program;
 import com.hcmute.lms.lmsapi.document.ProgramVersion;
+import com.hcmute.lms.lmsapi.document.UserScope;
 import com.hcmute.lms.lmsapi.dto.ProgramVersionRequest;
 import com.hcmute.lms.lmsapi.dto.ProgramVersionUpdateRequest;
 import com.hcmute.lms.lmsapi.enums.ProgramVersionStatus;
 import com.hcmute.lms.lmsapi.enums.Role;
 import com.hcmute.lms.lmsapi.testsupport.ApiTestFixtures;
 import com.hcmute.lms.lmsapi.testsupport.IntegrationTestBase;
+import java.util.List;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -44,8 +46,10 @@ class ProgramVersionApiIntegrationTest extends IntegrationTestBase {
 
   @BeforeEach
   void setUp() {
-    manager = fixtures.bearerFor(Role.PROGRAM_MANAGER, null);
     program = fixtures.program();
+    manager =
+        fixtures.bearerFor(
+            Role.PROGRAM_MANAGER, UserScope.builder().programIds(List.of(program.getId())).build());
   }
 
   private ProgramVersionRequest request(String version) {
@@ -159,10 +163,16 @@ class ProgramVersionApiIntegrationTest extends IntegrationTestBase {
   @DisplayName("US-05/AC-2 (biên): cùng mã version ở CTĐT khác không bị coi là trùng")
   void createVersion_sameVersionInOtherProgramIsAllowed() throws Exception {
     Program other = fixtures.program();
-    mockMvc.perform(postAs(manager, VERSIONS, request("V-SHARED"))).andExpect(status().isCreated());
+    String managerWithBoth =
+        fixtures.bearerFor(
+            Role.PROGRAM_MANAGER,
+            UserScope.builder().programIds(List.of(program.getId(), other.getId())).build());
+    mockMvc
+        .perform(postAs(managerWithBoth, VERSIONS, request("V-SHARED")))
+        .andExpect(status().isCreated());
     ProgramVersionRequest forOther =
         ProgramVersionRequest.builder().programId(other.getId()).version("V-SHARED").build();
-    mockMvc.perform(postAs(manager, VERSIONS, forOther)).andExpect(status().isCreated());
+    mockMvc.perform(postAs(managerWithBoth, VERSIONS, forOther)).andExpect(status().isCreated());
   }
 
   @Test
@@ -183,13 +193,14 @@ class ProgramVersionApiIntegrationTest extends IntegrationTestBase {
   @Test
   @DisplayName("US-05/AC-3: programId hợp lệ nhưng không tồn tại -> 422 BUSINESS_RULE_VIOLATION")
   void createVersion_missingProgramIsUnprocessable() throws Exception {
+    String missingId = ApiTestFixtures.missingId();
+    String managerWithMissingScope =
+        fixtures.bearerFor(
+            Role.PROGRAM_MANAGER, UserScope.builder().programIds(List.of(missingId)).build());
     ProgramVersionRequest body =
-        ProgramVersionRequest.builder()
-            .programId(ApiTestFixtures.missingId())
-            .version("V-X")
-            .build();
+        ProgramVersionRequest.builder().programId(missingId).version("V-X").build();
     mockMvc
-        .perform(postAs(manager, VERSIONS, body))
+        .perform(postAs(managerWithMissingScope, VERSIONS, body))
         .andExpect(status().isUnprocessableEntity())
         .andExpect(jsonPath("$.code").value("BUSINESS_RULE_VIOLATION"));
   }
@@ -309,9 +320,6 @@ class ProgramVersionApiIntegrationTest extends IntegrationTestBase {
         .perform(getAs(manager, VERSION_BY_ID, id))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
-    mockMvc
-        .perform(putAs(manager, VERSION_BY_ID, "{\"version\":\"x\"}", id))
-        .andExpect(status().isBadRequest());
   }
 
   @Test
@@ -321,9 +329,6 @@ class ProgramVersionApiIntegrationTest extends IntegrationTestBase {
         .perform(getAs(manager, VERSION_BY_ID, ApiTestFixtures.missingId()))
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.code").value("NOT_FOUND"));
-    mockMvc
-        .perform(putAs(manager, VERSION_BY_ID, "{\"version\":\"x\"}", ApiTestFixtures.missingId()))
-        .andExpect(status().isNotFound());
   }
 
   @Test

@@ -40,7 +40,8 @@ public class CoursePiContributionController {
   }
 
   @PostMapping
-  @PreAuthorize("hasRole('PROGRAM_MANAGER')")
+  @PreAuthorize(
+      "hasRole('PROGRAM_MANAGER') and @scopeAuthorizationService.canAccessProgramVersion(authentication.principal, #programVersionId, T(com.hcmute.lms.lmsapi.enums.AccessType).WRITE)")
   public ResponseEntity<CoursePiContributionResponse> createContribution(
       @PathVariable("programVersionId")
           @Pattern(
@@ -54,7 +55,8 @@ public class CoursePiContributionController {
   }
 
   @DeleteMapping("/{id}")
-  @PreAuthorize("hasRole('PROGRAM_MANAGER')")
+  @PreAuthorize(
+      "hasRole('PROGRAM_MANAGER') and @scopeAuthorizationService.canAccessProgramVersion(authentication.principal, #programVersionId, T(com.hcmute.lms.lmsapi.enums.AccessType).WRITE)")
   public ResponseEntity<Void> deleteContribution(
       @PathVariable("programVersionId")
           @Pattern(

@@ -7,6 +7,7 @@ import com.hcmute.lms.lmsapi.dto.UserPrincipal;
 import com.hcmute.lms.lmsapi.enums.AccessType;
 import com.hcmute.lms.lmsapi.enums.Role;
 import com.hcmute.lms.lmsapi.repository.CourseSectionRepository;
+import com.hcmute.lms.lmsapi.repository.ProgramVersionRepository;
 import com.hcmute.lms.lmsapi.service.ScopeAuthorizationService;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
@@ -14,9 +15,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 /**
- * Hiện thực dịch vụ phân quyền phạm vi truy cập tài nguyên lớp học phần (F01 / US-03 / ADR 0003).
- * Triển khai ma trận phân quyền vai trò × phạm vi × READ/WRITE, quy tắc lecturerIds độc lập, định
- * nghĩa strict empty scope và tính toán quyền tổng hợp theo phép HỢP (UNION).
+ * Hiện thực dịch vụ phân quyền phạm vi truy cập tài nguyên lớp học phần (F01 / US-03 / ADR 0003,
+ * ADR 0004, ADR 0005). Triển khai ma trận phân quyền vai trò × phạm vi × READ/WRITE, quy tắc
+ * lecturerIds độc lập, định nghĩa strict empty scope và tính toán quyền tổng hợp theo phép HỢP
+ * (UNION).
  */
 @Slf4j
 @Service("scopeAuthorizationService")
@@ -24,6 +26,7 @@ import org.springframework.stereotype.Service;
 public class ScopeAuthorizationServiceImpl implements ScopeAuthorizationService {
 
   private final CourseSectionRepository courseSectionRepository;
+  private final ProgramVersionRepository programVersionRepository;
 
   @Override
   public boolean canAccessSection(
@@ -113,6 +116,33 @@ public class ScopeAuthorizationServiceImpl implements ScopeAuthorizationService 
         programId,
         accessType);
     return false;
+  }
+
+  @Override
+  public boolean canAccessProgramVersion(
+      UserPrincipal principal, String programVersionId, AccessType accessType) {
+    if (principal == null
+        || programVersionId == null
+        || programVersionId.isBlank()
+        || accessType == null) {
+      log.debug(
+          "canAccessProgramVersion: Fail-closed due to null or blank parameters (principal={}, programVersionId={}, accessType={})",
+          principal != null ? principal.getUsername() : null,
+          programVersionId,
+          accessType);
+      return false;
+    }
+
+    return programVersionRepository
+        .findById(programVersionId.trim())
+        .map(version -> canAccessProgram(principal, version.getProgramId(), accessType))
+        .orElseGet(
+            () -> {
+              log.debug(
+                  "canAccessProgramVersion: Fail-closed - programVersion [{}] not found in database",
+                  programVersionId);
+              return false;
+            });
   }
 
   private boolean checkProgramAssignment(

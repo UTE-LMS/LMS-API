@@ -151,3 +151,24 @@ Phần này chuẩn bị sẵn câu trả lời khoa học, chuẩn mực cho 4 
 > Toàn bộ 4 câu hỏi bảo vệ đồ án tốt nghiệp chuyên sâu cho phân hệ F01 (Xác thực Nimbus Resource Server, Quản lý phiên tokenVersion và Phân quyền phạm vi canAccessSection) theo góc nhìn kép Sinh viên IT và Sinh viên IBS được lưu trữ chi tiết tại:  
 > `doc/de-van-dap/f01-xac-thuc-phan-quyen.md`.
 
+
+---
+
+## Phiên #15 — 2026-11-03: Cập nhật phân quyền khởi tạo danh mục CTĐT cho ADMIN và kích hoạt kiểm tra Scope cho PROGRAM_MANAGER (ADR 0005)
+
+- **Sinh viên yêu cầu:** TinMH (IT) / minhat5
+- **Mục tiêu:**
+  1. Ban hành ADR 0005: Chuyển quyền tạo/sửa danh mục Ngành đào tạo (`POST/PUT /api/v1/programs`) từ `PROGRAM_MANAGER` sang `ADMIN` để giải quyết dứt điểm nghịch lý "con gà - quả trứng" với `ScopeValidationService` (F01) và bảo vệ Master Data cấp trường.
+  2. Bổ sung `canAccessProgramVersion` vào `ScopeAuthorizationService`/`ScopeAuthorizationServiceImpl` và kích hoạt kiểm tra bắt buộc `scope.programIds` (`canAccessProgram` / `canAccessProgramVersion`) cho mọi thao tác ghi của `PROGRAM_MANAGER` trên `ProgramVersion`, `PLO`, `PI`, và ma trận I/R/M (`CoursePiContribution`).
+  3. Cập nhật bộ kiểm thử tích hợp `ProgramIntegrationTest`, unit test `ProgramScopeAuthorizationTest`, và đồng bộ toàn bộ tài liệu dự án (`doc/adr/0005-...`, `doc/plan/F02-...`, `doc/sdd/02-...`, `doc/sdd/04-...`, `doc/srs/README.md`, `doc/test-plan.md`, `doc/de-van-dap/f02-...`).
+- **Mã nguồn đã chỉnh sửa:**
+  - `doc/adr/0005-phan-quyen-khoi-tao-danh-muc-ctdt.md`: Tạo mới ghi nhận quyết định kiến trúc.
+  - `ScopeAuthorizationService.java` & `ScopeAuthorizationServiceImpl.java`: Bổ sung `canAccessProgramVersion(principal, programVersionId, accessType)`.
+  - `ProgramController.java`: Sửa `@PreAuthorize` của `createProgram` và `updateProgram` sang `hasRole('ADMIN')`.
+  - `ProgramVersionController.java`, `PloController.java`, `PiController.java`, `CoursePiContributionController.java`: Bổ sung SpEL `@scopeAuthorizationService.canAccessProgram(...)` và `canAccessProgramVersion(...)` kiểm tra `scope.programIds` cho `PROGRAM_MANAGER`.
+  - `ProgramScopeAuthorizationTest.java`: Bổ sung unit test cho `canAccessProgramVersion`.
+  - `ProgramIntegrationTest.java`: Cập nhật `ADMIN` tạo `Program` (201), `PROGRAM_MANAGER` tạo `Program` bị từ chối (403); `PROGRAM_MANAGER` tạo `ProgramVersion` ngoài scope bị từ chối (403), đúng scope thành công (201).
+  - Cập nhật tài liệu: `doc/plan/F02-ctdt-plo-pi.md`, `doc/sdd/02-component.md`, `doc/sdd/04-sequence.md`, `doc/srs/README.md`, `doc/test-plan.md`, `doc/de-van-dap/f02-ctdt-plo-pi.md`.
+- **Kết quả kiểm thử:**
+  - `mvn test -Dtest=ProgramIntegrationTest,ProgramScopeAuthorizationTest`: 12/12 tests passed (BUILD SUCCESS).
+  - `mvn test -Dtest=ScopeAuthorizationMatrixIntegrationTest,ScopeAuthorizationEmpiricalChallengeTest`: 29/29 tests passed (BUILD SUCCESS).

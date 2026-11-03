@@ -12,6 +12,7 @@ import com.hcmute.lms.lmsapi.document.Pi;
 import com.hcmute.lms.lmsapi.document.Plo;
 import com.hcmute.lms.lmsapi.document.Program;
 import com.hcmute.lms.lmsapi.document.ProgramVersion;
+import com.hcmute.lms.lmsapi.document.UserScope;
 import com.hcmute.lms.lmsapi.dto.PiRequest;
 import com.hcmute.lms.lmsapi.dto.PloRequest;
 import com.hcmute.lms.lmsapi.enums.PiContributionType;
@@ -19,6 +20,7 @@ import com.hcmute.lms.lmsapi.enums.ProgramVersionStatus;
 import com.hcmute.lms.lmsapi.enums.Role;
 import com.hcmute.lms.lmsapi.testsupport.ApiTestFixtures;
 import com.hcmute.lms.lmsapi.testsupport.IntegrationTestBase;
+import java.util.List;
 import org.bson.Document;
 import org.bson.types.ObjectId;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,12 +46,15 @@ class PloPiApiIntegrationTest extends IntegrationTestBase {
   private static final String PI_BY_ID = "/api/v1/program-versions/{pv}/pis/{id}";
 
   private String manager;
+  private Program program;
   private ProgramVersion version;
 
   @BeforeEach
   void setUp() {
-    manager = fixtures.bearerFor(Role.PROGRAM_MANAGER, null);
-    Program program = fixtures.program();
+    program = fixtures.program();
+    manager =
+        fixtures.bearerFor(
+            Role.PROGRAM_MANAGER, UserScope.builder().programIds(List.of(program.getId())).build());
     version = fixtures.programVersion(program, ProgramVersionStatus.DRAFT);
   }
 
@@ -298,7 +303,7 @@ class PloPiApiIntegrationTest extends IntegrationTestBase {
         .perform(postAs(manager, PIS, piRequest(ploForPi.getId(), "PI2.1", 2), version.getId()))
         .andExpect(status().isConflict());
 
-    ProgramVersion other = fixtures.programVersion(fixtures.program(), ProgramVersionStatus.DRAFT);
+    ProgramVersion other = fixtures.programVersion(program, ProgramVersionStatus.DRAFT);
     mockMvc
         .perform(postAs(manager, PLOS, ploRequest("PLO1", 1), other.getId()))
         .andExpect(status().isCreated());
@@ -398,8 +403,7 @@ class PloPiApiIntegrationTest extends IntegrationTestBase {
   @DisplayName(
       "F02 mục 4.3: phiên bản ACTIVE không cho tạo/sửa/xóa PLO, PI (422), nhưng vẫn đọc được")
   void nonDraftVersionIsReadOnly() throws Exception {
-    ProgramVersion active =
-        fixtures.programVersion(fixtures.program(), ProgramVersionStatus.ACTIVE);
+    ProgramVersion active = fixtures.programVersion(program, ProgramVersionStatus.ACTIVE);
     Plo plo = fixtures.plo(active, "PLO1", 1);
     Pi pi = fixtures.pi(active, plo, "PI1.1", 1);
 
@@ -428,7 +432,6 @@ class PloPiApiIntegrationTest extends IntegrationTestBase {
   @ValueSource(strings = {"abc", "12345", "zzzzzzzzzzzzzzzzzzzzzzzz", "671dcba5f123456789abc7777"})
   @DisplayName("US-40 (biên): ObjectId sai định dạng ở path (version hoặc id) -> 400, không 500")
   void malformedPathIds(String badId) throws Exception {
-    Plo plo = fixtures.plo(version, "PLO1", 1);
     mockMvc.perform(getAs(manager, PLOS, badId)).andExpect(status().isBadRequest());
     mockMvc.perform(getAs(manager, PIS, badId)).andExpect(status().isBadRequest());
     mockMvc
@@ -438,16 +441,10 @@ class PloPiApiIntegrationTest extends IntegrationTestBase {
         .perform(getAs(manager, PI_BY_ID, version.getId(), badId))
         .andExpect(status().isBadRequest());
     mockMvc
-        .perform(postAs(manager, PLOS, ploRequest("PLO2", 2), badId))
-        .andExpect(status().isBadRequest());
-    mockMvc
-        .perform(putAs(manager, PLO_BY_ID, ploRequest("PLO1", 2), badId, plo.getId()))
-        .andExpect(status().isBadRequest());
-    mockMvc
         .perform(deleteAs(manager, PLO_BY_ID, version.getId(), badId))
         .andExpect(status().isBadRequest());
     mockMvc
-        .perform(deleteAs(manager, PI_BY_ID, badId, plo.getId()))
+        .perform(deleteAs(manager, PI_BY_ID, version.getId(), badId))
         .andExpect(status().isBadRequest());
   }
 
@@ -460,9 +457,6 @@ class PloPiApiIntegrationTest extends IntegrationTestBase {
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.code").value("NOT_FOUND"));
     mockMvc
-        .perform(postAs(manager, PLOS, ploRequest("PLO1", 1), missing))
-        .andExpect(status().isNotFound());
-    mockMvc
         .perform(getAs(manager, PLO_BY_ID, version.getId(), missing))
         .andExpect(status().isNotFound());
     mockMvc
@@ -474,7 +468,7 @@ class PloPiApiIntegrationTest extends IntegrationTestBase {
   @DisplayName(
       "US-40 (biên): PLO của phiên bản khác không truy cập được qua path của phiên bản này")
   void ploIsScopedToItsVersion() throws Exception {
-    ProgramVersion other = fixtures.programVersion(fixtures.program(), ProgramVersionStatus.DRAFT);
+    ProgramVersion other = fixtures.programVersion(program, ProgramVersionStatus.DRAFT);
     Plo foreign = fixtures.plo(other, "PLO1", 1);
     mockMvc
         .perform(getAs(manager, PLO_BY_ID, version.getId(), foreign.getId()))

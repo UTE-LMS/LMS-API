@@ -46,6 +46,9 @@ Quản lý khung chuẩn đầu ra cấp chương trình: chương trình, phiê
 9. **Người xác nhận nội dung là `QA_OFFICER`** **[ĐỀ XUẤT, chờ Q08; xem ADR 0004]**: chỉ `QA_OFFICER` được đổi
    `verification.status` của `program_versions`, `plos`, `pis`. `PROGRAM_MANAGER` soạn nội dung nhưng không tự xác nhận
    (tách người soạn khỏi người xác nhận). `ADMIN` không có quyền này.
+10. **Quyền khởi tạo danh mục CTĐT thuộc `ADMIN`** **[ĐỀ XUẤT; xem ADR 0005]**: `POST/PUT /api/v1/programs` do `ADMIN`
+    thực hiện. `PROGRAM_MANAGER` quản lý các phiên bản `program_versions`, `plos`, `pis`, `course_pi_contributions`
+    trong phạm vi `scope.programIds` được giao (kiểm tra `canAccessProgram` / `canAccessProgramVersion`, fail-closed).
 
 ## 5. Stories và acceptance criteria (nháp)
 
@@ -74,12 +77,12 @@ Tiền tố thực tế: `/api/v1` (theo F01 và ADR 0002), không phải `/api`
 
 | Phương thức | Đường dẫn | Quyền |
 |---|---|---|
-| GET/POST/PUT | `/api/v1/programs`, `/api/v1/programs/{id}` | đọc: mọi vai trò; ghi: PROGRAM_MANAGER |
-| GET/POST/PUT | `/api/v1/program-versions`, `/api/v1/program-versions/{id}` | như trên |
-| GET/POST/PUT | `/api/v1/program-versions/{pvId}/plos`, `.../plos/{id}` | như trên |
-| GET/POST/PUT | `/api/v1/program-versions/{pvId}/pis`, `.../pis/{id}` | như trên |
-| GET/POST/DELETE | `/api/v1/program-versions/{pvId}/pi-contributions` | như trên |
-| PUT | `/api/v1/program-versions/{id}/verification`, `.../plos/{id}/verification`, `.../pis/{id}/verification` (US-08) | QA_OFFICER **[ĐỀ XUẤT, chờ Q08]** |
+| GET/POST/PUT | `/api/v1/programs`, `/api/v1/programs/{id}` | đọc: mọi vai trò; ghi: ADMIN [ADR 0005] |
+| GET/POST/PUT | `/api/v1/program-versions`, `/api/v1/program-versions/{id}` | đọc: mọi vai trò; ghi: PROGRAM_MANAGER (trong scope) [ADR 0005] |
+| GET/POST/PUT | `/api/v1/program-versions/{pvId}/plos`, `.../plos/{id}` | đọc: mọi vai trò; ghi: PROGRAM_MANAGER (trong scope) [ADR 0005] |
+| GET/POST/PUT | `/api/v1/program-versions/{pvId}/pis`, `.../pis/{id}` | đọc: mọi vai trò; ghi: PROGRAM_MANAGER (trong scope) [ADR 0005] |
+| GET/POST/DELETE | `/api/v1/program-versions/{pvId}/pi-contributions` | đọc: mọi vai trò; ghi: PROGRAM_MANAGER (trong scope) [ADR 0005] |
+| PUT | `/api/v1/program-versions/{id}/verification`, `.../plos/{id}/verification`, `.../pis/{id}/verification` (US-08) | QA_OFFICER (trong scope) [ADR 0004, ADR 0005] |
 
 ## 7. Kiểm tra tham chiếu ở service (không có khóa ngoại)
 
