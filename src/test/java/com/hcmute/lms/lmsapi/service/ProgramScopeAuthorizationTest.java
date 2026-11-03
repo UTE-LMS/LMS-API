@@ -1,16 +1,20 @@
 package com.hcmute.lms.lmsapi.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.when;
 
+import com.hcmute.lms.lmsapi.document.ProgramVersion;
 import com.hcmute.lms.lmsapi.document.RoleAssignment;
 import com.hcmute.lms.lmsapi.document.UserScope;
 import com.hcmute.lms.lmsapi.dto.UserPrincipal;
 import com.hcmute.lms.lmsapi.enums.AccessType;
 import com.hcmute.lms.lmsapi.enums.Role;
 import com.hcmute.lms.lmsapi.repository.CourseSectionRepository;
+import com.hcmute.lms.lmsapi.repository.ProgramVersionRepository;
 import com.hcmute.lms.lmsapi.service.impl.ScopeAuthorizationServiceImpl;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -19,13 +23,15 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("canAccessProgram Unit Tests (F02 / ADR 0004)")
+@DisplayName("canAccessProgram & canAccessProgramVersion Unit Tests (F02 / ADR 0004 & ADR 0005)")
 class ProgramScopeAuthorizationTest {
 
   private static final String PROGRAM_ID = "671dcba5f123456789abc001";
   private static final String OTHER_PROGRAM_ID = "671dcba5f123456789abc099";
+  private static final String VERSION_ID = "671dcba5f123456789abc002";
 
   @Mock private CourseSectionRepository courseSectionRepository;
+  @Mock private ProgramVersionRepository programVersionRepository;
 
   @InjectMocks private ScopeAuthorizationServiceImpl service;
 
@@ -109,6 +115,37 @@ class ProgramScopeAuthorizationTest {
     assertThat(service.canAccessProgram(principal(Role.QA_OFFICER, null), " ", AccessType.WRITE))
         .isFalse();
     assertThat(service.canAccessProgram(principal(Role.QA_OFFICER, null), PROGRAM_ID, null))
+        .isFalse();
+  }
+
+  @Test
+  @DisplayName("canAccessProgramVersion ủy quyền đúng theo programId của phiên bản")
+  void canAccessProgramVersion_delegatesToProgram() {
+    ProgramVersion version = ProgramVersion.builder().id(VERSION_ID).programId(PROGRAM_ID).build();
+    when(programVersionRepository.findById(VERSION_ID)).thenReturn(Optional.of(version));
+
+    UserScope matchingScope = UserScope.builder().programIds(List.of(PROGRAM_ID)).build();
+    assertThat(
+            service.canAccessProgramVersion(
+                principal(Role.PROGRAM_MANAGER, matchingScope), VERSION_ID, AccessType.WRITE))
+        .isTrue();
+
+    UserScope outOfScope = UserScope.builder().programIds(List.of(OTHER_PROGRAM_ID)).build();
+    assertThat(
+            service.canAccessProgramVersion(
+                principal(Role.PROGRAM_MANAGER, outOfScope), VERSION_ID, AccessType.WRITE))
+        .isFalse();
+  }
+
+  @Test
+  @DisplayName("canAccessProgramVersion trả false khi phiên bản không tồn tại (fail-closed)")
+  void canAccessProgramVersion_notFound_denied() {
+    when(programVersionRepository.findById("non-existent")).thenReturn(Optional.empty());
+
+    UserScope scope = UserScope.builder().programIds(List.of(PROGRAM_ID)).build();
+    assertThat(
+            service.canAccessProgramVersion(
+                principal(Role.PROGRAM_MANAGER, scope), "non-existent", AccessType.WRITE))
         .isFalse();
   }
 }

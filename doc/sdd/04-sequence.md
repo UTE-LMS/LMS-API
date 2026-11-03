@@ -113,7 +113,7 @@ sequenceDiagram
 ## 3. Tạo phiên bản CTĐT, PLO, PI (US-05, US-06)
 
 Căn cứ: `ProgramVersionController`, `ProgramVersionServiceImpl.createProgramVersion`, `PloController`, `PloServiceImpl.createPlo`,
-`PiServiceImpl.createPi`. (Tạo `program` ở `ProgramServiceImpl.createProgram` theo cùng khuôn: kiểm tra mã trùng rồi lưu.)
+`PiServiceImpl.createPi`. (Tạo `program` ở `ProgramServiceImpl.createProgram` do `ADMIN` thực hiện theo ADR 0005: kiểm tra mã trùng rồi lưu.)
 
 ```mermaid
 sequenceDiagram
@@ -129,7 +129,7 @@ sequenceDiagram
     participant MP as Mapper
     participant DB as MongoDB
 
-    Note over PM,CT: Đã qua mục 2: JWT hợp lệ và @PreAuthorize hasRole('PROGRAM_MANAGER')
+    Note over PM,CT: Đã qua mục 2: JWT hợp lệ và @PreAuthorize hasRole('PROGRAM_MANAGER') kèm kiểm tra phạm vi chương trình (@scopeAuthorizationService.canAccessProgram / canAccessProgramVersion per ADR 0005)
 
     rect rgb(235, 245, 255)
     Note over PM,DB: A. POST /api/v1/program-versions

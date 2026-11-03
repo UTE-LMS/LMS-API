@@ -59,7 +59,8 @@ public class PiController {
   }
 
   @PostMapping
-  @PreAuthorize("hasRole('PROGRAM_MANAGER')")
+  @PreAuthorize(
+      "hasRole('PROGRAM_MANAGER') and @scopeAuthorizationService.canAccessProgramVersion(authentication.principal, #programVersionId, T(com.hcmute.lms.lmsapi.enums.AccessType).WRITE)")
   public ResponseEntity<PiResponse> createPi(
       @PathVariable("programVersionId")
           @Pattern(
@@ -76,7 +77,8 @@ public class PiController {
   }
 
   @PutMapping("/{id}")
-  @PreAuthorize("hasRole('PROGRAM_MANAGER')")
+  @PreAuthorize(
+      "hasRole('PROGRAM_MANAGER') and @scopeAuthorizationService.canAccessProgramVersion(authentication.principal, #programVersionId, T(com.hcmute.lms.lmsapi.enums.AccessType).WRITE)")
   public ResponseEntity<PiResponse> updatePi(
       @PathVariable("programVersionId")
           @Pattern(
@@ -92,7 +94,8 @@ public class PiController {
   }
 
   @DeleteMapping("/{id}")
-  @PreAuthorize("hasRole('PROGRAM_MANAGER')")
+  @PreAuthorize(
+      "hasRole('PROGRAM_MANAGER') and @scopeAuthorizationService.canAccessProgramVersion(authentication.principal, #programVersionId, T(com.hcmute.lms.lmsapi.enums.AccessType).WRITE)")
   public ResponseEntity<Void> deletePi(
       @PathVariable("programVersionId")
           @Pattern(

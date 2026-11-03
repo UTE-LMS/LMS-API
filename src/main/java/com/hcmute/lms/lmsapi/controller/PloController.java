@@ -59,7 +59,8 @@ public class PloController {
   }
 
   @PostMapping
-  @PreAuthorize("hasRole('PROGRAM_MANAGER')")
+  @PreAuthorize(
+      "hasRole('PROGRAM_MANAGER') and @scopeAuthorizationService.canAccessProgramVersion(authentication.principal, #programVersionId, T(com.hcmute.lms.lmsapi.enums.AccessType).WRITE)")
   public ResponseEntity<PloResponse> createPlo(
       @PathVariable("programVersionId")
           @Pattern(
@@ -76,7 +77,8 @@ public class PloController {
   }
 
   @PutMapping("/{id}")
-  @PreAuthorize("hasRole('PROGRAM_MANAGER')")
+  @PreAuthorize(
+      "hasRole('PROGRAM_MANAGER') and @scopeAuthorizationService.canAccessProgramVersion(authentication.principal, #programVersionId, T(com.hcmute.lms.lmsapi.enums.AccessType).WRITE)")
   public ResponseEntity<PloResponse> updatePlo(
       @PathVariable("programVersionId")
           @Pattern(
@@ -92,7 +94,8 @@ public class PloController {
   }
 
   @DeleteMapping("/{id}")
-  @PreAuthorize("hasRole('PROGRAM_MANAGER')")
+  @PreAuthorize(
+      "hasRole('PROGRAM_MANAGER') and @scopeAuthorizationService.canAccessProgramVersion(authentication.principal, #programVersionId, T(com.hcmute.lms.lmsapi.enums.AccessType).WRITE)")
   public ResponseEntity<Void> deletePlo(
       @PathVariable("programVersionId")
           @Pattern(

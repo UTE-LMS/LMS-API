@@ -138,7 +138,12 @@ class ProgramIntegrationTest {
                 .build());
 
     managerUser =
-        createUser("f02_manager_" + SUFFIX, Role.PROGRAM_MANAGER, UserScope.builder().build());
+        createUser(
+            "f02_manager_" + SUFFIX,
+            Role.PROGRAM_MANAGER,
+            UserScope.builder()
+                .programIds(List.of(program.getId(), "671dcba5f123456789abc777"))
+                .build());
     qaUser =
         createUser(
             "f02_qa_" + SUFFIX,
@@ -230,11 +235,13 @@ class ProgramIntegrationTest {
 
     ApiTestSupport.performJson(
             mockMvc, objectMapper, post("/api/v1/programs"), managerToken, request)
+        .andExpect(status().isForbidden());
+
+    ApiTestSupport.performJson(mockMvc, objectMapper, post("/api/v1/programs"), adminToken, request)
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.code").value("F02_NEW_" + SUFFIX));
 
-    ApiTestSupport.performJson(
-            mockMvc, objectMapper, post("/api/v1/programs"), managerToken, request)
+    ApiTestSupport.performJson(mockMvc, objectMapper, post("/api/v1/programs"), adminToken, request)
         .andExpect(status().isConflict());
 
     mockMvc
@@ -244,6 +251,19 @@ class ProgramIntegrationTest {
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + managerToken))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.content", hasSize(2)));
+
+    ProgramVersionRequest outOfScopeProgram =
+        ProgramVersionRequest.builder()
+            .programId("671dcba5f123456789abc999")
+            .version("9999")
+            .build();
+    ApiTestSupport.performJson(
+            mockMvc,
+            objectMapper,
+            post("/api/v1/program-versions"),
+            managerToken,
+            outOfScopeProgram)
+        .andExpect(status().isForbidden());
 
     ProgramVersionRequest missingProgram =
         ProgramVersionRequest.builder().programId("671dcba5f123456789abc777").version("X").build();

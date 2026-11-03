@@ -68,7 +68,8 @@ public class ProgramVersionController {
   }
 
   @PostMapping
-  @PreAuthorize("hasRole('PROGRAM_MANAGER')")
+  @PreAuthorize(
+      "hasRole('PROGRAM_MANAGER') and @scopeAuthorizationService.canAccessProgram(authentication.principal, #request.programId, T(com.hcmute.lms.lmsapi.enums.AccessType).WRITE)")
   public ResponseEntity<ProgramVersionResponse> createProgramVersion(
       @Valid @RequestBody ProgramVersionRequest request) {
     log.info("API request: POST /api/v1/program-versions for program [{}]", request.getProgramId());
@@ -77,7 +78,8 @@ public class ProgramVersionController {
   }
 
   @PutMapping("/{id}")
-  @PreAuthorize("hasRole('PROGRAM_MANAGER')")
+  @PreAuthorize(
+      "hasRole('PROGRAM_MANAGER') and @scopeAuthorizationService.canAccessProgramVersion(authentication.principal, #id, T(com.hcmute.lms.lmsapi.enums.AccessType).WRITE)")
   public ResponseEntity<ProgramVersionResponse> updateProgramVersion(
       @PathVariable("id")
           @Pattern(

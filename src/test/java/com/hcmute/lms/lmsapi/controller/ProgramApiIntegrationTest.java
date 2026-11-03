@@ -22,17 +22,19 @@ import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.test.web.servlet.MvcResult;
 
-/** F02 / US-05: chương trình đào tạo ({@code programs}) qua HTTP. */
+/** F02 / US-05: chương trình đào tạo ({@code programs}) qua HTTP (cập nhật theo ADR 0005). */
 @DisplayName("F02 / US-05: API chương trình đào tạo")
 class ProgramApiIntegrationTest extends IntegrationTestBase {
 
   private static final String PROGRAMS = "/api/v1/programs";
   private static final String PROGRAM_BY_ID = "/api/v1/programs/{id}";
 
+  private String admin;
   private String manager;
 
   @BeforeEach
   void setUp() {
+    admin = fixtures.bearerFor(Role.ADMIN, null);
     manager = fixtures.bearerFor(Role.PROGRAM_MANAGER, null);
   }
 
@@ -41,7 +43,8 @@ class ProgramApiIntegrationTest extends IntegrationTestBase {
   }
 
   @Test
-  @DisplayName("US-05: tạo CTĐT thành công, level/degree để trống được lưu null, không tự điền")
+  @DisplayName(
+      "US-05: tạo CTĐT thành công (ADMIN), level/degree để trống được lưu null, không tự điền")
   void createProgram_blankOptionalFieldsBecomeNull() throws Exception {
     ProgramRequest body = request(fixtures.code("PRG"));
     body.setLevel("   ");
@@ -49,7 +52,7 @@ class ProgramApiIntegrationTest extends IntegrationTestBase {
 
     MvcResult result =
         mockMvc
-            .perform(postAs(manager, PROGRAMS, body))
+            .perform(postAs(admin, PROGRAMS, body))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.code").value(body.getCode()))
             .andExpect(jsonPath("$.level").value(nullValue()))
@@ -66,12 +69,12 @@ class ProgramApiIntegrationTest extends IntegrationTestBase {
   void createProgram_codeIsTrimmedAndDuplicateIsConflict() throws Exception {
     String code = fixtures.code("PRG");
     mockMvc
-        .perform(postAs(manager, PROGRAMS, request("  " + code + "  ")))
+        .perform(postAs(admin, PROGRAMS, request("  " + code + "  ")))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.code").value(code));
 
     mockMvc
-        .perform(postAs(manager, PROGRAMS, request(code)))
+        .perform(postAs(admin, PROGRAMS, request(code)))
         .andExpect(status().isConflict())
         .andExpect(jsonPath("$.code").value("CONFLICT"));
   }
@@ -88,7 +91,7 @@ class ProgramApiIntegrationTest extends IntegrationTestBase {
             + code
             + "\",\"name\":\"x\",\"extra\":{\"admin\":true},\"unknownField\":1}";
     mockMvc
-        .perform(postAs(manager, PROGRAMS, body))
+        .perform(postAs(admin, PROGRAMS, body))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.id").value(not(forgedId)));
   }
@@ -100,7 +103,7 @@ class ProgramApiIntegrationTest extends IntegrationTestBase {
     String code = fixtures.code("L");
     String padded = code + "X".repeat(length - code.length());
     assertThat(padded).hasSize(length);
-    mockMvc.perform(postAs(manager, PROGRAMS, request(padded))).andExpect(status().isCreated());
+    mockMvc.perform(postAs(admin, PROGRAMS, request(padded))).andExpect(status().isCreated());
   }
 
   @Test
@@ -109,21 +112,21 @@ class ProgramApiIntegrationTest extends IntegrationTestBase {
   void createProgram_lengthOverflow() throws Exception {
     ProgramRequest longCode = request("C".repeat(65));
     mockMvc
-        .perform(postAs(manager, PROGRAMS, longCode))
+        .perform(postAs(admin, PROGRAMS, longCode))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.fieldErrors[*].field", hasItem("code")));
 
     ProgramRequest longName = request(fixtures.code("PRG"));
     longName.setName("N".repeat(256));
     mockMvc
-        .perform(postAs(manager, PROGRAMS, longName))
+        .perform(postAs(admin, PROGRAMS, longName))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.fieldErrors[*].field", hasItem("name")));
 
     ProgramRequest longLevel = request(fixtures.code("PRG"));
     longLevel.setLevel("L".repeat(101));
     mockMvc
-        .perform(postAs(manager, PROGRAMS, longLevel))
+        .perform(postAs(admin, PROGRAMS, longLevel))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.fieldErrors[*].field", hasItem("level")));
   }
@@ -133,18 +136,18 @@ class ProgramApiIntegrationTest extends IntegrationTestBase {
       "US-40/AC-1: body rỗng, {} , JSON hỏng; mã/tên chỉ gồm khoảng trắng -> 400 VALIDATION_ERROR")
   void createProgram_invalidBodies() throws Exception {
     mockMvc
-        .perform(postAs(manager, PROGRAMS, null))
+        .perform(postAs(admin, PROGRAMS, null))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
-    mockMvc.perform(postAs(manager, PROGRAMS, "{")).andExpect(status().isBadRequest());
+    mockMvc.perform(postAs(admin, PROGRAMS, "{")).andExpect(status().isBadRequest());
     mockMvc
-        .perform(postAs(manager, PROGRAMS, "{}"))
+        .perform(postAs(admin, PROGRAMS, "{}"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.fieldErrors[*].field", hasItem("code")))
         .andExpect(jsonPath("$.fieldErrors[*].field", hasItem("name")));
     ProgramRequest blank = ProgramRequest.builder().code("   ").name("\t").build();
     mockMvc
-        .perform(postAs(manager, PROGRAMS, blank))
+        .perform(postAs(admin, PROGRAMS, blank))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.fieldErrors[*].field", hasItem("code")))
         .andExpect(jsonPath("$.fieldErrors[*].field", hasItem("name")));
@@ -153,26 +156,27 @@ class ProgramApiIntegrationTest extends IntegrationTestBase {
   // ------------------------------------------------------------------ đọc / sửa
 
   @Test
-  @DisplayName("US-05: sửa CTĐT 200; đổi sang mã đã có -> 409; giữ nguyên mã -> 200; id lạ -> 404")
+  @DisplayName(
+      "US-05: sửa CTĐT 200 (ADMIN); đổi sang mã đã có -> 409; giữ nguyên mã -> 200; id lạ -> 404")
   void updateProgram() throws Exception {
     Program first = fixtures.program();
     Program second = fixtures.program();
     ProgramRequest rename = request(first.getCode());
 
     mockMvc
-        .perform(putAs(manager, PROGRAM_BY_ID, rename, second.getId()))
+        .perform(putAs(admin, PROGRAM_BY_ID, rename, second.getId()))
         .andExpect(status().isConflict());
 
     ProgramRequest keepCode = request(second.getCode());
     keepCode.setLevel("Đại học");
     mockMvc
-        .perform(putAs(manager, PROGRAM_BY_ID, keepCode, second.getId()))
+        .perform(putAs(admin, PROGRAM_BY_ID, keepCode, second.getId()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.level").value("Đại học"));
     assertThat(mongo().findById(second.getId(), Program.class).getLevel()).isEqualTo("Đại học");
 
     mockMvc
-        .perform(putAs(manager, PROGRAM_BY_ID, keepCode, ApiTestFixtures.missingId()))
+        .perform(putAs(admin, PROGRAM_BY_ID, keepCode, ApiTestFixtures.missingId()))
         .andExpect(status().isNotFound());
   }
 
@@ -185,7 +189,7 @@ class ProgramApiIntegrationTest extends IntegrationTestBase {
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
     mockMvc
-        .perform(putAs(manager, PROGRAM_BY_ID, request("X"), id))
+        .perform(putAs(admin, PROGRAM_BY_ID, request("X"), id))
         .andExpect(status().isBadRequest());
   }
 
@@ -276,15 +280,16 @@ class ProgramApiIntegrationTest extends IntegrationTestBase {
 
   @ParameterizedTest(name = "{0}")
   @EnumSource(Role.class)
-  @DisplayName("F02 mục 6: mọi vai trò đọc được CTĐT; chỉ PROGRAM_MANAGER ghi, vai trò khác -> 403")
-  void readAllWriteOnlyProgramManager(Role role) throws Exception {
+  @DisplayName(
+      "ADR 0005: mọi vai trò đọc được CTĐT; chỉ ADMIN ghi, vai trò khác (kể cả PROGRAM_MANAGER) -> 403")
+  void readAllWriteOnlyAdmin(Role role) throws Exception {
     String bearer = fixtures.bearerFor(role, null);
     Program program = fixtures.program();
 
     mockMvc.perform(getAs(bearer, PROGRAMS)).andExpect(status().isOk());
     mockMvc.perform(getAs(bearer, PROGRAM_BY_ID, program.getId())).andExpect(status().isOk());
 
-    boolean mayWrite = role == Role.PROGRAM_MANAGER;
+    boolean mayWrite = role == Role.ADMIN;
     var create = mockMvc.perform(postAs(bearer, PROGRAMS, request(fixtures.code("PRG"))));
     var update =
         mockMvc.perform(putAs(bearer, PROGRAM_BY_ID, request(program.getCode()), program.getId()));

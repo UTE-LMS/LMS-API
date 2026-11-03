@@ -60,14 +60,14 @@ public class ProgramController {
   }
 
   @PostMapping
-  @PreAuthorize("hasRole('PROGRAM_MANAGER')")
+  @PreAuthorize("hasRole('ADMIN')")
   public ResponseEntity<ProgramResponse> createProgram(@Valid @RequestBody ProgramRequest request) {
     log.info("API request: POST /api/v1/programs with code [{}]", request.getCode());
     return ResponseEntity.status(HttpStatus.CREATED).body(programService.createProgram(request));
   }
 
   @PutMapping("/{id}")
-  @PreAuthorize("hasRole('PROGRAM_MANAGER')")
+  @PreAuthorize("hasRole('ADMIN')")
   public ResponseEntity<ProgramResponse> updateProgram(
       @PathVariable("id")
           @Pattern(

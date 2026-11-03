@@ -10,13 +10,16 @@ import com.hcmute.lms.lmsapi.document.Course;
 import com.hcmute.lms.lmsapi.document.CoursePiContribution;
 import com.hcmute.lms.lmsapi.document.Pi;
 import com.hcmute.lms.lmsapi.document.Plo;
+import com.hcmute.lms.lmsapi.document.Program;
 import com.hcmute.lms.lmsapi.document.ProgramVersion;
+import com.hcmute.lms.lmsapi.document.UserScope;
 import com.hcmute.lms.lmsapi.dto.CoursePiContributionRequest;
 import com.hcmute.lms.lmsapi.enums.PiContributionType;
 import com.hcmute.lms.lmsapi.enums.ProgramVersionStatus;
 import com.hcmute.lms.lmsapi.enums.Role;
 import com.hcmute.lms.lmsapi.testsupport.ApiTestFixtures;
 import com.hcmute.lms.lmsapi.testsupport.IntegrationTestBase;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -36,14 +39,18 @@ class CoursePiContributionApiIntegrationTest extends IntegrationTestBase {
   private static final String ROW_BY_ID = "/api/v1/program-versions/{pv}/pi-contributions/{id}";
 
   private String manager;
+  private Program program;
   private ProgramVersion version;
   private Pi pi;
   private Course course;
 
   @BeforeEach
   void setUp() {
-    manager = fixtures.bearerFor(Role.PROGRAM_MANAGER, null);
-    version = fixtures.programVersion(fixtures.program(), ProgramVersionStatus.DRAFT);
+    program = fixtures.program();
+    manager =
+        fixtures.bearerFor(
+            Role.PROGRAM_MANAGER, UserScope.builder().programIds(List.of(program.getId())).build());
+    version = fixtures.programVersion(program, ProgramVersionStatus.DRAFT);
     Plo plo = fixtures.plo(version, "PLO1", 1);
     pi = fixtures.pi(version, plo, "PI1.1", 1);
     course = fixtures.course();
@@ -119,7 +126,7 @@ class CoursePiContributionApiIntegrationTest extends IntegrationTestBase {
   @DisplayName("US-07/AC-2 (biên): cùng học phần và PI ở phiên bản CTĐT khác không bị coi là trùng")
   void sameCourseAndPiInOtherVersionIsAllowed() throws Exception {
     mockMvc.perform(postAs(manager, ROWS, request(PiContributionType.I), version.getId()));
-    ProgramVersion other = fixtures.programVersion(fixtures.program(), ProgramVersionStatus.DRAFT);
+    ProgramVersion other = fixtures.programVersion(program, ProgramVersionStatus.DRAFT);
     Pi otherPi = fixtures.pi(other, fixtures.plo(other, "PLO1", 1), "PI1.1", 1);
     CoursePiContributionRequest body =
         CoursePiContributionRequest.builder()
@@ -221,11 +228,9 @@ class CoursePiContributionApiIntegrationTest extends IntegrationTestBase {
         .andExpect(jsonPath("$.fieldErrors[*].field", hasItem("courseId")));
 
     mockMvc
-        .perform(postAs(manager, ROWS, request(PiContributionType.I), ApiTestFixtures.missingId()))
+        .perform(getAs(manager, ROWS, ApiTestFixtures.missingId()))
         .andExpect(status().isNotFound());
-    mockMvc
-        .perform(postAs(manager, ROWS, request(PiContributionType.I), "xyz"))
-        .andExpect(status().isBadRequest());
+    mockMvc.perform(getAs(manager, ROWS, "xyz")).andExpect(status().isBadRequest());
   }
 
   @Test
@@ -250,7 +255,7 @@ class CoursePiContributionApiIntegrationTest extends IntegrationTestBase {
   @DisplayName("US-07: xóa dòng ma trận -> 204; xóa lại -> 404; dòng của phiên bản khác -> 404")
   void deleteRow() throws Exception {
     CoursePiContribution row = fixtures.contribution(version, course, pi, PiContributionType.R);
-    ProgramVersion other = fixtures.programVersion(fixtures.program(), ProgramVersionStatus.DRAFT);
+    ProgramVersion other = fixtures.programVersion(program, ProgramVersionStatus.DRAFT);
 
     mockMvc
         .perform(deleteAs(manager, ROW_BY_ID, other.getId(), row.getId()))
