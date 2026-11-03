@@ -171,7 +171,8 @@ const COLLECTIONS = {
       programVersionId: OID, courseId: OID, semester: INT_N, credits: INT_N,
       type: { enum: ['COMPULSORY', 'ELECTIVE', null] },
       category: { enum: ['FOUNDATION', 'MAJOR_FOUNDATION', 'SPECIALIZED', 'CAPSTONE_PROJECT', 'THESIS', null] },
-      prerequisiteCourseIds: arr(OID)
+      prerequisiteCourseIds: arr(OID),
+      previousCourseIds: arr(OID)
     }),
     indexes: [[{ programVersionId: 1, courseId: 1 }, { unique: true }]]
   },

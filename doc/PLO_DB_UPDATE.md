@@ -143,7 +143,7 @@ Danh mục học phần gốc (Abstract Course).
 
 #### 3.7. `program_courses`
 Vị trí học phần trong một CTĐT cụ thể.
-* **Fields:** `_id`, `programVersionId` (`ObjectId`), `courseId` (`ObjectId`), `semester` (`Int`), `credits` (`Int`), `type` (`Enum["COMPULSORY", "ELECTIVE"]`), `category` (`String`), `prerequisiteCourseIds` (`Array<ObjectId>`), `createdAt`, `updatedAt`.
+* **Fields:** `_id`, `programVersionId` (`ObjectId`), `courseId` (`ObjectId`), `semester` (`Int`), `credits` (`Int`), `type` (`Enum["COMPULSORY", "ELECTIVE"]`), `category` (`String`), `prerequisiteCourseIds` (`Array<ObjectId>`), `previousCourseIds` (`Array<ObjectId>`), `createdAt`, `updatedAt`.
 * **Indexes:** `{ programVersionId: 1, courseId: 1 }` (unique).
 
 #### 3.8. `course_pi_contributions`

@@ -30,7 +30,7 @@ Trong phân hệ F03, nhóm IT đã hiện thực hóa trọn vẹn User Story *
 2. **Hiện thực Tầng Dịch vụ (Service Layer) & Toàn vẹn tham chiếu:**
    - [CourseServiceImpl.java](file:///D:/Code/Project/LMS-API/src/main/java/com/hcmute/lms/lmsapi/service/impl/CourseServiceImpl.java): Xử lý CRUD cho danh mục học phần. Kiểm tra trùng mã học phần (HTTP 409 `COURSE_CODE_ALREADY_EXISTS`). Cơ chế bảo vệ xóa an toàn: chặn xóa học phần khi đã được gán vào `program_courses` (HTTP 422 `COURSE_HAS_PROGRAM_COURSES`) hoặc đã có trong ma trận đóng góp `course_pi_contributions` (HTTP 422 `COURSE_HAS_PI_CONTRIBUTIONS`).
    - [ProgramCourseServiceImpl.java](file:///D:/Code/Project/LMS-API/src/main/java/com/hcmute/lms/lmsapi/service/impl/ProgramCourseServiceImpl.java): Quản lý vị trí học phần trong CTĐT. Xác thực sự tồn tại của `programVersionId` và `courseId` (HTTP 404/422). Kiểm tra trùng lặp cặp khóa (HTTP 409 `PROGRAM_COURSE_ALREADY_EXISTS`).
-   - **Xác thực học phần tiên quyết (`prerequisiteCourseIds`):** Duyệt danh sách mã tiên quyết, kiểm tra từng học phần phải tồn tại trong CSDL và không được là chính học phần đang gán (tự tham chiếu) (HTTP 422 `PREREQUISITE_COURSE_INVALID`).
+   - **Xác thực học phần tiên quyết (`prerequisiteCourseIds`) và học phần học trước (`previousCourseIds`):** Duyệt danh sách mã tiên quyết và học trước, kiểm tra từng học phần phải tồn tại trong CSDL và không được là chính học phần đang gán (tự tham chiếu) (HTTP 422).
 
 3. **Hiện thực API RESTful và Phân quyền Scope Authorization (ADR 0005):**
    - [CourseController.java](file:///D:/Code/Project/LMS-API/src/main/java/com/hcmute/lms/lmsapi/controller/CourseController.java) (`/api/v1/courses`): `ADMIN` và `PROGRAM_MANAGER` được phép thêm/sửa danh mục; chỉ `ADMIN` được xóa danh mục; tất cả người dùng xác thực được phép tra cứu (`GET`).
@@ -110,17 +110,18 @@ Dưới góc độ quản trị đào tạo và kinh doanh số, US-09 giải qu
 
 ---
 
-## Câu Hỏi 4: Kiểm tra điều kiện học phần tiên quyết (`prerequisiteCourseIds`) được thiết kế như thế nào? Tác động gì nếu bỏ qua kiểm tra này?
+## Câu Hỏi 4: Kiểm tra điều kiện học phần tiên quyết (`prerequisiteCourseIds`) và học phần học trước (`previousCourseIds`) được thiết kế như thế nào? Tác động gì nếu bỏ qua kiểm tra này?
 
 ### Trả lời — Góc nhìn Sinh viên Công nghệ thông tin (IT):
 
 1. **Thuật toán Xác thực tại `ProgramCourseServiceImpl`:**
-   - Khi nhận danh sách `prerequisiteCourseIds`:
-     - **Kiểm tra tự tham chiếu (Self-reference):** `if (prerequisiteCourseIds.contains(courseId)) throw new BusinessRuleException(PREREQUISITE_COURSE_INVALID, "Học phần không thể là tiên quyết của chính nó");`
-     - **Kiểm tra tính tồn tại (Existence Validation):** Sử dụng `courseRepository.findAllById(prerequisiteCourseIds)` để tải toàn bộ các học phần tiên quyết lên trong 1 câu truy vấn đơn ($O(1)$ round-trip network). So sánh kích thước danh sách trả về với kích thước danh sách đầu vào; nếu có bất kỳ ID nào không tồn tại, trả về lỗi HTTP 422.
+   - Khi nhận danh sách `prerequisiteCourseIds` và `previousCourseIds`:
+     - **Kiểm tra tự tham chiếu (Self-reference):** Chặn không cho học phần tự tham chiếu chính nó làm tiên quyết hoặc học phần học trước (ném ngoại lệ `BusinessRuleViolationException` HTTP 422: `PREREQUISITE_SELF_REFERENCE`, `PREVIOUS_COURSE_SELF_REFERENCE`).
+     - **Kiểm tra tính tồn tại (Existence Validation):** Kiểm tra từng ID học phần tham chiếu trong `courseRepository`; nếu có bất kỳ ID nào không tồn tại, trả về lỗi HTTP 422 (`PREREQUISITE_NOT_FOUND`, `PREVIOUS_COURSE_NOT_FOUND`).
+     - **Kiểm tra xung đột tiên quyết và học trước (Mutual Exclusivity / Conflict Validation):** Một học phần không thể đồng thời vừa là môn tiên quyết (bắt buộc đậu) vừa là môn học trước (chỉ cần đã học) của cùng một môn học. Nếu tồn tại bất kỳ học phần nào nằm trong cả hai danh sách, hệ thống ném ngoại lệ `PREREQUISITE_AND_PREVIOUS_CONFLICT` (HTTP 422).
 2. **Hậu quả nếu bỏ qua kiểm tra:**
    - **Treo thuật toán xếp thời khóa biểu / Đăng ký môn học:** Khi sinh viên đăng ký môn học, hệ thống portal sẽ duyệt đồ thị tiên quyết (Dependency Graph Traversal). Nếu tồn tại Self-loop ($A \to A$) hoặc chu trình khép kín ($A \to B \to A$), thuật toán đệ quy (DFS/BFS) sẽ bị tràn ngăn xếp (StackOverflowError) hoặc vòng lặp vô tận (Infinite Loop).
-   - **Dữ liệu rác (Corrupted References):** Nếu lưu các ID học phần không tồn tại, giao diện Portal của sinh viên sẽ hiển thị lỗi màn hình trắng (White Screen of Death / NullPointerException) khi cố gắng render danh sách môn tiên quyết.
+   - **Dữ liệu rác (Corrupted References):** Nếu lưu các ID học phần không tồn tại, giao diện Portal của sinh viên sẽ hiển thị lỗi màn hình trắng (White Screen of Death / NullPointerException) khi cố gắng render danh sách môn tiên quyết hoặc môn học trước.
 
 ---
 
