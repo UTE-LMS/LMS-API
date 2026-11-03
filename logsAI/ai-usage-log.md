@@ -172,3 +172,32 @@ Phần này chuẩn bị sẵn câu trả lời khoa học, chuẩn mực cho 4 
 - **Kết quả kiểm thử:**
   - `mvn test -Dtest=ProgramIntegrationTest,ProgramScopeAuthorizationTest`: 12/12 tests passed (BUILD SUCCESS).
   - `mvn test -Dtest=ScopeAuthorizationMatrixIntegrationTest,ScopeAuthorizationEmpiricalChallengeTest`: 29/29 tests passed (BUILD SUCCESS).
+
+
+---
+
+## Phiên #16 — 2026-11-03: Hiện thực hóa phân hệ F03 (US-09) — Quản lý Học phần và Gán học phần vào Phiên bản CTĐT (Issue #20)
+
+- **Sinh viên yêu cầu:** TinMH (IT) / minhat5
+- **Mục tiêu:**
+  1. Rà soát toàn bộ các GitHub Issues thuộc phân hệ F03 (`#20`, `#21`, `#22`, `#23`).
+  2. Đánh giá tính khả thi và dữ kiện đầu vào: Xác định Issue #20 (`[F03] US-09`) có đầy đủ dữ kiện, đặc tả và điều kiện tiên quyết từ F00/F01/F02; các Issue #21 (US-10), #22 (US-11), #23 (US-12) bị vướng các phụ thuộc chưa hoàn thành (F05a `terms`, tài liệu đề cương gốc Q02, ngưỡng CLO Q12, ma trận CLO-PI duyệt từ Khoa Q14).
+  3. Hiện thực trọn vẹn US-09 bao gồm:
+     - Enums: `CourseType` (`COMPULSORY`, `ELECTIVE`), `CourseCategory` (`FOUNDATION`, `MAJOR_FOUNDATION`, `SPECIALIZED`, `CAPSTONE_PROJECT`, `THESIS`).
+     - Entity: `ProgramCourse` (`program_courses`) với compound unique index `{'programVersionId': 1, 'courseId': 1}`.
+     - Repositories: `CourseRepository`, `ProgramCourseRepository`, `CoursePiContributionRepository.existsByCourseId`.
+     - DTOs & Mappers: `CourseRequest`, `CourseUpdateRequest`, `CourseResponse`, `ProgramCourseRequest`, `ProgramCourseUpdateRequest`, `ProgramCourseResponse`, `CourseMapper`, `ProgramCourseMapper`.
+     - Services & Controllers: `CourseServiceImpl`, `ProgramCourseServiceImpl`, `CourseController` (`/api/v1/courses`), `ProgramCourseController` (`/api/v1/program-versions/{programVersionId}/courses`).
+     - Kiểm soát truy cập Scope-based Security: tích hợp `@scopeAuthorizationService.canAccessProgramVersion` (ADR 0005) bảo đảm fail-closed cho `PROGRAM_MANAGER`.
+     - Toàn vẹn tham chiếu cấp ứng dụng: Kiểm tra học phần tiên quyết `prerequisiteCourseIds` (chặn không tồn tại, chặn tự tham chiếu), cơ chế Restrict Delete (chặn xóa học phần đã được gán vào `program_courses` hoặc `course_pi_contributions`).
+  4. Kiểm thử toàn diện:
+     - Unit tests: `CourseServiceImplTest` (8 tests), `ProgramCourseServiceImplTest` (9 tests).
+     - Validation tests: `CourseValidationTest` (5 tests).
+     - MockMvc Integration tests: `CourseIntegrationTest` (10 tests) chạy trên MongoDB Replica Set thật (`rs0`), bao phủ US-09/AC-1 (tạo học phần, 409 trùng code), US-09/AC-2 (gán vào CTĐT, 409 trùng), US-09/AC-3 (422 tiên quyết không hợp lệ), RBAC & Scope Authorization (403), toàn vẹn Restrict Delete (422).
+  5. Soạn thảo hồ sơ vấn đáp bảo vệ đồ án tốt nghiệp `doc/de-van-dap/f03-hoc-phan-clo.md` theo góc nhìn bổ trợ IT & IBS.
+- **Kết quả kiểm định chất lượng (DoD):**
+  - Spotless formatting: Tất cả 216 files tuân thủ google-java-format.
+  - SpotBugs analysis: 0 bugs found.
+  - PMD CPD duplication check: 0 duplications found.
+  - JaCoCo coverage: Vượt ngưỡng kiểm định.
+  - Toàn bộ test suite dự án: 870/870 tests passed (0 failures, 0 errors).

@@ -18,5 +18,7 @@ public interface CoursePiContributionRepository
   boolean existsByProgramVersionIdAndCourseIdAndPiId(
       String programVersionId, String courseId, String piId);
 
+  boolean existsByCourseId(String courseId);
+
   long countByPiId(String piId);
 }
