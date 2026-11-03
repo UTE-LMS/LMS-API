@@ -38,6 +38,7 @@ class ProgramCourseServiceImplTest {
   private static final String VERSION_ID = "671dcba5f123456789abc002";
   private static final String COURSE_ID = "671dcba5f123456789abc005";
   private static final String PREREQ_ID = "671dcba5f123456789abc006";
+  private static final String PREV_ID = "671dcba5f123456789abc004";
 
   @Mock private ProgramCourseRepository programCourseRepository;
   @Mock private ProgramVersionRepository programVersionRepository;
@@ -54,6 +55,20 @@ class ProgramCourseServiceImplTest {
         .type(CourseType.COMPULSORY)
         .category(CourseCategory.MAJOR_FOUNDATION)
         .prerequisiteCourseIds(prereqs)
+        .previousCourseIds(List.of())
+        .build();
+  }
+
+  private ProgramCourseRequest request(
+      String courseId, List<String> prereqs, List<String> previous) {
+    return ProgramCourseRequest.builder()
+        .courseId(courseId)
+        .semester(2)
+        .credits(3)
+        .type(CourseType.COMPULSORY)
+        .category(CourseCategory.MAJOR_FOUNDATION)
+        .prerequisiteCourseIds(prereqs)
+        .previousCourseIds(previous)
         .build();
   }
 
@@ -66,6 +81,7 @@ class ProgramCourseServiceImplTest {
     when(programCourseRepository.existsByProgramVersionIdAndCourseId(VERSION_ID, COURSE_ID))
         .thenReturn(false);
     when(courseRepository.existsById(PREREQ_ID)).thenReturn(true);
+    when(courseRepository.existsById(PREV_ID)).thenReturn(true);
     when(programCourseRepository.save(any(ProgramCourse.class)))
         .thenAnswer(invocation -> invocation.getArgument(0));
     when(programCourseMapper.toResponse(any(ProgramCourse.class), any(Course.class)))
@@ -76,15 +92,17 @@ class ProgramCourseServiceImplTest {
                 .semester(2)
                 .type(CourseType.COMPULSORY)
                 .category(CourseCategory.MAJOR_FOUNDATION)
+                .previousCourseIds(List.of(PREV_ID))
                 .prerequisiteCourseIds(List.of(PREREQ_ID))
                 .build());
 
     ProgramCourseResponse response =
         programCourseService.addCourseToProgramVersion(
-            VERSION_ID, request(COURSE_ID, List.of(PREREQ_ID)));
+            VERSION_ID, request(COURSE_ID, List.of(PREREQ_ID), List.of(PREV_ID)));
 
     assertThat(response.getCourseId()).isEqualTo(COURSE_ID);
     assertThat(response.getPrerequisiteCourseIds()).containsExactly(PREREQ_ID);
+    assertThat(response.getPreviousCourseIds()).containsExactly(PREV_ID);
     verify(programCourseRepository).save(any(ProgramCourse.class));
   }
 
@@ -151,6 +169,65 @@ class ProgramCourseServiceImplTest {
   }
 
   @Test
+  @DisplayName("US-09/AC-3: previousCourseIds chứa chính nó ném HTTP 422")
+  void addCourseToProgramVersion_selfPreviousCourse_throwsException() {
+    Course course = Course.builder().id(COURSE_ID).code("CS102").build();
+    when(programVersionRepository.existsById(VERSION_ID)).thenReturn(true);
+    when(courseRepository.findById(COURSE_ID)).thenReturn(Optional.of(course));
+    when(programCourseRepository.existsByProgramVersionIdAndCourseId(VERSION_ID, COURSE_ID))
+        .thenReturn(false);
+
+    assertThatThrownBy(
+            () ->
+                programCourseService.addCourseToProgramVersion(
+                    VERSION_ID, request(COURSE_ID, List.of(), List.of(COURSE_ID))))
+        .isInstanceOf(BusinessRuleViolationException.class)
+        .hasMessageContaining("PREVIOUS_COURSE_SELF_REFERENCE");
+
+    verify(programCourseRepository, never()).save(any());
+  }
+
+  @Test
+  @DisplayName("US-09/AC-3: previousCourseIds chứa học phần không tồn tại ném HTTP 422")
+  void addCourseToProgramVersion_nonExistentPreviousCourse_throwsException() {
+    Course course = Course.builder().id(COURSE_ID).code("CS102").build();
+    when(programVersionRepository.existsById(VERSION_ID)).thenReturn(true);
+    when(courseRepository.findById(COURSE_ID)).thenReturn(Optional.of(course));
+    when(programCourseRepository.existsByProgramVersionIdAndCourseId(VERSION_ID, COURSE_ID))
+        .thenReturn(false);
+    when(courseRepository.existsById(PREV_ID)).thenReturn(false);
+
+    assertThatThrownBy(
+            () ->
+                programCourseService.addCourseToProgramVersion(
+                    VERSION_ID, request(COURSE_ID, List.of(), List.of(PREV_ID))))
+        .isInstanceOf(BusinessRuleViolationException.class)
+        .hasMessageContaining("PREVIOUS_COURSE_NOT_FOUND");
+
+    verify(programCourseRepository, never()).save(any());
+  }
+
+  @Test
+  @DisplayName("Học phần vừa là tiên quyết vừa là học trước ném HTTP 422")
+  void addCourseToProgramVersion_prerequisiteAndPreviousConflict_throwsException() {
+    Course course = Course.builder().id(COURSE_ID).code("CS102").build();
+    when(programVersionRepository.existsById(VERSION_ID)).thenReturn(true);
+    when(courseRepository.findById(COURSE_ID)).thenReturn(Optional.of(course));
+    when(programCourseRepository.existsByProgramVersionIdAndCourseId(VERSION_ID, COURSE_ID))
+        .thenReturn(false);
+    when(courseRepository.existsById(PREREQ_ID)).thenReturn(true);
+
+    assertThatThrownBy(
+            () ->
+                programCourseService.addCourseToProgramVersion(
+                    VERSION_ID, request(COURSE_ID, List.of(PREREQ_ID), List.of(PREREQ_ID))))
+        .isInstanceOf(BusinessRuleViolationException.class)
+        .hasMessageContaining("PREREQUISITE_AND_PREVIOUS_CONFLICT");
+
+    verify(programCourseRepository, never()).save(any());
+  }
+
+  @Test
   @DisplayName("Gán học phần khi CTĐT không tồn tại ném HTTP 422")
   void addCourseToProgramVersion_versionNotFound_throwsException() {
     when(programVersionRepository.existsById(VERSION_ID)).thenReturn(false);
@@ -190,6 +267,7 @@ class ProgramCourseServiceImplTest {
     when(programCourseRepository.findByProgramVersionIdAndCourseId(VERSION_ID, COURSE_ID))
         .thenReturn(Optional.of(pc));
     when(courseRepository.existsById(PREREQ_ID)).thenReturn(true);
+    when(courseRepository.existsById(PREV_ID)).thenReturn(true);
     when(programCourseRepository.save(any(ProgramCourse.class))).thenReturn(pc);
     when(programCourseMapper.toResponse(any(), any()))
         .thenReturn(
@@ -204,6 +282,7 @@ class ProgramCourseServiceImplTest {
             .semester(3)
             .credits(3)
             .type(CourseType.ELECTIVE)
+            .previousCourseIds(List.of(PREV_ID))
             .prerequisiteCourseIds(List.of(PREREQ_ID))
             .build();
 

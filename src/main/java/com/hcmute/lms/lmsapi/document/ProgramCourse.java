@@ -52,4 +52,8 @@ public class ProgramCourse {
   @Builder.Default
   @Field(name = "prerequisiteCourseIds", targetType = FieldType.OBJECT_ID)
   private List<String> prerequisiteCourseIds = new ArrayList<>();
+
+  @Builder.Default
+  @Field(name = "previousCourseIds", targetType = FieldType.OBJECT_ID)
+  private List<String> previousCourseIds = new ArrayList<>();
 }

@@ -41,6 +41,10 @@ public class ProgramCourseMapperImpl implements ProgramCourseMapper {
             programCourse.getPrerequisiteCourseIds() != null
                 ? new ArrayList<>(programCourse.getPrerequisiteCourseIds())
                 : new ArrayList<>())
+        .previousCourseIds(
+            programCourse.getPreviousCourseIds() != null
+                ? new ArrayList<>(programCourse.getPreviousCourseIds())
+                : new ArrayList<>())
         .build();
   }
 

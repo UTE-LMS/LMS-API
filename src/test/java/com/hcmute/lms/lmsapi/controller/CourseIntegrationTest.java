@@ -28,6 +28,7 @@ class CourseIntegrationTest extends IntegrationTestBase {
   private ProgramVersion programVersion;
   private Course course1;
   private Course course2;
+  private Course course3;
 
   private String adminToken;
   private String pmToken;
@@ -41,6 +42,7 @@ class CourseIntegrationTest extends IntegrationTestBase {
 
     course1 = fixtures.course();
     course2 = fixtures.course();
+    course3 = fixtures.course();
 
     adminToken = fixtures.bearerFor(Role.ADMIN, UserScope.builder().build());
     pmToken =
@@ -120,7 +122,7 @@ class CourseIntegrationTest extends IntegrationTestBase {
 
   @Test
   @DisplayName(
-      "US-09/AC-3: prerequisiteCourseIds chứa học phần không tồn tại hoặc chính nó ném HTTP 422")
+      "US-09/AC-3: prerequisiteCourseIds / previousCourseIds chứa học phần không tồn tại, chính nó hoặc xung đột ném HTTP 422")
   void us09_ac3_invalidPrerequisites() throws Exception {
     // 1. Tiên quyết là chính nó -> 422
     ProgramCourseRequest selfPrereq =
@@ -158,6 +160,67 @@ class CourseIntegrationTest extends IntegrationTestBase {
                 pmToken,
                 "/api/v1/program-versions/{pvId}/courses",
                 nonExistentPrereq,
+                programVersion.getId()))
+        .andExpect(status().isUnprocessableEntity())
+        .andExpect(jsonPath("$.code").value("BUSINESS_RULE_VIOLATION"));
+
+    // 3. Học phần học trước là chính nó -> 422
+    ProgramCourseRequest selfPrev =
+        ProgramCourseRequest.builder()
+            .courseId(course1.getId())
+            .semester(1)
+            .credits(3)
+            .type(CourseType.COMPULSORY)
+            .previousCourseIds(List.of(course1.getId()))
+            .build();
+
+    mockMvc
+        .perform(
+            postAs(
+                pmToken,
+                "/api/v1/program-versions/{pvId}/courses",
+                selfPrev,
+                programVersion.getId()))
+        .andExpect(status().isUnprocessableEntity())
+        .andExpect(jsonPath("$.code").value("BUSINESS_RULE_VIOLATION"));
+
+    // 4. Học phần học trước là học phần không tồn tại -> 422
+    ProgramCourseRequest nonExistentPrev =
+        ProgramCourseRequest.builder()
+            .courseId(course1.getId())
+            .semester(1)
+            .credits(3)
+            .type(CourseType.COMPULSORY)
+            .previousCourseIds(List.of("671dcba5f123456789ffffff"))
+            .build();
+
+    mockMvc
+        .perform(
+            postAs(
+                pmToken,
+                "/api/v1/program-versions/{pvId}/courses",
+                nonExistentPrev,
+                programVersion.getId()))
+        .andExpect(status().isUnprocessableEntity())
+        .andExpect(jsonPath("$.code").value("BUSINESS_RULE_VIOLATION"));
+
+    // 5. Vừa là tiên quyết vừa là học trước -> 422
+    ProgramCourseRequest conflictPrereqPrev =
+        ProgramCourseRequest.builder()
+            .courseId(course2.getId())
+            .semester(2)
+            .credits(3)
+            .type(CourseType.COMPULSORY)
+            .prerequisiteCourseIds(List.of(course1.getId()))
+            .previousCourseIds(List.of(course1.getId()))
+            .build();
+
+    mockMvc
+        .perform(
+            postAs(
+                pmToken,
+                "/api/v1/program-versions/{pvId}/courses",
+                conflictPrereqPrev,
                 programVersion.getId()))
         .andExpect(status().isUnprocessableEntity())
         .andExpect(jsonPath("$.code").value("BUSINESS_RULE_VIOLATION"));
@@ -221,7 +284,7 @@ class CourseIntegrationTest extends IntegrationTestBase {
   @Test
   @DisplayName("CRUD vòng đời: Gán học phần, cập nhật, lấy chi tiết, xóa khỏi CTĐT và xóa học phần")
   void lifecycleCrudTest() throws Exception {
-    // 1. Gán course2 vào programVersion với tiên quyết là course1
+    // 1. Gán course2 vào programVersion với tiên quyết là course1 và học trước là course3
     ProgramCourseRequest assignReq =
         ProgramCourseRequest.builder()
             .courseId(course2.getId())
@@ -230,6 +293,7 @@ class CourseIntegrationTest extends IntegrationTestBase {
             .type(CourseType.ELECTIVE)
             .category(CourseCategory.SPECIALIZED)
             .prerequisiteCourseIds(List.of(course1.getId()))
+            .previousCourseIds(List.of(course3.getId()))
             .build();
 
     mockMvc
@@ -240,7 +304,8 @@ class CourseIntegrationTest extends IntegrationTestBase {
                 assignReq,
                 programVersion.getId()))
         .andExpect(status().isCreated())
-        .andExpect(jsonPath("$.prerequisiteCourseIds", hasSize(1)));
+        .andExpect(jsonPath("$.prerequisiteCourseIds", hasSize(1)))
+        .andExpect(jsonPath("$.previousCourseIds", hasSize(1)));
 
     // 2. Lấy danh sách học phần của CTĐT
     mockMvc
@@ -269,6 +334,7 @@ class CourseIntegrationTest extends IntegrationTestBase {
             .type(CourseType.COMPULSORY)
             .category(CourseCategory.SPECIALIZED)
             .prerequisiteCourseIds(List.of(course1.getId()))
+            .previousCourseIds(List.of(course3.getId()))
             .build();
 
     mockMvc
@@ -281,7 +347,8 @@ class CourseIntegrationTest extends IntegrationTestBase {
                 course2.getId()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.semester").value(3))
-        .andExpect(jsonPath("$.type").value("COMPULSORY"));
+        .andExpect(jsonPath("$.type").value("COMPULSORY"))
+        .andExpect(jsonPath("$.previousCourseIds", hasSize(1)));
 
     // 5. Cố gắng xóa course2 khi đang được tham chiếu trong CTĐT -> 422
     mockMvc

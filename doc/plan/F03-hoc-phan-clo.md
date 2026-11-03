@@ -19,7 +19,7 @@ sau này phải bám vào (câu hỏi chỉ được đo cặp (CLO, PI) có tro
 | Collection | Trường chính |
 |---|---|
 | `courses` | `code` (duy nhất), `name`, `credits` (int), `extra`. *(Q17 đã chốt: không tạo collection `departments`, bỏ `departmentId`)* |
-| `program_courses` | `programVersionId`, `courseId`, `semester`, `credits`, `type` (`COMPULSORY`/`ELECTIVE`), `category` (`FOUNDATION`, `MAJOR_FOUNDATION`, `SPECIALIZED`, `CAPSTONE_PROJECT`, `THESIS`), `prerequisiteCourseIds[]` |
+| `program_courses` | `programVersionId`, `courseId`, `semester`, `credits`, `type` (`COMPULSORY`/`ELECTIVE`), `category` (`FOUNDATION`, `MAJOR_FOUNDATION`, `SPECIALIZED`, `CAPSTONE_PROJECT`, `THESIS`), `prerequisiteCourseIds[]`, `previousCourseIds[]` |
 | `syllabi` | `courseId`, `version`, `effectiveFromTermId`, `effectiveToTermId` (null được), `status` (`DRAFT`/`CONFIRMED`/`ARCHIVED`), `verification`. Duy nhất `(courseId, version)` |
 | `clos` | `syllabusId`, `courseId`, `code` (`^CLO[0-9]+$`), `contentOriginal`, `bloomLevel` (1–6), `bloomNote`, `measurement` (`{ defaultWeight, defaultPassThreshold }`, null cho tới khi Khoa xác nhận), `verification`. Duy nhất `(syllabusId, code)` |
 | `clo_pi_links` | `cloId`, `piId`, `syllabusId`, `programVersionId`, `weight` (0 < x ≤ 1, null cho tới khi quy tắc xác nhận), `verification`. Duy nhất `(cloId, piId)` |
@@ -44,7 +44,7 @@ sau này phải bám vào (câu hỏi chỉ được đo cặp (CLO, PI) có tro
 |---|---|---|
 | US-09/AC-1 | Tạo `courses` với `code` mới → thành công; trùng `code` → 409 | **ĐÃ HOÀN THÀNH (Issue #20)** |
 | US-09/AC-2 | Gán học phần vào một `programVersionId` (`program_courses`); trùng `(programVersionId, courseId)` → 409 | **ĐÃ HOÀN THÀNH (Issue #20)** |
-| US-09/AC-3 | `prerequisiteCourseIds` chứa học phần không tồn tại hoặc chính nó → 422 | **ĐÃ HOÀN THÀNH (Issue #20)** |
+| US-09/AC-3 | `prerequisiteCourseIds` / `previousCourseIds` chứa học phần không tồn tại hoặc chính nó → 422 | **ĐÃ HOÀN THÀNH (Issue #20)** |
 | US-10/AC-1 | Tạo `syllabi` mới với `(courseId, version)` chưa có, `status = DRAFT`; trùng → 409 | Chờ F05a (`terms`), Q02 |
 | US-10/AC-2 | `effectiveToTermId` không trước `effectiveFromTermId` (nếu có thông tin học kỳ) → 422 | Chờ F05a (`terms`), Q02 |
 | US-10/AC-3 | Đề cương `CONFIRMED` không cho sửa CLO của nó (422); phải tạo phiên bản mới | Chờ F05a (`terms`), Q02 |

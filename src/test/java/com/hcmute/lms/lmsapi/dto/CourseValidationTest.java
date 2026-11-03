@@ -70,6 +70,7 @@ class CourseValidationTest {
             .type(CourseType.COMPULSORY)
             .category(CourseCategory.FOUNDATION)
             .prerequisiteCourseIds(List.of("671dcba5f123456789abc002"))
+            .previousCourseIds(List.of("671dcba5f123456789abc003"))
             .build();
 
     Set<ConstraintViolation<ProgramCourseRequest>> violations = validator.validate(request);
@@ -104,5 +105,14 @@ class CourseValidationTest {
             .type(CourseType.COMPULSORY)
             .build();
     assertThat(validator.validate(invalidSemester)).isNotEmpty();
+
+    ProgramCourseRequest invalidPreviousId =
+        ProgramCourseRequest.builder()
+            .courseId("671dcba5f123456789abc001")
+            .semester(1)
+            .type(CourseType.COMPULSORY)
+            .previousCourseIds(List.of("invalid-hex-id"))
+            .build();
+    assertThat(validator.validate(invalidPreviousId)).isNotEmpty();
   }
 }

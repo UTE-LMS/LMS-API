@@ -25,7 +25,7 @@ Quản lý khung chuẩn đầu ra cấp chương trình: chương trình, phiê
 | `plos` | `programVersionId`, `code` (`^PLO[1-9][0-9]*$`), `displayOrder`, `category` (`GENERAL`/`SPECIALIZED`/`UNSPECIFIED`), `contentOriginal`, `contentSummary`, `capabilityLevelRaw` (1–6), `verification`, `reviewNote`. Duy nhất `(programVersionId, code)` |
 | `pis` | `programVersionId`, `ploId`, `code` (`^PI[1-9][0-9]*\.[1-9][0-9]*$`), `displayOrder`, `nameOriginalTerm`, `contentOriginal`, `contentShort`, `capabilityLevelRaw` (1–6), `targetPassRate` (0–1), `verification`. Duy nhất `(programVersionId, code)` |
 | `courses` | `code` (duy nhất), `name`, `credits`, `departmentId` (chưa có collection bộ môn, Q17) — thuộc F03 |
-| `program_courses` | `programVersionId`, `courseId`, `semester`, `credits`, `type` (`COMPULSORY`/`ELECTIVE`), `category`, `prerequisiteCourseIds[]`. Duy nhất `(programVersionId, courseId)` — thuộc F03 |
+| `program_courses` | `programVersionId`, `courseId`, `semester`, `credits`, `type` (`COMPULSORY`/`ELECTIVE`), `category`, `prerequisiteCourseIds[]`, `previousCourseIds[]`. Duy nhất `(programVersionId, courseId)` — thuộc F03 |
 | `course_pi_contributions` | `programVersionId`, `courseId`, `piId`, `contribution` (`I`/`R`/`M`), `verification`. Duy nhất `(programVersionId, courseId, piId)` |
 
 `verification = { status: UNVERIFIED | VERIFIED | NEEDS_CLARIFICATION, verifiedBy, verifiedAt, note }`.

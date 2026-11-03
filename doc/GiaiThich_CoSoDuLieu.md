@@ -207,6 +207,7 @@ Học phần là *môn học có mã và nội dung xác định*, khác với *
 | `semester`, `credits`, `type` | Học kỳ dự kiến, tín chỉ, `COMPULSORY` (bắt buộc) / `ELECTIVE` (tự chọn) |
 | `category` | Nhóm: cơ sở / cơ sở ngành / chuyên ngành / đồ án / khóa luận |
 | `prerequisiteCourseIds[]` | Học phần tiên quyết |
+| `previousCourseIds[]` | Học phần học trước |
 
 **Chỉ mục:** (`programVersionId`, `courseId`) duy nhất. **Khởi tạo:** chưa có (cần danh mục học phần từ bản CTĐT).
 

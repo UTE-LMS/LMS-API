@@ -24,4 +24,5 @@ public class ProgramCourseResponse {
   private CourseType type;
   private CourseCategory category;
   @Builder.Default private List<String> prerequisiteCourseIds = new ArrayList<>();
+  @Builder.Default private List<String> previousCourseIds = new ArrayList<>();
 }
