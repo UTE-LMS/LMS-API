@@ -41,4 +41,12 @@ public class ProgramCourseRequest {
               message = "ID học phần tiên quyết phải là ObjectId 24 ký tự hex")
           String>
       prerequisiteCourseIds = new ArrayList<>();
+
+  @Builder.Default
+  private List<
+          @Pattern(
+              regexp = "^[0-9a-fA-F]{24}$",
+              message = "ID học phần học trước phải là ObjectId 24 ký tự hex")
+          String>
+      previousCourseIds = new ArrayList<>();
 }

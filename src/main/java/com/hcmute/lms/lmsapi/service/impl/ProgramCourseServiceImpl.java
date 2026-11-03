@@ -92,6 +92,9 @@ public class ProgramCourseServiceImpl implements ProgramCourseService {
 
     List<String> sanitizedPrereqs =
         validatePrerequisites(request.getCourseId(), request.getPrerequisiteCourseIds());
+    List<String> sanitizedPreviousCourses =
+        validatePreviousCourses(request.getCourseId(), request.getPreviousCourseIds());
+    validateNoPrerequisiteAndPreviousConflict(sanitizedPrereqs, sanitizedPreviousCourses);
 
     Integer credits = request.getCredits() != null ? request.getCredits() : course.getCredits();
 
@@ -104,6 +107,7 @@ public class ProgramCourseServiceImpl implements ProgramCourseService {
             .type(request.getType())
             .category(request.getCategory())
             .prerequisiteCourseIds(sanitizedPrereqs)
+            .previousCourseIds(sanitizedPreviousCourses)
             .build();
 
     try {
@@ -139,12 +143,16 @@ public class ProgramCourseServiceImpl implements ProgramCourseService {
 
     List<String> sanitizedPrereqs =
         validatePrerequisites(courseId, request.getPrerequisiteCourseIds());
+    List<String> sanitizedPreviousCourses =
+        validatePreviousCourses(courseId, request.getPreviousCourseIds());
+    validateNoPrerequisiteAndPreviousConflict(sanitizedPrereqs, sanitizedPreviousCourses);
 
     programCourse.setSemester(request.getSemester());
     programCourse.setCredits(request.getCredits());
     programCourse.setType(request.getType());
     programCourse.setCategory(request.getCategory());
     programCourse.setPrerequisiteCourseIds(sanitizedPrereqs);
+    programCourse.setPreviousCourseIds(sanitizedPreviousCourses);
 
     programCourse = programCourseRepository.save(programCourse);
     Course course = courseRepository.findById(courseId).orElse(null);
@@ -199,6 +207,47 @@ public class ProgramCourseServiceImpl implements ProgramCourseService {
     }
 
     return distinctPrereqs;
+  }
+
+  private List<String> validatePreviousCourses(String courseId, List<String> previousCourseIds) {
+    if (previousCourseIds == null || previousCourseIds.isEmpty()) {
+      return new ArrayList<>();
+    }
+
+    List<String> distinctPrevious = new ArrayList<>(new LinkedHashSet<>(previousCourseIds));
+
+    for (String prevId : distinctPrevious) {
+      ObjectIdUtils.requireValid(prevId, "previousCourseId");
+
+      if (prevId.equals(courseId)) {
+        throw new BusinessRuleViolationException(
+            "PREVIOUS_COURSE_SELF_REFERENCE",
+            "Học phần không thể là học phần học trước của chính nó: " + prevId);
+      }
+
+      if (!courseRepository.existsById(prevId)) {
+        throw new BusinessRuleViolationException(
+            "PREVIOUS_COURSE_NOT_FOUND", "Học phần học trước không tồn tại: " + prevId);
+      }
+    }
+
+    return distinctPrevious;
+  }
+
+  private void validateNoPrerequisiteAndPreviousConflict(
+      List<String> prerequisiteCourseIds, List<String> previousCourseIds) {
+    if (prerequisiteCourseIds == null || previousCourseIds == null) {
+      return;
+    }
+
+    for (String prereqId : prerequisiteCourseIds) {
+      if (previousCourseIds.contains(prereqId)) {
+        throw new BusinessRuleViolationException(
+            "PREREQUISITE_AND_PREVIOUS_CONFLICT",
+            "Học phần không thể đồng thời vừa là học phần tiên quyết vừa là học phần học trước: "
+                + prereqId);
+      }
+    }
   }
 
   private AppException conflict(String courseId) {
