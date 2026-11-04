@@ -14,6 +14,7 @@ import com.hcmute.lms.lmsapi.document.UserScope;
 import com.hcmute.lms.lmsapi.dto.CloMeasurementDto;
 import com.hcmute.lms.lmsapi.dto.CloPiLinkRequest;
 import com.hcmute.lms.lmsapi.dto.CloRequest;
+import com.hcmute.lms.lmsapi.dto.CloUpdateRequest;
 import com.hcmute.lms.lmsapi.dto.SyllabusRequest;
 import com.hcmute.lms.lmsapi.dto.SyllabusStatusUpdateRequest;
 import com.hcmute.lms.lmsapi.dto.VerificationRequest;
@@ -49,6 +50,7 @@ class CloIntegrationTest extends IntegrationTestBase {
   private String qaToken;
   private String qaOutOfScopeToken;
   private String lecturerToken;
+  private String adminToken;
 
   @BeforeEach
   void setUpFixtures() {
@@ -57,6 +59,8 @@ class CloIntegrationTest extends IntegrationTestBase {
 
     course1 = fixtures.course();
     course2 = fixtures.course();
+    fixtures.programCourse(programVersion, course1);
+    fixtures.programCourse(programVersion, course2);
 
     plo = fixtures.plo(programVersion, "PLO1", 1);
     pi = fixtures.pi(programVersion, plo, "PI1.1", 1);
@@ -76,6 +80,7 @@ class CloIntegrationTest extends IntegrationTestBase {
             Role.QA_OFFICER,
             UserScope.builder().programIds(List.of("671dcba5f123456789abc999")).build());
     lecturerToken = fixtures.bearerFor(Role.LECTURER, UserScope.builder().build());
+    adminToken = fixtures.bearerFor(Role.ADMIN, UserScope.builder().build());
   }
 
   @AfterEach
@@ -427,6 +432,208 @@ class CloIntegrationTest extends IntegrationTestBase {
     mockMvc
         .perform(
             putAs(qaOutOfScopeToken, "/api/v1/clo-pi-links/{id}/verification", verifyReq, linkId))
+        .andExpect(status().isForbidden());
+  }
+
+  // ------------------------------------------------------------------
+  // Phân quyền theo phạm vi của PROGRAM_MANAGER (ADR 0009, phương án A)
+  // ------------------------------------------------------------------
+
+  private String createSyllabusAs(String bearer, String courseId, String version) throws Exception {
+    MvcResult result =
+        mockMvc
+            .perform(
+                postAs(
+                    bearer,
+                    "/api/v1/courses/{courseId}/syllabi",
+                    SyllabusRequest.builder().version(version).build(),
+                    courseId))
+            .andExpect(status().isCreated())
+            .andReturn();
+    return read(result, "$.id");
+  }
+
+  private String createCloAs(String bearer, String syllabusId, String code) throws Exception {
+    MvcResult result =
+        mockMvc
+            .perform(
+                postAs(
+                    bearer,
+                    "/api/v1/syllabi/{syllabusId}/clos",
+                    CloRequest.builder().code(code).bloomLevel(2).build(),
+                    syllabusId))
+            .andExpect(status().isCreated())
+            .andReturn();
+    return read(result, "$.id");
+  }
+
+  @Test
+  @DisplayName(
+      "US-10/AC-4: PM chỉ ghi đề cương của học phần thuộc CTĐT trong scope; LECTURER bị chặn")
+  void us10_ac4_syllabusWriteIsScoped() throws Exception {
+    SyllabusRequest req = SyllabusRequest.builder().version("2024.1").build();
+
+    // PM ngoài scope và LECTURER không được tạo đề cương -> 403
+    mockMvc
+        .perform(
+            postAs(pmOutOfScopeToken, "/api/v1/courses/{courseId}/syllabi", req, course1.getId()))
+        .andExpect(status().isForbidden());
+    mockMvc
+        .perform(postAs(lecturerToken, "/api/v1/courses/{courseId}/syllabi", req, course1.getId()))
+        .andExpect(status().isForbidden());
+
+    // PM trong scope -> 201; rồi PM ngoài scope/LECTURER không đổi được trạng thái -> 403
+    String syllabusId = createSyllabusAs(pmToken, course1.getId(), "2024.1");
+    SyllabusStatusUpdateRequest confirm =
+        SyllabusStatusUpdateRequest.builder().status(SyllabusStatus.CONFIRMED).build();
+    mockMvc
+        .perform(putAs(pmOutOfScopeToken, "/api/v1/syllabi/{id}/status", confirm, syllabusId))
+        .andExpect(status().isForbidden());
+    mockMvc
+        .perform(putAs(lecturerToken, "/api/v1/syllabi/{id}/status", confirm, syllabusId))
+        .andExpect(status().isForbidden());
+
+    // Đọc vẫn mở cho mọi vai trò đã xác thực
+    mockMvc
+        .perform(getAs(pmOutOfScopeToken, "/api/v1/courses/{courseId}/syllabi", course1.getId()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$", hasSize(1)));
+    mockMvc
+        .perform(getAs(lecturerToken, "/api/v1/syllabi/{id}", syllabusId))
+        .andExpect(status().isOk());
+  }
+
+  @Test
+  @DisplayName("US-10/AC-4: học phần chưa thuộc CTĐT nào chỉ ADMIN ghi được (fail-closed)")
+  void us10_ac4_orphanCourseIsAdminOnly() throws Exception {
+    Course orphan = fixtures.course();
+    SyllabusRequest req = SyllabusRequest.builder().version("2024.1").build();
+
+    mockMvc
+        .perform(postAs(pmToken, "/api/v1/courses/{courseId}/syllabi", req, orphan.getId()))
+        .andExpect(status().isForbidden());
+
+    mockMvc
+        .perform(postAs(adminToken, "/api/v1/courses/{courseId}/syllabi", req, orphan.getId()))
+        .andExpect(status().isCreated());
+  }
+
+  @Test
+  @DisplayName("US-10/AC-4: học phần thuộc nhiều CTĐT, scope khớp một CTĐT là đủ (phép HỢP)")
+  void us10_ac4_courseInSeveralProgramsUnionOfScopes() throws Exception {
+    Program otherProgram = fixtures.program();
+    ProgramVersion otherVersion = fixtures.programVersion(otherProgram, ProgramVersionStatus.DRAFT);
+    Course shared = fixtures.course();
+    fixtures.programCourse(programVersion, shared);
+    fixtures.programCourse(otherVersion, shared);
+
+    String otherProgramPm =
+        fixtures.bearerFor(
+            Role.PROGRAM_MANAGER,
+            UserScope.builder().programIds(List.of(otherProgram.getId())).build());
+    SyllabusRequest req = SyllabusRequest.builder().version("2024.1").build();
+
+    // PM chỉ quản lý CTĐT thứ hai vẫn ghi được; PM ngoài cả hai thì không
+    mockMvc
+        .perform(postAs(otherProgramPm, "/api/v1/courses/{courseId}/syllabi", req, shared.getId()))
+        .andExpect(status().isCreated());
+    mockMvc
+        .perform(
+            postAs(pmOutOfScopeToken, "/api/v1/courses/{courseId}/syllabi", req, shared.getId()))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
+  @DisplayName("US-11/AC-5: PM ngoài scope và LECTURER không thêm/sửa/xóa được CLO")
+  void us11_ac5_cloWriteIsScoped() throws Exception {
+    String syllabusId = createSyllabusAs(pmToken, course1.getId(), "2024.1");
+    String cloId = createCloAs(pmToken, syllabusId, "CLO1");
+    CloRequest newClo = CloRequest.builder().code("CLO2").bloomLevel(3).build();
+    CloUpdateRequest update = CloUpdateRequest.builder().code("CLO1").bloomLevel(4).build();
+
+    for (String denied : List.of(pmOutOfScopeToken, lecturerToken)) {
+      mockMvc
+          .perform(postAs(denied, "/api/v1/syllabi/{syllabusId}/clos", newClo, syllabusId))
+          .andExpect(status().isForbidden());
+      mockMvc
+          .perform(putAs(denied, "/api/v1/clos/{id}", update, cloId))
+          .andExpect(status().isForbidden());
+      mockMvc
+          .perform(deleteAs(denied, "/api/v1/clos/{id}", cloId))
+          .andExpect(status().isForbidden());
+    }
+
+    // CLO không bị đổi/xóa bởi các lời gọi bị chặn; PM trong scope và ADMIN vẫn thao tác được
+    mockMvc
+        .perform(getAs(pmOutOfScopeToken, "/api/v1/clos/{id}", cloId))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.bloomLevel").value(2));
+    mockMvc
+        .perform(putAs(pmToken, "/api/v1/clos/{id}", update, cloId))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.bloomLevel").value(4));
+    mockMvc
+        .perform(deleteAs(adminToken, "/api/v1/clos/{id}", cloId))
+        .andExpect(status().isNoContent());
+  }
+
+  @Test
+  @DisplayName("US-12/AC-6: PM ngoài scope và LECTURER không tạo/xóa được liên kết CLO–PI")
+  void us12_ac6_linkWriteIsScoped() throws Exception {
+    String syllabusId = createSyllabusAs(pmToken, course1.getId(), "2024.1");
+    String cloId = createCloAs(pmToken, syllabusId, "CLO1");
+    CloPiLinkRequest linkReq =
+        CloPiLinkRequest.builder()
+            .programVersionId(programVersion.getId())
+            .cloId(cloId)
+            .piId(pi.getId())
+            .build();
+
+    for (String denied : List.of(pmOutOfScopeToken, lecturerToken)) {
+      mockMvc
+          .perform(postAs(denied, "/api/v1/syllabi/{syllabusId}/clo-pi-links", linkReq, syllabusId))
+          .andExpect(status().isForbidden());
+    }
+
+    MvcResult created =
+        mockMvc
+            .perform(
+                postAs(pmToken, "/api/v1/syllabi/{syllabusId}/clo-pi-links", linkReq, syllabusId))
+            .andExpect(status().isCreated())
+            .andReturn();
+    String linkId = read(created, "$.id");
+
+    for (String denied : List.of(pmOutOfScopeToken, lecturerToken)) {
+      mockMvc
+          .perform(deleteAs(denied, "/api/v1/clo-pi-links/{id}", linkId))
+          .andExpect(status().isForbidden());
+    }
+    mockMvc
+        .perform(deleteAs(pmToken, "/api/v1/clo-pi-links/{id}", linkId))
+        .andExpect(status().isNoContent());
+  }
+
+  @Test
+  @DisplayName(
+      "US-12/AC-6: version trong scope nhưng đề cương thuộc học phần ngoài scope -> 403 (vế AND)")
+  void us12_ac6_versionInScopeButSyllabusOutOfScope() throws Exception {
+    Program otherProgram = fixtures.program();
+    ProgramVersion otherVersion = fixtures.programVersion(otherProgram, ProgramVersionStatus.DRAFT);
+    Course foreign = fixtures.course();
+    fixtures.programCourse(otherVersion, foreign);
+    String foreignSyllabusId = createSyllabusAs(adminToken, foreign.getId(), "2024.1");
+    String foreignCloId = createCloAs(adminToken, foreignSyllabusId, "CLO1");
+
+    // pmToken có scope CTĐT `program` (programVersion hợp lệ) nhưng đề cương thuộc `otherProgram`
+    CloPiLinkRequest req =
+        CloPiLinkRequest.builder()
+            .programVersionId(programVersion.getId())
+            .cloId(foreignCloId)
+            .piId(pi.getId())
+            .build();
+    mockMvc
+        .perform(
+            postAs(pmToken, "/api/v1/syllabi/{syllabusId}/clo-pi-links", req, foreignSyllabusId))
         .andExpect(status().isForbidden());
   }
 }

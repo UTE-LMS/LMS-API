@@ -271,3 +271,35 @@ Phần này chuẩn bị sẵn câu trả lời khoa học, chuẩn mực cho 4 
   - SpotBugs: 0 bugs found.
   - PMD CPD: 0 duplications found.
   - Test suites: 35/35 new tests passed; toàn bộ test suite dự án đạt 100%.
+
+
+---
+
+## Phiên #19 — 2026-11-04: Hoàn thiện nhánh F03 — sửa SpotBugs, phân quyền theo phạm vi cho đề cương/CLO (ADR 0009), đồng bộ tài liệu
+
+- **Sinh viên yêu cầu:** TinMH (IT)
+- **Công cụ / mô hình:** Claude Code, claude-sonnet-5-5 (có dùng subagent cho việc soạn tài liệu và rà soát chéo mã)
+- **Mục tiêu:**
+  1. Kiểm chứng nhánh `feat/f03-us10-us11-us12-syllabus-clo` bằng `./mvnw verify`: phát hiện `URF_UNREAD_FIELD` (SpotBugs) ở `CloIntegrationTest` (`pmOutOfScopeToken`, `lecturerToken`) và xung đột `logsAI/ai-usage-log.md` khi gộp `main`.
+  2. Sửa SpotBugs bằng cách **viết test dùng hai token đó** (không tắt công cụ, không xóa field để qua mặt).
+  3. Phát hiện endpoint ghi của `syllabi`/`clos`/`clo_pi_links` không kiểm `scope.programIds` của `PROGRAM_MANAGER` (trái ADR 0005 §3.2). Sinh viên chọn **phương án A**: suy phạm vi qua `program_courses` (ADR 0009, đề xuất, chờ GVHD/Khoa xác nhận).
+  4. Gộp `main` vào nhánh, gộp tay log (đánh lại số phiên #17/#18), đồng bộ tài liệu F03/F05a và `LMS-UI/doc/API-CONTRACT.md`.
+- **File AI sinh/sửa (chưa commit):**
+  - Mã: `ScopeAuthorizationService` + `ScopeAuthorizationServiceImpl` (thêm `canAccessCourse/Syllabus/Clo/CloPiLink`); `SyllabusController`, `CloController`, `CloPiLinkController` (SpEL kiểm scope cho thao tác ghi).
+  - Test: `CloIntegrationTest` (+6 ca scope: US-10/AC-4 ×3, US-11/AC-5, US-12/AC-6 ×2; fixture gán học phần vào CTĐT), `CourseScopeAuthorizationTest` (15 ca unit), `ApiTestFixtures.programCourse` + dọn `program_courses`.
+  - Tài liệu: `doc/adr/0009-phan-quyen-pham-vi-de-cuong-clo.md`, `doc/plan/F03-hoc-phan-clo.md`, `doc/plan/F05a-hoc-ky-lop-sinh-vien.md`, `doc/de-van-dap/f03-hoc-phan-clo.md`, `doc/sdd/02-component.md`, `doc/sdd/04-sequence.md`, `doc/srs/README.md`, `doc/test-plan.md`; repo UI: `doc/API-CONTRACT.md` (§6.2, §6.4.1).
+- **Quyết định của AI cần sinh viên xác nhận:**
+  - PM đọc/ghi: học phần chưa thuộc CTĐT nào thì **chỉ ADMIN ghi được** (hệ quả: ADMIN tạo học phần và gán vào CTĐT trước khi PM soạn đề cương).
+  - Tài nguyên không tồn tại: PM nhận 403 (không phải 404), nhất quán `canAccessProgramVersion`.
+  - Quyền ghi `courses`/`terms` vẫn `ADMIN`/`PROGRAM_MANAGER` không kiểm scope (ngoài phạm vi ADR 0009).
+  - US-18/AC-2 (từ chối nhập điểm khi `SCORE_LOCKED`) **chờ F05b**; Issue #28 chưa đủ điều kiện đóng.
+  - Quy tắc 6 plan F03 (không xóa CLO/liên kết đã được `outcomeMappings`/`student_results` tham chiếu) **chờ F06**.
+- **Kiểm chứng đã làm:**
+  - `./mvnw -B verify` trên worktree nhánh F03 + `main` gộp: 972 test, 0 lỗi, 0 skip, BUILD SUCCESS (gồm Spotless, SpotBugs, JaCoCo, CPD). Trước khi sửa: 929 test pass nhưng SpotBugs báo 2 lỗi.
+  - Chạy trên MongoDB replica set `rs0` cổng 27018.
+  - Công cụ agy (Antigravity) không dùng được trong phiên này (quota 429), nên không có ý kiến từ agy; phản biện do AI tự thực hiện và một subagent rà soát độc lập.
+- **Lỗi AI tự phát hiện khi làm (để điền bảng B):**
+  - Lượt chạy test đầu của `us11_ac5_cloWriteIsScoped` fail 400 thay vì 403 do `CloUpdateRequest` bắt buộc `code`; sửa dữ liệu test (không sửa mã).
+  - Subagent rà soát độc lập phát hiện `canAccessCourse` cộng dồn quyền QA_OFFICER (ngành khác) thành quyền GHI; đã sửa (chỉ tính `PROGRAM_MANAGER`/`ADMIN`) và thêm test hồi quy. Các phát hiện còn lại chưa sửa vì cần quyết định thiết kế, đã ghi `doc/tech-debt.md` TD-27…TD-29 và ADR 0009 §4.
+- **Sinh viên đã sửa/rà soát:** _chờ sinh viên rà soát_
+- **Commit / PR:** chưa commit. PR nên ghi `Closes #21`, `Closes #22`, `Closes #23`; **không** ghi `Closes #28` (chờ F05b). Sinh viên IBS review.

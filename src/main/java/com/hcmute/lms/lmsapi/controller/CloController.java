@@ -43,7 +43,8 @@ public class CloController {
   }
 
   @PostMapping("/syllabi/{syllabusId}/clos")
-  @PreAuthorize("hasAnyRole('ADMIN', 'PROGRAM_MANAGER')")
+  @PreAuthorize(
+      "hasRole('ADMIN') or (hasRole('PROGRAM_MANAGER') and @scopeAuthorizationService.canAccessSyllabus(authentication.principal, #syllabusId, T(com.hcmute.lms.lmsapi.enums.AccessType).WRITE))")
   public ResponseEntity<CloResponse> createClo(
       @PathVariable("syllabusId")
           @Pattern(
@@ -67,7 +68,8 @@ public class CloController {
   }
 
   @PutMapping("/clos/{id}")
-  @PreAuthorize("hasAnyRole('ADMIN', 'PROGRAM_MANAGER')")
+  @PreAuthorize(
+      "hasRole('ADMIN') or (hasRole('PROGRAM_MANAGER') and @scopeAuthorizationService.canAccessClo(authentication.principal, #id, T(com.hcmute.lms.lmsapi.enums.AccessType).WRITE))")
   public ResponseEntity<CloResponse> updateClo(
       @PathVariable("id")
           @Pattern(regexp = "^[0-9a-fA-F]{24}$", message = "ID CLO phải là ObjectId 24 ký tự hex")
@@ -78,7 +80,8 @@ public class CloController {
   }
 
   @DeleteMapping("/clos/{id}")
-  @PreAuthorize("hasAnyRole('ADMIN', 'PROGRAM_MANAGER')")
+  @PreAuthorize(
+      "hasRole('ADMIN') or (hasRole('PROGRAM_MANAGER') and @scopeAuthorizationService.canAccessClo(authentication.principal, #id, T(com.hcmute.lms.lmsapi.enums.AccessType).WRITE))")
   public ResponseEntity<Void> deleteClo(
       @PathVariable("id")
           @Pattern(regexp = "^[0-9a-fA-F]{24}$", message = "ID CLO phải là ObjectId 24 ký tự hex")

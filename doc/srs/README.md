@@ -50,7 +50,7 @@ Mỗi file dưới đây giữ story và AC dự thảo của feature; **chưa c
 
 | Feature | File | Story | Ưu tiên (xem plan §2) | Dòng AC có mã trong plan | Trạng thái |
 |---|---|---|---|---|---|
-| F03 Học phần, đề cương, CLO | [`F03-hoc-phan-clo.md`](../plan/F03-hoc-phan-clo.md) | US-09…12 | C | 15 (US-09…12) | Chưa có mã |
+| F03 Học phần, đề cương, CLO | [`F03-hoc-phan-clo.md`](../plan/F03-hoc-phan-clo.md) | US-09…12 | C | 15 (US-09…12); bổ sung nháp 3 (US-10/AC-4, US-11/AC-5, US-12/AC-6: PM ghi theo scope, [ADR 0009](../adr/0009-phan-quyen-pham-vi-de-cuong-clo.md), đã hiện thực trên nhánh F03, chờ merge) | Chưa có mã trong bảng gốc này (nhánh F03 có mã; bảng chưa đồng bộ) |
 | F04 Bài đánh giá, rubric, duyệt ma trận | [`F04-bai-danh-gia.md`](../plan/F04-bai-danh-gia.md) | US-13…16, NEW-01 (US-17: K) | US-13, 14: MR; US-15, 16: C; NEW-01: C chờ GVHD Q11 | 16 (US-13…16, NEW-01) | Chưa có mã |
 | F05a Học kỳ, lớp, sinh viên | [`F05a-hoc-ky-lop-sinh-vien.md`](../plan/F05a-hoc-ky-lop-sinh-vien.md) | US-18…20 | C | 11 | Chưa có mã |
 | F05b Nhập điểm | [`F05b-nhap-diem.md`](../plan/F05b-nhap-diem.md) | US-21…25 | US-21…24: C; US-25: MR | 16 | Chưa có mã |

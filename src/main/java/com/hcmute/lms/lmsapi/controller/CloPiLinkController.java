@@ -48,7 +48,7 @@ public class CloPiLinkController {
 
   @PostMapping("/syllabi/{syllabusId}/clo-pi-links")
   @PreAuthorize(
-      "hasRole('ADMIN') or (hasRole('PROGRAM_MANAGER') and @scopeAuthorizationService.canAccessProgramVersion(authentication.principal, #request.programVersionId, T(com.hcmute.lms.lmsapi.enums.AccessType).WRITE))")
+      "hasRole('ADMIN') or (hasRole('PROGRAM_MANAGER') and @scopeAuthorizationService.canAccessProgramVersion(authentication.principal, #request.programVersionId, T(com.hcmute.lms.lmsapi.enums.AccessType).WRITE) and @scopeAuthorizationService.canAccessSyllabus(authentication.principal, #syllabusId, T(com.hcmute.lms.lmsapi.enums.AccessType).WRITE))")
   public ResponseEntity<CloPiLinkResponse> createLink(
       @PathVariable("syllabusId")
           @Pattern(
@@ -66,7 +66,8 @@ public class CloPiLinkController {
   }
 
   @DeleteMapping("/clo-pi-links/{id}")
-  @PreAuthorize("hasAnyRole('ADMIN', 'PROGRAM_MANAGER')")
+  @PreAuthorize(
+      "hasRole('ADMIN') or (hasRole('PROGRAM_MANAGER') and @scopeAuthorizationService.canAccessCloPiLink(authentication.principal, #id, T(com.hcmute.lms.lmsapi.enums.AccessType).WRITE))")
   public ResponseEntity<Void> deleteLink(
       @PathVariable("id")
           @Pattern(

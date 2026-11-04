@@ -213,6 +213,15 @@ bảng dưới chỉ để không bỏ sót.
 | F07 Báo cáo, truy vết | US-31…36 | 11 | Chưa có mã, chưa có test |
 | F08 Cải tiến | US-37, 38, NEW-02 | 10 | Chưa có mã, chưa có test |
 
+**Ca kiểm thử phân quyền scope F03 (ADR 0009, ĐỀ XUẤT chờ xác nhận; đã có test trên nhánh F03, chờ review/merge):**
+
+| AC dự thảo | Ca dự kiến | Trạng thái |
+|---|---|---|
+| US-10/AC-4 | `POST /courses/{courseId}/syllabi`, `PUT /syllabi/{id}/status`: PM ngoài scope → 403; PM trong scope → 2xx; học phần chưa thuộc `program_courses` nào → PM 403, ADMIN 2xx | Đã có test (`CloIntegrationTest`) |
+| US-11/AC-5 | `POST /syllabi/{syllabusId}/clos`, `PUT`/`DELETE /clos/{id}`: như trên | Đã có test (`CloIntegrationTest`) |
+| US-12/AC-6 | `POST /syllabi/{syllabusId}/clo-pi-links` (cần cả `canAccessProgramVersion` và `canAccessSyllabus`), `DELETE /clo-pi-links/{id}`: như trên; `PUT …/verification` vẫn chỉ `QA_OFFICER` đúng scope | Đã có test (`CloIntegrationTest`) |
+| (ngoài AC) | Unit test 4 phương thức mới của `ScopeAuthorizationService`: học phần thuộc hai CTĐT chỉ một trong scope → true (phép hợp); tài nguyên không tồn tại → false; vai trò khác → false | Đã có test (`CourseScopeAuthorizationTest`) |
+
 Test đặc biệt quan trọng cần có khi các feature này có mã (nhắc lại từ rule 04, mục 5): điểm > tối đa; `BLANK` ≠ `MISSING`;
 trùng bản ghi điểm; tổng `weight` ≠ 1; cặp CLO–PI ngoài `clo_pi_links`; quy tắc `DRAFT` không chạy chính thức; lớp
 45/40; sửa điểm đồng thời; người dùng ngoài phạm vi lớp.

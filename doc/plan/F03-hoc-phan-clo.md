@@ -57,6 +57,14 @@ sau này phải bám vào (câu hỏi chỉ được đo cặp (CLO, PI) có tro
 | US-12/AC-3 | Đổi `verification.status` sang `VERIFIED` ghi người xác nhận và thời điểm | **ĐÃ HOÀN THÀNH (Issue #23)** |
 | US-12/AC-4 | API ma trận trả CLO × PI kèm trạng thái xác nhận từng ô | **ĐÃ HOÀN THÀNH (Issue #23)** |
 | US-12/AC-5 | `weight` ngoài (0, 1] → 400; `null` hợp lệ | **ĐÃ HOÀN THÀNH (Issue #23)** |
+| US-10/AC-4 *(bổ sung theo ADR 0009)* | Ghi đề cương (`POST /courses/{courseId}/syllabi`, `PUT /syllabi/{id}/status`): `PROGRAM_MANAGER` ngoài scope → 403; trong scope → 2xx; học phần chưa thuộc `program_courses` nào → PM 403, `ADMIN` 2xx | **ĐÃ HIỆN THỰC trên nhánh F03 (chờ review/merge)** |
+| US-11/AC-5 *(bổ sung theo ADR 0009)* | Ghi CLO (`POST /syllabi/{syllabusId}/clos`, `PUT`/`DELETE /clos/{id}`): PM ngoài scope → 403; trong scope → 2xx; học phần chưa thuộc `program_courses` nào → PM 403, `ADMIN` 2xx | **ĐÃ HIỆN THỰC trên nhánh F03 (chờ review/merge)** |
+| US-12/AC-6 *(bổ sung theo ADR 0009)* | Ghi liên kết (`POST /syllabi/{syllabusId}/clo-pi-links`, `DELETE /clo-pi-links/{id}`): PM ngoài scope → 403; trong scope → 2xx; học phần chưa thuộc `program_courses` nào → PM 403, `ADMIN` 2xx | **ĐÃ HIỆN THỰC trên nhánh F03 (chờ review/merge)** |
+
+Ghi chú: AC-4/AC-5/AC-6 ở trên chưa có mã và chưa có test; đang chờ ADR 0009 được xác nhận (xem mục 6). Quy tắc nghiệp vụ **6** (không
+xóa/sửa CLO, liên kết đã được `outcomeMappings` hoặc `student_results` tham chiếu) và ca test "xóa CLO đang được dùng" (mục 8) **CHỜ F06**:
+các collection `outcomeMappings` (trong `questions`/`assessments`) và `student_results` chưa có nghiệp vụ, nên chưa thể kiểm tham chiếu.
+Quy tắc **7** (đề cương `CONFIRMED` không sửa CLO) đã có qua US-10/AC-3.
 
 ## 6. API đề xuất **[ĐÃ HIỆN THỰC]**
 
@@ -69,7 +77,23 @@ sau này phải bám vào (câu hỏi chỉ được đo cặp (CLO, PI) có tro
 | GET/POST/DELETE | `/api/v1/syllabi/{syllabusId}/clo-pi-links`, `/api/v1/clo-pi-links/{id}`; `GET .../clo-pi-matrix` |
 | PUT | `/api/v1/clo-pi-links/{id}/verification` |
 
-Quyền ghi: ADMIN, PROGRAM_MANAGER; thẩm định: QA_OFFICER (theo phạm vi scope); đọc: mọi vai trò đã xác thực.
+Quyền (hiện trạng mã): ghi `ADMIN`, `PROGRAM_MANAGER` (mới kiểm vai trò); thẩm định: `QA_OFFICER` (theo phạm vi scope); đọc: mọi vai trò đã xác thực.
+
+**Đề xuất theo ADR 0009 (chờ GVHD/Khoa xác nhận; đã hiện thực trên nhánh F03, chờ review/merge):** các endpoint ghi của `syllabi`, `clos`, `clo_pi_links` thêm kiểm `scope.programIds`
+của `PROGRAM_MANAGER` (fail-closed) bằng cách suy phạm vi qua `program_courses`:
+
+| Endpoint ghi | Vai trò | Kiểm scope (PM) |
+|---|---|---|
+| `POST /courses/{courseId}/syllabi` | ADMIN, PM | `canAccessCourse` |
+| `PUT /syllabi/{id}/status` | ADMIN, PM | `canAccessSyllabus` |
+| `POST /syllabi/{syllabusId}/clos` | ADMIN, PM | `canAccessSyllabus` |
+| `PUT`, `DELETE /clos/{id}` | ADMIN, PM | `canAccessClo` |
+| `POST /syllabi/{syllabusId}/clo-pi-links` | ADMIN, PM | `canAccessProgramVersion` và `canAccessSyllabus` |
+| `DELETE /clo-pi-links/{id}` | ADMIN, PM | `canAccessCloPiLink` (qua `programVersionId`) |
+| `PUT /clo-pi-links/{id}/verification` | QA_OFFICER đúng scope (ADR 0004), không đổi | — |
+
+`ADMIN` luôn qua. PM qua khi học phần có trong `program_courses` của ít nhất một phiên bản thuộc ngành trong scope của PM; học phần
+chưa thuộc CTĐT nào thì chỉ `ADMIN` ghi được (nên `ADMIN` gán học phần vào CTĐT trước khi PM soạn đề cương). Các `GET` giữ `isAuthenticated()`.
 
 ## 7. Kiểm tra tham chiếu ở service
 
@@ -79,7 +103,8 @@ Quyền ghi: ADMIN, PROGRAM_MANAGER; thẩm định: QA_OFFICER (theo phạm vi 
 ## 8. Test bắt buộc
 
 Mã CLO trùng trong/ngoài đề cương; `bloomLevel` biên (0,1,6,7); liên kết trùng; PI sai phiên bản; sửa CLO của đề cương `CONFIRMED`;
-`weight` biên (0, 1, 1,01, null); xóa CLO đang được dùng; ma trận CLO × PI rỗng.
+`weight` biên (0, 1, 1,01, null); xóa CLO đang được dùng *(chờ F06)*; ma trận CLO × PI rỗng; phân quyền scope theo ADR 0009 (PM ngoài scope → 403,
+trong scope → 2xx, học phần chưa thuộc CTĐT nào → PM 403 và `ADMIN` 2xx, học phần thuộc hai CTĐT chỉ một trong scope → 2xx, tài nguyên không tồn tại → 403).
 
 ## 9. Không làm / chưa quyết (Các nội dung CHƯA ĐƯỢC XÁC NHẬN)
 
@@ -93,4 +118,4 @@ Mã CLO trùng trong/ngoài đề cương; `bloomLevel` biên (0,1,6,7); liên k
 
 Vì sao CLO nhận diện bằng `_id` chứ không bằng `code`; vì sao có `clo_pi_links` riêng (khung đã duyệt để chặn gán PI tùy ý cho
 câu hỏi); vì sao đề cương phiên bản hóa (đổi CLO không làm sai báo cáo cũ); bỏ kiểm tra "cặp CLO–PI nằm trong liên kết" thì
-một câu hỏi có thể đo PI không liên quan CLO của nó; vì sao phải triển khai trước quản lý `terms` của F05a để kiểm tra tính hợp lệ về thời gian của đề cương. Xem chi tiết tại `doc/de-van-dap/f03-hoc-phan-clo.md`.
+một câu hỏi có thể đo PI không liên quan CLO của nó; vì sao phải triển khai trước quản lý `terms` của F05a để kiểm tra tính hợp lệ về thời gian của đề cương. Vì sao PM ghi đề cương/CLO phải bị giới hạn theo scope và phạm vi được suy qua `program_courses` (ADR 0009). Xem chi tiết tại `doc/de-van-dap/f03-hoc-phan-clo.md`.

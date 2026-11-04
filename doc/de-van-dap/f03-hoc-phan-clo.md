@@ -2,7 +2,7 @@
 
 **Đề tài:** Hệ thống quản lý, đo lường và phân tích chuẩn đầu ra chương trình đào tạo (Learning Outcomes Management and Analytics System)  
 **Phân hệ:** F03 — Quản lý Học phần, Vị trí học phần trong CTĐT (US-09), Đề cương theo phiên bản (US-10), Chuẩn đầu ra học phần CLO (US-11), và Liên kết CLO–PI (US-12), tích hợp Quản lý Học kỳ (F05a / US-18)  
-**Tài liệu liên quan:** `doc/plan/F03-hoc-phan-clo.md`, `doc/plan/F05a-hoc-ky-lop-sinh-vien.md`, `doc/adr/0002-nen-tang-chung-step-00.md`, `doc/adr/0005-phan-quyen-chuong-trinh-dao-tao.md`, `doc/GiaiThich_CoSoDuLieu.md` (§2 nguyên tắc 2 & 12, §4.6–4.7, §4.9–4.11, §4.16, §7), `LMS-UI/doc/API-CONTRACT.md`  
+**Tài liệu liên quan:** `doc/plan/F03-hoc-phan-clo.md`, `doc/plan/F05a-hoc-ky-lop-sinh-vien.md`, `doc/adr/0002-nen-tang-chung-step-00.md`, `doc/adr/0005-phan-quyen-chuong-trinh-dao-tao.md`, `doc/adr/0009-phan-quyen-pham-vi-de-cuong-clo.md` (ĐỀ XUẤT), `doc/GiaiThich_CoSoDuLieu.md` (§2 nguyên tắc 2 & 12, §4.6–4.7, §4.9–4.11, §4.16, §7), `LMS-UI/doc/API-CONTRACT.md`  
 **Nhóm sinh viên thực hiện:** Sinh viên Công nghệ thông tin (IT) & Sinh viên Kinh doanh số (IBS)
 
 ---
@@ -141,6 +141,7 @@ Dưới góc độ quản trị đào tạo và kinh doanh số, US-09 giải qu
    - **Gán học phần vào CTĐT `program_courses`:** Là tài nguyên gắn liền với một phiên bản CTĐT cụ thể. Do đó, các endpoint tại `/api/v1/program-versions/{programVersionId}/courses` được bảo vệ bằng SpEL:  
      `@PreAuthorize("@scopeAuthorizationService.canAccessProgramVersion(principal, #programVersionId)")`
    - **Thẩm định liên kết CLO-PI:** Được phân quyền chặt chẽ cho vai trò `QA_OFFICER` theo phạm vi ngành đào tạo (`programIds`).
+   - **Lưu ý hiện trạng:** các endpoint ghi `syllabi`, `clos`, `clo_pi_links` hiện mới kiểm vai trò (`ADMIN`, `PROGRAM_MANAGER`), chưa kiểm `scope.programIds` của PM. Việc bổ sung đang ở trạng thái đề xuất, xem Câu hỏi 11 và ADR 0009.
 2. **Cơ chế Fail-Closed (Đóng mặc định):**
    - Nếu `principal` không có quyền (ví dụ `STUDENT`, `LECTURER`), hoặc `PROGRAM_MANAGER` cố tình can thiệp vào `programVersionId` của một ngành khác ngoài danh sách `scope.programIds` được cấp phép, Spring Security sẽ chặn lại ngay tại tầng Filter và trả về HTTP 403 `FORBIDDEN`.
 
@@ -153,7 +154,7 @@ Dưới góc độ quản trị đào tạo và kinh doanh số, US-09 giải qu
 1. **Thực hiện trước module Quản lý Học kỳ `terms` của F05a (US-18, Issue #28):**
    - **Mô hình hóa NoSQL & Ràng buộc toàn vẹn:** Tạo collection `terms` ([Term.java](file:///D:/Code/Project/LMS-API/src/main/java/com/hcmute/lms/lmsapi/document/Term.java)) với các trường `code` (Unique Index), `academicYear`, `startDate`, `endDate`, và `status` ([TermStatus.java](file:///D:/Code/Project/LMS-API/src/main/java/com/hcmute/lms/lmsapi/enums/TermStatus.java) gồm `OPEN`, `SCORE_LOCKED`, `CLOSED`).
    - **Xác thực logic thời gian (US-18/AC-1):** Tại [TermServiceImpl.java](file:///D:/Code/Project/LMS-API/src/main/java/com/hcmute/lms/lmsapi/service/impl/TermServiceImpl.java), kiểm tra `startDate <= endDate` (ném HTTP 422 `BUSINESS_RULE_VIOLATION` nếu vi phạm), kiểm tra chống trùng mã học kỳ (HTTP 409 `CONFLICT`).
-   - **Cơ chế Khóa sổ điểm & Mở lại (US-18/AC-2 & AC-3):** Hỗ trợ đổi trạng thái sang `SCORE_LOCKED`. Khi chuyển trạng thái từ `SCORE_LOCKED` quay lại `OPEN`, bắt buộc phải cung cấp lý do giải trình (`reason` không được rỗng/trống).
+   - **Cơ chế Khóa sổ điểm & Mở lại (US-18/AC-2 & AC-3):** Hỗ trợ đổi trạng thái sang `SCORE_LOCKED`. Khi chuyển trạng thái từ `SCORE_LOCKED` quay lại `OPEN`, bắt buộc phải cung cấp lý do giải trình (`reason` không được rỗng/trống). Lưu ý: vế "từ chối nhập/sửa điểm khi học kỳ bị khóa" của US-18/AC-2 **chờ F05b** (chưa có mã nhập điểm), nên AC-2 chưa hoàn thành.
    - **Bảo vệ toàn vẹn xóa (Restrict Delete):** Chặn xóa học kỳ khi đang được đề cương môn học áp dụng (`existsByEffectiveFromTermIdOrEffectiveToTermId`) hoặc đang có lớp học phần mở trong kỳ (`existsByTermId`) với HTTP 422.
 
 2. **Hiện thực trọn vẹn các User Story cốt lõi của F03 (US-10, US-11, US-12):**
@@ -268,3 +269,29 @@ Tuân thủ tuyệt đối **Quy tắc cứng số 2 (Không bịa minh chứng/
    - **Cách xử lý:** Trường `weight` trong `clo_pi_links` được phép mang giá trị `null` (US-12/AC-5). Hệ thống không ép buộc tính toán số học khi quy tắc chưa được chuẩn hóa.
 5. **Chưa làm: Module Lớp học phần (`course_sections`) và Nhập sinh viên/Ghi danh (US-19, US-20 của F05a)**
    - **Lý do:** Đợt này chỉ thực hiện trước phần Quản lý học kỳ `terms` (US-18) để đáp ứng ràng buộc cho `syllabi` của F03. Phần sinh viên và ghi danh còn phụ thuộc vào quyết định của Khoa về việc sử dụng mã sinh viên thật hay mã ẩn danh `studentRef` (Q09) để đảm bảo quyền riêng tư.
+
+---
+
+## Câu Hỏi 11: Phân quyền theo phạm vi (scope) cho việc ghi đề cương, CLO và liên kết CLO–PI được thiết kế thế nào? (ADR 0009 — ĐỀ XUẤT, chờ GVHD/Khoa xác nhận)
+
+**Trạng thái:** đang thực hiện; chưa có mã và chưa có kết quả test cho phần này. Câu trả lời mô tả thiết kế đã chốt để hiện thực.
+
+### Trả lời — Góc nhìn Sinh viên Công nghệ thông tin (IT):
+
+1. **Vấn đề:** endpoint ghi của `syllabi`, `clos`, `clo_pi_links` chỉ kiểm `hasAnyRole('ADMIN','PROGRAM_MANAGER')`, nên một PM sửa được đề cương/CLO của ngành khác, trái ADR 0005 §3.2.
+2. **Khó khăn kỹ thuật:** `syllabi` và `clos` chỉ có `courseId`, không có `programVersionId` nên không gọi thẳng `canAccessProgramVersion`.
+3. **Giải pháp (phương án A):** thêm vào `ScopeAuthorizationService` bốn phương thức fail-closed: `canAccessCourse`, `canAccessSyllabus` (tra `syllabi.courseId`), `canAccessClo` (tra `clos.courseId`), `canAccessCloPiLink` (tra `clo_pi_links.programVersionId` rồi gọi `canAccessProgramVersion`). `canAccessCourse`: `ADMIN` luôn qua; PM qua khi có ít nhất một bản ghi `program_courses` của học phần đó thuộc phiên bản CTĐT có `programId` ∈ `scope.programIds`. Học phần chưa thuộc CTĐT nào, hoặc tài nguyên không tồn tại, thì PM bị 403.
+4. **Phương án đã loại:** B (giữ nguyên: PM bất kỳ sửa đề cương mọi học phần, vi phạm ADR 0005 §3.2); C (thêm `programVersionId` vào `syllabi`: đổi schema CSDL v0.5, mà đổi thiết kế phải xin phép).
+5. **Bỏ kiểm tra này thì sao:** quay về hiện trạng, PM ngoài ngành sửa được CLO, rồi tự gắn liên kết CLO–PI cho ngành mình không quản lý.
+
+### Trả lời — Góc nhìn Sinh viên Kinh doanh số (IBS):
+
+- Đề cương và CLO là cam kết chuẩn đầu ra của một chương trình. Người chịu trách nhiệm chương trình nào thì chỉ nên được chỉnh phần của chương trình đó (phân định trách nhiệm theo ADR 0005).
+- Học phần dùng chung nhiều ngành: chỉ cần một ngành trong phạm vi của PM là PM được soạn. Đây là đánh đổi có chủ đích, được giảm nhẹ nhờ đề cương `CONFIRMED` bị khóa và liên kết CLO–PI phải được `QA_OFFICER` đúng phạm vi xác nhận.
+- Quy trình đi kèm: `ADMIN` tạo học phần và gán vào CTĐT trước, sau đó PM mới soạn đề cương. Học phần chưa gán chỉ `ADMIN` ghi được.
+
+### Câu hỏi hội đồng có thể hỏi thêm:
+
+- *Hai ngành dùng chung một học phần, PM ngành A sửa có ảnh hưởng ngành B không?* Có thể có, vì quy tắc là phép hợp. Nếu cần chặt hơn (đồng thuận mọi ngành) thì phải xin thay quy tắc; hiện chưa làm.
+- *Vì sao tài nguyên không tồn tại trả 403 chứ không phải 404?* Nhất quán với `canAccessProgramVersion`; kiểm quyền chạy trước khi tra tài nguyên.
+- *Đã kiểm chứng bằng test chưa?* Đã có test trên nhánh F03: `CloIntegrationTest` (US-10/AC-4, US-11/AC-5, US-12/AC-6) và `CourseScopeAuthorizationTest` (unit). Chờ review/merge; xem `doc/test-plan.md` mục 8.5.

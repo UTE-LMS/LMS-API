@@ -38,9 +38,9 @@ Biết **ai học lớp nào, học kỳ nào, đề cương nào**. Số ghi da
 
 | ID | AC | Trạng thái |
 |---|---|---|
-| US-18/AC-1 | Tạo học kỳ với `code` mới, `startDate ≤ endDate` → thành công; trùng `code` → 409; `startDate > endDate` → 400/422 | **ĐÃ HOÀN THÀNH (Issue #28 - làm trước cho F03)** |
-| US-18/AC-2 | Đổi `status` sang `SCORE_LOCKED` → ghi nhận trạng thái và log; chặn nhập/sửa điểm (test cùng F05b) | **ĐÃ HOÀN THÀNH (Issue #28 - làm trước cho F03)** |
-| US-18/AC-3 | Mở lại học kỳ `SCORE_LOCKED → OPEN` chỉ ADMIN/PROGRAM_MANAGER và có lý do giải trình | **ĐÃ HOÀN THÀNH (Issue #28 - làm trước cho F03)** |
+| US-18/AC-1 | Tạo học kỳ với `code` mới, `startDate ≤ endDate` → thành công; trùng `code` → 409; `startDate > endDate` → 400/422 | **ĐÃ HIỆN THỰC trên nhánh F03 (Issue #28 - làm trước cho F03); PR chưa mở/chưa merge** |
+| US-18/AC-2 | Đổi `status` sang `SCORE_LOCKED` → ghi nhận trạng thái và log; chặn nhập/sửa điểm (test cùng F05b) | **MỘT PHẦN (chưa hoàn thành):** đã có trạng thái `SCORE_LOCKED` và việc mở lại cần lý do (xem AC-3), có log ứng dụng, chưa ghi `audit_logs`; vế **từ chối nhập/sửa điểm CHỜ F05b** (chưa có mã nhập điểm) |
+| US-18/AC-3 | Mở lại học kỳ `SCORE_LOCKED → OPEN` chỉ ADMIN/PROGRAM_MANAGER và có lý do giải trình | **ĐÃ HIỆN THỰC trên nhánh F03 (Issue #28 - làm trước cho F03); PR chưa mở/chưa merge** |
 | US-19/AC-1 | Tạo lớp với `courseId`, `syllabusId` (cùng học phần), `termId`, ≥ 1 giảng viên → thành công | Chưa làm (Chờ giai đoạn F05a đầy đủ) |
 | US-19/AC-2 | `syllabusId` không thuộc `courseId`, hoặc `termId`/`lecturerIds` không tồn tại → 422 | Chưa làm (Chờ giai đoạn F05a đầy đủ) |
 | US-19/AC-3 | Trùng `code` lớp → 409 | Chưa làm (Chờ giai đoạn F05a đầy đủ) |
