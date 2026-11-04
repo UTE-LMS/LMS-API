@@ -6,8 +6,12 @@ import com.hcmute.lms.lmsapi.document.UserScope;
 import com.hcmute.lms.lmsapi.dto.UserPrincipal;
 import com.hcmute.lms.lmsapi.enums.AccessType;
 import com.hcmute.lms.lmsapi.enums.Role;
+import com.hcmute.lms.lmsapi.repository.CloPiLinkRepository;
+import com.hcmute.lms.lmsapi.repository.CloRepository;
 import com.hcmute.lms.lmsapi.repository.CourseSectionRepository;
+import com.hcmute.lms.lmsapi.repository.ProgramCourseRepository;
 import com.hcmute.lms.lmsapi.repository.ProgramVersionRepository;
+import com.hcmute.lms.lmsapi.repository.SyllabusRepository;
 import com.hcmute.lms.lmsapi.service.ScopeAuthorizationService;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +31,10 @@ public class ScopeAuthorizationServiceImpl implements ScopeAuthorizationService 
 
   private final CourseSectionRepository courseSectionRepository;
   private final ProgramVersionRepository programVersionRepository;
+  private final ProgramCourseRepository programCourseRepository;
+  private final SyllabusRepository syllabusRepository;
+  private final CloRepository cloRepository;
+  private final CloPiLinkRepository cloPiLinkRepository;
 
   @Override
   public boolean canAccessSection(
@@ -141,6 +149,120 @@ public class ScopeAuthorizationServiceImpl implements ScopeAuthorizationService 
               log.debug(
                   "canAccessProgramVersion: Fail-closed - programVersion [{}] not found in database",
                   programVersionId);
+              return false;
+            });
+  }
+
+  @Override
+  public boolean canAccessCourse(UserPrincipal principal, String courseId, AccessType accessType) {
+    if (principal == null || courseId == null || courseId.isBlank() || accessType == null) {
+      log.debug("canAccessCourse: Fail-closed due to null or blank parameters");
+      return false;
+    }
+    if (principal.getRoleAssignments() == null || principal.getRoleAssignments().isEmpty()) {
+      log.debug(
+          "canAccessCourse: Fail-closed - user [{}] has no role assignments",
+          principal.getUsername());
+      return false;
+    }
+
+    // ADMIN không phụ thuộc phạm vi, kể cả khi học phần chưa thuộc CTĐT nào.
+    boolean isAdmin =
+        principal.getRoleAssignments().stream()
+            .anyMatch(a -> a != null && a.getRole() == Role.ADMIN);
+    if (isAdmin) {
+      return true;
+    }
+
+    // Phép HỢP: một CTĐT chứa học phần nằm trong phạm vi là đủ. Học phần không thuộc CTĐT nào
+    // -> danh sách rỗng -> từ chối (fail-closed).
+    boolean allowed =
+        programCourseRepository.findByCourseId(courseId.trim()).stream()
+            .anyMatch(
+                pc -> canAccessCourseVersion(principal, pc.getProgramVersionId(), accessType));
+    log.debug(
+        "canAccessCourse: Access {} for user [{}] on course [{}] with accessType [{}]",
+        allowed ? "GRANTED" : "DENIED",
+        principal.getUsername(),
+        courseId,
+        accessType);
+    return allowed;
+  }
+
+  /**
+   * Quyền trên một phiên bản CTĐT cho tài nguyên F03 (ADR 0009). GHI chỉ tính phân công {@code
+   * PROGRAM_MANAGER} có scope khớp, để vai trò khác của cùng người dùng (ví dụ QA_OFFICER ở ngành
+   * khác) không cộng dồn thành quyền ghi. ĐỌC dùng quy tắc chung của {@link
+   * #canAccessProgramVersion}.
+   */
+  private boolean canAccessCourseVersion(
+      UserPrincipal principal, String programVersionId, AccessType accessType) {
+    if (accessType != AccessType.WRITE) {
+      return canAccessProgramVersion(principal, programVersionId, accessType);
+    }
+    if (principal == null || principal.getRoleAssignments() == null) {
+      return false;
+    }
+    if (programVersionId == null || programVersionId.isBlank()) {
+      return false;
+    }
+    return programVersionRepository
+        .findById(programVersionId.trim())
+        .map(
+            version ->
+                principal.getRoleAssignments().stream()
+                    .anyMatch(
+                        a ->
+                            a != null
+                                && (a.getRole() == Role.ADMIN
+                                    || (a.getRole() == Role.PROGRAM_MANAGER
+                                        && matchesProgramScope(
+                                            a.getScope(), version.getProgramId())))))
+        .orElse(false);
+  }
+
+  @Override
+  public boolean canAccessSyllabus(
+      UserPrincipal principal, String syllabusId, AccessType accessType) {
+    if (syllabusId == null || syllabusId.isBlank()) {
+      return false;
+    }
+    return syllabusRepository
+        .findById(syllabusId.trim())
+        .map(syllabus -> canAccessCourse(principal, syllabus.getCourseId(), accessType))
+        .orElseGet(
+            () -> {
+              log.debug("canAccessSyllabus: Fail-closed - syllabus [{}] not found", syllabusId);
+              return false;
+            });
+  }
+
+  @Override
+  public boolean canAccessClo(UserPrincipal principal, String cloId, AccessType accessType) {
+    if (cloId == null || cloId.isBlank()) {
+      return false;
+    }
+    return cloRepository
+        .findById(cloId.trim())
+        .map(clo -> canAccessCourse(principal, clo.getCourseId(), accessType))
+        .orElseGet(
+            () -> {
+              log.debug("canAccessClo: Fail-closed - CLO [{}] not found", cloId);
+              return false;
+            });
+  }
+
+  @Override
+  public boolean canAccessCloPiLink(UserPrincipal principal, String linkId, AccessType accessType) {
+    if (linkId == null || linkId.isBlank()) {
+      return false;
+    }
+    return cloPiLinkRepository
+        .findById(linkId.trim())
+        .map(link -> canAccessCourseVersion(principal, link.getProgramVersionId(), accessType))
+        .orElseGet(
+            () -> {
+              log.debug("canAccessCloPiLink: Fail-closed - link [{}] not found", linkId);
               return false;
             });
   }

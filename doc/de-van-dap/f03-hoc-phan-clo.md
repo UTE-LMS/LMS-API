@@ -1,17 +1,17 @@
 # Hồ Sơ Vấn Đáp Bảo Vệ Đồ Án Tốt Nghiệp — Phân Hệ F03: Học Phần, Đề Cương, CLO và Liên Kết CLO–PI (LMS-API)
 
 **Đề tài:** Hệ thống quản lý, đo lường và phân tích chuẩn đầu ra chương trình đào tạo (Learning Outcomes Management and Analytics System)  
-**Phân hệ:** F03 — Quản lý Học phần, Vị trí học phần trong CTĐT (US-09), Đề cương theo phiên bản (US-10), Chuẩn đầu ra học phần CLO (US-11), và Liên kết CLO–PI (US-12)  
-**Tài liệu liên quan:** `doc/plan/F03-hoc-phan-clo.md`, `doc/adr/0002-nen-tang-chung-step-00.md`, `doc/adr/0005-phan-quyen-chuong-trinh-dao-tao.md`, `doc/GiaiThich_CoSoDuLieu.md` (§2 nguyên tắc 2 & 12, §4.6–4.7, §4.9–4.11, §7), `LMS-UI/doc/API-CONTRACT.md`  
+**Phân hệ:** F03 — Quản lý Học phần, Vị trí học phần trong CTĐT (US-09), Đề cương theo phiên bản (US-10), Chuẩn đầu ra học phần CLO (US-11), và Liên kết CLO–PI (US-12), tích hợp Quản lý Học kỳ (F05a / US-18)  
+**Tài liệu liên quan:** `doc/plan/F03-hoc-phan-clo.md`, `doc/plan/F05a-hoc-ky-lop-sinh-vien.md`, `doc/adr/0002-nen-tang-chung-step-00.md`, `doc/adr/0005-phan-quyen-chuong-trinh-dao-tao.md`, `doc/adr/0009-phan-quyen-pham-vi-de-cuong-clo.md` (ĐỀ XUẤT), `doc/GiaiThich_CoSoDuLieu.md` (§2 nguyên tắc 2 & 12, §4.6–4.7, §4.9–4.11, §4.16, §7), `LMS-UI/doc/API-CONTRACT.md`  
 **Nhóm sinh viên thực hiện:** Sinh viên Công nghệ thông tin (IT) & Sinh viên Kinh doanh số (IBS)
 
 ---
 
 ## Bối Cảnh và Mục Đích Tài Liệu
 
-Tài liệu này chuẩn bị bộ câu hỏi và câu trả lời học thuật chuyên sâu phục vụ buổi bảo vệ Đồ án tốt nghiệp trước Hội đồng đánh giá khoa học cho phân hệ **F03**. Nội dung được cấu trúc song song theo hai góc nhìn bổ trợ mật thiết cho nhau:
-- **Góc nhìn Sinh viên chuyên ngành Công nghệ thông tin (IT):** Tập trung vào thiết kế cơ sở dữ liệu NoSQL tối ưu hóa cho truy vấn phân tán, phân rã quan hệ Many-to-Many giữa Học phần và Phiên bản CTĐT thông qua collection trung gian `program_courses`, toàn vẹn tham chiếu cấp dịch vụ (Application-level Referential Integrity), kiểm soát truy cập phân tầng theo phạm vi quản trị (`ScopeAuthorizationService` - fail-closed), và cơ chế bảo vệ xóa an toàn (Restrict Delete).
-- **Góc nhìn Sinh viên chuyên ngành Kinh doanh số (IBS):** Tập trung vào triết lý Giáo dục dựa trên chuẩn đầu ra (Outcome-Based Education - OBE), tính tái sử dụng và quản trị danh mục học phần cấp trường (Course Master Catalog Management), thiết kế cấu trúc chương trình đào tạo phân tầng (Khối kiến thức cơ sở khối ngành, cơ sở ngành, chuyên ngành, đồ án/khóa luận tốt nghiệp), ràng buộc logic lộ trình học tập (Học phần tiên quyết - Prerequisite Chains), và tính bất biến lịch sử của đề cương môn học theo từng niên khóa.
+Tài liệu này chuẩn bị bộ câu hỏi và câu trả lời học thuật chuyên sâu phục vụ buổi bảo vệ Đồ án tốt nghiệp trước Hội đồng đánh giá khoa học cho phân hệ **F03** và bước làm trước của **F05a (US-18: Học kỳ)**. Nội dung được cấu trúc song song theo hai góc nhìn bổ trợ mật thiết cho nhau:
+- **Góc nhìn Sinh viên chuyên ngành Công nghệ thông tin (IT):** Tập trung vào thiết kế cơ sở dữ liệu NoSQL tối ưu hóa cho truy vấn phân tán, phân rã quan hệ Many-to-Many giữa Học phần và Phiên bản CTĐT thông qua collection trung gian `program_courses`, toàn vẹn tham chiếu cấp dịch vụ (Application-level Referential Integrity), kiểm soát truy cập phân tầng theo phạm vi quản trị (`ScopeAuthorizationService` - fail-closed), cơ chế bảo vệ xóa an toàn (Restrict Delete), xác thực tính toàn vẹn thời gian niên khóa giữa `terms` và `syllabi`, và đóng băng đề cương `CONFIRMED`.
+- **Góc nhìn Sinh viên chuyên ngành Kinh doanh số (IBS):** Tập trung vào triết lý Giáo dục dựa trên chuẩn đầu ra (Outcome-Based Education - OBE), tính tái sử dụng và quản trị danh mục học phần cấp trường (Course Master Catalog Management), thiết kế cấu trúc chương trình đào tạo phân tầng, ràng buộc logic lộ trình học tập (Học phần tiên quyết và học trước), tính bất biến lịch sử của đề cương môn học theo từng niên khóa, khung thẩm định ma trận CLO–PI chuẩn mực, và nguyên tắc không giả mạo số liệu/chuẩn đầu ra khi chưa được Khoa phê duyệt.
 
 ---
 
@@ -30,7 +30,7 @@ Trong phân hệ F03, nhóm IT đã hiện thực hóa trọn vẹn User Story *
 2. **Hiện thực Tầng Dịch vụ (Service Layer) & Toàn vẹn tham chiếu:**
    - [CourseServiceImpl.java](file:///D:/Code/Project/LMS-API/src/main/java/com/hcmute/lms/lmsapi/service/impl/CourseServiceImpl.java): Xử lý CRUD cho danh mục học phần. Kiểm tra trùng mã học phần (HTTP 409 `COURSE_CODE_ALREADY_EXISTS`). Cơ chế bảo vệ xóa an toàn: chặn xóa học phần khi đã được gán vào `program_courses` (HTTP 422 `COURSE_HAS_PROGRAM_COURSES`) hoặc đã có trong ma trận đóng góp `course_pi_contributions` (HTTP 422 `COURSE_HAS_PI_CONTRIBUTIONS`).
    - [ProgramCourseServiceImpl.java](file:///D:/Code/Project/LMS-API/src/main/java/com/hcmute/lms/lmsapi/service/impl/ProgramCourseServiceImpl.java): Quản lý vị trí học phần trong CTĐT. Xác thực sự tồn tại của `programVersionId` và `courseId` (HTTP 404/422). Kiểm tra trùng lặp cặp khóa (HTTP 409 `PROGRAM_COURSE_ALREADY_EXISTS`).
-   - **Xác thực học phần tiên quyết (`prerequisiteCourseIds`) và học phần học trước (`previousCourseIds`):** Duyệt danh sách mã tiên quyết và học trước, kiểm tra từng học phần phải tồn tại trong CSDL và không được là chính học phần đang gán (tự tham chiếu) (HTTP 422).
+   - **Xác thực học phần tiên quyết (`prerequisiteCourseIds`) và học phần học trước (`previousCourseIds`):** Duyệt danh sách mã tiên quyết và học trước, kiểm tra từng học phần phải tồn tại trong CSDL và không được là chính học phần đang gán (tự tham chiếu) (HTTP 422). Đồng thời kiểm tra xung đột loại trừ giữa tiên quyết và học trước (`PREREQUISITE_AND_PREVIOUS_CONFLICT`).
 
 3. **Hiện thực API RESTful và Phân quyền Scope Authorization (ADR 0005):**
    - [CourseController.java](file:///D:/Code/Project/LMS-API/src/main/java/com/hcmute/lms/lmsapi/controller/CourseController.java) (`/api/v1/courses`): `ADMIN` và `PROGRAM_MANAGER` được phép thêm/sửa danh mục; chỉ `ADMIN` được xóa danh mục; tất cả người dùng xác thực được phép tra cứu (`GET`).
@@ -38,7 +38,7 @@ Trong phân hệ F03, nhóm IT đã hiện thực hóa trọn vẹn User Story *
 
 4. **Kiểm thử tự động toàn diện:**
    - Viết bộ kiểm thử Unit Tests và Bean Validation riêng biệt: `CourseServiceImplTest`, `ProgramCourseServiceImplTest`, `CourseValidationTest`.
-   - Viết bài kiểm thử tích hợp thực tế [CourseIntegrationTest.java](file:///D:/Code/Project/LMS-API/src/test/java/com/hcmute/lms/lmsapi/controller/CourseIntegrationTest.java) chạy trên MongoDB Replica Set thật (`rs0`), bao phủ 100% các Acceptance Criteria: US-09/AC-1 (tạo học phần, trùng mã 409), US-09/AC-2 (gán vào CTĐT, trùng 409), US-09/AC-3 (học phần tiên quyết không hợp lệ 422), kiểm tra RBAC, phạm vi scope rejection (HTTP 403), và vòng đời CRUD.
+   - Viết bài kiểm thử tích hợp thực tế [CourseIntegrationTest.java](file:///D:/Code/Project/LMS-API/src/test/java/com/hcmute/lms/lmsapi/controller/CourseIntegrationTest.java) chạy trên MongoDB Replica Set thật (`rs0`), bao phủ 100% các Acceptance Criteria: US-09/AC-1 (tạo học phần, trùng mã 409), US-09/AC-2 (gán vào CTĐT, trùng 409), US-09/AC-3 (học phần tiên quyết/học trước không hợp lệ 422), kiểm tra RBAC, phạm vi scope rejection (HTTP 403), và vòng đời CRUD.
 
 ---
 
@@ -137,23 +137,161 @@ Dưới góc độ quản trị đào tạo và kinh doanh số, US-09 giải qu
 ### Trả lời — Góc nhìn Sinh viên Công nghệ thông tin (IT):
 
 1. **Phân cấp Thẩm quyền Rõ ràng:**
-   - **Danh mục Master `courses`:** Là tài nguyên dùng chung toàn trường, do đó các thao tác `POST` (Tạo mới), `PUT` (Cập nhật) chỉ cho phép vai trò quản trị `ADMIN` và `PROGRAM_MANAGER`. Thao tác `DELETE` chỉ dành riêng cho `ADMIN`. Thao tác tra cứu `GET` mở cho tất cả người dùng hợp lệ trong hệ thống (`@PreAuthorize("isAuthenticated()")`).
+   - **Danh mục Master `courses` và `terms`:** Là tài nguyên dùng chung toàn trường, do đó các thao tác `POST` (Tạo mới), `PUT` (Cập nhật) chỉ cho phép vai trò quản trị `ADMIN` và `PROGRAM_MANAGER`. Thao tác `DELETE` chỉ dành riêng cho `ADMIN`. Thao tác tra cứu `GET` mở cho tất cả người dùng hợp lệ trong hệ thống (`@PreAuthorize("isAuthenticated()")`).
    - **Gán học phần vào CTĐT `program_courses`:** Là tài nguyên gắn liền với một phiên bản CTĐT cụ thể. Do đó, các endpoint tại `/api/v1/program-versions/{programVersionId}/courses` được bảo vệ bằng SpEL:  
      `@PreAuthorize("@scopeAuthorizationService.canAccessProgramVersion(principal, #programVersionId)")`
+   - **Thẩm định liên kết CLO-PI:** Được phân quyền chặt chẽ cho vai trò `QA_OFFICER` theo phạm vi ngành đào tạo (`programIds`).
+   - **Lưu ý hiện trạng:** các endpoint ghi `syllabi`, `clos`, `clo_pi_links` hiện mới kiểm vai trò (`ADMIN`, `PROGRAM_MANAGER`), chưa kiểm `scope.programIds` của PM. Việc bổ sung đang ở trạng thái đề xuất, xem Câu hỏi 11 và ADR 0009.
 2. **Cơ chế Fail-Closed (Đóng mặc định):**
    - Nếu `principal` không có quyền (ví dụ `STUDENT`, `LECTURER`), hoặc `PROGRAM_MANAGER` cố tình can thiệp vào `programVersionId` của một ngành khác ngoài danh sách `scope.programIds` được cấp phép, Spring Security sẽ chặn lại ngay tại tầng Filter và trả về HTTP 403 `FORBIDDEN`.
 
 ---
 
-## Câu Hỏi 6: Vì sao các User Story còn lại của F03 (US-10, US-11, US-12) chưa thực hiện trong đợt này và cần những điều kiện gì để triển khai tiếp?
+## Câu Hỏi 6: Phân hệ F03 (Học phần, đề cương, CLO, liên kết CLO–PI) và phân hệ F05a (Học kỳ) đã được hiện thực như thế nào? Vì sao quản lý học kỳ (`terms`) phải được làm trước đề cương môn học (`syllabi`)?
+
+### Trả lời — Góc nhìn Sinh viên Công nghệ thông tin (IT):
+
+1. **Thực hiện trước module Quản lý Học kỳ `terms` của F05a (US-18, Issue #28):**
+   - **Mô hình hóa NoSQL & Ràng buộc toàn vẹn:** Tạo collection `terms` ([Term.java](file:///D:/Code/Project/LMS-API/src/main/java/com/hcmute/lms/lmsapi/document/Term.java)) với các trường `code` (Unique Index), `academicYear`, `startDate`, `endDate`, và `status` ([TermStatus.java](file:///D:/Code/Project/LMS-API/src/main/java/com/hcmute/lms/lmsapi/enums/TermStatus.java) gồm `OPEN`, `SCORE_LOCKED`, `CLOSED`).
+   - **Xác thực logic thời gian (US-18/AC-1):** Tại [TermServiceImpl.java](file:///D:/Code/Project/LMS-API/src/main/java/com/hcmute/lms/lmsapi/service/impl/TermServiceImpl.java), kiểm tra `startDate <= endDate` (ném HTTP 422 `BUSINESS_RULE_VIOLATION` nếu vi phạm), kiểm tra chống trùng mã học kỳ (HTTP 409 `CONFLICT`).
+   - **Cơ chế Khóa sổ điểm & Mở lại (US-18/AC-2 & AC-3):** Hỗ trợ đổi trạng thái sang `SCORE_LOCKED`. Khi chuyển trạng thái từ `SCORE_LOCKED` quay lại `OPEN`, bắt buộc phải cung cấp lý do giải trình (`reason` không được rỗng/trống). Lưu ý: vế "từ chối nhập/sửa điểm khi học kỳ bị khóa" của US-18/AC-2 **chờ F05b** (chưa có mã nhập điểm), nên AC-2 chưa hoàn thành.
+   - **Bảo vệ toàn vẹn xóa (Restrict Delete):** Chặn xóa học kỳ khi đang được đề cương môn học áp dụng (`existsByEffectiveFromTermIdOrEffectiveToTermId`) hoặc đang có lớp học phần mở trong kỳ (`existsByTermId`) với HTTP 422.
+
+2. **Hiện thực trọn vẹn các User Story cốt lõi của F03 (US-10, US-11, US-12):**
+   - **US-10 (Đề cương môn học - `syllabi` / Issue #21):**
+     - Nhờ có collection `terms` được triển khai trước, [SyllabusServiceImpl.java](file:///D:/Code/Project/LMS-API/src/main/java/com/hcmute/lms/lmsapi/service/impl/SyllabusServiceImpl.java) đã tích hợp `TermRepository` để giải quyết trọn vẹn **US-10/AC-2**: kiểm tra sự tồn tại của `effectiveFromTermId` và `effectiveToTermId` (HTTP 404 nếu không tìm thấy), đồng thời đối chiếu thời gian hiệu lực bảo đảm `effectiveToTermId` không được diễn ra trước `effectiveFromTermId` (HTTP 422 nếu niên khóa kết thúc đi trước niên khóa bắt đầu).
+     - Đảm bảo tính bất biến: Đề cương ở trạng thái `CONFIRMED` sẽ khóa không cho sửa đổi CLO của nó (US-10/AC-3).
+   - **US-11 (Chuẩn đầu ra học phần - `clos` / Issue #22):**
+     - Quản lý danh mục CLO gắn theo từng đề cương cụ thể ([Clo.java](file:///D:/Code/Project/LMS-API/src/main/java/com/hcmute/lms/lmsapi/document/Clo.java)), mã định dạng `^CLO[0-9]+$`, thang đo Bloom cấp độ 1–6 (US-11/AC-1 & AC-3).
+     - Ràng buộc Unique `(syllabusId, code)` ở cấp MongoDB engine: Chặn trùng mã CLO trong cùng một đề cương (HTTP 409), nhưng cho phép cùng mã ở hai đề cương khác nhau (US-11/AC-2).
+     - Trường `measurement` để `null` cho tới khi Khoa phê duyệt quy tắc đo lường (US-11/AC-4).
+   - **US-12 (Liên kết CLO–PI và Ma trận CLO × PI / Issue #23):**
+     - Tạo collection `clo_pi_links` ([CloPiLink.java](file:///D:/Code/Project/LMS-API/src/main/java/com/hcmute/lms/lmsapi/document/CloPiLink.java)), kiểm tra tính tương thích giữa CLO và PI: `piId` bắt buộc phải thuộc về đúng `programVersionId` của liên kết (HTTP 422), chặn trùng lặp cặp `(cloId, piId)` với HTTP 409 (US-12/AC-1 & AC-2).
+     - Cung cấp API ma trận 2 chiều CLO × PI (`GET /api/v1/syllabi/{syllabusId}/clo-pi-matrix?programVersionId=...`) hiển thị trạng thái liên kết và thẩm định từng ô ma trận (US-12/AC-4).
+     - Thẩm định pháp lý: Cho phép vai trò `QA_OFFICER` cập nhật trạng thái thẩm định sang `VERIFIED` kèm ghi nhận người duyệt và thời điểm (US-12/AC-3).
+
+---
+
+### Trả lời — Góc nhìn Sinh viên Kinh doanh số (IBS):
+
+1. **Vì sao phải làm trước Quản lý Học kỳ `terms` của F05a?**
+   - Trong quản trị đại học theo chuẩn kiểm định OBE, một đề cương môn học (Syllabus) không tồn tại độc lập mà luôn gắn với một **khung thời gian áp dụng pháp lý** (Thời điểm bắt đầu áp dụng từ học kỳ nào, kết thúc ở học kỳ nào).
+   - Nếu không có thực thể `terms` quản lý niên khóa và mốc thời gian chuẩn hóa trước, việc khai báo `effectiveFromTermId` và `effectiveToTermId` trong đề cương sẽ chỉ là những chuỗi mã vô nghĩa, không thể kiểm tra được nghịch lý logic (như đề cương có kỳ hết hạn lại đi trước kỳ ban hành).
+   - Do đó, việc triển khai `terms` trước là điều kiện tiên quyết (Prerequisite Invariant) để đảm bảo tính hợp lệ của dữ liệu sư phạm trước khi bất kỳ đề cương nào được lưu vào hệ sinh thái.
+
+2. **Ý nghĩa kiểm soát chất lượng đào tạo của chuỗi F03:**
+   - Chuỗi nghiệp vụ `Học phần -> Đề cương -> CLO -> Liên kết CLO-PI` tạo thành một hành lang kiểm soát chất lượng chặt chẽ:
+     - Giảng viên không thể tự ý bịa đặt chuẩn đầu ra hay đưa các yêu cầu vượt quá khung Bloom quy định.
+     - Sinh viên được bảo vệ quyền lợi thông qua nguyên tắc đóng băng đề cương `CONFIRMED`.
+     - Nhà trường kiểm soát được 100% việc câu hỏi thi đo lường đúng chỉ số PI đã cam kết trong chương trình đào tạo.
+
+---
+
+## Câu Hỏi 7: Vì sao Chuẩn đầu ra học phần (CLO) phải được nhận diện bằng `_id` thay vì dùng mã nghiệp vụ `code`?
+
+### Trả lời — Góc nhìn Sinh viên Công nghệ thông tin (IT):
+
+1. **Phạm vi Không gian Tên Cục bộ (Local Namespace Scope):**
+   - Mã CLO (như `CLO1`, `CLO2`) không phải là mã định danh toàn cục (Globally Unique Identifier).
+   - Trong cùng một trường đại học, hàng trăm học phần khác nhau đều có `CLO1` (ví dụ: `CLO1` của môn *Lập trình hướng đối tượng* và `CLO1` của môn *Cơ sở dữ liệu*).
+   - Thậm chí trong cùng một học phần, hai phiên bản đề cương khác nhau (ví dụ: `version 2023.1` và `version 2024.1`) đều có `CLO1` nhưng định nghĩa hai chuẩn năng lực hoàn toàn khác nhau.
+2. **Toàn vẹn Khóa Ngoại NoSQL:**
+   - Nếu dùng `code` làm khóa tham chiếu, các collection liên quan như `clo_pi_links`, `questions`, `outcomeMappings`, `student_results` sẽ bị xung đột hoặc phải lưu khóa phức hợp cồng kềnh `(courseId, syllabusVersion, cloCode)`.
+   - Sử dụng MongoDB `_id` (ObjectId 12-byte bất biến) làm Primary Key cho phép trỏ chính xác tuyệt đối tới định nghĩa CLO của đúng phiên bản đề cương mà không bao giờ bị nhầm lẫn. Cặp chỉ mục duy nhất `@CompoundIndex(def = "{'syllabusId': 1, 'code': 1}", unique = true)` bảo đảm trong phạm vi một đề cương không bao giờ có 2 CLO trùng mã (US-11/AC-2).
+
+---
+
+### Trả lời — Góc nhìn Sinh viên Kinh doanh số (IBS):
+
+- Trong thiết kế sư phạm OBE, CLO là đơn vị đo lường cơ bản nhất của một học phần.
+- Việc nhận diện bằng `_id` giúp hệ thống truy vết chính xác sinh viên học ở niên khóa nào, theo đề cương phiên bản nào, và đạt chuẩn đầu ra theo đúng cam kết chuẩn đầu ra tại thời điểm họ học, bảo đảm tính minh chứng phục vụ kiểm định chất lượng (AUN-QA, ABET).
+
+---
+
+## Câu Hỏi 8: Vì sao Đề cương môn học (`syllabi`) phải được phiên bản hóa và áp dụng cơ chế đóng băng (Freeze / Immutability) khi ở trạng thái `CONFIRMED`?
+
+### Trả lời — Góc nhìn Sinh viên Công nghệ thông tin (IT):
+
+1. **Bảo vệ Tính Bất Biến của Dữ liệu Lịch sử (Historical Data Immutability):**
+   - Khi một đề cương đã chuyển sang `CONFIRMED`, nó trở thành căn cứ pháp lý để tổ chức giảng dạy, ra đề thi và đo lường điểm số sinh viên.
+   - Nếu cho phép sửa hoặc xóa CLO của một đề cương đã `CONFIRMED`, các kỳ thi đã diễn ra hoặc bảng điểm của các học kỳ trước tham chiếu tới CLO đó sẽ bị sai lệch, mồ côi hoặc thay đổi kết quả đo lường trong quá khứ.
+2. **Cơ chế Ngăn Chặn ở Tầng Dịch vụ (US-10/AC-3):**
+   - Tại `CloServiceImpl`, mọi hành vi `createClo`, `updateClo`, `deleteClo` đều kiểm tra `syllabus.getStatus() == SyllabusStatus.CONFIRMED`.
+   - Nếu phát hiện đề cương đã `CONFIRMED`, hệ thống lập tức chặn lại và ném `BusinessRuleViolationException` (HTTP 422), buộc người quản lý phải tạo một phiên bản đề cương mới (`Syllabus` mới với version kế tiếp).
+
+---
+
+### Trả lời — Góc nhìn Sinh viên Kinh doanh số (IBS):
+
+- Đề cương môn học là "hợp đồng học tập" giữa Nhà trường, Giảng viên và Sinh viên.
+- Việc đóng băng đề cương đảm bảo tính khách quan trong đánh giá chuẩn đầu ra. Giảng viên không thể tùy tiện thay đổi chuẩn đầu ra giữa chừng để "hợp thức hóa" kết quả thi của sinh viên. Mọi điều chỉnh về mục tiêu đào tạo bắt buộc phải thông qua quy trình tái thẩm định và ban hành phiên bản đề cương mới.
+
+---
+
+## Câu Hỏi 9: Vì sao cần Collection trung gian `clo_pi_links` riêng biệt mà không để giảng viên tự gán PI trực tiếp cho từng câu hỏi kiểm tra?
+
+### Trả lời — Góc nhìn Sinh viên Công nghệ thông tin (IT):
+
+1. **Mô hình Khung Thẩm Định Trước (Pre-approved Governance Matrix):**
+   - Nếu không có bảng liên kết `clo_pi_links`, khi nhập ngân hàng câu hỏi đề thi, giảng viên có thể chọn bất kỳ PI nào trong toàn bộ chương trình đào tạo để gán cho một câu hỏi.
+   - Khi đó, hệ thống không thể kiểm soát tính hợp lệ sư phạm ở tầng dữ liệu.
+2. **Ràng buộc Kiểm tra Hợp Lệ Đa Chiều (Cross-dimensional Validation):**
+   - `clo_pi_links` lưu trữ bộ 4 trường: `(programVersionId, syllabusId, cloId, piId)`.
+   - Thuật toán tại `CloPiLinkServiceImpl` kiểm tra: `cloId` phải thuộc về đúng `syllabusId`, và `piId` phải thuộc về đúng `programVersionId` (US-12/AC-2).
+   - Khi giảng viên ra câu hỏi ở phân hệ F04/F05b, API chỉ cho phép chọn cặp (CLO, PI) đã tồn tại trong danh sách `clo_pi_links` đã được phê duyệt (`verification.status = VERIFIED`). Bỏ qua kiểm tra này sẽ dẫn tới việc một câu hỏi đo lường một chỉ số PI không hề liên quan gì đến nội dung học phần.
+
+---
+
+### Trả lời — Góc nhìn Sinh viên Kinh doanh số (IBS):
+
+- **Nguyên tắc Đồng bộ Sư phạm (Constructive Alignment) của GS. John Biggs:** Mục tiêu bài thi (Assessment Tasks) phải đo Chuẩn đầu ra học phần (CLO), và CLO phải đóng góp trực tiếp vào Chỉ số hiệu năng (PI) của CTĐT đã được Hội đồng Khoa học phê duyệt.
+- `clo_pi_links` chính là bản số hóa "Ma trận ánh xạ chuẩn đầu ra môn học vào chuẩn đầu ra chương trình". Giảng viên giảng dạy môn học không có thẩm quyền tự ý thay đổi mối liên kết này, mà phải tuân thủ tuyệt đối khung ma trận do Bộ môn và Khoa ban hành.
+
+---
+
+## Câu Hỏi 10: Báo cáo chi tiết các nội dung CHƯA ĐƯỢC XÁC NHẬN (chưa làm) trong đợt này và lý do vì sao?
 
 ### Trả lời — Góc nhìn Sinh viên Công nghệ thông tin & Kinh doanh số:
 
-1. **Tính trung thực học thuật và Nguyên tắc không giả lập dữ liệu (Rule 2):**
-   - **US-10 (Đề cương môn học - `syllabi`):** AC-2 yêu cầu kiểm tra ràng buộc `effectiveToTermId` không được trước `effectiveFromTermId`. Dữ liệu này phụ thuộc vào collection `terms` thuộc phân hệ **F05a** (US-18, Issue #28) hiện chưa được hiện thực. Đồng thời, AC-3 yêu cầu đóng băng (freeze) sửa CLO khi đề cương ở trạng thái `CONFIRMED`, đòi hỏi module CLO (US-11) phải có sẵn. Ngoài ra, nội dung đề cương chính thức vẫn đang chờ cung cấp từ Khoa (Q02).
-   - **US-11 (Chuẩn đầu ra học phần - `clos`):** Phụ thuộc vào `syllabusId` từ US-10. Đồng thời, trường `clos.measurement` (tỷ trọng, ngưỡng đạt) theo quy tắc nghiệp vụ §4 và câu hỏi nghiệp vụ Q12 phải để `null` cho tới khi Khoa xác nhận, không được tự ý bịa đặt số liệu giả (ví dụ: 60%, 20/40/40).
-   - **US-12 (Liên kết CLO–PI và Ma trận CLO × PI):** Đây là liên kết mang tính pháp lý sư phạm cốt lõi. Theo quy tắc nghiệp vụ §4.5 và câu hỏi Q14, hệ thống chỉ chấp nhận ma trận CLO–PI chính thức do Khoa/Bộ môn ban hành và phê duyệt; nghiêm cấm nhóm phát triển tự suy diễn ánh xạ từ câu chữ của CLO và PI. Hơn nữa, công thức trọng số `weight` của liên kết vẫn đang chờ câu trả lời Q22.
+Tuân thủ tuyệt đối **Quy tắc cứng số 2 (Không bịa minh chứng/dữ liệu giả)** và **Quy tắc số 8 (Bất biến nghiệp vụ & Xử lý câu hỏi chưa xác nhận)** trong `CLAUDE.md`, nhóm sinh viên chủ động dừng và báo cáo rõ các hạng mục chưa làm do thiếu xác nhận chính thức từ Hội đồng/Khoa:
 
-2. **Kết luận đề xuất:**
-   - Nhóm IT & IBS đã hoàn thành 100% US-09 (Issue #20) với đầy đủ mã nguồn, unit test, integration test, và tài liệu vấn đáp.
-   - Các User Story #21, #22, #23 được tổng kết chi tiết kèm theo các câu hỏi nghiệp vụ đang chờ để Thầy/Cô và Hội đồng định hướng phương án (triển khai F05a trước, hoặc cung cấp mẫu ma trận CLO–PI nghiệm thu).
+1. **Chưa làm: Seed nội dung văn bản gốc của CLO và Đề cương chính thức (Chờ Q02)**
+   - **Lý do:** Khoa chưa cung cấp tệp đề cương môn học chính thức có đóng dấu duyệt.
+   - **Cách xử lý:** Hệ thống mở trường `contentOriginal` để người dùng nhập thật qua API hoặc giao diện, tuyệt đối không tự ý viết các câu chữ CLO giả định từ trí nhớ vào dữ liệu seed chính thức. Các bài kiểm thử tự động chỉ dùng dữ liệu giả lập có nhãn rõ ràng `[DỮ LIỆU THỬ NGHIỆM]`.
+2. **Chưa làm: Tỷ trọng mặc định (`defaultWeight`) và Ngưỡng đạt mặc định (`defaultPassThreshold`) của CLO (Chờ Q12)**
+   - **Lý do:** Khoa chưa ban hành văn bản quy định tỷ trọng và điểm sàn đạt CLO (ví dụ có bắt buộc đạt mọi CLO hay không, ngưỡng 50% hay 60%).
+   - **Cách xử lý:** Trường `clos.measurement` được để `null` theo mặc định (US-11/AC-4). Khi Khoa ban hành quy chế chính thức, người quản trị có thể cập nhật qua API với giá trị hợp lệ trong đoạn $[0, 1]$.
+3. **Chưa làm: Tự động gán sẵn bảng ánh xạ CLO–PI vào cơ sở dữ liệu mẫu (Chờ Q14)**
+   - **Lý do:** Khoa chưa phê duyệt bảng ma trận ánh xạ CLO–PI của các môn thử nghiệm.
+   - **Cách xử lý:** Nhóm xây dựng đầy đủ API thiết lập `clo_pi_links`, ma trận CLO × PI và chức năng phê duyệt của `QA_OFFICER`, nhưng không đưa vào seed các liên kết giả mạo khi chưa có quyết định của Khoa.
+4. **Chưa làm: Thuật toán quy đổi trọng số cứng `weight` trong liên kết CLO-PI (Chờ Q22)**
+   - **Lý do:** Công thức tính toán tổng hợp gián tiếp theo phương pháp `FROM_CLOS` vẫn đang trong giai đoạn dự thảo.
+   - **Cách xử lý:** Trường `weight` trong `clo_pi_links` được phép mang giá trị `null` (US-12/AC-5). Hệ thống không ép buộc tính toán số học khi quy tắc chưa được chuẩn hóa.
+5. **Chưa làm: Module Lớp học phần (`course_sections`) và Nhập sinh viên/Ghi danh (US-19, US-20 của F05a)**
+   - **Lý do:** Đợt này chỉ thực hiện trước phần Quản lý học kỳ `terms` (US-18) để đáp ứng ràng buộc cho `syllabi` của F03. Phần sinh viên và ghi danh còn phụ thuộc vào quyết định của Khoa về việc sử dụng mã sinh viên thật hay mã ẩn danh `studentRef` (Q09) để đảm bảo quyền riêng tư.
+
+---
+
+## Câu Hỏi 11: Phân quyền theo phạm vi (scope) cho việc ghi đề cương, CLO và liên kết CLO–PI được thiết kế thế nào? (ADR 0009 — ĐỀ XUẤT, chờ GVHD/Khoa xác nhận)
+
+**Trạng thái:** đang thực hiện; chưa có mã và chưa có kết quả test cho phần này. Câu trả lời mô tả thiết kế đã chốt để hiện thực.
+
+### Trả lời — Góc nhìn Sinh viên Công nghệ thông tin (IT):
+
+1. **Vấn đề:** endpoint ghi của `syllabi`, `clos`, `clo_pi_links` chỉ kiểm `hasAnyRole('ADMIN','PROGRAM_MANAGER')`, nên một PM sửa được đề cương/CLO của ngành khác, trái ADR 0005 §3.2.
+2. **Khó khăn kỹ thuật:** `syllabi` và `clos` chỉ có `courseId`, không có `programVersionId` nên không gọi thẳng `canAccessProgramVersion`.
+3. **Giải pháp (phương án A):** thêm vào `ScopeAuthorizationService` bốn phương thức fail-closed: `canAccessCourse`, `canAccessSyllabus` (tra `syllabi.courseId`), `canAccessClo` (tra `clos.courseId`), `canAccessCloPiLink` (tra `clo_pi_links.programVersionId` rồi gọi `canAccessProgramVersion`). `canAccessCourse`: `ADMIN` luôn qua; PM qua khi có ít nhất một bản ghi `program_courses` của học phần đó thuộc phiên bản CTĐT có `programId` ∈ `scope.programIds`. Học phần chưa thuộc CTĐT nào, hoặc tài nguyên không tồn tại, thì PM bị 403.
+4. **Phương án đã loại:** B (giữ nguyên: PM bất kỳ sửa đề cương mọi học phần, vi phạm ADR 0005 §3.2); C (thêm `programVersionId` vào `syllabi`: đổi schema CSDL v0.5, mà đổi thiết kế phải xin phép).
+5. **Bỏ kiểm tra này thì sao:** quay về hiện trạng, PM ngoài ngành sửa được CLO, rồi tự gắn liên kết CLO–PI cho ngành mình không quản lý.
+
+### Trả lời — Góc nhìn Sinh viên Kinh doanh số (IBS):
+
+- Đề cương và CLO là cam kết chuẩn đầu ra của một chương trình. Người chịu trách nhiệm chương trình nào thì chỉ nên được chỉnh phần của chương trình đó (phân định trách nhiệm theo ADR 0005).
+- Học phần dùng chung nhiều ngành: chỉ cần một ngành trong phạm vi của PM là PM được soạn. Đây là đánh đổi có chủ đích, được giảm nhẹ nhờ đề cương `CONFIRMED` bị khóa và liên kết CLO–PI phải được `QA_OFFICER` đúng phạm vi xác nhận.
+- Quy trình đi kèm: `ADMIN` tạo học phần và gán vào CTĐT trước, sau đó PM mới soạn đề cương. Học phần chưa gán chỉ `ADMIN` ghi được.
+
+### Câu hỏi hội đồng có thể hỏi thêm:
+
+- *Hai ngành dùng chung một học phần, PM ngành A sửa có ảnh hưởng ngành B không?* Có thể có, vì quy tắc là phép hợp. Nếu cần chặt hơn (đồng thuận mọi ngành) thì phải xin thay quy tắc; hiện chưa làm.
+- *Vì sao tài nguyên không tồn tại trả 403 chứ không phải 404?* Nhất quán với `canAccessProgramVersion`; kiểm quyền chạy trước khi tra tài nguyên.
+- *Đã kiểm chứng bằng test chưa?* Đã có test trên nhánh F03: `CloIntegrationTest` (US-10/AC-4, US-11/AC-5, US-12/AC-6) và `CourseScopeAuthorizationTest` (unit). Chờ review/merge; xem `doc/test-plan.md` mục 8.5.

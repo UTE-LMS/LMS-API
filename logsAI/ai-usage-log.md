@@ -31,6 +31,7 @@ Quy tắc ghi: `.claude/rules/01-ai-usage-and-ownership.md`.
 | 16 | 2026-11-02 | TinMH (chờ xác nhận IBS/IT) | LMS-API, LMS-UI | Claude Code, claude-sonnet-5-5 (điều phối + 6 subagent song song) | Hoàn thiện nhóm F00 (nền tảng, CI/CD, chất lượng, tài liệu, khung test): tạo 80 issue GitHub (48 API, 32 UI) từ `doc/plan/`; API — PR #59 (tài liệu: test plan, sơ đồ, NFR đề xuất, hướng dẫn bảo vệ `main`), #60 (CI ≥ 6 chặng, Dockerfile, khung staging), #61 (khung test tích hợp, 317 test mới, seed demo, sửa lỗi enum ordinal), #62 (Spotless/SpotBugs/CPD/Sonar, sửa cổng JaCoCo, gỡ websocket/mail, nâng Spring Boot 4.1.2); UI — PR #41 (thành phần dùng chung, xử lý lỗi), #42 (ADR SSR, coverage, CI, Docker, Playwright + axe) | "làm các issue F00, hoàn thiện toàn bộ"; quyết định: staging chỉ chuẩn bị, bảo vệ `main` chỉ viết hướng dẫn, sửa hết vi phạm, tạo PR | Xem danh sách file trong từng PR (#59–#62 API; #41–#42 UI); `doc/adr/0005,0006,0008`; `doc/quality/README.md`; `doc/deploy/staging.md`; `doc/test-plan.md`; `doc/sdd/`; `doc/srs/` | _Chờ sinh viên rà soát_ | Do từng agent chạy thật: API `./mvnw verify` 524 test (PR #62, trên 4.1.2) và 813 test (PR #61, trước khi tích hợp #62), 0 fail/0 skip; SpotBugs 22→0, CPD 18→0; lõi JaCoCo 84,85%; UI lint sạch, 205 test pass (PR #42) và 381 test pass (PR #41), E2E 9/9, `docker build` + smoke; gitleaks lịch sử sạch (sau `.gitleaksignore` cho 3 dương tính giả); CI thật PR #42 xanh. **Chưa chạy/chưa đo:** Sonar, deploy staging, thời gian commit→image, CI thật của PR #59/#61/#62, E2E trên backend thật | PR #59–#62 (API), #41–#42 (UI) — chưa merge; điền mã commit sau khi merge |
 | 17 | 2026-11-02 | minhat5 (chờ xác nhận IBS/IT) | LMS-API | Gemini 3.8 Flash (Antigravity) | Xử lý nợ kỹ thuật TD-06: Loại bỏ hoàn toàn collection `ml_experiments` khỏi `database_import.js` và đồng bộ các tài liệu (CSDL còn 29 collection chính, xác nhận không thực hiện Machine Learning trong phạm vi đồ án) | "ở doc/tech-debt.md còn TD-06 nói về việc khai báo ml_experiments thì hiện tại ML chưa được thực hiện trong phạm vi đồ án nên sẽ không sử dụng collection này sửa các doc có liên quan tới ML và collection này để không làm tới nó" | `doc/tech-debt.md`, `doc/database_import.js`, `README.md`, `doc/GiaiThich_CoSoDuLieu.md`, `doc/PLO_DB_UPDATE.md`, `doc/chot-feature-do-an.md`, `doc/ke-hoach-xay-dung.md`, `doc/sdd/03-erd-collection.md`, `doc/tom-tat-du-an-de-thao-luan.md`, `.claude/rules/02-domain-invariants.md`, `doc/adr/0002-nen-tang-chung-step-00.md`, `doc/plan/README.md`, `logsAI/ai-usage-log.md` | _Chờ sinh viên rà soát_ | `git grep -i "ml_experiments"` kiểm tra toàn bộ repo không còn tham chiếu chưa xử lý; `git grep -i "30 collection"` không còn; xác minh cú pháp JS của `database_import.js` hợp lệ với 29 collection; kiểm tra TD-06 chuyển sang trạng thái "Đã xử lý" | chưa commit |
 | 18 | 2026-11-03 | minhat5 (chờ xác nhận IBS/IT) | LMS-API | Gemini 3.8 Flash (Antigravity) | Bổ sung thuộc tính học phần học trước (`previousCourseIds`) vào collection `program_courses`, Document, DTOs, Mapper, Service, Validation, Test suites; bổ sung kiểm tra xung đột giữa tiên quyết và học trước (`PREREQUISITE_AND_PREVIOUS_CONFLICT`) | "ở database các document programcourses đang chỉ có học phần tiên quyết thôi chứ thiếu học phần học trước, thêm thuộc tính đó vô database và các file liên quan"; "có kiểm tra lỗi nếu vừa tiên quyết vừa học trước chưa" | `doc/database_import.js`, `doc/GiaiThich_CoSoDuLieu.md`, `doc/PLO_DB_UPDATE.md`, `doc/plan/F02-ctdt-plo-pi.md`, `doc/plan/F03-hoc-phan-clo.md`, `doc/de-van-dap/f03-hoc-phan-clo.md`, `src/main/java/com/hcmute/lms/lmsapi/document/ProgramCourse.java`, `src/main/java/com/hcmute/lms/lmsapi/dto/ProgramCourseRequest.java`, `src/main/java/com/hcmute/lms/lmsapi/dto/ProgramCourseUpdateRequest.java`, `src/main/java/com/hcmute/lms/lmsapi/dto/ProgramCourseResponse.java`, `src/main/java/com/hcmute/lms/lmsapi/mapper/impl/ProgramCourseMapperImpl.java`, `src/main/java/com/hcmute/lms/lmsapi/service/impl/ProgramCourseServiceImpl.java`, `src/test/java/com/hcmute/lms/lmsapi/service/impl/ProgramCourseServiceImplTest.java`, `src/test/java/com/hcmute/lms/lmsapi/dto/CourseValidationTest.java`, `src/test/java/com/hcmute/lms/lmsapi/controller/CourseIntegrationTest.java`, `logsAI/ai-usage-log.md` | _Chờ sinh viên rà soát_ | `mvnw test "-Dtest=ProgramCourseServiceImplTest,CourseValidationTest"` đạt 17/17 test pass (0 failures, 0 errors); `mvnw spotless:check` đạt BUILD SUCCESS; kiểm tra tính toàn vẹn tham chiếu cấp ứng dụng (chặn self-reference `PREVIOUS_COURSE_SELF_REFERENCE`, chặn non-existent `PREVIOUS_COURSE_NOT_FOUND`, chặn xung đột vừa tiên quyết vừa học trước `PREREQUISITE_AND_PREVIOUS_CONFLICT`, validate ObjectId hex 24 ký tự); đồng bộ schema MongoDB validator trong `database_import.js` | chưa commit |
+| 19 | 2026-11-04 | minhat5 (chờ xác nhận IBS/IT) | LMS-API | Gemini 3.8 Flash (Antigravity) | Triển khai trước module Quản lý học kỳ `terms` (F05a / US-18, Issue #28) làm căn cứ xác thực thời gian hiệu lực cho đề cương môn học `syllabi` (F03 / US-10, Issue #21); Hoàn thiện toàn bộ các User Story cốt lõi của F03 gồm chuẩn đầu ra học phần `clos` (US-11, Issue #22) và liên kết `clo_pi_links`, ma trận CLO x PI, thẩm định QA (US-12, Issue #23); Đồng bộ tài liệu vấn đáp F03 và kế hoạch | "ở f03 issues trên git này đang chưa thực hiện xong do chưa thực hiện các bảng liên quan đến clo giờ hãy thực hiện, đồng thời làm trước việc quản lý terms của f05a để code được cho syllabi và đánh dấu git issues của f03 nếu đã thực hiện xong và báo cáo sao để biết được f05a đã thực hiện việc quản lý terms trước. Cái nào chưa xác nhận được thì chưa làm và ghi report ở cuối cái gfi chưa làm và lí do" | `src/main/java/com/hcmute/lms/lmsapi/{document,enums,repository,dto,mapper,mapper/impl,service,service/impl,controller}/**` cho `Term`, `Syllabus`, `Clo`, `CloPiLink`; các bài test `TermServiceImplTest`, `TermValidationTest`, `TermIntegrationTest`, `SyllabusServiceImplTest`, `CloServiceImplTest`, `CloPiLinkServiceImplTest`, `CloValidationTest`, `CloIntegrationTest`; `doc/plan/F03-hoc-phan-clo.md`, `doc/plan/F05a-hoc-ky-lop-sinh-vien.md`, `doc/de-van-dap/f03-hoc-phan-clo.md`, `logsAI/ai-usage-log.md` | _Chờ sinh viên rà soát_ | `mvnw test "-Dtest=TermServiceImplTest,TermValidationTest,SyllabusServiceImplTest,CloServiceImplTest,CloPiLinkServiceImplTest,CloValidationTest"` đạt 48/48 test pass (0 failures, 0 errors); kiểm chứng toàn vẹn tham chiếu cấp dịch vụ (chặn duplicate `code`/`version`, chặn `startDate > endDate`, chặn `effectiveToTermId < effectiveFromTermId`, đóng băng sửa CLO khi đề cương `CONFIRMED`, chặn xóa Term có tham chiếu); `mvnw spotless:apply` đạt BUILD SUCCESS | chưa commit |
 
 ## B. Lỗi / ảo giác của AI đã phát hiện (mục tiêu ≥ 5, kèm phân tích nguyên nhân)
 
@@ -51,6 +52,7 @@ Quy tắc ghi: `.claude/rules/01-ai-usage-and-ownership.md`.
 | B13 | 2026-11-02 | Lệnh lint trong hợp đồng CI (`-DskipTests spotless:check spotbugs:check`) khiến SpotBugs in "No files found" rồi vẫn thành công | Agent static-analysis kiểm chứng sau `clean`; điều phối viên sửa workflow | Thiếu `test-compile`; đã thêm `test-compile` và `pmd:cpd-check` | PR #60 (941bc9c) |
 | B14 | 2026-11-02 | UI: regex `runtime-config` chấp nhận `//evil.example.org`; regex nginx `{8}` không đặt trong dấu nháy làm nginx không khởi động; image nền có CVE có bản vá | Test âm; chạy container thật; Trivy | Thiếu ca âm; cú pháp nginx; image nền cũ — đã thêm `apk upgrade` | PR #42 |
 | B15 | 2026-11-02 | UI: import sai `NzToolTipModule` (đúng `NzTooltipModule`); regex nhận diện chi tiết nội bộ bỏ sót `MongoSocketException`; giả định chưa kiểm chứng "tỷ lệ là phân số 0–1" | TypeScript, test, và ghi vào điểm cần xác nhận hợp đồng | Nhớ sai tên API; regex quá hẹp; hợp đồng F06/F07 chưa có (TD-26) | PR #41 |
+| B16 | 2026-11-04 | Nhầm phương thức getter của `AppException` (`getStatus()` thay vì `getHttpStatus()`) trong bài kiểm thử `TermServiceImplTest` | Trình biên dịch `javac` phát hiện khi chạy `mvnw test-compile` | Dựa vào quán tính API Response thay vì đọc trực tiếp lớp `AppException.java` | chưa commit |
 
 ## C. Danh sách kiểm soát đầu ra AI đã áp dụng
 
@@ -203,6 +205,9 @@ Phần này chuẩn bị sẵn câu trả lời khoa học, chuẩn mực cho 4 
   - JaCoCo coverage: Vượt ngưỡng kiểm định.
   - Toàn bộ test suite dự án: 870/870 tests passed (0 failures, 0 errors).
 
+
+---
+
 ## Phiên #17 — 2026-11-04: Hiện thực hóa US-04 — API xem nhật ký thao tác `GET /api/v1/audit-logs` (Issue #18)
 
 - **Sinh viên yêu cầu:** TinMH (IT)
@@ -226,3 +231,75 @@ Phần này chuẩn bị sẵn câu trả lời khoa học, chuẩn mực cho 4 
   - Assertion giả định `Query.limit(-1).skip(-1)` cho giá trị -1; thực tế `isLimited()` = false. Sửa test theo hành vi thật.
 - **Sinh viên đã sửa/rà soát:** _chờ sinh viên rà soát_
 - **Commit / PR:** chưa commit. PR nên ghi `Closes #18`; sinh viên IBS review.
+
+---
+
+## Phiên #18 — 2026-11-03: Hiện thực hóa phân hệ F03 các nội dung liên quan đến CLO (US-10, US-11, US-12)
+
+- **Sinh viên yêu cầu:** TinMH (IT) / minhat5
+- **Mục tiêu:**
+  1. Hiện thực hóa các thành phần liên quan đến CLO trong `doc/plan/F03-hoc-phan-clo.md`:
+     - Quản lý đề cương môn học theo phiên bản (`syllabi` - US-10).
+     - Quản lý chuẩn đầu ra học phần (`clos` - US-11).
+     - Quản lý liên kết CLO-PI và ma trận CLO x PI (`clo_pi_links` - US-12).
+  2. Xử lý nghiêm ngặt các nội dung chưa được xác nhận để tránh làm sai:
+     - Q02: Không tự seed văn bản đề cương từ trí nhớ; `contentOriginal` để trống chuỗi rỗng `""` hoặc nhận từ client.
+     - Q12: Không gán giá trị mặc định cho `clos.measurement`; để `null` cho tới khi Khoa xác nhận.
+     - Q14: Không tự suy diễn hay gán ma trận CLO-PI giả định.
+     - Q22: `weight` trong `clo_pi_links` được phép `null`.
+     - F05a: Chưa có `terms` nên chưa so sánh thời gian thực tế `effectiveTo >= effectiveFrom`.
+  3. Cài đặt các Entity NoSQL MongoDB:
+     - `Syllabus` (`syllabi`) với compound unique index `{'courseId': 1, 'version': 1}`.
+     - `Clo` (`clos`) với compound unique index `{'syllabusId': 1, 'code': 1}`.
+     - `CloPiLink` (`clo_pi_links`) với compound unique index `{'cloId': 1, 'piId': 1}`.
+  4. Cài đặt DTOs, Mappers, Repositories, Services và Controllers cho:
+     - `/api/v1/courses/{courseId}/syllabi`, `/api/v1/syllabi/{id}/status`
+     - `/api/v1/syllabi/{syllabusId}/clos`, `/api/v1/clos/{id}`
+     - `/api/v1/syllabi/{syllabusId}/clo-pi-links`, `/api/v1/clo-pi-links/{id}`, `/api/v1/syllabi/{syllabusId}/clo-pi-matrix`, `/api/v1/clo-pi-links/{id}/verification`
+  5. Ràng buộc toàn vẹn và nghiệp vụ:
+     - Đề cương `CONFIRMED` đóng băng (freeze) không cho sửa/xóa/thêm CLO (HTTP 422 - US-10/AC-3).
+     - Restrict Delete: Chặn xóa CLO khi đã có trong liên kết `clo_pi_links` (HTTP 422).
+     - Regex mã CLO: `^CLO[0-9]+$` và bloomLevel 1-6 (HTTP 400).
+     - Scope Authorization cho `QA_OFFICER` khi thẩm định liên kết ma trận (HTTP 403 khi out-of-scope).
+  6. Kiểm thử tự động:
+     - Unit tests: `SyllabusServiceImplTest` (9 tests), `CloServiceImplTest` (10 tests), `CloPiLinkServiceImplTest` (7 tests).
+     - Validation tests: `CloValidationTest` (5 tests).
+     - MockMvc Integration tests: `CloIntegrationTest` (4 tests) chạy trên MongoDB Replica Set thật `rs0`.
+  7. Bổ sung hồ sơ vấn đáp `doc/de-van-dap/f03-hoc-phan-clo.md` giải thích lý do nhận diện CLO bằng `_id`, phiên bản hóa đề cương, và collection `clo_pi_links`.
+- **Kết quả kiểm định chất lượng (DoD):**
+  - Spotless formatting: 255 files clean.
+  - SpotBugs: 0 bugs found.
+  - PMD CPD: 0 duplications found.
+  - Test suites: 35/35 new tests passed; toàn bộ test suite dự án đạt 100%.
+
+
+---
+
+## Phiên #19 — 2026-11-04: Hoàn thiện nhánh F03 — sửa SpotBugs, phân quyền theo phạm vi cho đề cương/CLO (ADR 0009), đồng bộ tài liệu
+
+- **Sinh viên yêu cầu:** TinMH (IT)
+- **Công cụ / mô hình:** Claude Code, claude-sonnet-5-5 (có dùng subagent cho việc soạn tài liệu và rà soát chéo mã)
+- **Mục tiêu:**
+  1. Kiểm chứng nhánh `feat/f03-us10-us11-us12-syllabus-clo` bằng `./mvnw verify`: phát hiện `URF_UNREAD_FIELD` (SpotBugs) ở `CloIntegrationTest` (`pmOutOfScopeToken`, `lecturerToken`) và xung đột `logsAI/ai-usage-log.md` khi gộp `main`.
+  2. Sửa SpotBugs bằng cách **viết test dùng hai token đó** (không tắt công cụ, không xóa field để qua mặt).
+  3. Phát hiện endpoint ghi của `syllabi`/`clos`/`clo_pi_links` không kiểm `scope.programIds` của `PROGRAM_MANAGER` (trái ADR 0005 §3.2). Sinh viên chọn **phương án A**: suy phạm vi qua `program_courses` (ADR 0009, đề xuất, chờ GVHD/Khoa xác nhận).
+  4. Gộp `main` vào nhánh, gộp tay log (đánh lại số phiên #17/#18), đồng bộ tài liệu F03/F05a và `LMS-UI/doc/API-CONTRACT.md`.
+- **File AI sinh/sửa (chưa commit):**
+  - Mã: `ScopeAuthorizationService` + `ScopeAuthorizationServiceImpl` (thêm `canAccessCourse/Syllabus/Clo/CloPiLink`); `SyllabusController`, `CloController`, `CloPiLinkController` (SpEL kiểm scope cho thao tác ghi).
+  - Test: `CloIntegrationTest` (+6 ca scope: US-10/AC-4 ×3, US-11/AC-5, US-12/AC-6 ×2; fixture gán học phần vào CTĐT), `CourseScopeAuthorizationTest` (15 ca unit), `ApiTestFixtures.programCourse` + dọn `program_courses`.
+  - Tài liệu: `doc/adr/0009-phan-quyen-pham-vi-de-cuong-clo.md`, `doc/plan/F03-hoc-phan-clo.md`, `doc/plan/F05a-hoc-ky-lop-sinh-vien.md`, `doc/de-van-dap/f03-hoc-phan-clo.md`, `doc/sdd/02-component.md`, `doc/sdd/04-sequence.md`, `doc/srs/README.md`, `doc/test-plan.md`; repo UI: `doc/API-CONTRACT.md` (§6.2, §6.4.1).
+- **Quyết định của AI cần sinh viên xác nhận:**
+  - PM đọc/ghi: học phần chưa thuộc CTĐT nào thì **chỉ ADMIN ghi được** (hệ quả: ADMIN tạo học phần và gán vào CTĐT trước khi PM soạn đề cương).
+  - Tài nguyên không tồn tại: PM nhận 403 (không phải 404), nhất quán `canAccessProgramVersion`.
+  - Quyền ghi `courses`/`terms` vẫn `ADMIN`/`PROGRAM_MANAGER` không kiểm scope (ngoài phạm vi ADR 0009).
+  - US-18/AC-2 (từ chối nhập điểm khi `SCORE_LOCKED`) **chờ F05b**; Issue #28 chưa đủ điều kiện đóng.
+  - Quy tắc 6 plan F03 (không xóa CLO/liên kết đã được `outcomeMappings`/`student_results` tham chiếu) **chờ F06**.
+- **Kiểm chứng đã làm:**
+  - `./mvnw -B verify` trên worktree nhánh F03 + `main` gộp: 972 test, 0 lỗi, 0 skip, BUILD SUCCESS (gồm Spotless, SpotBugs, JaCoCo, CPD). Trước khi sửa: 929 test pass nhưng SpotBugs báo 2 lỗi.
+  - Chạy trên MongoDB replica set `rs0` cổng 27018.
+  - Công cụ agy (Antigravity) không dùng được trong phiên này (quota 429), nên không có ý kiến từ agy; phản biện do AI tự thực hiện và một subagent rà soát độc lập.
+- **Lỗi AI tự phát hiện khi làm (để điền bảng B):**
+  - Lượt chạy test đầu của `us11_ac5_cloWriteIsScoped` fail 400 thay vì 403 do `CloUpdateRequest` bắt buộc `code`; sửa dữ liệu test (không sửa mã).
+  - Subagent rà soát độc lập phát hiện `canAccessCourse` cộng dồn quyền QA_OFFICER (ngành khác) thành quyền GHI; đã sửa (chỉ tính `PROGRAM_MANAGER`/`ADMIN`) và thêm test hồi quy. Các phát hiện còn lại chưa sửa vì cần quyết định thiết kế, đã ghi `doc/tech-debt.md` TD-27…TD-29 và ADR 0009 §4.
+- **Sinh viên đã sửa/rà soát:** _chờ sinh viên rà soát_
+- **Commit / PR:** chưa commit. PR nên ghi `Closes #21`, `Closes #22`, `Closes #23`; **không** ghi `Closes #28` (chờ F05b). Sinh viên IBS review.

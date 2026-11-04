@@ -25,4 +25,23 @@ public interface ScopeAuthorizationService {
 
   boolean canAccessProgramVersion(
       UserPrincipal principal, String programVersionId, AccessType accessType);
+
+  /**
+   * Kiểm tra quyền trên một học phần (ADR 0009). Học phần không có {@code programVersionId} riêng
+   * nên phạm vi được suy từ {@code program_courses}: ADMIN luôn được phép; các vai trò khác cần ÍT
+   * NHẤT MỘT phiên bản CTĐT chứa học phần mà {@link #canAccessProgramVersion} cho phép (phép HỢP).
+   * Học phần chưa thuộc CTĐT nào, hoặc không tồn tại, chỉ ADMIN được phép (fail-closed).
+   */
+  boolean canAccessCourse(UserPrincipal principal, String courseId, AccessType accessType);
+
+  /** Kiểm tra quyền trên đề cương thông qua {@code syllabi.courseId} (ADR 0009). */
+  boolean canAccessSyllabus(UserPrincipal principal, String syllabusId, AccessType accessType);
+
+  /** Kiểm tra quyền trên CLO thông qua {@code clos.courseId} (ADR 0009). */
+  boolean canAccessClo(UserPrincipal principal, String cloId, AccessType accessType);
+
+  /**
+   * Kiểm tra quyền trên liên kết CLO–PI thông qua {@code clo_pi_links.programVersionId} (ADR 0009).
+   */
+  boolean canAccessCloPiLink(UserPrincipal principal, String linkId, AccessType accessType);
 }

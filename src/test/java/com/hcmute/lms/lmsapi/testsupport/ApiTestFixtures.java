@@ -7,11 +7,14 @@ import com.hcmute.lms.lmsapi.document.CourseSection;
 import com.hcmute.lms.lmsapi.document.Pi;
 import com.hcmute.lms.lmsapi.document.Plo;
 import com.hcmute.lms.lmsapi.document.Program;
+import com.hcmute.lms.lmsapi.document.ProgramCourse;
 import com.hcmute.lms.lmsapi.document.ProgramVersion;
 import com.hcmute.lms.lmsapi.document.RoleAssignment;
 import com.hcmute.lms.lmsapi.document.User;
 import com.hcmute.lms.lmsapi.document.UserScope;
 import com.hcmute.lms.lmsapi.document.Verification;
+import com.hcmute.lms.lmsapi.enums.CourseCategory;
+import com.hcmute.lms.lmsapi.enums.CourseType;
 import com.hcmute.lms.lmsapi.enums.PiContributionType;
 import com.hcmute.lms.lmsapi.enums.ProgramVersionStatus;
 import com.hcmute.lms.lmsapi.enums.Role;
@@ -196,6 +199,19 @@ public final class ApiTestFixtures {
     return mongo.save(Course.builder().code(code("CRS")).name(LABEL + " Học phần giả").build());
   }
 
+  /** Gán học phần vào phiên bản CTĐT (cơ sở suy phạm vi của đề cương/CLO, ADR 0009). */
+  public ProgramCourse programCourse(ProgramVersion version, Course course) {
+    return mongo.save(
+        ProgramCourse.builder()
+            .programVersionId(version.getId())
+            .courseId(course.getId())
+            .semester(1)
+            .credits(3)
+            .type(CourseType.COMPULSORY)
+            .category(CourseCategory.MAJOR_FOUNDATION)
+            .build());
+  }
+
   /** Thêm một dòng ma trận I/R/M giả. */
   public CoursePiContribution contribution(
       ProgramVersion version, Course course, Pi pi, PiContributionType type) {
@@ -247,6 +263,7 @@ public final class ApiTestFixtures {
     List<String> versionIds = ids("program_versions", Criteria.where("programId").in(programOids));
     List<ObjectId> versionOids = versionIds.stream().map(ObjectId::new).toList();
 
+    removeIn("program_courses", "programVersionId", versionOids);
     removeIn("course_pi_contributions", "programVersionId", versionOids);
     removeIn("pis", "programVersionId", versionOids);
     removeIn("plos", "programVersionId", versionOids);

@@ -36,29 +36,29 @@ Biết **ai học lớp nào, học kỳ nào, đề cương nào**. Số ghi da
 
 ## 5. Stories và acceptance criteria (nháp)
 
-| ID | AC |
-|---|---|
-| US-18/AC-1 | Tạo học kỳ với `code` mới, `startDate ≤ endDate` → thành công; trùng `code` → 409; `startDate > endDate` → 400/422 |
-| US-18/AC-2 | Đổi `status` sang `SCORE_LOCKED` → mọi API nhập/sửa điểm của lớp trong học kỳ trả lỗi (test cùng F05b); ghi `audit_logs` **[ĐỀ XUẤT]** |
-| US-18/AC-3 | Mở lại học kỳ `SCORE_LOCKED → OPEN` chỉ ADMIN/PROGRAM_MANAGER và có lý do **[ĐỀ XUẤT]** |
-| US-19/AC-1 | Tạo lớp với `courseId`, `syllabusId` (cùng học phần), `termId`, ≥ 1 giảng viên → thành công |
-| US-19/AC-2 | `syllabusId` không thuộc `courseId`, hoặc `termId`/`lecturerIds` không tồn tại → 422 |
-| US-19/AC-3 | Trùng `code` lớp → 409 |
-| US-19/AC-4 | Giảng viên chỉ thấy lớp mình phụ trách (xem F01) |
-| US-20/AC-1 | Tải tệp CSV/Excel danh sách lớp: mỗi dòng có `studentRef`; sinh viên mới được tạo, sinh viên cũ được dùng lại; tất cả được ghi danh `ENROLLED` |
-| US-20/AC-2 | Dòng thiếu `studentRef`, trùng trong tệp, hoặc đã ghi danh lớp đó → báo lỗi theo dòng, không ghi nửa chừng (một thao tác thống nhất) |
-| US-20/AC-3 | Tệp rỗng, sai cột, sai định dạng → 400 với thông báo rõ |
-| US-20/AC-4 | Sau khi nhập, số `ENROLLED` của lớp đúng bằng số dòng hợp lệ; rút khỏi lớp chuyển `WITHDRAWN`, mẫu số giảm tương ứng |
+| ID | AC | Trạng thái |
+|---|---|---|
+| US-18/AC-1 | Tạo học kỳ với `code` mới, `startDate ≤ endDate` → thành công; trùng `code` → 409; `startDate > endDate` → 400/422 | **ĐÃ HIỆN THỰC trên nhánh F03 (Issue #28 - làm trước cho F03); PR chưa mở/chưa merge** |
+| US-18/AC-2 | Đổi `status` sang `SCORE_LOCKED` → ghi nhận trạng thái và log; chặn nhập/sửa điểm (test cùng F05b) | **MỘT PHẦN (chưa hoàn thành):** đã có trạng thái `SCORE_LOCKED` và việc mở lại cần lý do (xem AC-3), có log ứng dụng, chưa ghi `audit_logs`; vế **từ chối nhập/sửa điểm CHỜ F05b** (chưa có mã nhập điểm) |
+| US-18/AC-3 | Mở lại học kỳ `SCORE_LOCKED → OPEN` chỉ ADMIN/PROGRAM_MANAGER và có lý do giải trình | **ĐÃ HIỆN THỰC trên nhánh F03 (Issue #28 - làm trước cho F03); PR chưa mở/chưa merge** |
+| US-19/AC-1 | Tạo lớp với `courseId`, `syllabusId` (cùng học phần), `termId`, ≥ 1 giảng viên → thành công | Chưa làm (Chờ giai đoạn F05a đầy đủ) |
+| US-19/AC-2 | `syllabusId` không thuộc `courseId`, hoặc `termId`/`lecturerIds` không tồn tại → 422 | Chưa làm (Chờ giai đoạn F05a đầy đủ) |
+| US-19/AC-3 | Trùng `code` lớp → 409 | Chưa làm (Chờ giai đoạn F05a đầy đủ) |
+| US-19/AC-4 | Giảng viên chỉ thấy lớp mình phụ trách (xem F01) | Chưa làm (Chờ giai đoạn F05a đầy đủ) |
+| US-20/AC-1 | Tải tệp CSV/Excel danh sách lớp: mỗi dòng có `studentRef`; sinh viên mới được tạo, sinh viên cũ được dùng lại; tất cả được ghi danh `ENROLLED` | Chưa làm (Chờ Q09 và thư viện Excel F05b) |
+| US-20/AC-2 | Dòng thiếu `studentRef`, trùng trong tệp, hoặc đã ghi danh lớp đó → báo lỗi theo dòng, không ghi nửa chừng (một thao tác thống nhất) | Chưa làm (Chờ Q09 và thư viện Excel F05b) |
+| US-20/AC-3 | Tệp rỗng, sai cột, sai định dạng → 400 với thông báo rõ | Chưa làm (Chờ Q09 và thư viện Excel F05b) |
+| US-20/AC-4 | Sau khi nhập, số `ENROLLED` của lớp đúng bằng số dòng hợp lệ; rút khỏi lớp chuyển `WITHDRAWN`, mẫu số giảm tương ứng | Chưa làm (Chờ Q09 và thư viện Excel F05b) |
 
 ## 6. API đề xuất **[ĐỀ XUẤT]**
 
-| Phương thức | Đường dẫn | Quyền |
-|---|---|---|
-| GET/POST/PUT | `/api/terms`, `/api/terms/{id}`; `PUT /api/terms/{id}/status` | ADMIN, PROGRAM_MANAGER |
-| GET/POST/PUT | `/api/sections`, `/api/sections/{id}` | ADMIN, PROGRAM_MANAGER; đọc: giảng viên lớp mình |
-| POST | `/api/sections/{id}/enrollments/import` (tệp) | LECTURER (lớp mình), ADMIN |
-| GET | `/api/sections/{id}/enrollments` | theo phạm vi |
-| PUT | `/api/enrollments/{id}/status` (rút/ghi danh lại) | LECTURER (lớp mình), ADMIN |
+| Phương thức | Đường dẫn | Quyền | Trạng thái |
+|---|---|---|---|
+| GET/POST/PUT/DELETE | `/api/v1/terms`, `/api/v1/terms/{id}`; `PUT /api/v1/terms/{id}/status` | ADMIN, PROGRAM_MANAGER; đọc: authenticated | **ĐÃ HIỆN THỰC** |
+| GET/POST/PUT | `/api/v1/sections`, `/api/v1/sections/{id}` | ADMIN, PROGRAM_MANAGER; đọc: giảng viên lớp mình | Chưa làm |
+| POST | `/api/v1/sections/{id}/enrollments/import` (tệp) | LECTURER (lớp mình), ADMIN | Chưa làm |
+| GET | `/api/v1/sections/{id}/enrollments` | theo phạm vi | Chưa làm |
+| PUT | `/api/v1/enrollments/{id}/status` (rút/ghi danh lại) | LECTURER (lớp mình), ADMIN | Chưa làm |
 
 ## 7. Kiểm tra tham chiếu ở service
 

@@ -142,3 +142,9 @@ done
   (`ErrorResponse`), tạo vòng `dto ↔ exception` ở mức package.
 - `ScopeAuthorizationService.canAccessProgram` được gọi duy nhất từ `ProgramVerificationServiceImpl`;
   `canAccessSection` **không** được lớp production nào gọi (chỉ test gọi qua controller thử nghiệm).
+
+**Đề xuất F03 (ADR 0009, đã hiện thực trên nhánh F03, chờ merge; mục 2 và bảng endpoint ở trên chưa gồm các lớp/endpoint F03):** `ScopeAuthorizationService` sẽ có
+thêm `canAccessCourse`, `canAccessSyllabus`, `canAccessClo`, `canAccessCloPiLink` (fail-closed). `canAccessCourse` suy phạm vi của
+`PROGRAM_MANAGER` qua `program_courses` → `program_versions.programId` ∈ `scope.programIds`; `canAccessCloPiLink` suy từ
+`clo_pi_links.programVersionId` qua `canAccessProgramVersion`. Các endpoint ghi `syllabi`, `clos`, `clo_pi_links` sẽ gọi chúng bằng SpEL
+trong `@PreAuthorize`. Bảng endpoint và sơ đồ lớp sẽ được cập nhật khi mã F03 được tích hợp vào nhánh chứa tài liệu này.
