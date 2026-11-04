@@ -109,9 +109,7 @@ sequenceDiagram
 - Mỗi request đọc lại `users` từ CSDL (không tin vai trò trong token) nên đổi vai trò/khóa tài khoản có hiệu lực ngay, và
   `logout`/khóa tăng `tokenVersion` làm mọi token cũ bị 401.
 - Kiểm tra **phạm vi dữ liệu** (scope) không nằm ở bước này mà ở service khi cần (mục 4 là ví dụ duy nhất hiện có).
-- F03 (ADR 0009, đã hiện thực trên nhánh F03, chờ merge): ghi đề cương, CLO, liên kết CLO–PI của `PROGRAM_MANAGER` cũng sẽ qua kiểm phạm vi trong
-  `@PreAuthorize` (`canAccessCourse`/`canAccessSyllabus`/`canAccessClo`/`canAccessCloPiLink`). Chưa có sơ đồ tuần tự riêng cho luồng này;
-  sẽ bổ sung khi mã được tích hợp.
+- F03 (ADR 0010 thay thế ADR 0009): Admin quản lý Master Catalog `courses`; Trưởng bộ môn (`DEPARTMENT_HEAD`) nhận scope `courseIds` từ Admin và phân công cho Giảng viên (`LECTURER`) trong bộ môn biên soạn đề cương/CLO ở trạng thái `DRAFT`; Trưởng bộ môn thẩm định và duyệt `CONFIRMED`. Trưởng ngành (`PROGRAM_MANAGER`) quản lý đưa môn vào CTĐT (`program_courses`) và tạo liên kết $CLO \to PI$ (`clo_pi_links`) theo `scope.programIds`. Các kiểm tra scope đều thực hiện fail-closed qua `ScopeAuthorizationService`.
 
 ## 3. Tạo phiên bản CTĐT, PLO, PI (US-05, US-06)
 

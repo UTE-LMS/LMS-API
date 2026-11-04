@@ -143,8 +143,8 @@ done
 - `ScopeAuthorizationService.canAccessProgram` được gọi duy nhất từ `ProgramVerificationServiceImpl`;
   `canAccessSection` **không** được lớp production nào gọi (chỉ test gọi qua controller thử nghiệm).
 
-**Đề xuất F03 (ADR 0009, đã hiện thực trên nhánh F03, chờ merge; mục 2 và bảng endpoint ở trên chưa gồm các lớp/endpoint F03):** `ScopeAuthorizationService` sẽ có
-thêm `canAccessCourse`, `canAccessSyllabus`, `canAccessClo`, `canAccessCloPiLink` (fail-closed). `canAccessCourse` suy phạm vi của
-`PROGRAM_MANAGER` qua `program_courses` → `program_versions.programId` ∈ `scope.programIds`; `canAccessCloPiLink` suy từ
-`clo_pi_links.programVersionId` qua `canAccessProgramVersion`. Các endpoint ghi `syllabi`, `clos`, `clo_pi_links` sẽ gọi chúng bằng SpEL
-trong `@PreAuthorize`. Bảng endpoint và sơ đồ lớp sẽ được cập nhật khi mã F03 được tích hợp vào nhánh chứa tài liệu này.
+**Mô hình phân quyền F03 (ADR 0010 thay thế ADR 0009):** `ScopeAuthorizationService` cung cấp kiểm soát truy cập phân cấp:
+- Master Catalog `courses`: Chỉ `ADMIN` (Phòng Đào tạo) tạo/sửa/xóa (`hasRole('ADMIN')`). Thu hồi quyền tạo/sửa môn của `PROGRAM_MANAGER`.
+- Đề cương môn học (`syllabi`) & CLO (`clos`): `ScopeAuthorizationService.canAccessCourse(principal, courseId)` kiểm tra tập hợp $O(1)$ trực tiếp: `principal.getScope().getCourseIds().contains(courseId)` với vai trò `DEPARTMENT_HEAD` (Trưởng bộ môn) hoặc `LECTURER` (Giảng viên được phân công). Giảng viên chỉ soạn khi đề cương ở `DRAFT`; Trưởng bộ môn duyệt chuyển trạng thái sang `CONFIRMED`. `PROGRAM_MANAGER` không có quyền can thiệp vào đề cương/CLO (bị chặn 403).
+- Liên kết CLO–PI (`clo_pi_links`): `PROGRAM_MANAGER` thiết lập ma trận liên kết cho CTĐT của ngành mình qua `@scopeAuthorizationService.canAccessProgramVersion(principal, programVersionId)`.
+- Thẩm định CLO–PI: `QA_OFFICER` kiểm tra theo `canAccessProgramVersion` (ADR 0004). Bảng endpoint và sơ đồ lớp sẽ được cập nhật khi mã F03 được tích hợp vào nhánh chứa tài liệu này.
