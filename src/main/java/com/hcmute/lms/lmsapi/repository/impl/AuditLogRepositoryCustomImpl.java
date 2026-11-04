@@ -7,10 +7,14 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.bson.types.ObjectId;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.support.PageableExecutionUtils;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -26,7 +30,50 @@ public class AuditLogRepositoryCustomImpl implements AuditLogRepositoryCustom {
   @Override
   public List<AuditLog> findLogsByCriteria(
       String collection, String entityId, AuditAction action, Instant from, Instant to, int limit) {
+    Query query = buildQuery(null, collection, entityId, action, from, to);
+    query.with(Sort.by(Sort.Direction.DESC, "at"));
+
+    if (limit > 0) {
+      query.limit(limit);
+    }
+
+    return mongoTemplate.find(query, AuditLog.class);
+  }
+
+  @Override
+  public Page<AuditLog> searchLogs(
+      String userId,
+      String collection,
+      String entityId,
+      AuditAction action,
+      Instant from,
+      Instant to,
+      Pageable pageable) {
+    Query query = buildQuery(userId, collection, entityId, action, from, to);
+
+    // Đếm trên truy vấn chưa phân trang; _id làm khóa phụ để thứ tự giữa các trang ổn định khi
+    // nhiều dòng trùng thời điểm.
+    long total = mongoTemplate.count(Query.of(query).limit(-1).skip(-1), AuditLog.class);
+
+    query.with(pageable).with(Sort.by(Sort.Direction.DESC, "at").and(Sort.by("_id").descending()));
+    List<AuditLog> content = mongoTemplate.find(query, AuditLog.class);
+
+    return PageableExecutionUtils.getPage(content, pageable, () -> total);
+  }
+
+  private Query buildQuery(
+      String userId,
+      String collection,
+      String entityId,
+      AuditAction action,
+      Instant from,
+      Instant to) {
     List<Criteria> criteriaList = new ArrayList<>();
+
+    if (userId != null && !userId.isBlank()) {
+      // userId được lưu dạng BSON ObjectId (xem AuditLog.userId) nên phải so sánh bằng ObjectId.
+      criteriaList.add(Criteria.where("userId").is(new ObjectId(userId.trim())));
+    }
 
     if (collection != null && !collection.isBlank()) {
       criteriaList.add(Criteria.where("entity.collection").is(collection));
@@ -52,13 +99,6 @@ public class AuditLogRepositoryCustomImpl implements AuditLogRepositoryCustom {
     if (!criteriaList.isEmpty()) {
       query.addCriteria(new Criteria().andOperator(criteriaList.toArray(new Criteria[0])));
     }
-
-    query.with(Sort.by(Sort.Direction.DESC, "at"));
-
-    if (limit > 0) {
-      query.limit(limit);
-    }
-
-    return mongoTemplate.find(query, AuditLog.class);
+    return query;
   }
 }
