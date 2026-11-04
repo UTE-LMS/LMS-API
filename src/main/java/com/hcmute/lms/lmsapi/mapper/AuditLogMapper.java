@@ -2,6 +2,7 @@ package com.hcmute.lms.lmsapi.mapper;
 
 import com.hcmute.lms.lmsapi.document.AuditEntity;
 import com.hcmute.lms.lmsapi.document.AuditLog;
+import com.hcmute.lms.lmsapi.dto.AuditLogResponse;
 import com.hcmute.lms.lmsapi.enums.AuditAction;
 
 /**
@@ -40,4 +41,13 @@ public interface AuditLogMapper {
    * @return Dữ liệu đã làm sạch an toàn
    */
   Object sanitize(Object input);
+
+  /**
+   * Chuyển một AuditLog đã lưu sang DTO trả về client (F01 / US-04). before/after được làm sạch lần
+   * nữa khi đọc, phòng dòng cũ được ghi trước khi quy tắc làm sạch có hiệu lực.
+   *
+   * @param auditLog bản ghi nhật ký (không null)
+   * @return DTO tương ứng
+   */
+  AuditLogResponse toResponse(AuditLog auditLog);
 }

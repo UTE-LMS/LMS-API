@@ -2,6 +2,7 @@ package com.hcmute.lms.lmsapi.mapper.impl;
 
 import com.hcmute.lms.lmsapi.document.AuditEntity;
 import com.hcmute.lms.lmsapi.document.AuditLog;
+import com.hcmute.lms.lmsapi.dto.AuditLogResponse;
 import com.hcmute.lms.lmsapi.enums.AuditAction;
 import com.hcmute.lms.lmsapi.mapper.AuditLogMapper;
 import java.time.Instant;
@@ -64,6 +65,21 @@ public class AuditLogMapperImpl implements AuditLogMapper {
         .after(sanitizedAfter)
         .reason(reason)
         .ip(ip)
+        .build();
+  }
+
+  @Override
+  public AuditLogResponse toResponse(AuditLog auditLog) {
+    return AuditLogResponse.builder()
+        .id(auditLog.getId())
+        .at(auditLog.getAt())
+        .userId(auditLog.getUserId())
+        .action(auditLog.getAction())
+        .entity(auditLog.getEntity())
+        .before(sanitize(auditLog.getBefore()))
+        .after(sanitize(auditLog.getAfter()))
+        .reason(auditLog.getReason())
+        .ip(auditLog.getIp())
         .build();
   }
 
