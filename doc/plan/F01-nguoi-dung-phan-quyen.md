@@ -83,6 +83,11 @@ Ghi chú:
 | US-03/AC-3 | Có test tham số hóa kiểm tra toàn diện ma trận vai trò × phạm vi × READ/WRITE trên controller giả lập theo bảng ma trận mục 4.2 |
 | US-03/AC-4 | Kiểm thử độc lập: LECTURER có `scope == null` hoặc scope rỗng nhưng nằm trong `lecturerIds` được cấp quyền; LECTURER có scope rỗng và không nằm trong `lecturerIds` bị từ chối 403; VIEWER chỉ có `programIds` bị từ chối 403 (không bị coi là scope rỗng); PROGRAM_MANAGER chỉ có `programIds` bị từ chối 403 (hạn chế đã biết) |
 | US-03/AC-5 | Kiểm thử: Đổi vai trò hoặc scope của người dùng trong CSDL thì request kế tiếp với token hợp lệ hiện tại sử dụng ngay quyền hạn mới |
+| US-04/AC-1 | `GET /api/v1/audit-logs` trả danh sách phân trang chuẩn (zero-indexed, `content`, `page`, `size`, `totalElements`, `totalPages`, `last`), dòng mới nhất trước; trang vượt quá cuối hoặc không có dòng khớp trả `content` rỗng, không lỗi |
+| US-04/AC-2 | Lọc tùy chọn theo `action`, `entity` (tên collection), `entityId`, `userId` (người thực hiện), `from`, `to` (ISO-8601, bao gồm hai đầu mút); các bộ lọc kết hợp bằng AND |
+| US-04/AC-3 | Chỉ `ADMIN` đọc được; mọi vai trò khác → 403, chưa đăng nhập → 401 *(giữ ADMIN-only, chưa mở cho `QA_OFFICER`; nếu Khoa muốn mở thì sửa `@PreAuthorize` và test)* |
+| US-04/AC-4 | `before`/`after` không lộ `passwordHash`, token, secret: khử khuẩn lúc ghi (`AuditLogMapper.sanitize`) và **khử khuẩn lại lúc đọc**, nên dòng cũ ghi trước khi có quy tắc vẫn được che (`[PROTECTED]`) |
+| US-04/AC-5 | `page < 0`, `size < 1`, `size > 100`, `action` không thuộc `AuditAction`, `userId` không phải ObjectId 24 hex, `from`/`to` sai định dạng ISO-8601, hoặc `from` sau `to` → 400 `VALIDATION_ERROR` |
 
 ## 6. Danh sách API chính thức (`/api/v1/`)
 
@@ -96,6 +101,7 @@ Ghi chú:
 | GET | `/api/v1/users/{id}` | ADMIN | Xem chi tiết người dùng |
 | PUT | `/api/v1/users/{id}` | ADMIN | Cập nhật thông tin/vai trò (không đổi username/password) |
 | PUT | `/api/v1/users/{id}/status` | ADMIN | Khóa hoặc mở khóa tài khoản (khi khóa: tăng `tokenVersion`) |
+| GET | `/api/v1/audit-logs` | ADMIN | Xem nhật ký thao tác (US-04): phân trang, lọc `action`, `entity`, `entityId`, `userId`, `from`, `to` |
 
 ## 7. Quyết định Kiến trúc (ADR 0003)
 
@@ -123,7 +129,8 @@ Ghi chú:
 - Chuyển giao cho F02: F01 chỉ có `canAccessSection` (quyền trên lớp). Quyền trên CTĐT (ví dụ `QA_OFFICER` xác nhận
   `program_versions`/PLO/PI theo `scope.programIds`, xem ADR 0004) cần hàm kiểm tra riêng (ví dụ `canAccessProgram`,
   fail-closed) do F02 bổ sung, kèm việc ánh xạ CTĐT → lớp để vai trò chỉ có `programIds` không bị 403 trên lớp.
-- US-04 (Màn hình xem nhật ký kiểm toán) và NEW-03 (Giao diện sinh viên xem kết quả) thuộc các giai đoạn mở rộng tiếp theo.
+- US-04 (API xem nhật ký thao tác, issue #18) đã làm phần API đọc/lọc; màn hình hiển thị thuộc repo `LMS-UI`. Việc *ghi* audit cho các hành động khác ngoài `LOGIN` thuộc các feature sở hữu hành động đó (F04, F05b, F06...).
+- NEW-03 (vai trò STUDENT xem kết quả của chính mình, issue #19) **hoãn**, làm khi có thời gian; phụ thuộc F05a (`students.userId`) và F06 (`student_results`).
 
 ## 10. Để vấn đáp
 

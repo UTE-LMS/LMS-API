@@ -166,7 +166,8 @@ Không thấy `@Disabled` trong `src/test`.
 | US-03/AC-3 (ma trận vai trò × phạm vi × READ/WRITE) | `ScopeAuthorizationMatrixIntegrationTest` (nhóm 2); `ScopeAuthorizationServiceImplTest` (25 ca); `ScopeAuthorizationEmpiricalChallengeTest` | Mã thử nghiệm | Như trên. AC viết "test tham số hóa"; thực tế là các phương thức riêng cho từng vai trò |
 | US-03/AC-4 (LECTURER `lecturerIds`; VIEWER/PM chỉ `programIds` → 403) | `ScopeAuthorizationMatrixIntegrationTest#lecturer_IndependentLecturerIdsRule_Success`, `#viewer_ProgramOnlyScope_Forbidden`; `ScopeAuthorizationServiceImplTest#lecturer_IndependentLecturerIdsRule_Granted`, `#viewer_ProgramOnlyScope_IsNotEmptyScope_Denied`, `#managementRoles_Read_ProgramOnlyScope_Denied`; `UserScopeTest`, `UserScopeEmpiricalChallengeTest` | Mã thử nghiệm | |
 | US-03/AC-5 (đổi vai trò/scope trong DB có hiệu lực ngay với token cũ) | `ScopeAuthorizationMatrixIntegrationTest#dynamicPermissionReload_ImmediateEffectWithSameToken`; `ScopeDynamicReloadAndEdgeCasesEmpiricalChallengeTest#*` | Có | Kiểm qua endpoint thử nghiệm `/api/v1/test/sections/**`, nên cùng hạn chế "mã thử nghiệm" như AC-1 |
-| US-04 (màn hình nhật ký, MR) và "ghi audit" ngoài `LOGIN` | — | Khoảng trống | Chưa có AC trong plan F01 cho US-04; **không có** endpoint đọc `audit_logs`; mã chỉ gọi `AuditService.record` ở đăng nhập |
+| US-04/AC-1..5 (API xem nhật ký: phân trang, lọc, ADMIN-only, không lộ secret, 400) | `AuditLogApiIntegrationTest` (15 ca, mã AC trong `@DisplayName`); `AuditLogQueryServiceImplTest` (4 ca); `AuditLogRepositoryCustomUnitTest#testSearchLogs*`; `AuditLogMapperUnitTest#testToResponseSanitizesOnRead` | Có | Chạy được trên MongoDB đơn lẻ (không dùng transaction). Chưa kiểm thử trên `rs0` Docker vì Docker đang tắt lúc làm |
+| "ghi audit" ngoài `LOGIN` | — | Khoảng trống | Mã chỉ gọi `AuditService.record` ở đăng nhập; các hành động còn lại thuộc F04/F05b/F06 |
 | NEW-03 (sinh viên xem kết quả, MR) | `ScopeAuthorizationMatrixIntegrationTest#student_ReadAndWrite_Forbidden` (chỉ kiểm bị từ chối) | Khoảng trống | Chưa có AC và chưa có mã |
 
 ### 8.4 F02 — CTĐT, PLO, PI, ma trận I/R/M (`doc/plan/F02-ctdt-plo-pi.md`)
@@ -232,7 +233,7 @@ trùng bản ghi điểm; tổng `weight` ≠ 1; cặp CLO–PI ngoài `clo_pi_l
 | G-10 | US-01/AC-4: chưa kiểm `passwordHash` không lộ ở `LoginResponse`, `/auth/me`, `GET /users`, log | Test một phần |
 | G-11 | US-02/AC-1: chưa kiểm `roleAssignments` rỗng → 400 | Test một phần |
 | G-12 | US-03: `canAccessSection` chỉ được kiểm qua controller thử nghiệm; AC-2 "mọi endpoint" không có test duyệt toàn bộ | Test trên mã thử nghiệm / một phần |
-| G-13 | US-04 (đọc nhật ký) và NEW-03 không có mã; chỉ `LOGIN` được ghi audit — các `AuditAction` còn lại chưa có nơi gọi | Chưa có mã |
+| G-13 | NEW-03 (hoãn) chưa có mã; chỉ `LOGIN` được ghi audit — các `AuditAction` còn lại chưa có nơi gọi. US-04 (đọc nhật ký) đã có mã và test | Chưa có mã (phần còn lại) |
 | G-14 | Quy ước gắn mã AC trong `@DisplayName` mới áp dụng cho 2 lớp test; phần lớn test chưa gắn AC | Quy trình |
 | G-15 | Không có tầng E2E, không có test hiệu năng, không có bảng test thủ công/UAT | Thiếu tầng |
 | G-16 | Chưa có báo cáo coverage công bố; JaCoCo `check` với `haltOnFailure=false` không chặn build | Công cụ |

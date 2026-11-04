@@ -208,7 +208,33 @@ Phần này chuẩn bị sẵn câu trả lời khoa học, chuẩn mực cho 4 
 
 ---
 
-## Phiên #17 — 2026-11-03: Hiện thực hóa phân hệ F03 các nội dung liên quan đến CLO (US-10, US-11, US-12)
+## Phiên #17 — 2026-11-04: Hiện thực hóa US-04 — API xem nhật ký thao tác `GET /api/v1/audit-logs` (Issue #18)
+
+- **Sinh viên yêu cầu:** TinMH (IT)
+- **Công cụ / mô hình:** Claude Code, claude-sonnet-5-5
+- **Mục tiêu:** Rà soát F01 trên GitHub Issues, làm US-04 (#18) và hoãn NEW-03 (#19, gắn nhãn `hoãn`).
+- **File AI sinh/sửa (chưa commit, nhánh `feat/f01-us04-audit-logs-api`):**
+  - Mã: `controller/AuditLogController`, `service/AuditLogQueryService` + `impl/AuditLogQueryServiceImpl`, `dto/AuditLogResponse`; sửa `repository/AuditLogRepositoryCustom` + `impl` (thêm `searchLogs` phân trang, lọc `userId` bằng ObjectId), `mapper/AuditLogMapper` + `impl` (thêm `toResponse`, làm sạch lại `before`/`after` khi đọc).
+  - Test: `AuditLogApiIntegrationTest` (15 ca), `AuditLogQueryServiceImplTest` (4), thêm ca vào `AuditLogRepositoryCustomUnitTest` (2) và `AuditLogMapperUnitTest` (1).
+  - Tài liệu: `doc/plan/F01-nguoi-dung-phan-quyen.md` (AC US-04/AC-1..5, bảng API, mục 9), `doc/test-plan.md`, và `LMS-UI/doc/API-CONTRACT.md` §5.5 (repo UI, chưa commit).
+- **Quyết định của AI cần sinh viên xác nhận:**
+  - Chỉ `ADMIN` được đọc (issue ghi "ADMIN và/hoặc QA_OFFICER — hỏi"). Chưa hỏi Khoa/GVHD.
+  - Tên tham số lọc `entity` (tên collection) + `entityId` + `userId` + `from`/`to`; đây là lựa chọn của AI bám theo chữ trong issue.
+  - Không thêm dependency, không đổi schema CSDL.
+- **Kiểm chứng đã làm:**
+  - `./mvnw test` cho 4 lớp test liên quan US-04 (`AuditLogApiIntegrationTest`, `AuditLogQueryServiceImplTest`, `AuditLogRepositoryCustomUnitTest`, `AuditLogMapperUnitTest`): 26/26 pass; `spotless:check` và `spotbugs:check` = 0 lỗi.
+  - Lượt chạy đầu dùng MongoDB đơn lẻ cổng 27017 (database tạm, đã xóa) vì Docker đang tắt; `ApiContractIntegrationTest#f01ResponsesDoNotLeakSecrets` lỗi ở lượt đó do thiếu transaction.
+  - Phát hiện DB Docker cũ (nạp tay bằng `mongo:8.0`) thiếu `previousCourseIds` ở `program_courses` và còn `departmentId`, `ml_experiments` so với `database_import.js` hiện tại; image `lms-mongo` cũng build trước commit `6bec776`. Đã build lại `lms-mongo:latest` và chạy container `lms-mongo-rs0` (cổng 27018, volume mới `lms-mongo-data-v2`); volume và container cũ giữ nguyên, chưa xóa.
+  - `./mvnw -B -ntp -o verify` trên `rs0` mới: **895 test, 0 lỗi, 0 skip, BUILD SUCCESS** (gồm spotless, SpotBugs, JaCoCo trong `verify`). Chưa xem lần chạy CI trên GitHub.
+- **Lỗi AI tự phát hiện khi làm (để điền bảng B):**
+  - Fixture test repository giả lập "trang đầy" sai: `PageableExecutionUtils.getPage` suy tổng từ offset khi trang ngắn nên không gọi `count` (test báo 21 thay vì 41). Sửa fixture, không sửa mã.
+  - Assertion giả định `Query.limit(-1).skip(-1)` cho giá trị -1; thực tế `isLimited()` = false. Sửa test theo hành vi thật.
+- **Sinh viên đã sửa/rà soát:** _chờ sinh viên rà soát_
+- **Commit / PR:** chưa commit. PR nên ghi `Closes #18`; sinh viên IBS review.
+
+---
+
+## Phiên #18 — 2026-11-03: Hiện thực hóa phân hệ F03 các nội dung liên quan đến CLO (US-10, US-11, US-12)
 
 - **Sinh viên yêu cầu:** TinMH (IT) / minhat5
 - **Mục tiêu:**

@@ -4,8 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.hcmute.lms.lmsapi.document.AuditEntity;
 import com.hcmute.lms.lmsapi.document.AuditLog;
+import com.hcmute.lms.lmsapi.dto.AuditLogResponse;
 import com.hcmute.lms.lmsapi.enums.AuditAction;
 import com.hcmute.lms.lmsapi.mapper.impl.AuditLogMapperImpl;
+import java.time.Instant;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -80,5 +82,39 @@ public class AuditLogMapperUnitTest {
     assertThat(map.get("username")).isEqualTo("teacher_minh");
     assertThat(map.get("accessToken")).isEqualTo("[PROTECTED]");
     assertThat(map.get("age")).isEqualTo(35);
+  }
+
+  @Test
+  @DisplayName("US-04: toResponse sao chép đủ trường và làm sạch lại before/after khi đọc")
+  void testToResponseSanitizesOnRead() {
+    Instant at = Instant.parse("2026-10-01T08:00:00Z");
+    AuditEntity entity = new AuditEntity("users", "507f1f77bcf86cd799439012");
+    AuditLog stored =
+        AuditLog.builder()
+            .id("507f1f77bcf86cd799439011")
+            .at(at)
+            .userId("507f1f77bcf86cd799439012")
+            .action(AuditAction.LOGIN)
+            .entity(entity)
+            .before(Map.of("username", "alice", "passwordHash", "$2a$10$leaked"))
+            .after(null)
+            .reason(null)
+            .ip("203.0.113.7")
+            .build();
+
+    AuditLogResponse response = mapper.toResponse(stored);
+
+    assertThat(response.getId()).isEqualTo("507f1f77bcf86cd799439011");
+    assertThat(response.getAt()).isEqualTo(at);
+    assertThat(response.getUserId()).isEqualTo("507f1f77bcf86cd799439012");
+    assertThat(response.getAction()).isEqualTo(AuditAction.LOGIN);
+    assertThat(response.getEntity()).isEqualTo(entity);
+    assertThat(response.getIp()).isEqualTo("203.0.113.7");
+    assertThat(response.getAfter()).isNull();
+    @SuppressWarnings("unchecked")
+    Map<String, Object> before = (Map<String, Object>) response.getBefore();
+    assertThat(before)
+        .containsEntry("username", "alice")
+        .containsEntry("passwordHash", "[PROTECTED]");
   }
 }
