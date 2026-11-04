@@ -10,7 +10,7 @@ Cập nhật bảng này khi có thay đổi; không điền trạng thái theo 
 |---|---|---|---|
 | Phiếu đăng ký đề tài (GV và SV), bảng phân công | Bước 1–2 | `doc/quy-trinh/` | Đang làm (có dự thảo `phan-cong.md`; chưa có phiếu đăng ký) |
 | Báo cáo tiến độ ≥ 1 lần/tuần; GVHD duyệt 2 tuần/lần | Hằng tuần | `doc/bao-cao-tien-do/` | Chưa có |
-| **Bản cam kết sản phẩm và metric, có chữ ký** | **Tuần 7–10 (trước mốc 50%)** | `doc/cam-ket-san-pham-metric.md` | Đang làm (có dự thảo, **chưa điền, chưa ký**) |
+| **Bản cam kết sản phẩm và metric, có chữ ký** | **Tuần 7–10 (trước mốc 50%)** | `doc/cam-ket-san-pham-metric.md` | Đang làm (đã cập nhật 2 học phần thử nghiệm thật từ CTĐT Fintech; chờ điền đầy đủ và ký) |
 | Kết luận rà soát của bộ môn | Sau mốc 50% | _do bộ môn cấp_ | Chưa có |
 
 ## Tiêu chí và ngưỡng Mức 5

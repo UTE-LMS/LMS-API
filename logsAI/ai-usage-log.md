@@ -303,3 +303,27 @@ Phần này chuẩn bị sẵn câu trả lời khoa học, chuẩn mực cho 4 
   - Subagent rà soát độc lập phát hiện `canAccessCourse` cộng dồn quyền QA_OFFICER (ngành khác) thành quyền GHI; đã sửa (chỉ tính `PROGRAM_MANAGER`/`ADMIN`) và thêm test hồi quy. Các phát hiện còn lại chưa sửa vì cần quyết định thiết kế, đã ghi `doc/tech-debt.md` TD-27…TD-29 và ADR 0009 §4.
 - **Sinh viên đã sửa/rà soát:** _chờ sinh viên rà soát_
 - **Commit / PR:** chưa commit. PR nên ghi `Closes #21`, `Closes #22`, `Closes #23`; **không** ghi `Closes #28` (chờ F05b). Sinh viên IBS review.
+
+---
+
+## Phiên #20 — 2026-11-04: Tiếp nhận dữ liệu CTĐT Fintech và 2 đề cương chi tiết học phần thử nghiệm, đối chiếu yêu cầu và cập nhật tiến độ
+
+- **Sinh viên yêu cầu:** TinMH (IT)
+- **Công cụ / mô hình:** Antigravity, Gemini 3.8 Flash
+- **Mục tiêu:**
+  1. Rà soát cấu trúc nội dung của 3 tài liệu mới được chuyển vào `doc/`:
+     - `doc/Biểu mẫu 09_CTĐT ngành FINTECH v2.md` (CTĐT ngành Công nghệ tài chính 2024, mã 7340205, 9 ELO, 27 PI, 132 tín chỉ, kế hoạch 8 học kỳ).
+     - `doc/11. APCM220307 - TIN HỌC ỨNG DỤNG_0001.md` (Đề cương chi tiết học phần Tin học ứng dụng: 3 CLO, ánh xạ PI1.2, PI2.3, PI3.1, PI5.2, kế hoạch kiểm tra 4 bài thực hành + thi cuối kỳ).
+     - `doc/47. ABDA433708 - ỨNG DỤNG PHÂN TÍCH DỮ LIỆU LỚN TRONG KINH DOANH_0001.md` (Đề cương chi tiết học phần Ứng dụng phân tích Big Data trong kinh doanh: 4 CLO, ánh xạ PI1.3, PI2.3, PI3.3, PI6.2, rubric thuyết trình & project nhóm).
+  2. Đối chiếu với các yêu cầu và rủi ro trong tài liệu đồ án:
+     - Thỏa mãn minh chứng gốc **MC01** (thêm CTĐT thứ 2) và **MC02** (đề cương chi tiết học phần thử nghiệm) trong `doc/BS.md`.
+     - Giải quyết câu hỏi còn nợ **Q02** (đề cương chính thức) và **Q14** (ánh xạ CLO–PI đã duyệt) trong `doc/GiaiThich_CoSoDuLieu.md` §8.
+     - Hạ cấp mức độ rủi ro **R1** (từ **Cao** xuống **Trung bình**) và tháo gỡ điểm nghẽn cho Cột mốc **K1** trong `doc/ke-hoach-xay-dung.md`.
+     - Cung cấp dữ liệu thực tế cho các User Story thuộc F02 (`programs`, `program_versions`, `plos`, `pis`), F03 (`courses`, `program_courses`, `syllabi`, `clos`, `clo_pi_links`) và F04 (`assessments`, rubric).
+  3. Cập nhật tiến độ vào `doc/cam-ket-san-pham-metric.md`, `doc/ke-hoach-xay-dung.md`, `doc/rubric-checklist.md`.
+- **File AI sinh/sửa:**
+  - Tài liệu: `doc/cam-ket-san-pham-metric.md`, `doc/ke-hoach-xay-dung.md`, `doc/rubric-checklist.md`, `logsAI/ai-usage-log.md`.
+- **Kiểm chứng đã làm:**
+  - Đọc và đối chiếu toàn bộ các trường dữ liệu, chuẩn đầu ra ELO/PI/CLO, trọng số đánh giá giữa 3 file dữ liệu gốc và schema CSDL MongoDB v0.5.
+- **Sinh viên đã sửa/rà soát:** _chờ sinh viên rà soát_
+- **Commit / PR:** chưa commit.

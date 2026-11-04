@@ -45,7 +45,7 @@ ML; quản lý "minh chứng" như danh mục dữ liệu (chỉ lưu tệp đi�
 luận mức đạt của toàn chương trình; thay thế quy trình đo lường chính thức của Khoa. (Duyệt *ma trận ánh xạ* đề thi
 là NEW-01 ở mục 4, chờ GVHD.)
 
-**Học phần thử nghiệm:** [ĐIỀN: ba học phần; chưa chọn]. Nguồn dữ liệu điểm: [ĐIỀN]. Giới hạn: kết quả chỉ kết luận
+**Học phần thử nghiệm:** Đã tiếp nhận 2 học phần thử nghiệm có đề cương chi tiết chính thức và ánh xạ CLO–PI từ CTĐT Công nghệ tài chính: (1) `APCM220307` - Tin học ứng dụng; (2) `ABDA433708` - Ứng dụng phân tích dữ liệu lớn trong kinh doanh (bên cạnh học phần mẫu `OOPR230279` của CTĐT CNTT). Nguồn dữ liệu điểm: [CHỜ TIẾP NHẬN BẢNG ĐIỂM HOẶC DÙNG DỮ LIỆU THỬ NGHIỆM CÓ NHÃN]. Giới hạn: kết quả chỉ kết luận
 trong phạm vi có đủ minh chứng.
 
 **Phụ thuộc bên ngoài (rủi ro):** quy tắc đo lường (công thức, trọng số, ngưỡng) do Khoa xác nhận. Nếu đến hạn K3
