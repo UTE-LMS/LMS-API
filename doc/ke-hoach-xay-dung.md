@@ -18,7 +18,7 @@ Nguồn: `Rubric_Do_An_Mon_Hoc_CNPM_V2-1.docx.md`, `BS.md`, `Misa.md`, `GiaiThic
 **Đã chốt (người dùng xác nhận)**
 - Hiện tại là **tuần 5** của kỳ 95 ngày làm việc (≈ 19 tuần).
 - **ML nằm ngoài phạm vi.**
-- **Ba học phần thử nghiệm để sau** (chưa chọn).
+- **Học phần thử nghiệm:** Đã tiếp nhận đề cương chính thức và ánh xạ CLO–PI của 2 học phần (`APCM220307`, `ABDA433708`) thuộc CTĐT Fintech v2 (2024); cùng học phần mẫu `OOPR230279` (CNTT).
 - Hai tài liệu lệch nhau thì **theo `GiaiThich_CoSoDuLieu.md`** (thiết kế CSDL).
 - Hai sinh viên **không phân công cứng nhắc**, hỗ trợ chéo tự do.
 - Thiết kế CSDL **v0.5** (theo `PLO_DB_UPDATE.md`) là bản hiện hành. Riêng ba điểm lệch phạm vi/nguyên tắc của v0.5 (duyệt
@@ -39,7 +39,7 @@ Nguồn: `Rubric_Do_An_Mon_Hoc_CNPM_V2-1.docx.md`, `BS.md`, `Misa.md`, `GiaiThic
 
 **Trong phạm vi**
 - CTĐT CNTT (1 chương trình), 7 PLO, 17 PI.
-- Học phần thử nghiệm: **chưa chọn** (xem R1 và việc K1). Hệ thống phải hoạt động với bất kỳ học phần nào; phát
+- Học phần thử nghiệm: **Đã tiếp nhận 2 đề cương chi tiết chính thức** (`APCM220307`, `ABDA433708`) thuộc CTĐT Fintech v2, đầy đủ CLO và ánh xạ CLO–PI; hệ thống hoạt động với bất kỳ học phần nào; phát
   triển và kiểm thử bằng dữ liệu giả có nhãn cho tới khi có học phần và dữ liệu thật.
 - 8 nhóm chức năng F01–F08 (mục 3).
 
@@ -324,7 +324,7 @@ trung xong trước T14. Mục tiêu: build xanh ≥ 90%, commit → staging ≤
 
 | # | Rủi ro | Mức | Phương án |
 |---|---|---|---|
-| R1 | Khoa chậm hoặc không cung cấp đề cương, quy tắc đo, điểm theo câu hỏi (MC02–MC08); **ba học phần thử nghiệm chưa chọn** | **Cao** | Rule engine cấu hình; dev/test bằng dữ liệu giả **có nhãn**; chọn học phần càng sớm càng tốt (nên trước K1) và quyết định xong trước K3. Nếu tới K3 vẫn thiếu: chạy ở chế độ không chính thức, ghi rõ giới hạn trong báo cáo và luận văn. Không bịa dữ liệu hay công thức |
+| R1 | Khoa chậm cung cấp quy tắc đo, điểm theo câu hỏi (MC03–MC08); **đã có 2 đề cương thật (`APCM220307`, `ABDA433708`)** | **Trung bình** (giảm từ Cao) | Đã có đề cương và ánh xạ CLO–PI thật; tiếp tục cấu hình rule engine; dev/test bằng dữ liệu giả **có nhãn** khi chưa có file điểm thật. Nếu tới K3 vẫn thiếu: chạy ở chế độ không chính thức, ghi rõ giới hạn trong báo cáo và luận văn. Không bịa dữ liệu hay công thức |
 | R2 | Điểm chỉ có tổng, không có theo câu hỏi (Q05) | Cao | `dataGranularity = TOTAL_ONLY` có trong thiết kế nhưng **không đo được CLO/PI**; thảo luận với GVHD để đổi phạm vi bằng ADR trước K1 |
 | R3 | Không đủ ≥ 10 người dùng thật hoặc ≥ 3 bên liên quan | Trung bình | Lên danh sách và hẹn ngay từ T5; báo sớm cho GVHD nếu thiếu |
 | R4 | Transaction cần replica set; môi trường staging không hỗ trợ | Trung bình | Kiểm tra ở P0; nếu không có, đổi cách đảm bảo nhất quán bằng ADR |
@@ -373,7 +373,7 @@ trung xong trước T14. Mục tiêu: build xanh ≥ 90%, commit → staging ≤
 
 1. **Ngày bắt đầu chính xác của kỳ** và ngày bảo vệ dự kiến (để quy T-n ra ngày).
 2. **F08 (theo dõi cải tiến)** có nằm trong cam kết không (kế hoạch đang xếp là Must).
-3. **Khi nào chọn ba học phần thử nghiệm** và có dữ liệu điểm theo câu hỏi hay không (R1, R2). Đề xuất: trước K1.
+3. **Học phần thử nghiệm:** Đã chọn và tiếp nhận 2 đề cương chi tiết chính thức (`APCM220307`, `ABDA433708`) thuộc CTĐT Fintech. Còn chờ dữ liệu điểm theo câu hỏi (R2).
 4. Tập story đưa vào bản cam kết Bước 3 (mục 3, cuối).
 5. Con số KPI và NFR (mục 8).
 6. Java 25 hay LTS; nơi đặt staging; SSR của UI.
