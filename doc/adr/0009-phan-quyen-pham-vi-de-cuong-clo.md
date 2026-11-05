@@ -1,6 +1,6 @@
 # ADR 0009 — Phân quyền theo phạm vi cho ghi đề cương, CLO và liên kết CLO–PI
 
-- **Trạng thái:** ĐỀ XUẤT, **chờ GVHD/Khoa xác nhận**. Chưa phải quyết định chính thức.
+- **Trạng thái:** BÃI BỎ / THAY THẾ BỞI ADR 0010 (SUPERSEDED by ADR 0010: Phân quyền theo Bộ môn và Giảng viên).
 - **Ngày:** 2026-11-04
 - **Người soạn:** Claude Code theo yêu cầu của sinh viên TinMH (IT); sinh viên rà soát và ghi tên người chốt: [ĐIỀN]
 - **Liên quan:** ADR 0003 (xác thực, phân quyền F01), ADR 0004 (QA xác nhận), ADR 0005 (`0005-phan-quyen-khoi-tao-danh-muc-ctdt.md`, §3.2), `doc/plan/F03-hoc-phan-clo.md`

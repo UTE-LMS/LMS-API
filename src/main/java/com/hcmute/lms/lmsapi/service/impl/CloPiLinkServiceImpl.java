@@ -24,6 +24,7 @@ import com.hcmute.lms.lmsapi.mapper.PiMapper;
 import com.hcmute.lms.lmsapi.repository.CloPiLinkRepository;
 import com.hcmute.lms.lmsapi.repository.CloRepository;
 import com.hcmute.lms.lmsapi.repository.PiRepository;
+import com.hcmute.lms.lmsapi.repository.ProgramCourseRepository;
 import com.hcmute.lms.lmsapi.repository.ProgramVersionRepository;
 import com.hcmute.lms.lmsapi.repository.SyllabusRepository;
 import com.hcmute.lms.lmsapi.service.CloPiLinkService;
@@ -48,6 +49,7 @@ public class CloPiLinkServiceImpl implements CloPiLinkService {
   private final CloRepository cloRepository;
   private final PiRepository piRepository;
   private final ProgramVersionRepository programVersionRepository;
+  private final ProgramCourseRepository programCourseRepository;
   private final ScopeAuthorizationService scopeAuthorizationService;
   private final CloPiLinkMapper cloPiLinkMapper;
   private final CloMapper cloMapper;
@@ -61,12 +63,23 @@ public class CloPiLinkServiceImpl implements CloPiLinkService {
 
   @Override
   public CloPiLinkResponse createLink(String syllabusId, CloPiLinkRequest request) {
-    requireSyllabus(syllabusId);
+    Syllabus syllabus = requireSyllabus(syllabusId);
 
     ObjectIdUtils.requireValid(request.getProgramVersionId(), "programVersionId");
     if (!programVersionRepository.existsById(request.getProgramVersionId())) {
       throw new ResourceNotFoundException(
           "Phiên bản CTĐT không tồn tại: " + request.getProgramVersionId());
+    }
+
+    // TD-28: Kiểm tra học phần của đề cương phải thuộc phiên bản CTĐT được liên kết
+    // (program_courses)
+    if (syllabus.getCourseId() != null
+        && !programCourseRepository.existsByProgramVersionIdAndCourseId(
+            request.getProgramVersionId(), syllabus.getCourseId())) {
+      throw new BusinessRuleViolationException(
+          String.format(
+              "Học phần id=[%s] của đề cương không thuộc phiên bản CTĐT id=[%s]",
+              syllabus.getCourseId(), request.getProgramVersionId()));
     }
 
     Clo clo = requireClo(request.getCloId());
@@ -136,13 +149,13 @@ public class CloPiLinkServiceImpl implements CloPiLinkService {
     List<CloResponse> cloResponses = cloMapper.toResponseList(clos);
     List<PiResponse> piResponses = piMapper.toResponseList(pis);
 
-    List<CloPiLinkCellDto> cellDtos = new ArrayList<>(links.size());
+    List<CloPiLinkCellDto> cellDtos = new ArrayList<>();
     for (CloPiLink link : links) {
       cellDtos.add(
           CloPiLinkCellDto.builder()
+              .linkId(link.getId())
               .cloId(link.getCloId())
               .piId(link.getPiId())
-              .linkId(link.getId())
               .weight(link.getWeight())
               .verification(link.getVerification())
               .build());

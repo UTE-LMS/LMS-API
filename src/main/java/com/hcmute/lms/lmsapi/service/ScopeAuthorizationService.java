@@ -4,9 +4,9 @@ import com.hcmute.lms.lmsapi.dto.UserPrincipal;
 import com.hcmute.lms.lmsapi.enums.AccessType;
 
 /**
- * Service kiểm tra phân quyền truy cập tài nguyên lớp học phần theo vai trò và phạm vi (F01 / US-03
- * / ADR 0003, ADR 0004, ADR 0005). Áp dụng ma trận phân quyền vai trò × phạm vi × READ/WRITE, quy
- * tắc lecturerIds độc lập, định nghĩa scope rỗng nghiêm ngặt và nguyên lý fail-closed.
+ * Service kiểm tra phân quyền truy cập tài nguyên theo vai trò và phạm vi (F01 / ADR 0003, ADR
+ * 0004, ADR 0005, ADR 0010). Áp dụng ma trận phân quyền vai trò × phạm vi × READ/WRITE, quy tắc
+ * lecturerIds độc lập, định nghĩa scope rỗng nghiêm ngặt và nguyên lý fail-closed.
  */
 public interface ScopeAuthorizationService {
 
@@ -27,21 +27,27 @@ public interface ScopeAuthorizationService {
       UserPrincipal principal, String programVersionId, AccessType accessType);
 
   /**
-   * Kiểm tra quyền trên một học phần (ADR 0009). Học phần không có {@code programVersionId} riêng
-   * nên phạm vi được suy từ {@code program_courses}: ADMIN luôn được phép; các vai trò khác cần ÍT
-   * NHẤT MỘT phiên bản CTĐT chứa học phần mà {@link #canAccessProgramVersion} cho phép (phép HỢP).
-   * Học phần chưa thuộc CTĐT nào, hoặc không tồn tại, chỉ ADMIN được phép (fail-closed).
+   * Kiểm tra quyền trên một học phần (ADR 0010). ADMIN luôn được phép. Cho thao tác WRITE, chỉ
+   * DEPARTMENT_HEAD hoặc LECTURER có {@code courseId} trong {@code scope.courseIds} được phép; các
+   * vai trò khác (PROGRAM_MANAGER, QA_OFFICER,...) bị từ chối (fail-closed).
    */
   boolean canAccessCourse(UserPrincipal principal, String courseId, AccessType accessType);
 
-  /** Kiểm tra quyền trên đề cương thông qua {@code syllabi.courseId} (ADR 0009). */
+  /** Kiểm tra quyền trên đề cương thông qua {@code syllabi.courseId} (ADR 0010). */
   boolean canAccessSyllabus(UserPrincipal principal, String syllabusId, AccessType accessType);
 
-  /** Kiểm tra quyền trên CLO thông qua {@code clos.courseId} (ADR 0009). */
+  /** Kiểm tra quyền trên CLO thông qua {@code clos.courseId} (ADR 0010). */
   boolean canAccessClo(UserPrincipal principal, String cloId, AccessType accessType);
 
   /**
-   * Kiểm tra quyền trên liên kết CLO–PI thông qua {@code clo_pi_links.programVersionId} (ADR 0009).
+   * Kiểm tra quyền trên liên kết CLO–PI thông qua {@code clo_pi_links.programVersionId} (ADR 0010).
    */
   boolean canAccessCloPiLink(UserPrincipal principal, String linkId, AccessType accessType);
+
+  /**
+   * Kiểm tra quyền phân công môn học cho giảng viên (ADR 0010). ADMIN luôn được phép.
+   * DEPARTMENT_HEAD chỉ được phân công khi {@code courseId} nằm trong {@code scope.courseIds} của
+   * chính mình.
+   */
+  boolean canAssignCourse(UserPrincipal principal, String courseId);
 }

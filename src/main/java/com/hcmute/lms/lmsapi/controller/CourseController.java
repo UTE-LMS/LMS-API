@@ -66,14 +66,14 @@ public class CourseController {
   }
 
   @PostMapping
-  @PreAuthorize("hasAnyRole('ADMIN', 'PROGRAM_MANAGER')")
+  @PreAuthorize("hasRole('ADMIN')")
   public ResponseEntity<CourseResponse> createCourse(@Valid @RequestBody CourseRequest request) {
     log.info("API request: POST /api/v1/courses with code [{}]", request.getCode());
     return ResponseEntity.status(HttpStatus.CREATED).body(courseService.createCourse(request));
   }
 
   @PutMapping("/{id}")
-  @PreAuthorize("hasAnyRole('ADMIN', 'PROGRAM_MANAGER')")
+  @PreAuthorize("hasRole('ADMIN')")
   public ResponseEntity<CourseResponse> updateCourse(
       @PathVariable("id")
           @Pattern(

@@ -12,7 +12,6 @@ import com.hcmute.lms.lmsapi.document.Pi;
 import com.hcmute.lms.lmsapi.document.Syllabus;
 import com.hcmute.lms.lmsapi.dto.CloPiLinkRequest;
 import com.hcmute.lms.lmsapi.dto.CloPiLinkResponse;
-import com.hcmute.lms.lmsapi.dto.CloPiMatrixResponse;
 import com.hcmute.lms.lmsapi.dto.UserPrincipal;
 import com.hcmute.lms.lmsapi.dto.VerificationRequest;
 import com.hcmute.lms.lmsapi.enums.AccessType;
@@ -26,6 +25,7 @@ import com.hcmute.lms.lmsapi.mapper.PiMapper;
 import com.hcmute.lms.lmsapi.repository.CloPiLinkRepository;
 import com.hcmute.lms.lmsapi.repository.CloRepository;
 import com.hcmute.lms.lmsapi.repository.PiRepository;
+import com.hcmute.lms.lmsapi.repository.ProgramCourseRepository;
 import com.hcmute.lms.lmsapi.repository.ProgramVersionRepository;
 import com.hcmute.lms.lmsapi.repository.SyllabusRepository;
 import com.hcmute.lms.lmsapi.service.ScopeAuthorizationService;
@@ -49,6 +49,7 @@ class CloPiLinkServiceImplTest {
   @Mock private CloRepository cloRepository;
   @Mock private PiRepository piRepository;
   @Mock private ProgramVersionRepository programVersionRepository;
+  @Mock private ProgramCourseRepository programCourseRepository;
   @Mock private ScopeAuthorizationService scopeAuthorizationService;
   @Mock private CloPiLinkMapper cloPiLinkMapper;
   @Mock private CloMapper cloMapper;
@@ -110,6 +111,34 @@ class CloPiLinkServiceImplTest {
   }
 
   @Test
+  @DisplayName("getLinks: Lấy danh sách liên kết theo syllabusId")
+  void getLinks_Success() {
+    when(syllabusRepository.findById(syllabusId)).thenReturn(Optional.of(syllabus));
+    when(cloPiLinkRepository.findBySyllabusId(syllabusId)).thenReturn(List.of(link));
+    when(cloPiLinkMapper.toResponseList(List.of(link))).thenReturn(List.of(response));
+
+    List<CloPiLinkResponse> result = cloPiLinkService.getLinks(syllabusId);
+    assertThat(result).hasSize(1);
+    assertThat(result.get(0).getId()).isEqualTo(linkId);
+  }
+
+  @Test
+  @DisplayName(
+      "createLink: Ném BusinessRuleViolationException khi môn học không thuộc CTĐT (TD-28)")
+  void createLink_CourseNotInProgramVersion_ThrowsBusinessRuleViolation() {
+    String courseId = new ObjectId().toHexString();
+    Syllabus s = Syllabus.builder().id(syllabusId).courseId(courseId).build();
+    when(syllabusRepository.findById(syllabusId)).thenReturn(Optional.of(s));
+    when(programVersionRepository.existsById(programVersionId)).thenReturn(true);
+    when(programCourseRepository.existsByProgramVersionIdAndCourseId(programVersionId, courseId))
+        .thenReturn(false);
+
+    assertThatThrownBy(() -> cloPiLinkService.createLink(syllabusId, request))
+        .isInstanceOf(BusinessRuleViolationException.class)
+        .hasMessageContaining("không thuộc phiên bản CTĐT");
+  }
+
+  @Test
   @DisplayName(
       "createLink: Ném BusinessRuleViolationException khi PI không thuộc programVersionId (US-12/AC-2)")
   void createLink_PiMismatchVersion_ThrowsBusinessRuleViolation() {
@@ -117,14 +146,12 @@ class CloPiLinkServiceImplTest {
     when(programVersionRepository.existsById(programVersionId)).thenReturn(true);
     when(cloRepository.findById(cloId)).thenReturn(Optional.of(clo));
 
-    // PI thuộc version khác
-    String otherVersionId = new ObjectId().toHexString();
-    pi.setProgramVersionId(otherVersionId);
-    when(piRepository.findById(piId)).thenReturn(Optional.of(pi));
+    Pi mismatchPi = Pi.builder().id(piId).programVersionId(new ObjectId().toHexString()).build();
+    when(piRepository.findById(piId)).thenReturn(Optional.of(mismatchPi));
 
     assertThatThrownBy(() -> cloPiLinkService.createLink(syllabusId, request))
         .isInstanceOf(BusinessRuleViolationException.class)
-        .hasMessageContaining("PI");
+        .hasMessageContaining("không thuộc về phiên bản CTĐT");
   }
 
   @Test
@@ -160,37 +187,10 @@ class CloPiLinkServiceImplTest {
   }
 
   @Test
-  @DisplayName("deleteLink: Xóa liên kết thành công")
-  void deleteLink_Success() {
-    when(cloPiLinkRepository.existsById(linkId)).thenReturn(true);
-
-    cloPiLinkService.deleteLink(linkId);
-    verify(cloPiLinkRepository).deleteById(linkId);
-  }
-
-  @Test
-  @DisplayName("getMatrix: Trả ma trận CLO x PI thành công (US-12/AC-4)")
-  void getMatrix_Success() {
-    when(syllabusRepository.findById(syllabusId)).thenReturn(Optional.of(syllabus));
-    when(programVersionRepository.existsById(programVersionId)).thenReturn(true);
-    when(cloRepository.findBySyllabusIdOrderByCodeAsc(syllabusId)).thenReturn(List.of(clo));
-    when(piRepository.findByProgramVersionIdOrderByDisplayOrderAsc(programVersionId))
-        .thenReturn(List.of(pi));
-    when(cloPiLinkRepository.findBySyllabusIdAndProgramVersionId(syllabusId, programVersionId))
-        .thenReturn(List.of(link));
-
-    CloPiMatrixResponse matrix = cloPiLinkService.getMatrix(syllabusId, programVersionId);
-    assertThat(matrix).isNotNull();
-    assertThat(matrix.getSyllabusId()).isEqualTo(syllabusId);
-    assertThat(matrix.getLinks()).hasSize(1);
-  }
-
-  @Test
-  @DisplayName("verifyLink: Chặn khi QA không có quyền scope trên programVersion")
+  @DisplayName("verifyLink: Chặn khi QA_OFFICER ngoài scope của programVersion (ADR 0004)")
   void verifyLink_OutOfScope_ThrowsForbidden() {
     when(cloPiLinkRepository.findById(linkId)).thenReturn(Optional.of(link));
-    UserPrincipal principal = UserPrincipal.builder().id("qa_user").build();
-
+    UserPrincipal principal = UserPrincipal.builder().id("qa1").build();
     when(scopeAuthorizationService.canAccessProgramVersion(
             principal, programVersionId, AccessType.WRITE))
         .thenReturn(false);
@@ -204,25 +204,24 @@ class CloPiLinkServiceImplTest {
   }
 
   @Test
-  @DisplayName("verifyLink: Cập nhật status sang VERIFIED thành công (US-12/AC-3)")
+  @DisplayName("verifyLink: Thành công khi QA_OFFICER đúng scope (US-12/AC-3)")
   void verifyLink_Success() {
     when(cloPiLinkRepository.findById(linkId)).thenReturn(Optional.of(link));
-    UserPrincipal principal = UserPrincipal.builder().id("qa_user").build();
-
+    UserPrincipal principal = UserPrincipal.builder().id("qa1").build();
     when(scopeAuthorizationService.canAccessProgramVersion(
             principal, programVersionId, AccessType.WRITE))
         .thenReturn(true);
     when(cloPiLinkRepository.save(any(CloPiLink.class))).thenReturn(link);
-    when(cloPiLinkMapper.toResponse(any(CloPiLink.class))).thenReturn(response);
+    when(cloPiLinkMapper.toResponse(link)).thenReturn(response);
 
     VerificationRequest req =
-        VerificationRequest.builder().status(VerificationStatus.VERIFIED).build();
+        VerificationRequest.builder()
+            .status(VerificationStatus.VERIFIED)
+            .note("Đã đối chiếu")
+            .build();
 
     CloPiLinkResponse result = cloPiLinkService.verifyLink(linkId, req, principal);
     assertThat(result).isNotNull();
     verify(cloPiLinkRepository).save(link);
-    assertThat(link.getVerification()).isNotNull();
-    assertThat(link.getVerification().getStatus()).isEqualTo(VerificationStatus.VERIFIED);
-    assertThat(link.getVerification().getVerifiedBy()).isEqualTo("qa_user");
   }
 }

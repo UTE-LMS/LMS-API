@@ -8,6 +8,7 @@ import com.hcmute.lms.lmsapi.enums.AccessType;
 import com.hcmute.lms.lmsapi.enums.Role;
 import com.hcmute.lms.lmsapi.repository.CloPiLinkRepository;
 import com.hcmute.lms.lmsapi.repository.CloRepository;
+import com.hcmute.lms.lmsapi.repository.CourseRepository;
 import com.hcmute.lms.lmsapi.repository.CourseSectionRepository;
 import com.hcmute.lms.lmsapi.repository.ProgramCourseRepository;
 import com.hcmute.lms.lmsapi.repository.ProgramVersionRepository;
@@ -19,10 +20,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 /**
- * Hiện thực dịch vụ phân quyền phạm vi truy cập tài nguyên lớp học phần (F01 / US-03 / ADR 0003,
- * ADR 0004, ADR 0005). Triển khai ma trận phân quyền vai trò × phạm vi × READ/WRITE, quy tắc
- * lecturerIds độc lập, định nghĩa strict empty scope và tính toán quyền tổng hợp theo phép HỢP
- * (UNION).
+ * Hiện thực dịch vụ phân quyền phạm vi truy cập tài nguyên lớp học phần, chương trình đào tạo, học
+ * phần, đề cương và CLO (F01 / ADR 0003, ADR 0004, ADR 0005, ADR 0010). Triển khai ma trận phân
+ * quyền vai trò × phạm vi × READ/WRITE, quy tắc lecturerIds độc lập, định nghĩa strict empty scope
+ * và tính toán quyền tổng hợp theo phép HỢP (UNION).
  */
 @Slf4j
 @Service("scopeAuthorizationService")
@@ -30,6 +31,7 @@ import org.springframework.stereotype.Service;
 public class ScopeAuthorizationServiceImpl implements ScopeAuthorizationService {
 
   private final CourseSectionRepository courseSectionRepository;
+  private final CourseRepository courseRepository;
   private final ProgramVersionRepository programVersionRepository;
   private final ProgramCourseRepository programCourseRepository;
   private final SyllabusRepository syllabusRepository;
@@ -65,8 +67,7 @@ public class ScopeAuthorizationServiceImpl implements ScopeAuthorizationService 
 
     CourseSection section = sectionOpt.get();
 
-    // Quyền tổng hợp của người dùng có nhiều roleAssignments là phép HỢP (UNION):
-    // Nếu BẤT KỲ roleAssignment nào cấp quyền truy cập, kết quả trả về true.
+    // Duyệt qua từng phân công vai trò của người dùng; nếu có ít nhất 1 vai trò hợp lệ -> cho phép
     for (RoleAssignment assignment : principal.getRoleAssignments()) {
       if (checkAssignment(assignment, principal, section, accessType)) {
         log.debug(
@@ -166,7 +167,7 @@ public class ScopeAuthorizationServiceImpl implements ScopeAuthorizationService 
       return false;
     }
 
-    // ADMIN không phụ thuộc phạm vi, kể cả khi học phần chưa thuộc CTĐT nào.
+    // ADMIN luôn có toàn quyền
     boolean isAdmin =
         principal.getRoleAssignments().stream()
             .anyMatch(a -> a != null && a.getRole() == Role.ADMIN);
@@ -174,51 +175,64 @@ public class ScopeAuthorizationServiceImpl implements ScopeAuthorizationService 
       return true;
     }
 
-    // Phép HỢP: một CTĐT chứa học phần nằm trong phạm vi là đủ. Học phần không thuộc CTĐT nào
-    // -> danh sách rỗng -> từ chối (fail-closed).
-    boolean allowed =
-        programCourseRepository.findByCourseId(courseId.trim()).stream()
-            .anyMatch(
-                pc -> canAccessCourseVersion(principal, pc.getProgramVersionId(), accessType));
+    // Môn học phải tồn tại trong CSDL
+    if (!courseRepository.existsById(courseId.trim())) {
+      log.debug("canAccessCourse: Fail-closed - course [{}] not found in database", courseId);
+      return false;
+    }
+
+    for (RoleAssignment assignment : principal.getRoleAssignments()) {
+      if (checkCourseAssignment(assignment, courseId.trim(), accessType)) {
+        log.debug(
+            "canAccessCourse: Access GRANTED to user [{}] for course [{}] with accessType [{}] via role [{}]",
+            principal.getUsername(),
+            courseId,
+            accessType,
+            assignment.getRole());
+        return true;
+      }
+    }
+
     log.debug(
-        "canAccessCourse: Access {} for user [{}] on course [{}] with accessType [{}]",
-        allowed ? "GRANTED" : "DENIED",
+        "canAccessCourse: Access DENIED to user [{}] for course [{}] with accessType [{}]",
         principal.getUsername(),
         courseId,
         accessType);
-    return allowed;
+    return false;
   }
 
-  /**
-   * Quyền trên một phiên bản CTĐT cho tài nguyên F03 (ADR 0009). GHI chỉ tính phân công {@code
-   * PROGRAM_MANAGER} có scope khớp, để vai trò khác của cùng người dùng (ví dụ QA_OFFICER ở ngành
-   * khác) không cộng dồn thành quyền ghi. ĐỌC dùng quy tắc chung của {@link
-   * #canAccessProgramVersion}.
-   */
-  private boolean canAccessCourseVersion(
-      UserPrincipal principal, String programVersionId, AccessType accessType) {
-    if (accessType != AccessType.WRITE) {
-      return canAccessProgramVersion(principal, programVersionId, accessType);
-    }
-    if (principal == null || principal.getRoleAssignments() == null) {
+  @Override
+  public boolean canAssignCourse(UserPrincipal principal, String courseId) {
+    if (principal == null || courseId == null || courseId.isBlank()) {
+      log.debug("canAssignCourse: Fail-closed due to null or blank parameters");
       return false;
     }
-    if (programVersionId == null || programVersionId.isBlank()) {
+    if (principal.getRoleAssignments() == null || principal.getRoleAssignments().isEmpty()) {
+      log.debug(
+          "canAssignCourse: Fail-closed - user [{}] has no role assignments",
+          principal.getUsername());
       return false;
     }
-    return programVersionRepository
-        .findById(programVersionId.trim())
-        .map(
-            version ->
-                principal.getRoleAssignments().stream()
-                    .anyMatch(
-                        a ->
-                            a != null
-                                && (a.getRole() == Role.ADMIN
-                                    || (a.getRole() == Role.PROGRAM_MANAGER
-                                        && matchesProgramScope(
-                                            a.getScope(), version.getProgramId())))))
-        .orElse(false);
+
+    boolean isAdmin =
+        principal.getRoleAssignments().stream()
+            .anyMatch(a -> a != null && a.getRole() == Role.ADMIN);
+    if (isAdmin) {
+      return true;
+    }
+
+    if (!courseRepository.existsById(courseId.trim())) {
+      log.debug("canAssignCourse: Fail-closed - course [{}] not found in database", courseId);
+      return false;
+    }
+
+    // Chỉ Trưởng bộ môn (DEPARTMENT_HEAD) có courseId trong scope.courseIds mới được phân công
+    return principal.getRoleAssignments().stream()
+        .anyMatch(
+            a ->
+                a != null
+                    && a.getRole() == Role.DEPARTMENT_HEAD
+                    && matchesCourseScope(a.getScope(), courseId.trim()));
   }
 
   @Override
@@ -259,12 +273,38 @@ public class ScopeAuthorizationServiceImpl implements ScopeAuthorizationService 
     }
     return cloPiLinkRepository
         .findById(linkId.trim())
-        .map(link -> canAccessCourseVersion(principal, link.getProgramVersionId(), accessType))
+        .map(link -> canAccessProgramVersion(principal, link.getProgramVersionId(), accessType))
         .orElseGet(
             () -> {
               log.debug("canAccessCloPiLink: Fail-closed - link [{}] not found", linkId);
               return false;
             });
+  }
+
+  private boolean checkCourseAssignment(
+      RoleAssignment assignment, String courseId, AccessType accessType) {
+    if (assignment == null || assignment.getRole() == null) {
+      return false;
+    }
+
+    UserScope scope = assignment.getScope();
+    return switch (assignment.getRole()) {
+      case ADMIN -> true;
+      case DEPARTMENT_HEAD, LECTURER -> matchesCourseScope(scope, courseId);
+      case PROGRAM_MANAGER, QA_OFFICER ->
+          accessType == AccessType.READ
+              && (matchesCourseScope(scope, courseId) || isStrictEmptyScope(scope));
+      case VIEWER ->
+          accessType == AccessType.READ
+              && (isStrictEmptyScope(scope) || matchesCourseScope(scope, courseId));
+      case STUDENT -> false;
+    };
+  }
+
+  private boolean matchesCourseScope(UserScope scope, String courseId) {
+    return scope != null
+        && scope.getCourseIds() != null
+        && scope.getCourseIds().contains(courseId.trim());
   }
 
   private boolean checkProgramAssignment(

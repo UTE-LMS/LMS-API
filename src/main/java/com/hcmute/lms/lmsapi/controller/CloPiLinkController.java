@@ -48,7 +48,7 @@ public class CloPiLinkController {
 
   @PostMapping("/syllabi/{syllabusId}/clo-pi-links")
   @PreAuthorize(
-      "hasRole('ADMIN') or (hasRole('PROGRAM_MANAGER') and @scopeAuthorizationService.canAccessProgramVersion(authentication.principal, #request.programVersionId, T(com.hcmute.lms.lmsapi.enums.AccessType).WRITE) and @scopeAuthorizationService.canAccessSyllabus(authentication.principal, #syllabusId, T(com.hcmute.lms.lmsapi.enums.AccessType).WRITE))")
+      "hasRole('ADMIN') or (hasRole('PROGRAM_MANAGER') and @scopeAuthorizationService.canAccessProgramVersion(authentication.principal, #request.programVersionId, T(com.hcmute.lms.lmsapi.enums.AccessType).WRITE))")
   public ResponseEntity<CloPiLinkResponse> createLink(
       @PathVariable("syllabusId")
           @Pattern(
@@ -105,8 +105,7 @@ public class CloPiLinkController {
           String id,
       @Valid @RequestBody VerificationRequest request,
       @AuthenticationPrincipal UserPrincipal principal) {
-    log.info(
-        "API request: PUT /api/v1/clo-pi-links/{}/verification to [{}]", id, request.getStatus());
+    log.info("API request: PUT /api/v1/clo-pi-links/{}/verification", id);
     return ResponseEntity.ok(cloPiLinkService.verifyLink(id, request, principal));
   }
 }

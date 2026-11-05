@@ -34,9 +34,15 @@ sau này phải bám vào (câu hỏi chỉ được đo cặp (CLO, PI) có tro
 5. **Liên kết CLO–PI:** `clo_pi_links.syllabusId` và `programVersionId` phải khớp CLO và PI. Chỉ liên kết `verification.status = VERIFIED`
    mới được dùng cho tính chính thức (F06). `weight` dùng cho phương pháp `FROM_CLOS` (NEW-04), được phép `null`.
 6. Không xóa/sửa CLO, liên kết đã được `outcomeMappings` hoặc `student_results` tham chiếu; thay vào đó đổi trạng thái hoặc sinh đề cương mới.
-7. Đề cương `CONFIRMED` không sửa nội dung CLO; sửa = tạo `syllabi.version` mới (nguyên tắc phiên bản hóa).
-8. Học phần dùng thử: **ba học phần thử nghiệm chưa chọn**. Hệ thống phải chạy với bất kỳ học phần nào; seed OOP chỉ là ví dụ.
-9. `contentOriginal` của CLO để trống tới khi đối chiếu đề cương gốc (Q02); không điền từ trí nhớ.
+7. Đề cương khác `DRAFT` (`CONFIRMED` và `ARCHIVED`) không cho sửa nội dung CLO và không sửa liên kết CLO–PI (TD-27); sửa = tạo `syllabi.version` mới (nguyên tắc phiên bản hóa).
+8. Học phần thử nghiệm: Đã tiếp nhận 2 đề cương chi tiết chính thức từ CTĐT Fintech (`APCM220307`, `ABDA433708`) bên cạnh học phần mẫu `OOPR230279` của CNTT.
+9. `contentOriginal` của CLO trích xuất trực tiếp từ đề cương chính thức đã duyệt; không điền từ trí nhớ.
+10. **Phân quyền theo ADR 0010 (thay thế ADR 0009):**
+    - `courses` (kho tổng cấp trường): Chỉ `ADMIN` tạo / sửa / xóa môn học (kế thừa từ danh mục chính thức của Phòng Đào tạo). Thu hồi quyền tạo/sửa `courses` của `PROGRAM_MANAGER`.
+    - `scope.courseIds`: Admin gán môn phụ trách cho Trưởng bộ môn (`DEPARTMENT_HEAD`); Trưởng bộ môn phân công môn cho Giảng viên (`LECTURER`) trong bộ môn biên soạn đề cương.
+    - Soạn đề cương & CLO: `LECTURER` có `courseId` trong scope (khi đề cương ở trạng thái `DRAFT`).
+    - Phê duyệt đề cương: `DEPARTMENT_HEAD` có `courseId` trong scope thẩm định và duyệt chuyển trạng thái sang `CONFIRMED` (khóa đóng băng nội dung).
+    - Trưởng ngành (`PROGRAM_MANAGER`): Quản lý CTĐT, đưa môn học vào CTĐT (`program_courses`) và tạo liên kết $CLO \to PI$ (`clo_pi_links`) cho ngành mình.
 
 ## 5. Stories và acceptance criteria (nháp)
 
@@ -57,11 +63,11 @@ sau này phải bám vào (câu hỏi chỉ được đo cặp (CLO, PI) có tro
 | US-12/AC-3 | Đổi `verification.status` sang `VERIFIED` ghi người xác nhận và thời điểm | **ĐÃ HOÀN THÀNH (Issue #23)** |
 | US-12/AC-4 | API ma trận trả CLO × PI kèm trạng thái xác nhận từng ô | **ĐÃ HOÀN THÀNH (Issue #23)** |
 | US-12/AC-5 | `weight` ngoài (0, 1] → 400; `null` hợp lệ | **ĐÃ HOÀN THÀNH (Issue #23)** |
-| US-10/AC-4 *(bổ sung theo ADR 0009)* | Ghi đề cương (`POST /courses/{courseId}/syllabi`, `PUT /syllabi/{id}/status`): `PROGRAM_MANAGER` ngoài scope → 403; trong scope → 2xx; học phần chưa thuộc `program_courses` nào → PM 403, `ADMIN` 2xx | **ĐÃ HIỆN THỰC trên nhánh F03 (chờ review/merge)** |
-| US-11/AC-5 *(bổ sung theo ADR 0009)* | Ghi CLO (`POST /syllabi/{syllabusId}/clos`, `PUT`/`DELETE /clos/{id}`): PM ngoài scope → 403; trong scope → 2xx; học phần chưa thuộc `program_courses` nào → PM 403, `ADMIN` 2xx | **ĐÃ HIỆN THỰC trên nhánh F03 (chờ review/merge)** |
-| US-12/AC-6 *(bổ sung theo ADR 0009)* | Ghi liên kết (`POST /syllabi/{syllabusId}/clo-pi-links`, `DELETE /clo-pi-links/{id}`): PM ngoài scope → 403; trong scope → 2xx; học phần chưa thuộc `program_courses` nào → PM 403, `ADMIN` 2xx | **ĐÃ HIỆN THỰC trên nhánh F03 (chờ review/merge)** |
+| US-10/AC-4 *(bổ sung theo ADR 0010)* | Biên soạn đề cương (POST /courses/{courseId}/syllabi, PUT /syllabi/{id}): LECTURER hoặc DEPARTMENT_HEAD có courseId trong scope.courseIds → 2xx; ngoài scope hoặc PM → 403; ADMIN → 2xx. Duyệt trạng thái CONFIRMED: chỉ DEPARTMENT_HEAD có môn trong scope hoặc ADMIN → 2xx; GV/PM → 403 | **THIẾT KẾ MỚI (ADR 0010 thay thế ADR 0009)** |
+| US-11/AC-5 *(bổ sung theo ADR 0010)* | Biên soạn CLO (POST /syllabi/{syllabusId}/clos, PUT/DELETE /clos/{id}): LECTURER hoặc DEPARTMENT_HEAD có môn trong scope → 2xx; ngoài scope hoặc PM → 403; ADMIN → 2xx; đề cương CONFIRMED/ARCHIVED → 422 | **THIẾT KẾ MỚI (ADR 0010 thay thế ADR 0009)** |
+| US-12/AC-6 *(bổ sung theo ADR 0010)* | Ghi liên kết CLO-PI (POST /syllabi/{syllabusId}/clo-pi-links, DELETE /clo-pi-links/{id}): PROGRAM_MANAGER có programVersionId trong scope → 2xx; ngoài scope → 403; ADMIN → 2xx | **THIẾT KẾ MỚI (ADR 0010 thay thế ADR 0009)** |
 
-Ghi chú: AC-4/AC-5/AC-6 ở trên chưa có mã và chưa có test; đang chờ ADR 0009 được xác nhận (xem mục 6). Quy tắc nghiệp vụ **6** (không
+Ghi chú: Mô hình phân quyền mới theo ADR 0010 (thay thế ADR 0009) đã hoàn thiện tài liệu thiết kế; chuẩn bị triển khai mã nguồn và bộ test tương ứng. Quy tắc nghiệp vụ **6** (không
 xóa/sửa CLO, liên kết đã được `outcomeMappings` hoặc `student_results` tham chiếu) và ca test "xóa CLO đang được dùng" (mục 8) **CHỜ F06**:
 các collection `outcomeMappings` (trong `questions`/`assessments`) và `student_results` chưa có nghiệp vụ, nên chưa thể kiểm tham chiếu.
 Quy tắc **7** (đề cương `CONFIRMED` không sửa CLO) đã có qua US-10/AC-3.
@@ -77,23 +83,25 @@ Quy tắc **7** (đề cương `CONFIRMED` không sửa CLO) đã có qua US-10/
 | GET/POST/DELETE | `/api/v1/syllabi/{syllabusId}/clo-pi-links`, `/api/v1/clo-pi-links/{id}`; `GET .../clo-pi-matrix` |
 | PUT | `/api/v1/clo-pi-links/{id}/verification` |
 
-Quyền (hiện trạng mã): ghi `ADMIN`, `PROGRAM_MANAGER` (mới kiểm vai trò); thẩm định: `QA_OFFICER` (theo phạm vi scope); đọc: mọi vai trò đã xác thực.
+Quyền (Kiến trúc chuẩn theo ADR 0010 thay thế ADR 0009): Môn học (`courses`) do `ADMIN` quản trị; Đề cương (`syllabi`) và CLO do Giảng viên (`LECTURER`) biên soạn và Trưởng bộ môn (`DEPARTMENT_HEAD`) duyệt theo `scope.courseIds`; Trưởng ngành (`PROGRAM_MANAGER`) quản lý CTĐT (`program_courses`) và liên kết CLO–PI (`clo_pi_links`) theo `scope.programIds`; Thẩm định chất lượng: `QA_OFFICER` theo `scope.programIds` (ADR 0004); Đọc: mọi vai trò đã xác thực (`isAuthenticated()`).
 
-**Đề xuất theo ADR 0009 (chờ GVHD/Khoa xác nhận; đã hiện thực trên nhánh F03, chờ review/merge):** các endpoint ghi của `syllabi`, `clos`, `clo_pi_links` thêm kiểm `scope.programIds`
-của `PROGRAM_MANAGER` (fail-closed) bằng cách suy phạm vi qua `program_courses`:
+**Phân quyền chuẩn theo ADR 0010 (Bộ môn và Giảng viên, thay thế ADR 0009):**
+Admin quản lý kho môn `courses`; Trưởng bộ môn nhận scope môn và phân công Giảng viên soạn đề cương; Trưởng bộ môn duyệt `CONFIRMED`; Trưởng ngành quản lý CTĐT và liên kết CLO-PI:
 
-| Endpoint ghi | Vai trò | Kiểm scope (PM) |
+| Endpoint ghi | Vai trò | Điều kiện kiểm tra Scope |
 |---|---|---|
-| `POST /courses/{courseId}/syllabi` | ADMIN, PM | `canAccessCourse` |
-| `PUT /syllabi/{id}/status` | ADMIN, PM | `canAccessSyllabus` |
-| `POST /syllabi/{syllabusId}/clos` | ADMIN, PM | `canAccessSyllabus` |
-| `PUT`, `DELETE /clos/{id}` | ADMIN, PM | `canAccessClo` |
-| `POST /syllabi/{syllabusId}/clo-pi-links` | ADMIN, PM | `canAccessProgramVersion` và `canAccessSyllabus` |
-| `DELETE /clo-pi-links/{id}` | ADMIN, PM | `canAccessCloPiLink` (qua `programVersionId`) |
+| `POST /api/v1/courses/**` | ADMIN | — (Chỉ Admin tạo/sửa/xóa Master Catalog) |
+| `POST /api/v1/departments/assign-course` | ADMIN, DEPARTMENT_HEAD | `courseId` ∈ `scope.courseIds` của TBM (phân môn cho GV) |
+| `POST /courses/{courseId}/syllabi` | ADMIN, LECTURER | `courseId` ∈ `scope.courseIds` của GV (tạo đề cương DRAFT) |
+| `PUT /syllabi/{id}/status` | ADMIN, DEPARTMENT_HEAD | `courseId` ∈ `scope.courseIds` của TBM (duyệt CONFIRMED) |
+| `POST /syllabi/{syllabusId}/clos` | ADMIN, LECTURER | `courseId` ∈ `scope.courseIds` của GV (khi đề cương DRAFT) |
+| `PUT`, `DELETE /clos/{id}` | ADMIN, LECTURER | `courseId` ∈ `scope.courseIds` của GV (khi đề cương DRAFT) |
+| `POST /syllabi/{syllabusId}/clo-pi-links` | ADMIN, PROGRAM_MANAGER | `programVersionId` ∈ `scope.programIds` (nối CLO vào PI của ngành mình) |
+| `DELETE /clo-pi-links/{id}` | ADMIN, PROGRAM_MANAGER | `programVersionId` ∈ `scope.programIds` (xóa liên kết của ngành mình) |
 | `PUT /clo-pi-links/{id}/verification` | QA_OFFICER đúng scope (ADR 0004), không đổi | — |
 
-`ADMIN` luôn qua. PM qua khi học phần có trong `program_courses` của ít nhất một phiên bản thuộc ngành trong scope của PM; học phần
-chưa thuộc CTĐT nào thì chỉ `ADMIN` ghi được (nên `ADMIN` gán học phần vào CTĐT trước khi PM soạn đề cương). Các `GET` giữ `isAuthenticated()`.
+`ADMIN` luôn có toàn quyền. Giảng viên chỉ soạn đề cương/CLO cho môn được phân công (`scope.courseIds`). Trưởng bộ môn chỉ duyệt đề cương cho môn thuộc bộ môn mình (`scope.courseIds`). Trưởng ngành (`PROGRAM_MANAGER`) chỉ thao tác trên CTĐT và liên kết CLO-PI thuộc ngành mình (`scope.programIds`). Các API `GET` giữ `isAuthenticated()` để tra cứu công khai toàn trường.
+
 
 ## 7. Kiểm tra tham chiếu ở service
 
@@ -103,8 +111,7 @@ chưa thuộc CTĐT nào thì chỉ `ADMIN` ghi được (nên `ADMIN` gán họ
 ## 8. Test bắt buộc
 
 Mã CLO trùng trong/ngoài đề cương; `bloomLevel` biên (0,1,6,7); liên kết trùng; PI sai phiên bản; sửa CLO của đề cương `CONFIRMED`;
-`weight` biên (0, 1, 1,01, null); xóa CLO đang được dùng *(chờ F06)*; ma trận CLO × PI rỗng; phân quyền scope theo ADR 0009 (PM ngoài scope → 403,
-trong scope → 2xx, học phần chưa thuộc CTĐT nào → PM 403 và `ADMIN` 2xx, học phần thuộc hai CTĐT chỉ một trong scope → 2xx, tài nguyên không tồn tại → 403).
+phân quyền scope theo ADR 0010 (ADMIN quản trị Master Catalog courses; GV ngoài scope courseIds → 403; GV trong scope tạo đề cương DRAFT → 2xx; GV duyệt CONFIRMED → 403; TBM trong scope duyệt CONFIRMED → 2xx; PM can thiệp đề cương → 403; PM tạo liên kết CLO-PI theo programIds → 2xx; đề cương CONFIRMED chặn sửa CLO → 422).
 
 ## 9. Không làm / chưa quyết (Các nội dung CHƯA ĐƯỢC XÁC NHẬN)
 
@@ -118,4 +125,4 @@ trong scope → 2xx, học phần chưa thuộc CTĐT nào → PM 403 và `ADMIN
 
 Vì sao CLO nhận diện bằng `_id` chứ không bằng `code`; vì sao có `clo_pi_links` riêng (khung đã duyệt để chặn gán PI tùy ý cho
 câu hỏi); vì sao đề cương phiên bản hóa (đổi CLO không làm sai báo cáo cũ); bỏ kiểm tra "cặp CLO–PI nằm trong liên kết" thì
-một câu hỏi có thể đo PI không liên quan CLO của nó; vì sao phải triển khai trước quản lý `terms` của F05a để kiểm tra tính hợp lệ về thời gian của đề cương. Vì sao PM ghi đề cương/CLO phải bị giới hạn theo scope và phạm vi được suy qua `program_courses` (ADR 0009). Xem chi tiết tại `doc/de-van-dap/f03-hoc-phan-clo.md`.
+một câu hỏi có thể đo PI không liên quan CLO của nó; vì sao phải triển khai trước quản lý 	erms của F05a để kiểm tra tính hợp lệ về thời gian của đề cương. Vì sao bãi bỏ ADR 0009 (suy quyền PM qua CTĐT) và áp dụng kiến trúc ADR 0010 (Admin cấp môn, Trưởng bộ môn gán môn cho Giảng viên biên soạn và TBM duyệt, Trưởng ngành quản lý liên kết CLO–PI). Xem chi tiết tại doc/de-van-dap/f03-hoc-phan-clo.md.

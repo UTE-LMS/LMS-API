@@ -213,14 +213,16 @@ bảng dưới chỉ để không bỏ sót.
 | F07 Báo cáo, truy vết | US-31…36 | 11 | Chưa có mã, chưa có test |
 | F08 Cải tiến | US-37, 38, NEW-02 | 10 | Chưa có mã, chưa có test |
 
-**Ca kiểm thử phân quyền scope F03 (ADR 0009, ĐỀ XUẤT chờ xác nhận; đã có test trên nhánh F03, chờ review/merge):**
+**Ca kiểm thử phân quyền scope F03 (ADR 0010 thay thế hoàn toàn ADR 0009):**
 
-| AC dự thảo | Ca dự kiến | Trạng thái |
+| AC thiết kế | Ca dự kiến | Trạng thái |
 |---|---|---|
-| US-10/AC-4 | `POST /courses/{courseId}/syllabi`, `PUT /syllabi/{id}/status`: PM ngoài scope → 403; PM trong scope → 2xx; học phần chưa thuộc `program_courses` nào → PM 403, ADMIN 2xx | Đã có test (`CloIntegrationTest`) |
-| US-11/AC-5 | `POST /syllabi/{syllabusId}/clos`, `PUT`/`DELETE /clos/{id}`: như trên | Đã có test (`CloIntegrationTest`) |
-| US-12/AC-6 | `POST /syllabi/{syllabusId}/clo-pi-links` (cần cả `canAccessProgramVersion` và `canAccessSyllabus`), `DELETE /clo-pi-links/{id}`: như trên; `PUT …/verification` vẫn chỉ `QA_OFFICER` đúng scope | Đã có test (`CloIntegrationTest`) |
-| (ngoài AC) | Unit test 4 phương thức mới của `ScopeAuthorizationService`: học phần thuộc hai CTĐT chỉ một trong scope → true (phép hợp); tài nguyên không tồn tại → false; vai trò khác → false | Đã có test (`CourseScopeAuthorizationTest`) |
+| US-09 (Master Catalog) | `POST`, `PUT`, `DELETE /api/v1/courses/**`: Chỉ `ADMIN` được phép (2xx); `PROGRAM_MANAGER`, `DEPARTMENT_HEAD`, `LECTURER` bị chặn (403). `GET /courses/**`: tất cả người dùng xác thực được đọc (200). | Đang chuẩn bị test |
+| US-10/AC-4 | `POST /courses/{courseId}/syllabi`, `PUT /syllabi/{id}` (khi DRAFT): `LECTURER` hoặc `DEPARTMENT_HEAD` có `courseId` trong `scope.courseIds` → 2xx; ngoài scope hoặc PM → 403; `ADMIN` → 2xx. Duyệt `PUT /syllabi/{id}/status` sang `CONFIRMED`: chỉ `DEPARTMENT_HEAD` có môn trong scope hoặc `ADMIN` → 2xx; GV và PM → 403. | Đang chuẩn bị test |
+| US-11/AC-5 | `POST /syllabi/{syllabusId}/clos`, `PUT`/`DELETE /clos/{id}`: `LECTURER` hoặc `DEPARTMENT_HEAD` có môn trong scope → 2xx; ngoài scope hoặc PM → 403; `ADMIN` → 2xx. Khi đề cương `CONFIRMED` hoặc `ARCHIVED` → 422. | Đang chuẩn bị test |
+| US-12/AC-6 | `POST /syllabi/{syllabusId}/clo-pi-links`, `DELETE /clo-pi-links/{id}`: `PROGRAM_MANAGER` có `programVersionId` trong scope → 2xx; ngoài scope → 403; `ADMIN` → 2xx; `PUT …/verification` vẫn chỉ `QA_OFFICER` đúng scope. | Đang chuẩn bị test |
+| (Phân công môn) | `POST /api/v1/departments/assign-course`: `ADMIN` gán môn cho Trưởng bộ môn (2xx); Trưởng bộ môn gán môn cho Giảng viên trong bộ môn (2xx); Giảng viên/PM gọi API phân công → 403. | Đang chuẩn bị test |
+| (Đơn vị) | Unit test các phương thức của `ScopeAuthorizationService`: `canAccessCourse(principal, courseId)` kiểm tra tập hợp $O(1)$ trong bộ nhớ (`principal.getScope().getCourseIds().contains(courseId)`). | Đang chuẩn bị test |
 
 Test đặc biệt quan trọng cần có khi các feature này có mã (nhắc lại từ rule 04, mục 5): điểm > tối đa; `BLANK` ≠ `MISSING`;
 trùng bản ghi điểm; tổng `weight` ≠ 1; cặp CLO–PI ngoài `clo_pi_links`; quy tắc `DRAFT` không chạy chính thức; lớp

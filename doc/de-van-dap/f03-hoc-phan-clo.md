@@ -2,7 +2,7 @@
 
 **Đề tài:** Hệ thống quản lý, đo lường và phân tích chuẩn đầu ra chương trình đào tạo (Learning Outcomes Management and Analytics System)  
 **Phân hệ:** F03 — Quản lý Học phần, Vị trí học phần trong CTĐT (US-09), Đề cương theo phiên bản (US-10), Chuẩn đầu ra học phần CLO (US-11), và Liên kết CLO–PI (US-12), tích hợp Quản lý Học kỳ (F05a / US-18)  
-**Tài liệu liên quan:** `doc/plan/F03-hoc-phan-clo.md`, `doc/plan/F05a-hoc-ky-lop-sinh-vien.md`, `doc/adr/0002-nen-tang-chung-step-00.md`, `doc/adr/0005-phan-quyen-chuong-trinh-dao-tao.md`, `doc/adr/0009-phan-quyen-pham-vi-de-cuong-clo.md` (ĐỀ XUẤT), `doc/GiaiThich_CoSoDuLieu.md` (§2 nguyên tắc 2 & 12, §4.6–4.7, §4.9–4.11, §4.16, §7), `LMS-UI/doc/API-CONTRACT.md`  
+**Tài liệu liên quan:** `doc/plan/F03-hoc-phan-clo.md`, `doc/plan/F05a-hoc-ky-lop-sinh-vien.md`, `doc/adr/0002-nen-tang-chung-step-00.md`, `doc/adr/0005-phan-quyen-chuong-trinh-dao-tao.md`, `doc/adr/0010-phan-quyen-de-cuong-theo-bo-mon-va-giang-vien.md` (ADR 0010 thay thế ADR 0009), `doc/GiaiThich_CoSoDuLieu.md` (§2 nguyên tắc 2 & 12, §4.6–4.7, §4.9–4.11, §4.16, §7), `LMS-UI/doc/API-CONTRACT.md`  
 **Nhóm sinh viên thực hiện:** Sinh viên Công nghệ thông tin (IT) & Sinh viên Kinh doanh số (IBS)
 
 ---
@@ -33,7 +33,7 @@ Trong phân hệ F03, nhóm IT đã hiện thực hóa trọn vẹn User Story *
    - **Xác thực học phần tiên quyết (`prerequisiteCourseIds`) và học phần học trước (`previousCourseIds`):** Duyệt danh sách mã tiên quyết và học trước, kiểm tra từng học phần phải tồn tại trong CSDL và không được là chính học phần đang gán (tự tham chiếu) (HTTP 422). Đồng thời kiểm tra xung đột loại trừ giữa tiên quyết và học trước (`PREREQUISITE_AND_PREVIOUS_CONFLICT`).
 
 3. **Hiện thực API RESTful và Phân quyền Scope Authorization (ADR 0005):**
-   - [CourseController.java](file:///D:/Code/Project/LMS-API/src/main/java/com/hcmute/lms/lmsapi/controller/CourseController.java) (`/api/v1/courses`): `ADMIN` và `PROGRAM_MANAGER` được phép thêm/sửa danh mục; chỉ `ADMIN` được xóa danh mục; tất cả người dùng xác thực được phép tra cứu (`GET`).
+   - [CourseController.java](file:///D:/Code/Project/LMS-API/src/main/java/com/hcmute/lms/lmsapi/controller/CourseController.java) (`/api/v1/courses`): Theo mô hình chuẩn quản trị đại học (ADR 0010), danh mục Master Catalog `courses` thuộc quyền quản trị tập trung của `ADMIN` (Phòng Đào tạo) để đảm bảo tính nhất quán toàn trường và đồng bộ dữ liệu tín chỉ; thu hồi quyền tạo/sửa môn của `PROGRAM_MANAGER`. Tất cả người dùng xác thực được phép tra cứu (`GET`).
    - [ProgramCourseController.java](file:///D:/Code/Project/LMS-API/src/main/java/com/hcmute/lms/lmsapi/controller/ProgramCourseController.java) (`/api/v1/program-versions/{programVersionId}/courses`): Sử dụng `@PreAuthorize("@scopeAuthorizationService.canAccessProgramVersion(principal, #programVersionId)")` bảo đảm kiểm soát truy cập phân quyền chặt chẽ theo nguyên tắc fail-closed.
 
 4. **Kiểm thử tự động toàn diện:**
@@ -137,11 +137,11 @@ Dưới góc độ quản trị đào tạo và kinh doanh số, US-09 giải qu
 ### Trả lời — Góc nhìn Sinh viên Công nghệ thông tin (IT):
 
 1. **Phân cấp Thẩm quyền Rõ ràng:**
-   - **Danh mục Master `courses` và `terms`:** Là tài nguyên dùng chung toàn trường, do đó các thao tác `POST` (Tạo mới), `PUT` (Cập nhật) chỉ cho phép vai trò quản trị `ADMIN` và `PROGRAM_MANAGER`. Thao tác `DELETE` chỉ dành riêng cho `ADMIN`. Thao tác tra cứu `GET` mở cho tất cả người dùng hợp lệ trong hệ thống (`@PreAuthorize("isAuthenticated()")`).
+   - **Danh mục Master `courses` và `terms`:** Là tài nguyên dùng chung toàn trường, do đó các thao tác `POST` (Tạo mới), `PUT` (Cập nhật), `DELETE` (Xóa) chỉ dành riêng cho `ADMIN` (Phòng Đào tạo) theo ADR 0010. `PROGRAM_MANAGER` không có quyền tạo/sửa môn học trong kho tổng mà chỉ gán môn vào CTĐT (`program_courses`). Thao tác tra cứu `GET` mở cho tất cả người dùng hợp lệ trong hệ thống (`@PreAuthorize("isAuthenticated()")`).
    - **Gán học phần vào CTĐT `program_courses`:** Là tài nguyên gắn liền với một phiên bản CTĐT cụ thể. Do đó, các endpoint tại `/api/v1/program-versions/{programVersionId}/courses` được bảo vệ bằng SpEL:  
      `@PreAuthorize("@scopeAuthorizationService.canAccessProgramVersion(principal, #programVersionId)")`
    - **Thẩm định liên kết CLO-PI:** Được phân quyền chặt chẽ cho vai trò `QA_OFFICER` theo phạm vi ngành đào tạo (`programIds`).
-   - **Lưu ý hiện trạng:** các endpoint ghi `syllabi`, `clos`, `clo_pi_links` hiện mới kiểm vai trò (`ADMIN`, `PROGRAM_MANAGER`), chưa kiểm `scope.programIds` của PM. Việc bổ sung đang ở trạng thái đề xuất, xem Câu hỏi 11 và ADR 0009.
+   - **Phân quyền đề cương và chuẩn đầu ra theo ADR 0010 (thay thế ADR 0009):** Admin gán danh mục môn cho Trưởng bộ môn (`DEPARTMENT_HEAD`). Trưởng bộ môn phân công môn cho Giảng viên (`LECTURER`) biên soạn đề cương và CLO ở trạng thái `DRAFT`. Trưởng bộ môn là người thẩm định và duyệt `CONFIRMED`. Trưởng ngành (`PROGRAM_MANAGER`) chỉ thiết lập liên kết CLO–PI (`clo_pi_links`) cho ngành của mình. Xem chi tiết tại Câu hỏi 11.
 2. **Cơ chế Fail-Closed (Đóng mặc định):**
    - Nếu `principal` không có quyền (ví dụ `STUDENT`, `LECTURER`), hoặc `PROGRAM_MANAGER` cố tình can thiệp vào `programVersionId` của một ngành khác ngoài danh sách `scope.programIds` được cấp phép, Spring Security sẽ chặn lại ngay tại tầng Filter và trả về HTTP 403 `FORBIDDEN`.
 
@@ -272,26 +272,43 @@ Tuân thủ tuyệt đối **Quy tắc cứng số 2 (Không bịa minh chứng/
 
 ---
 
-## Câu Hỏi 11: Phân quyền theo phạm vi (scope) cho việc ghi đề cương, CLO và liên kết CLO–PI được thiết kế thế nào? (ADR 0009 — ĐỀ XUẤT, chờ GVHD/Khoa xác nhận)
+## Câu Hỏi 11: Phân quyền theo phạm vi (scope) cho việc tạo môn học, phân công biên soạn và phê duyệt đề cương, CLO và liên kết CLO–PI được thiết kế thế nào? (ADR 0010 — THAY THẾ TOÀN DIỆN ADR 0009)
 
-**Trạng thái:** đang thực hiện; chưa có mã và chưa có kết quả test cho phần này. Câu trả lời mô tả thiết kế đã chốt để hiện thực.
+**Trạng thái:** Đã chính thức thông qua kiến trúc tại ADR 0010 (bãi bỏ hoàn toàn ADR 0009); đã cập nhật toàn bộ tài liệu thiết kế (`doc/plan/F03-hoc-phan-clo.md`, `doc/sdd/`, `doc/srs/`, `doc/test-plan.md`), sẵn sàng triển khai mã nguồn và kiểm thử.
 
 ### Trả lời — Góc nhìn Sinh viên Công nghệ thông tin (IT):
 
-1. **Vấn đề:** endpoint ghi của `syllabi`, `clos`, `clo_pi_links` chỉ kiểm `hasAnyRole('ADMIN','PROGRAM_MANAGER')`, nên một PM sửa được đề cương/CLO của ngành khác, trái ADR 0005 §3.2.
-2. **Khó khăn kỹ thuật:** `syllabi` và `clos` chỉ có `courseId`, không có `programVersionId` nên không gọi thẳng `canAccessProgramVersion`.
-3. **Giải pháp (phương án A):** thêm vào `ScopeAuthorizationService` bốn phương thức fail-closed: `canAccessCourse`, `canAccessSyllabus` (tra `syllabi.courseId`), `canAccessClo` (tra `clos.courseId`), `canAccessCloPiLink` (tra `clo_pi_links.programVersionId` rồi gọi `canAccessProgramVersion`). `canAccessCourse`: `ADMIN` luôn qua; PM qua khi có ít nhất một bản ghi `program_courses` của học phần đó thuộc phiên bản CTĐT có `programId` ∈ `scope.programIds`. Học phần chưa thuộc CTĐT nào, hoặc tài nguyên không tồn tại, thì PM bị 403.
-4. **Phương án đã loại:** B (giữ nguyên: PM bất kỳ sửa đề cương mọi học phần, vi phạm ADR 0005 §3.2); C (thêm `programVersionId` vào `syllabi`: đổi schema CSDL v0.5, mà đổi thiết kế phải xin phép).
-5. **Bỏ kiểm tra này thì sao:** quay về hiện trạng, PM ngoài ngành sửa được CLO, rồi tự gắn liên kết CLO–PI cho ngành mình không quản lý.
+1. **Vì sao bãi bỏ ADR 0009?**
+   - *Lỗ hổng chiếm quyền (TD-29):* ADR 0009 suy quyền ghi đề cương cho `PROGRAM_MANAGER` thông qua `program_courses`. Do đó, một PM có thể tự ý gán một môn học bất kỳ vào CTĐT của mình (`POST /program-versions/{id}/courses`) để chiếm quyền sửa đề cương và CLO của môn đó.
+   - *Xung đột môn dùng chung:* Khi một môn học (như *Toán cao cấp*, *Lập trình căn bản*) được dùng chung bởi nhiều CTĐT của nhiều khoa/ngành khác nhau, việc PM ngành này sửa đề cương sẽ trực tiếp làm thay đổi hoặc phá vỡ cấu trúc đào tạo của PM ngành khác.
+   - *Độ phức tạp kỹ thuật:* ADR 0009 đòi hỏi truy vấn ngược (Reverse Lookup) đắt đỏ từ `courseId` $\to$ quét `program_courses` $\to$ lấy danh sách `programVersionId` $\to$ kiểm tra đối chiếu `scope.programIds`.
+
+2. **Kiến trúc Phân quyền Mới theo ADR 0010:**
+   - **Tách bạch quyền sở hữu và phạm vi quản trị:**
+     - `ADMIN` (Phòng Đào tạo): Đơn vị duy nhất tạo/sửa/xóa môn học trong Master Catalog `courses`. Admin gán `courseIds` vào `scope.courseIds` của Trưởng bộ môn (`DEPARTMENT_HEAD`).
+     - `DEPARTMENT_HEAD` (Trưởng bộ môn): Quản lý chuyên môn của các môn học thuộc bộ môn mình. Phân công môn học cho Giảng viên (`LECTURER`) trong bộ môn biên soạn đề cương bằng cách gán `courseId` vào `scope.courseIds` của Giảng viên. Trưởng bộ môn là người duy nhất có thẩm quyền thẩm định và duyệt chuyển trạng thái đề cương từ `DRAFT` sang `CONFIRMED`.
+     - `LECTURER` (Giảng viên bộ môn): Biên soạn nội dung đề cương (`syllabi`) và chuẩn đầu ra (`clos`) ở trạng thái `DRAFT` cho các môn học nằm trong `scope.courseIds` của mình. Giảng viên **không có quyền** tự duyệt đề cương sang `CONFIRMED`. Khi đề cương đã `CONFIRMED` hoặc `ARCHIVED`, giảng viên bị chặn hoàn toàn không được sửa CLO (HTTP 422).
+     - `PROGRAM_MANAGER` (Trưởng ngành): Không có quyền tạo môn học trong kho tổng, không có quyền can thiệp vào nội dung đề cương/CLO của bộ môn. PM tập trung vào cấp độ CTĐT: chọn môn đưa vào CTĐT (`program_courses`), xác định mức đóng góp I/R/M (`course_pi_contributions`), và thiết lập ma trận liên kết $CLO \to PI$ (`clo_pi_links`) theo `scope.programIds`.
+     - `QA_OFFICER` (Cán bộ Đảm bảo chất lượng): Thẩm định tính tương thích sư phạm của các liên kết CLO–PI (`verification.status = VERIFIED`).
+   - **Tối ưu hóa Hiệu năng & Bảo mật:**
+     - Phương thức `canAccessCourse(principal, courseId)` chuyển thành phép kiểm tra tập hợp $O(1)$ trong bộ nhớ: `principal.getScope().getCourseIds().contains(courseId)` (kết hợp kiểm tra vai trò `DEPARTMENT_HEAD` hoặc `LECTURER`).
+     - Triệt tiêu hoàn toàn truy vấn phân tán đắt đỏ và bịt kín 100% lỗ hổng TD-29.
 
 ### Trả lời — Góc nhìn Sinh viên Kinh doanh số (IBS):
 
-- Đề cương và CLO là cam kết chuẩn đầu ra của một chương trình. Người chịu trách nhiệm chương trình nào thì chỉ nên được chỉnh phần của chương trình đó (phân định trách nhiệm theo ADR 0005).
-- Học phần dùng chung nhiều ngành: chỉ cần một ngành trong phạm vi của PM là PM được soạn. Đây là đánh đổi có chủ đích, được giảm nhẹ nhờ đề cương `CONFIRMED` bị khóa và liên kết CLO–PI phải được `QA_OFFICER` đúng phạm vi xác nhận.
-- Quy trình đi kèm: `ADMIN` tạo học phần và gán vào CTĐT trước, sau đó PM mới soạn đề cương. Học phần chưa gán chỉ `ADMIN` ghi được.
+1. **Chuẩn hóa Mô hình Quản trị Đại học Thực tế:**
+   - Trong cấu trúc quản trị đại học hiện đại (và theo quy định của Bộ Giáo dục & Đào tạo Việt Nam):
+     - **Phòng Đào tạo (`ADMIN`)** giữ vai trò kiến trúc sư dữ liệu tổng, quản lý danh mục mã môn học chính thức phục vụ xếp thời khóa biểu và tính học phí.
+     - **Bộ môn chuyên môn (`DEPARTMENT_HEAD` & `LECTURER`)** là nơi sở hữu tri thức học thuật sâu. Trưởng bộ môn giao nhiệm vụ cho giảng viên có chuyên môn biên soạn đề cương chi tiết (Syllabus) và các chuẩn đầu ra học phần (CLO). Hội đồng chuyên môn của Bộ môn họp thẩm định và Trưởng bộ môn ký duyệt.
+     - **Ban điều hành Ngành đào tạo (`PROGRAM_MANAGER`)** đóng vai trò tích hợp hệ thống. Trưởng ngành chọn các môn học do các bộ môn cung cấp để ghép thành khung chương trình hoàn chỉnh, và xác định xem các CLO của môn học đó đóng góp vào những Chuẩn đầu ra chương trình (PLO/PI) nào của ngành mình.
+2. **Loại bỏ Rủi ro Xung đột Học thuật:**
+   - Việc giao quyền quản lý đề cương về đúng Bộ môn giúp chấm dứt tình trạng các ngành "giành nhau" sửa đề cương môn dùng chung, bảo đảm tính nhất quán và chất lượng học thuật cao nhất theo tiêu chuẩn kiểm định quốc tế AUN-QA và ABET.
 
 ### Câu hỏi hội đồng có thể hỏi thêm:
 
-- *Hai ngành dùng chung một học phần, PM ngành A sửa có ảnh hưởng ngành B không?* Có thể có, vì quy tắc là phép hợp. Nếu cần chặt hơn (đồng thuận mọi ngành) thì phải xin thay quy tắc; hiện chưa làm.
-- *Vì sao tài nguyên không tồn tại trả 403 chứ không phải 404?* Nhất quán với `canAccessProgramVersion`; kiểm quyền chạy trước khi tra tài nguyên.
-- *Đã kiểm chứng bằng test chưa?* Đã có test trên nhánh F03: `CloIntegrationTest` (US-10/AC-4, US-11/AC-5, US-12/AC-6) và `CourseScopeAuthorizationTest` (unit). Chờ review/merge; xem `doc/test-plan.md` mục 8.5.
+- *Vì sao không để Trưởng ngành (PM) tự tạo môn học và viết đề cương như thiết kế ban đầu?*  
+  Nếu để PM tự tạo môn học, hệ thống sẽ rơi vào tình trạng "loạn mã môn học" và trùng lặp nội dung khi nhiều ngành cùng tạo môn giống nhau. Hơn nữa, PM chỉ chịu trách nhiệm về ngành đào tạo của mình, không có thẩm quyền chuyên môn đại diện cho cả Bộ môn giảng dạy.
+- *Nếu Giảng viên chuyển công tác hoặc không tiếp tục biên soạn đề cương, Trưởng bộ môn xử lý thế nào?*  
+  Trưởng bộ môn chỉ cần gọi API phân công lại để thu hồi `courseId` từ `scope.courseIds` của giảng viên cũ và gán cho giảng viên mới. Dữ liệu đề cương ở trạng thái `DRAFT` vẫn được bảo toàn nguyên vẹn trên hệ thống.
+- *Trưởng ngành muốn môn học bổ sung thêm một chuẩn đầu ra CLO để đáp ứng PI mới của ngành mình thì làm sao?*  
+  Trưởng ngành không được tự ý sửa CLO trong hệ thống, mà gửi đề xuất qua kênh phối hợp học thuật cho Trưởng bộ môn. Trưởng bộ môn chỉ đạo Giảng viên cập nhật đề cương (tạo phiên bản mới) và duyệt `CONFIRMED`. Sau khi có CLO mới, Trưởng ngành sẽ tạo liên kết $CLO \to PI$ tương ứng.
