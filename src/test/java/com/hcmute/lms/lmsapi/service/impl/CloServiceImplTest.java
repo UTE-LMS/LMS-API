@@ -61,8 +61,8 @@ class CloServiceImplTest {
         Syllabus.builder()
             .id(syllabusId)
             .courseId(courseId)
-            .version("2024.1")
             .status(SyllabusStatus.DRAFT)
+            .version("2024.1")
             .build();
 
     clo =
@@ -121,7 +121,18 @@ class CloServiceImplTest {
 
     assertThatThrownBy(() -> cloService.createClo(syllabusId, request))
         .isInstanceOf(BusinessRuleViolationException.class)
-        .hasMessageContaining("Đề cương đã CONFIRMED không cho phép thêm CLO mới");
+        .hasMessageContaining("không cho phép thêm CLO mới");
+  }
+
+  @Test
+  @DisplayName("createClo: Chặn thêm CLO khi đề cương đã ARCHIVED (TD-27)")
+  void createClo_WhenSyllabusArchived_ThrowsBusinessRuleViolation() {
+    syllabus.setStatus(SyllabusStatus.ARCHIVED);
+    when(syllabusRepository.findById(syllabusId)).thenReturn(Optional.of(syllabus));
+
+    assertThatThrownBy(() -> cloService.createClo(syllabusId, request))
+        .isInstanceOf(BusinessRuleViolationException.class)
+        .hasMessageContaining("không cho phép thêm CLO mới");
   }
 
   @Test
@@ -141,7 +152,7 @@ class CloServiceImplTest {
     when(syllabusRepository.findById(syllabusId)).thenReturn(Optional.of(syllabus));
     when(cloRepository.existsBySyllabusIdAndCode(syllabusId, "CLO1")).thenReturn(false);
     when(cloMapper.toDocument(syllabusId, courseId, request)).thenReturn(clo);
-    when(cloRepository.save(any(Clo.class))).thenThrow(new DuplicateKeyException("duplicate"));
+    when(cloRepository.save(clo)).thenThrow(new DuplicateKeyException("E11000 duplicate key"));
 
     assertThatThrownBy(() -> cloService.createClo(syllabusId, request))
         .isInstanceOf(AppException.class)
@@ -174,7 +185,7 @@ class CloServiceImplTest {
 
     assertThatThrownBy(() -> cloService.updateClo(cloId, updateReq))
         .isInstanceOf(BusinessRuleViolationException.class)
-        .hasMessageContaining("Đề cương đã CONFIRMED không cho phép sửa nội dung CLO");
+        .hasMessageContaining("không cho phép sửa nội dung CLO");
   }
 
   @Test

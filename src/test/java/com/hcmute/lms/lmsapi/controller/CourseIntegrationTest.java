@@ -238,8 +238,14 @@ class CourseIntegrationTest extends IntegrationTestBase {
             .credits(2)
             .build();
 
-    // 1. PROGRAM_MANAGER tạo course -> 201
-    mockMvc.perform(postAs(pmToken, "/api/v1/courses", courseReq)).andExpect(status().isCreated());
+    // 1. PROGRAM_MANAGER tạo course -> 403 Forbidden (ADR 0010)
+    mockMvc
+        .perform(postAs(pmToken, "/api/v1/courses", courseReq))
+        .andExpect(status().isForbidden());
+    // 2. ADMIN tạo course -> 201 Created
+    mockMvc
+        .perform(postAs(adminToken, "/api/v1/courses", courseReq))
+        .andExpect(status().isCreated());
 
     // 2. LECTURER tạo course -> 403
     mockMvc

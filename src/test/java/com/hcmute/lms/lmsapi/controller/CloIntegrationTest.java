@@ -35,7 +35,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.test.web.servlet.MvcResult;
 
-@DisplayName("F03: Syllabi, CLOs and CLO-PI Links Integration Tests (US-10, US-11, US-12)")
+@DisplayName(
+    "F03: Syllabi, CLOs and CLO-PI Links Integration Tests (US-10, US-11, US-12 / ADR 0010)")
 class CloIntegrationTest extends IntegrationTestBase {
 
   private Program program;
@@ -49,7 +50,10 @@ class CloIntegrationTest extends IntegrationTestBase {
   private String pmOutOfScopeToken;
   private String qaToken;
   private String qaOutOfScopeToken;
+  private String deptHeadToken;
+  private String deptHeadOutOfScopeToken;
   private String lecturerToken;
+  private String lecturerOutOfScopeToken;
   private String adminToken;
 
   @BeforeEach
@@ -72,6 +76,7 @@ class CloIntegrationTest extends IntegrationTestBase {
         fixtures.bearerFor(
             Role.PROGRAM_MANAGER,
             UserScope.builder().programIds(List.of("671dcba5f123456789abc999")).build());
+
     qaToken =
         fixtures.bearerFor(
             Role.QA_OFFICER, UserScope.builder().programIds(List.of(program.getId())).build());
@@ -79,7 +84,25 @@ class CloIntegrationTest extends IntegrationTestBase {
         fixtures.bearerFor(
             Role.QA_OFFICER,
             UserScope.builder().programIds(List.of("671dcba5f123456789abc999")).build());
-    lecturerToken = fixtures.bearerFor(Role.LECTURER, UserScope.builder().build());
+
+    deptHeadToken =
+        fixtures.bearerFor(
+            Role.DEPARTMENT_HEAD,
+            UserScope.builder().courseIds(List.of(course1.getId(), course2.getId())).build());
+    deptHeadOutOfScopeToken =
+        fixtures.bearerFor(
+            Role.DEPARTMENT_HEAD,
+            UserScope.builder().courseIds(List.of("671dcba5f123456789abc999")).build());
+
+    lecturerToken =
+        fixtures.bearerFor(
+            Role.LECTURER,
+            UserScope.builder().courseIds(List.of(course1.getId(), course2.getId())).build());
+    lecturerOutOfScopeToken =
+        fixtures.bearerFor(
+            Role.LECTURER,
+            UserScope.builder().courseIds(List.of("671dcba5f123456789abc999")).build());
+
     adminToken = fixtures.bearerFor(Role.ADMIN, UserScope.builder().build());
   }
 
@@ -92,15 +115,16 @@ class CloIntegrationTest extends IntegrationTestBase {
   }
 
   @Test
-  @DisplayName("US-10: Vòng đời Syllabi, tạo mới (201), trùng version (409) và chuyển trạng thái")
+  @DisplayName("US-10: Vòng đời Syllabi, tạo mới (201), trùng version (409) và TBM duyệt CONFIRMED")
   void us10_syllabiLifecycleAndDuplicate() throws Exception {
     String version = "2024.1";
     SyllabusRequest req = SyllabusRequest.builder().version(version).build();
 
-    // 1. Tạo đề cương mới với PM token -> 201 Created
+    // 1. Giảng viên biên soạn đề cương mới -> 201 Created (status DRAFT)
     MvcResult createResult =
         mockMvc
-            .perform(postAs(pmToken, "/api/v1/courses/{courseId}/syllabi", req, course1.getId()))
+            .perform(
+                postAs(lecturerToken, "/api/v1/courses/{courseId}/syllabi", req, course1.getId()))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.version").value(version))
             .andExpect(jsonPath("$.status").value("DRAFT"))
@@ -110,26 +134,36 @@ class CloIntegrationTest extends IntegrationTestBase {
 
     // 2. Trùng (courseId, version) -> 409 CONFLICT (US-10/AC-1)
     mockMvc
-        .perform(postAs(pmToken, "/api/v1/courses/{courseId}/syllabi", req, course1.getId()))
+        .perform(postAs(lecturerToken, "/api/v1/courses/{courseId}/syllabi", req, course1.getId()))
         .andExpect(status().isConflict())
         .andExpect(jsonPath("$.code").value("CONFLICT"));
 
-    // 3. Chuyển trạng thái sang CONFIRMED -> 200 OK
+    // 3. Giảng viên cố tình tự duyệt đề cương -> 403 Forbidden
     mockMvc
         .perform(
             putAs(
-                pmToken,
+                lecturerToken,
+                "/api/v1/syllabi/{id}/status",
+                SyllabusStatusUpdateRequest.builder().status(SyllabusStatus.CONFIRMED).build(),
+                id))
+        .andExpect(status().isForbidden());
+
+    // 4. Trưởng bộ môn phê duyệt sang CONFIRMED -> 200 OK
+    mockMvc
+        .perform(
+            putAs(
+                deptHeadToken,
                 "/api/v1/syllabi/{id}/status",
                 SyllabusStatusUpdateRequest.builder().status(SyllabusStatus.CONFIRMED).build(),
                 id))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.status").value("CONFIRMED"));
 
-    // 4. Chuyển ngược sang DRAFT -> 422 UNPROCESSABLE_ENTITY
+    // 5. Chuyển ngược sang DRAFT -> 422 UNPROCESSABLE_ENTITY
     mockMvc
         .perform(
             putAs(
-                pmToken,
+                deptHeadToken,
                 "/api/v1/syllabi/{id}/status",
                 SyllabusStatusUpdateRequest.builder().status(SyllabusStatus.DRAFT).build(),
                 id))
@@ -169,7 +203,8 @@ class CloIntegrationTest extends IntegrationTestBase {
             .build();
 
     mockMvc
-        .perform(postAs(pmToken, "/api/v1/courses/{courseId}/syllabi", validReq, course1.getId()))
+        .perform(
+            postAs(lecturerToken, "/api/v1/courses/{courseId}/syllabi", validReq, course1.getId()))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.effectiveFromTermId").value(termFrom.getId()))
         .andExpect(jsonPath("$.effectiveToTermId").value(termTo.getId()));
@@ -184,7 +219,8 @@ class CloIntegrationTest extends IntegrationTestBase {
 
     mockMvc
         .perform(
-            postAs(pmToken, "/api/v1/courses/{courseId}/syllabi", invertedReq, course1.getId()))
+            postAs(
+                lecturerToken, "/api/v1/courses/{courseId}/syllabi", invertedReq, course1.getId()))
         .andExpect(status().isUnprocessableEntity())
         .andExpect(jsonPath("$.code").value("BUSINESS_RULE_VIOLATION"));
 
@@ -198,7 +234,10 @@ class CloIntegrationTest extends IntegrationTestBase {
     mockMvc
         .perform(
             postAs(
-                pmToken, "/api/v1/courses/{courseId}/syllabi", nonExistentTermReq, course1.getId()))
+                lecturerToken,
+                "/api/v1/courses/{courseId}/syllabi",
+                nonExistentTermReq,
+                course1.getId()))
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.code").value("NOT_FOUND"));
   }
@@ -212,7 +251,7 @@ class CloIntegrationTest extends IntegrationTestBase {
         mockMvc
             .perform(
                 postAs(
-                    pmToken,
+                    lecturerToken,
                     "/api/v1/courses/{courseId}/syllabi",
                     SyllabusRequest.builder().version("2024.1").build(),
                     course1.getId()))
@@ -225,7 +264,7 @@ class CloIntegrationTest extends IntegrationTestBase {
         mockMvc
             .perform(
                 postAs(
-                    pmToken,
+                    lecturerToken,
                     "/api/v1/courses/{courseId}/syllabi",
                     SyllabusRequest.builder().version("2024.1").build(),
                     course2.getId()))
@@ -244,7 +283,7 @@ class CloIntegrationTest extends IntegrationTestBase {
             .build();
 
     mockMvc
-        .perform(postAs(pmToken, "/api/v1/syllabi/{syllabusId}/clos", clo1Req, syl1Id))
+        .perform(postAs(lecturerToken, "/api/v1/syllabi/{syllabusId}/clos", clo1Req, syl1Id))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.code").value("CLO1"))
         .andExpect(jsonPath("$.bloomLevel").value(2))
@@ -252,13 +291,13 @@ class CloIntegrationTest extends IntegrationTestBase {
 
     // 2. Tạo CLO1 trên syl2 thành công (cùng code khác syllabusId) (US-11/AC-2)
     mockMvc
-        .perform(postAs(pmToken, "/api/v1/syllabi/{syllabusId}/clos", clo1Req, syl2Id))
+        .perform(postAs(lecturerToken, "/api/v1/syllabi/{syllabusId}/clos", clo1Req, syl2Id))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.code").value("CLO1"));
 
     // 3. Trùng code CLO1 trong cùng syl1 -> 409 CONFLICT (US-11/AC-2)
     mockMvc
-        .perform(postAs(pmToken, "/api/v1/syllabi/{syllabusId}/clos", clo1Req, syl1Id))
+        .perform(postAs(lecturerToken, "/api/v1/syllabi/{syllabusId}/clos", clo1Req, syl1Id))
         .andExpect(status().isConflict())
         .andExpect(jsonPath("$.code").value("CONFLICT"));
 
@@ -266,7 +305,7 @@ class CloIntegrationTest extends IntegrationTestBase {
     CloRequest badBloomReq =
         CloRequest.builder().code("CLO2").contentOriginal("Nội dung hợp lệ").bloomLevel(7).build();
     mockMvc
-        .perform(postAs(pmToken, "/api/v1/syllabi/{syllabusId}/clos", badBloomReq, syl1Id))
+        .perform(postAs(lecturerToken, "/api/v1/syllabi/{syllabusId}/clos", badBloomReq, syl1Id))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
 
@@ -279,15 +318,17 @@ class CloIntegrationTest extends IntegrationTestBase {
             .measurement(CloMeasurementDto.builder().defaultWeight(1.5).build())
             .build();
     mockMvc
-        .perform(postAs(pmToken, "/api/v1/syllabi/{syllabusId}/clos", badMeasurementReq, syl1Id))
+        .perform(
+            postAs(lecturerToken, "/api/v1/syllabi/{syllabusId}/clos", badMeasurementReq, syl1Id))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
 
-    // 6. Freeze: Chuyển syl1 sang CONFIRMED -> thêm CLO bị từ chối 422 (US-10/AC-3)
+    // 6. Freeze: Trưởng bộ môn chuyển syl1 sang CONFIRMED -> thêm CLO bị từ chối 422 (US-10/AC-3,
+    // TD-27)
     mockMvc
         .perform(
             putAs(
-                pmToken,
+                deptHeadToken,
                 "/api/v1/syllabi/{id}/status",
                 SyllabusStatusUpdateRequest.builder().status(SyllabusStatus.CONFIRMED).build(),
                 syl1Id))
@@ -296,7 +337,7 @@ class CloIntegrationTest extends IntegrationTestBase {
     CloRequest newCloReq =
         CloRequest.builder().code("CLO3").contentOriginal("Nội dung hợp lệ").bloomLevel(3).build();
     mockMvc
-        .perform(postAs(pmToken, "/api/v1/syllabi/{syllabusId}/clos", newCloReq, syl1Id))
+        .perform(postAs(lecturerToken, "/api/v1/syllabi/{syllabusId}/clos", newCloReq, syl1Id))
         .andExpect(status().isUnprocessableEntity())
         .andExpect(jsonPath("$.code").value("BUSINESS_RULE_VIOLATION"));
   }
@@ -305,12 +346,12 @@ class CloIntegrationTest extends IntegrationTestBase {
   @DisplayName(
       "US-12: Tạo liên kết CLO-PI (201), validate PI khác CTĐT (422), trùng (409), weight (400), matrix và QA xác nhận")
   void us12_cloPiLinkAndMatrixWorkflow() throws Exception {
-    // 1. Tạo syllabus trên course1
+    // 1. Giảng viên tạo syllabus trên course1
     MvcResult sylResult =
         mockMvc
             .perform(
                 postAs(
-                    pmToken,
+                    lecturerToken,
                     "/api/v1/courses/{courseId}/syllabi",
                     SyllabusRequest.builder().version("2024.1").build(),
                     course1.getId()))
@@ -318,7 +359,7 @@ class CloIntegrationTest extends IntegrationTestBase {
             .andReturn();
     String syllabusId = read(sylResult, "$.id");
 
-    // 2. Tạo CLO1 trên syllabus
+    // 2. Giảng viên tạo CLO1 trên syllabus
     CloRequest cloReq =
         CloRequest.builder()
             .code("CLO1")
@@ -327,12 +368,12 @@ class CloIntegrationTest extends IntegrationTestBase {
             .build();
     MvcResult cloResult =
         mockMvc
-            .perform(postAs(pmToken, "/api/v1/syllabi/{syllabusId}/clos", cloReq, syllabusId))
+            .perform(postAs(lecturerToken, "/api/v1/syllabi/{syllabusId}/clos", cloReq, syllabusId))
             .andExpect(status().isCreated())
             .andReturn();
     String cloId = read(cloResult, "$.id");
 
-    // 3. Tạo link (CLO1, PI1.1) hợp lệ -> 201 Created (US-12/AC-1)
+    // 3. Trưởng ngành (PM) tạo link (CLO1, PI1.1) hợp lệ -> 201 Created (US-12/AC-1)
     CloPiLinkRequest linkReq =
         CloPiLinkRequest.builder()
             .programVersionId(programVersion.getId())
@@ -368,9 +409,9 @@ class CloIntegrationTest extends IntegrationTestBase {
 
     CloPiLinkRequest badVersionLinkReq =
         CloPiLinkRequest.builder()
-            .programVersionId(programVersion.getId()) // version này
+            .programVersionId(programVersion.getId())
             .cloId(cloId)
-            .piId(otherPi.getId()) // nhưng PI của version khác
+            .piId(otherPi.getId())
             .build();
 
     mockMvc
@@ -436,7 +477,7 @@ class CloIntegrationTest extends IntegrationTestBase {
   }
 
   // ------------------------------------------------------------------
-  // Phân quyền theo phạm vi của PROGRAM_MANAGER (ADR 0009, phương án A)
+  // Phân quyền theo Bộ môn và Giảng viên (ADR 0010)
   // ------------------------------------------------------------------
 
   private String createSyllabusAs(String bearer, String courseId, String version) throws Exception {
@@ -469,29 +510,41 @@ class CloIntegrationTest extends IntegrationTestBase {
 
   @Test
   @DisplayName(
-      "US-10/AC-4: PM chỉ ghi đề cương của học phần thuộc CTĐT trong scope; LECTURER bị chặn")
+      "US-10/AC-4: Giảng viên chỉ soạn đề cương môn trong scope.courseIds; PM bị chặn; TBM duyệt CONFIRMED")
   void us10_ac4_syllabusWriteIsScoped() throws Exception {
     SyllabusRequest req = SyllabusRequest.builder().version("2024.1").build();
 
-    // PM ngoài scope và LECTURER không được tạo đề cương -> 403
+    // PM và Giảng viên ngoài scope không được tạo đề cương -> 403
+    mockMvc
+        .perform(postAs(pmToken, "/api/v1/courses/{courseId}/syllabi", req, course1.getId()))
+        .andExpect(status().isForbidden());
     mockMvc
         .perform(
-            postAs(pmOutOfScopeToken, "/api/v1/courses/{courseId}/syllabi", req, course1.getId()))
-        .andExpect(status().isForbidden());
-    mockMvc
-        .perform(postAs(lecturerToken, "/api/v1/courses/{courseId}/syllabi", req, course1.getId()))
+            postAs(
+                lecturerOutOfScopeToken,
+                "/api/v1/courses/{courseId}/syllabi",
+                req,
+                course1.getId()))
         .andExpect(status().isForbidden());
 
-    // PM trong scope -> 201; rồi PM ngoài scope/LECTURER không đổi được trạng thái -> 403
-    String syllabusId = createSyllabusAs(pmToken, course1.getId(), "2024.1");
+    // Giảng viên trong scope -> 201 Created
+    String syllabusId = createSyllabusAs(lecturerToken, course1.getId(), "2024.1");
+
+    // Giảng viên và TBM ngoài scope không được duyệt CONFIRMED -> 403
     SyllabusStatusUpdateRequest confirm =
         SyllabusStatusUpdateRequest.builder().status(SyllabusStatus.CONFIRMED).build();
     mockMvc
-        .perform(putAs(pmOutOfScopeToken, "/api/v1/syllabi/{id}/status", confirm, syllabusId))
-        .andExpect(status().isForbidden());
-    mockMvc
         .perform(putAs(lecturerToken, "/api/v1/syllabi/{id}/status", confirm, syllabusId))
         .andExpect(status().isForbidden());
+    mockMvc
+        .perform(putAs(deptHeadOutOfScopeToken, "/api/v1/syllabi/{id}/status", confirm, syllabusId))
+        .andExpect(status().isForbidden());
+
+    // TBM trong scope -> duyệt CONFIRMED thành công 200 OK
+    mockMvc
+        .perform(putAs(deptHeadToken, "/api/v1/syllabi/{id}/status", confirm, syllabusId))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("CONFIRMED"));
 
     // Đọc vẫn mở cho mọi vai trò đã xác thực
     mockMvc
@@ -504,54 +557,34 @@ class CloIntegrationTest extends IntegrationTestBase {
   }
 
   @Test
-  @DisplayName("US-10/AC-4: học phần chưa thuộc CTĐT nào chỉ ADMIN ghi được (fail-closed)")
+  @DisplayName("US-10/AC-4: Môn học chưa gán cho ai chỉ ADMIN tạo đề cương được (fail-closed)")
   void us10_ac4_orphanCourseIsAdminOnly() throws Exception {
     Course orphan = fixtures.course();
     SyllabusRequest req = SyllabusRequest.builder().version("2024.1").build();
 
+    // Giảng viên và PM không có môn trong scope -> 403
+    mockMvc
+        .perform(postAs(lecturerToken, "/api/v1/courses/{courseId}/syllabi", req, orphan.getId()))
+        .andExpect(status().isForbidden());
     mockMvc
         .perform(postAs(pmToken, "/api/v1/courses/{courseId}/syllabi", req, orphan.getId()))
         .andExpect(status().isForbidden());
 
+    // ADMIN có toàn quyền -> 201
     mockMvc
         .perform(postAs(adminToken, "/api/v1/courses/{courseId}/syllabi", req, orphan.getId()))
         .andExpect(status().isCreated());
   }
 
   @Test
-  @DisplayName("US-10/AC-4: học phần thuộc nhiều CTĐT, scope khớp một CTĐT là đủ (phép HỢP)")
-  void us10_ac4_courseInSeveralProgramsUnionOfScopes() throws Exception {
-    Program otherProgram = fixtures.program();
-    ProgramVersion otherVersion = fixtures.programVersion(otherProgram, ProgramVersionStatus.DRAFT);
-    Course shared = fixtures.course();
-    fixtures.programCourse(programVersion, shared);
-    fixtures.programCourse(otherVersion, shared);
-
-    String otherProgramPm =
-        fixtures.bearerFor(
-            Role.PROGRAM_MANAGER,
-            UserScope.builder().programIds(List.of(otherProgram.getId())).build());
-    SyllabusRequest req = SyllabusRequest.builder().version("2024.1").build();
-
-    // PM chỉ quản lý CTĐT thứ hai vẫn ghi được; PM ngoài cả hai thì không
-    mockMvc
-        .perform(postAs(otherProgramPm, "/api/v1/courses/{courseId}/syllabi", req, shared.getId()))
-        .andExpect(status().isCreated());
-    mockMvc
-        .perform(
-            postAs(pmOutOfScopeToken, "/api/v1/courses/{courseId}/syllabi", req, shared.getId()))
-        .andExpect(status().isForbidden());
-  }
-
-  @Test
-  @DisplayName("US-11/AC-5: PM ngoài scope và LECTURER không thêm/sửa/xóa được CLO")
+  @DisplayName("US-11/AC-5: PM và Giảng viên ngoài scope không thêm/sửa/xóa được CLO")
   void us11_ac5_cloWriteIsScoped() throws Exception {
-    String syllabusId = createSyllabusAs(pmToken, course1.getId(), "2024.1");
-    String cloId = createCloAs(pmToken, syllabusId, "CLO1");
+    String syllabusId = createSyllabusAs(lecturerToken, course1.getId(), "2024.1");
+    String cloId = createCloAs(lecturerToken, syllabusId, "CLO1");
     CloRequest newClo = CloRequest.builder().code("CLO2").bloomLevel(3).build();
     CloUpdateRequest update = CloUpdateRequest.builder().code("CLO1").bloomLevel(4).build();
 
-    for (String denied : List.of(pmOutOfScopeToken, lecturerToken)) {
+    for (String denied : List.of(pmToken, lecturerOutOfScopeToken)) {
       mockMvc
           .perform(postAs(denied, "/api/v1/syllabi/{syllabusId}/clos", newClo, syllabusId))
           .andExpect(status().isForbidden());
@@ -563,13 +596,9 @@ class CloIntegrationTest extends IntegrationTestBase {
           .andExpect(status().isForbidden());
     }
 
-    // CLO không bị đổi/xóa bởi các lời gọi bị chặn; PM trong scope và ADMIN vẫn thao tác được
+    // Giảng viên trong scope và ADMIN thao tác được
     mockMvc
-        .perform(getAs(pmOutOfScopeToken, "/api/v1/clos/{id}", cloId))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.bloomLevel").value(2));
-    mockMvc
-        .perform(putAs(pmToken, "/api/v1/clos/{id}", update, cloId))
+        .perform(putAs(lecturerToken, "/api/v1/clos/{id}", update, cloId))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.bloomLevel").value(4));
     mockMvc
@@ -578,10 +607,10 @@ class CloIntegrationTest extends IntegrationTestBase {
   }
 
   @Test
-  @DisplayName("US-12/AC-6: PM ngoài scope và LECTURER không tạo/xóa được liên kết CLO–PI")
+  @DisplayName("US-12/AC-6: PM ngoài scope và Giảng viên không tạo/xóa được liên kết CLO–PI")
   void us12_ac6_linkWriteIsScoped() throws Exception {
-    String syllabusId = createSyllabusAs(pmToken, course1.getId(), "2024.1");
-    String cloId = createCloAs(pmToken, syllabusId, "CLO1");
+    String syllabusId = createSyllabusAs(lecturerToken, course1.getId(), "2024.1");
+    String cloId = createCloAs(lecturerToken, syllabusId, "CLO1");
     CloPiLinkRequest linkReq =
         CloPiLinkRequest.builder()
             .programVersionId(programVersion.getId())
@@ -614,26 +643,28 @@ class CloIntegrationTest extends IntegrationTestBase {
   }
 
   @Test
-  @DisplayName(
-      "US-12/AC-6: version trong scope nhưng đề cương thuộc học phần ngoài scope -> 403 (vế AND)")
-  void us12_ac6_versionInScopeButSyllabusOutOfScope() throws Exception {
+  @DisplayName("TD-28: Đề cương của học phần không thuộc CTĐT -> 422 BUSINESS_RULE_VIOLATION")
+  void us12_ac6_syllabusCourseNotBelongToProgramVersion() throws Exception {
     Program otherProgram = fixtures.program();
     ProgramVersion otherVersion = fixtures.programVersion(otherProgram, ProgramVersionStatus.DRAFT);
-    Course foreign = fixtures.course();
-    fixtures.programCourse(otherVersion, foreign);
-    String foreignSyllabusId = createSyllabusAs(adminToken, foreign.getId(), "2024.1");
+    Course foreignCourse = fixtures.course();
+    fixtures.programCourse(otherVersion, foreignCourse);
+
+    String foreignSyllabusId = createSyllabusAs(adminToken, foreignCourse.getId(), "2024.1");
     String foreignCloId = createCloAs(adminToken, foreignSyllabusId, "CLO1");
 
-    // pmToken có scope CTĐT `program` (programVersion hợp lệ) nhưng đề cương thuộc `otherProgram`
+    // pmToken quản lý `programVersion`, nhưng `foreignCourse` không nằm trong `programVersion`
     CloPiLinkRequest req =
         CloPiLinkRequest.builder()
             .programVersionId(programVersion.getId())
             .cloId(foreignCloId)
             .piId(pi.getId())
             .build();
+
     mockMvc
         .perform(
             postAs(pmToken, "/api/v1/syllabi/{syllabusId}/clo-pi-links", req, foreignSyllabusId))
-        .andExpect(status().isForbidden());
+        .andExpect(status().isUnprocessableEntity())
+        .andExpect(jsonPath("$.code").value("BUSINESS_RULE_VIOLATION"));
   }
 }

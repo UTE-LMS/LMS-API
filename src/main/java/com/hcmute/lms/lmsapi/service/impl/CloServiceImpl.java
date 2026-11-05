@@ -49,10 +49,13 @@ public class CloServiceImpl implements CloService {
   public CloResponse createClo(String syllabusId, CloRequest request) {
     Syllabus syllabus = requireSyllabus(syllabusId);
 
-    // US-10/AC-3: Đề cương CONFIRMED không cho sửa/thêm CLO
-    if (syllabus.getStatus() == SyllabusStatus.CONFIRMED) {
+    // TD-27 / US-10/AC-3: Chỉ đề cương DRAFT mới cho phép thêm CLO (khóa cứng khi CONFIRMED hoặc
+    // ARCHIVED)
+    if (syllabus.getStatus() != SyllabusStatus.DRAFT) {
       throw new BusinessRuleViolationException(
-          "Đề cương đã CONFIRMED không cho phép thêm CLO mới; phải tạo phiên bản đề cương mới");
+          "Chỉ đề cương ở trạng thái DRAFT mới cho phép thêm CLO mới; đề cương đã "
+              + syllabus.getStatus()
+              + " không cho phép thêm CLO mới");
     }
 
     String code = request.getCode().trim();
@@ -82,10 +85,12 @@ public class CloServiceImpl implements CloService {
     Clo clo = requireClo(id);
     Syllabus syllabus = requireSyllabus(clo.getSyllabusId());
 
-    // US-10/AC-3: Đề cương CONFIRMED không cho sửa CLO
-    if (syllabus.getStatus() == SyllabusStatus.CONFIRMED) {
+    // TD-27 / US-10/AC-3: Chỉ đề cương DRAFT mới cho phép sửa CLO
+    if (syllabus.getStatus() != SyllabusStatus.DRAFT) {
       throw new BusinessRuleViolationException(
-          "Đề cương đã CONFIRMED không cho phép sửa nội dung CLO; phải tạo phiên bản đề cương mới");
+          "Chỉ đề cương ở trạng thái DRAFT mới cho phép sửa nội dung CLO; đề cương đã "
+              + syllabus.getStatus()
+              + " không cho phép sửa nội dung CLO");
     }
 
     String newCode = request.getCode().trim();
@@ -129,10 +134,12 @@ public class CloServiceImpl implements CloService {
     Clo clo = requireClo(id);
     Syllabus syllabus = requireSyllabus(clo.getSyllabusId());
 
-    // US-10/AC-3: Đề cương CONFIRMED không cho xóa CLO
-    if (syllabus.getStatus() == SyllabusStatus.CONFIRMED) {
+    // TD-27 / US-10/AC-3: Chỉ đề cương DRAFT mới cho phép xóa CLO
+    if (syllabus.getStatus() != SyllabusStatus.DRAFT) {
       throw new BusinessRuleViolationException(
-          "Đề cương đã CONFIRMED không cho phép xóa CLO; phải tạo phiên bản đề cương mới");
+          "Chỉ đề cương ở trạng thái DRAFT mới cho phép xóa CLO; đề cương đã "
+              + syllabus.getStatus()
+              + " không cho phép xóa CLO");
     }
 
     // Restrict delete: Không xóa CLO nếu đã có liên kết CLO-PI
