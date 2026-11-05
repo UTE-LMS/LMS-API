@@ -5,6 +5,7 @@ import com.hcmute.lms.lmsapi.document.Verification;
 import com.hcmute.lms.lmsapi.dto.PageResponse;
 import com.hcmute.lms.lmsapi.dto.ProgramVersionRequest;
 import com.hcmute.lms.lmsapi.dto.ProgramVersionResponse;
+import com.hcmute.lms.lmsapi.dto.ProgramVersionStatusUpdateRequest;
 import com.hcmute.lms.lmsapi.dto.ProgramVersionUpdateRequest;
 import com.hcmute.lms.lmsapi.enums.ProgramVersionStatus;
 import com.hcmute.lms.lmsapi.enums.VerificationStatus;
@@ -114,8 +115,6 @@ public class ProgramVersionServiceImpl implements ProgramVersionService {
       throw conflict(version);
     }
 
-    validateStatusTransition(programVersion.getStatus(), request.getStatus());
-
     programVersion.setVersion(version);
     programVersion.setTotalCredits(request.getTotalCredits());
     programVersion.setDurationYears(request.getDurationYears());
@@ -123,9 +122,6 @@ public class ProgramVersionServiceImpl implements ProgramVersionService {
         request.getApplicableCohorts() != null
             ? new ArrayList<>(request.getApplicableCohorts())
             : new ArrayList<>());
-    if (request.getStatus() != null) {
-      programVersion.setStatus(request.getStatus());
-    }
 
     try {
       programVersion = programVersionRepository.save(programVersion);
@@ -134,6 +130,18 @@ public class ProgramVersionServiceImpl implements ProgramVersionService {
           "Duplicate program version on update: {} - {}", programVersion.getProgramId(), version);
       throw conflict(version);
     }
+    return programVersionMapper.toResponse(programVersion);
+  }
+
+  @Override
+  public ProgramVersionResponse updateProgramVersionStatus(
+      String id, ProgramVersionStatusUpdateRequest request) {
+    ProgramVersion programVersion = requireProgramVersion(id);
+
+    validateStatusTransition(programVersion.getStatus(), request.getStatus());
+    programVersion.setStatus(request.getStatus());
+
+    programVersion = programVersionRepository.save(programVersion);
     return programVersionMapper.toResponse(programVersion);
   }
 

@@ -23,7 +23,7 @@ import com.hcmute.lms.lmsapi.dto.PiRequest;
 import com.hcmute.lms.lmsapi.dto.PloRequest;
 import com.hcmute.lms.lmsapi.dto.ProgramRequest;
 import com.hcmute.lms.lmsapi.dto.ProgramVersionRequest;
-import com.hcmute.lms.lmsapi.dto.ProgramVersionUpdateRequest;
+import com.hcmute.lms.lmsapi.dto.ProgramVersionStatusUpdateRequest;
 import com.hcmute.lms.lmsapi.dto.VerificationRequest;
 import com.hcmute.lms.lmsapi.enums.PiContributionType;
 import com.hcmute.lms.lmsapi.enums.ProgramVersionStatus;
@@ -271,28 +271,22 @@ class ProgramIntegrationTest {
             mockMvc, objectMapper, post("/api/v1/program-versions"), managerToken, missingProgram)
         .andExpect(status().isUnprocessableEntity());
 
-    ProgramVersionUpdateRequest backward =
-        ProgramVersionUpdateRequest.builder()
-            .version(activeVersion.getVersion())
-            .status(ProgramVersionStatus.DRAFT)
-            .build();
+    ProgramVersionStatusUpdateRequest backward =
+        ProgramVersionStatusUpdateRequest.builder().status(ProgramVersionStatus.DRAFT).build();
     ApiTestSupport.performJson(
             mockMvc,
             objectMapper,
-            put("/api/v1/program-versions/" + activeVersion.getId()),
+            put("/api/v1/program-versions/" + activeVersion.getId() + "/status"),
             managerToken,
             backward)
         .andExpect(status().isUnprocessableEntity());
 
-    ProgramVersionUpdateRequest forward =
-        ProgramVersionUpdateRequest.builder()
-            .version(draftVersion.getVersion())
-            .status(ProgramVersionStatus.ACTIVE)
-            .build();
+    ProgramVersionStatusUpdateRequest forward =
+        ProgramVersionStatusUpdateRequest.builder().status(ProgramVersionStatus.ACTIVE).build();
     ApiTestSupport.performJson(
             mockMvc,
             objectMapper,
-            put("/api/v1/program-versions/" + draftVersion.getId()),
+            put("/api/v1/program-versions/" + draftVersion.getId() + "/status"),
             managerToken,
             forward)
         .andExpect(status().isOk())
