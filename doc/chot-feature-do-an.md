@@ -218,20 +218,18 @@ Tóm tắt từ `GiaiThich_CoSoDuLieu.md` mục 2; vi phạm là lỗi nghiệp 
 
 ## 8. Việc còn treo trước khi ký (phụ thuộc người khác)
 
-| # | Việc | Ai trả lời | Ảnh hưởng tới feature |
-|---|---|---|---|
-| 1 | Chấp nhận NEW-01 (Trưởng bộ môn duyệt ma trận) và không làm xuất phôi in | GVHD (Q11) | NEW-01, vai trò DEPARTMENT_HEAD |
-| 2 | Chọn ba học phần thử nghiệm; xác nhận điểm có theo từng câu hỏi (Q05) | Khoa, GVHD | Toàn bộ E06–E08; nếu chỉ có điểm tổng phải đổi phạm vi bằng ADR |
-| 3 | Công thức, ngưỡng, mẫu số, xử lý thiếu dữ liệu (Q04, Q12, Q13) | Khoa | US-26–29; nếu không kịp K3 thì chạy chế độ không chính thức |
-| 4 | Phương pháp mặc định PI/PLO và chính sách nhập lại (Q19) | Khoa | US-23, US-28 |
-| 5 | Ánh xạ CLO–PI đã duyệt của ba học phần (Q14) | Khoa | US-12, US-15; KPI K7 |
-| 6 | Ai được xác nhận quy tắc đo (Q08) | Khoa | Phân quyền mục 6 |
-| 7 | Dùng mã sinh viên thật hay mã thay thế (Q09) | Khoa | US-20 |
-| 8 | Chấp nhận chạy chế độ không chính thức nếu K3 trượt | GVHD | Bản cam kết mục 3 |
-| 9 | ~~Cập nhật `CLAUDE.md` và rule 02~~ **Đã cập nhật 2026-10-27**; ADR nháp ở `adr/0001-duyet-ma-tran-de-thi.md`, cần GVHD trả lời để chốt | Hai sinh viên | Tránh agent tự mâu thuẫn với CSDL v0.5 |
-| 10 | **Công thức còn thiếu** (cấp PLO; cấp học phần khi `requireAllCloPass = false`; `WEIGHTED_ITEMS`; gộp PI nhiều học phần; thiếu dữ liệu/ngưỡng trong công thức): 11 mục CT-01…CT-11 ở `plan/F06-do-luong.md` §9 | GVHD, Khoa (Q20–Q23) | US-27, US-28, US-29, US-32; PLO không thể báo cáo chính thức nếu chưa có |
-
-Việc 1 nên ghi thành ADR (`doc/adr/`) vì đổi phạm vi (CLAUDE.md quy tắc 9).
+| # | Việc | Ai trả lời | Tình trạng (2026-11-06) | Ảnh hưởng tới feature |
+|---|---|---|---|---|
+| 1 | Chấp nhận NEW-01 (Trưởng bộ môn duyệt ma trận đề thi) và không làm xuất phôi in | GVHD (Q11) | Nhóm SV chốt giữ NEW-01 (ADR 0001); chờ GVHD ký xác nhận | NEW-01, vai trò DEPARTMENT_HEAD |
+| 2 | Chọn học phần thử nghiệm; xác nhận điểm có theo từng câu hỏi (Q05) | Khoa, GVHD | **Đã chọn 2 học phần** (`APCM220307`, `ABDA433708`); điểm theo câu hỏi `ITEM` (Q05) | E06–E08 |
+| 3 | Công thức, ngưỡng, mẫu số, xử lý thiếu dữ liệu (Q04, Q12, Q13) | Khoa | **Chưa có:** Khoa chưa cung cấp | US-26–29; nếu không kịp K3 thì chạy chế độ không chính thức |
+| 4 | Phương pháp mặc định PI/PLO và chính sách nhập lại (Q19) | Khoa | **Chưa có:** Khoa chưa cung cấp | US-23, US-28 |
+| 5 | Ánh xạ CLO–PI đã duyệt của các học phần thử nghiệm (Q14) | Khoa | **Đã có:** Lấy theo 2 đề cương chính thức đã duyệt (Q14) | US-12, US-15; KPI K7 |
+| 6 | Ai được xác nhận quy tắc đo và CTĐT (Q08) | Khoa | **Đã chốt nội bộ:** `QA_OFFICER` xác nhận CTĐT/PLO/PI (ADR 0004); người xác nhận quy tắc đo chờ Khoa | Phân quyền mục 6 |
+| 7 | Dùng mã sinh viên thật hay mã thay thế (Q09) | Khoa | **Đã chốt:** Dùng mã thật trên DB thật/staging; dữ liệu mẫu/test giữ mã giả (R9) | US-20 |
+| 8 | Chấp nhận chạy chế độ không chính thức nếu K3 trượt | GVHD | Chờ GVHD xác nhận | Bản cam kết mục 3 |
+| 9 | ADR cập nhật thiết kế: ADR 0001 (NEW-01), ADR 0010 (bộ môn/GV), ADR 0011 (PI suy ra từ CLO), ADR 0012 (bỏ quy đổi I/R/M) | Hai sinh viên | **Đã ban hành ADR 0001, 0010, 0011, 0012** | Giữ mã và tài liệu nhất quán |
+| 10 | **Công thức còn thiếu** (cấp PLO; cấp học phần khi `requireAllCloPass = false`; `WEIGHTED_ITEMS`; gộp PI nhiều học phần; thiếu dữ liệu/ngưỡng trong công thức): 11 mục CT-01…CT-11 ở `plan/F06-do-luong.md` §9 | GVHD, Khoa (Q20–Q23) | **Chưa có:** PLO không thể báo cáo chính thức nếu chưa có | US-27, US-28, US-29, US-32 |
 
 ---
 
@@ -239,6 +237,6 @@ Việc 1 nên ghi thành ADR (`doc/adr/`) vì đổi phạm vi (CLAUDE.md quy t�
 
 | Vai trò | Họ tên | Chữ ký | Ngày |
 |---|---|---|---|
-| Sinh viên 1 (IBS) | | | |
-| Sinh viên 2 (IT) | | | |
-| Giảng viên hướng dẫn | | | |
+| Sinh viên 1 (IT) | Tín | | |
+| Sinh viên 2 (IT) | Minh | | |
+| Giảng viên hướng dẫn | [ĐIỀN] | | |

@@ -22,13 +22,17 @@ v0.5 cập nhật theo `PLO_DB_UPDATE.md`. Số collection không đổi (30). C
 | Cải tiến | `improvement_actions` thêm `programVersionId`, `rootCause`, `expectedTarget`, `targetTermId`, `evaluation` (đánh giá hiệu quả), mức `CRITICAL` |
 | Nhật ký | `audit_logs.action` thêm `ASSESSMENT_APPROVE`, `ASSESSMENT_REJECT` |
 
-**Hai điểm lệch với phạm vi/nguyên tắc cũ, cần GVHD xác nhận (xem Q11, Q18 ở mục 8; Q17 đã chốt):** (1) quy trình duyệt ma trận đề thi và `exportedFiles` (xuất phôi in) chạm vào phạm vi "không duyệt đề" (Q11); (2) `irmWeights` cho phép quy đổi I/R/M thành hệ số, trái nguyên tắc 5 nếu bật (Q18). *Riêng Q17 đã chốt:* không tạo collection `departments`, bỏ trường `courses.departmentId`; vai trò `DEPARTMENT_HEAD` phụ trách duyệt theo danh sách môn học được phân công trong `scope.courseIds`.
+**Các điểm lệch với phạm vi/nguyên tắc cũ đã được xử lý bằng ADR (ADR 0011, 0012, 0010; xem Q10, Q11, Q17, Q18 ở mục 8):**
+(1) Quy trình duyệt ma trận đề thi (NEW-01) là duyệt *ma trận ánh xạ CLO của bài đánh giá*, không duyệt nội dung đề (ADR 0001; nhóm SV chốt giữ, GVHD chưa xác nhận);
+(2) Không quy đổi I/R/M thành hệ số, loại bỏ hoàn toàn `useIrmAsWeight` và `irmWeights` khỏi `measurement_rules` (ADR 0012);
+(3) Câu hỏi/tiêu chí chỉ gán CLO (`outcomeMappings.cloId`), PI luôn suy ra từ kết quả CLO qua `clo_pi_links` (`FROM_CLOS`, ADR 0011);
+(4) Không tạo collection `departments`, bỏ trường `courses.departmentId`; vai trò `DEPARTMENT_HEAD` duyệt theo danh sách môn học trong `scope.courseIds` (Q17, ADR 0010).
 
 # 1. Mục đích và phạm vi
 
 Tài liệu mô tả chi tiết các collection của cơ sở dữ liệu MongoDB, để giảng viên hướng dẫn xem xét và cho ý kiến trước khi triển khai.
 
-**Phạm vi đã chốt:** hệ thống chỉ **tiếp nhận và đo lường các kết quả có sẵn sau khi thi** (điểm theo câu hỏi/tiêu chí, rubric). Hệ thống **không tổ chức thi**: không tự sinh đề. Từ v0.5, **ma trận đề thi** (cấu trúc câu hỏi/tiêu chí và ánh xạ CLO–PI của bài đánh giá) phải được Trưởng bộ môn duyệt trước khi mở cổng nhập điểm; đây là duyệt *ma trận ánh xạ chuẩn đầu ra*, không phải duyệt nội dung đề thi (chờ GVHD xác nhận, Q11). Có **ngân hàng câu hỏi dạng danh mục** để lưu các câu hỏi của đề đã thi cùng ánh xạ CLO–PI, mức Bloom, nhằm khai báo một lần và dùng lại qua nhiều đề, nhiều học kỳ. Bài đánh giá trong cơ sở dữ liệu *khai báo cấu trúc của bài đã thi* (câu nào được dùng, điểm tối đa, đo cặp CLO–PI nào) để quy điểm lên chuẩn đầu ra.
+**Phạm vi đã chốt:** hệ thống chỉ **tiếp nhận và đo lường các kết quả có sẵn sau khi thi** (điểm theo câu hỏi/tiêu chí, rubric). Hệ thống **không tổ chức thi**: không tự sinh đề. Từ v0.5, **ma trận đề thi** (cấu trúc câu hỏi/tiêu chí và ánh xạ CLO của bài đánh giá) phải được Trưởng bộ môn duyệt trước khi mở cổng nhập điểm; đây là duyệt *ma trận ánh xạ chuẩn đầu ra*, không phải duyệt nội dung đề thi (nhóm SV chốt giữ theo NEW-01, ADR 0001; GVHD chưa xác nhận). Có **ngân hàng câu hỏi dạng danh mục** để lưu các câu hỏi của đề đã thi cùng ánh xạ CLO, mức Bloom, nhằm khai báo một lần và dùng lại qua nhiều đề, nhiều học kỳ. Bài đánh giá trong cơ sở dữ liệu *khai báo cấu trúc của bài đã thi* (câu nào được dùng, điểm tối đa, đo CLO nào theo ADR 0011) để quy điểm lên chuẩn đầu ra.
 
 **Về "minh chứng":** các tài liệu, dữ liệu nhóm thu thập trong quá trình khảo sát và xây dựng hệ thống (bản mô tả CTĐT, đề cương, quy trình đo lường, bảng điểm…) là hồ sơ của dự án, **không phải dữ liệu hệ thống quản lý khi vận hành**, nên không có collection quản lý danh mục này. Nguồn của từng PLO, PI, CLO chỉ được ghi ngắn gọn (tên tài liệu, trang) trong khối `source`. Hệ thống cũng không lưu bài làm của sinh viên; chỉ lưu điểm và truy vết về file điểm gốc.
 
@@ -48,14 +52,14 @@ Tài liệu mô tả chi tiết các collection của cơ sở dữ liệu Mongo
 | 2 | Mã CLO chỉ có nghĩa trong một học phần (CLO1 của OOP khác CLO1 của Cơ sở dữ liệu) | CLO nhận diện bằng `_id`; `code` chỉ duy nhất trong một đề cương |
 | 3 | PLO/PI nhận diện bằng **mã**, không dùng thứ tự dòng (tài liệu xếp PLO1, 6, 7, 4, 5, 2, 3) | `code` và `displayOrder` là hai trường riêng |
 | 4 | Lưu **nội dung nguyên văn, nguồn, trang, người xác nhận**; tách "tài liệu nói gì" khỏi "nhóm diễn giải" | Khối `source`, `verification`, `reviewNote` |
-| 5 | Mức Bloom ≠ điểm số; ký hiệu I/R/M ≠ trọng số; mức năng lực của PLO không suy ra bằng trung bình các PI | Lưu riêng từng loại. Bloom và mức năng lực: **không có trường quy đổi**. I/R/M: mặc định không quy đổi (`pi.useIrmAsWeight = false`); chỉ khi Khoa xác nhận mới bật và khai `irmWeights` (Q18) |
+| 5 | Mức Bloom ≠ điểm số; ký hiệu I/R/M ≠ trọng số; mức năng lực của PLO không suy ra bằng trung bình các PI | Lưu riêng từng loại. Bloom và mức năng lực: **không có trường quy đổi**. I/R/M: không quy đổi thành hệ số số học; loại bỏ hoàn toàn `useIrmAsWeight` và `irmWeights` khỏi quy tắc đo (Q18, ADR 0012) |
 | 6 | Công thức, trọng số, ngưỡng đạt phải được người có thẩm quyền xác nhận | `measurement_rules` có trạng thái `DRAFT/CONFIRMED`; chỉ quy tắc đã xác nhận mới cho kết luận chính thức |
 | 7 | Dữ liệu thiếu **không mặc định bằng 0**; riêng câu bỏ trống của sinh viên đã dự thi tính 0 có ghi nhận | `scores.status`: `SCORED`, `BLANK`, `ABSENT`, `NOT_GRADED`, `EXEMPT`, `MISSING` |
-| 8 | Điểm theo **từng câu hỏi/tiêu chí**; mỗi câu gắn CLO, PI và mức Bloom; một câu có thể đo nhiều cặp (CLO, PI) | `outcomeMappings[]` gồm các cặp `{cloId, piId, weight}` trong `questions` và `assessments.items[]`; `bloomLevel`, `maxScore` |
+| 8 | Điểm theo **từng câu hỏi/tiêu chí**; mỗi câu gắn CLO và mức Bloom; một câu có thể đo nhiều CLO (ADR 0011) | `outcomeMappings[]` gồm các `{cloId, weight}` trong `questions` và `assessments.items[]`; `bloomLevel`, `maxScore`. PI suy ra từ kết quả CLO |
 | 9 | Tỷ lệ đạt phải rõ mẫu số; báo cáo kèm số sinh viên chưa đủ dữ liệu | `aggregate_results.counts` (ghi danh, đủ dữ liệu, đạt, chưa đủ dữ liệu) |
 | 10 | Truy vết từ kết quả về dữ liệu gốc | `student_results.inputs[]` → `scores` → `import_batches` + số dòng trong file gốc |
 | 11 | Angular không truy cập MongoDB; backend kiểm tra quyền, dữ liệu và thực hiện công thức đo lường | Phân quyền theo `users.roleAssignments`; công thức đọc từ `measurement_rules` |
-| 12 | PI gắn cho câu hỏi chỉ được chọn trong ánh xạ CLO–PI đã duyệt của chính CLO đó; không cho gắn tùy ý | Dịch vụ kiểm tra cặp (CLO, PI) có trong `clo_pi_links`; chạy tính chính thức yêu cầu liên kết đã `VERIFIED` |
+| 12 | CLO gắn cho câu hỏi phải thuộc đề cương của bài đánh giá; PI suy ra qua `clo_pi_links` đã duyệt | Dịch vụ kiểm tra `cloId` thuộc `syllabi`; PI suy ra từ CLO qua `clo_pi_links`; chạy tính chính thức yêu cầu liên kết đã `VERIFIED` (ADR 0011) |
 | 13 | Chỉ thu thập thông tin cần thiết, ưu tiên mã sinh viên thay thế; không lưu bài làm của sinh viên | `students.studentRef` |
 | 14 | Không triển khai học máy (Machine Learning) | Đồ án không thực hiện ML; loại bỏ collection `ml_experiments`, không ghi dữ liệu thử nghiệm ML vào CSDL |
 
@@ -154,7 +158,7 @@ users, audit_logs: dùng chung cho toàn hệ thống
 | `programId` | Tham chiếu `programs` |
 | `version` | Tên phiên bản (khởi tạo: `BM7A-2.7-Updated-2026`) |
 | `totalCredits`, `durationYears` | Tổng số tín chỉ tốt nghiệp và thời gian đào tạo (năm) theo quy định; để trống cho đến khi đối chiếu bản CTĐT |
-| `applicableCohorts[]` | Các khóa tuyển sinh áp dụng (chưa biết — câu hỏi Q01) |
+| `applicableCohorts[]` | Các khóa tuyển sinh áp dụng: `['K23', 'K24', 'K25', 'K26', 'K27']` (Q01, nhóm SV xác nhận 2026-11-06) |
 | `status` | `DRAFT` / `ACTIVE` / `ARCHIVED` |
 | `verification` | Trạng thái xác nhận |
 
@@ -320,29 +324,28 @@ Ngân hàng: Lập trình hướng đối tượng
 | `categoryId` | Danh mục nội dung chứa câu hỏi |
 | `bloomLevel` | Mức Bloom của nhiệm vụ (1–6, bắt buộc). Lưu riêng, **không** mặc định bằng trình độ năng lực của PI |
 | `difficulty`, `defaultMaxScore` | Độ khó (tùy chọn); điểm tối đa gợi ý |
-| `outcomeMappings[]` | Các cặp `{cloId, piId, weight}`: câu hỏi đo CLO nào và PI nào. `weight` là phần điểm của câu được chia cho cặp đó; tổng các cặp của một câu bằng 1. Một câu có thể đo nhiều cặp |
-| `source` | `{system, externalQuestionId}` — nguồn nhập (Moodle…) và mã câu bên ngoài, để đối chiếu và chống nhập trùng |
+| `outcomeMappings[]` | Các phần tử `{cloId, weight}`: câu hỏi đo CLO nào. `weight` là phần điểm của câu được chia cho CLO đó; tổng các CLO của một câu bằng 1. Một câu có thể đo nhiều CLO (ADR 0011). PI suy ra qua `clo_pi_links` |
+| `source` | `{system, externalQuestionId}` — nguồn nhập (Excel…) và mã câu bên ngoài, để đối chiếu và chống nhập trùng (Q16: nhập từ Excel) |
 | `status` | `DRAFT` (mới nhập, chưa xác định ánh xạ) / `ACTIVE` / `RETIRED` |
 | `verification` | Trạng thái xác nhận ánh xạ |
 
 **Quy tắc:**
 
-- Mỗi câu hỏi (và mỗi tiêu chí rubric trong bài đánh giá) đều có thể ánh xạ với CLO và PI, và **một câu có thể ánh xạ với nhiều cặp CLO–PI**: nhiều CLO khác nhau, một CLO đo nhiều PI, hoặc một PI đến từ nhiều CLO. Mỗi cặp chỉ được khai báo một lần trong cùng một câu (MongoDB kiểm tra) để không tính trùng điểm.
-- Câu `ACTIVE` phải có ít nhất một cặp và tổng `weight` bằng 1 (MongoDB kiểm tra); câu `DRAFT` được để trống ánh xạ.
-- PI của một cặp phải thuộc ánh xạ CLO–PI đã có trong `clo_pi_links` của chính CLO đó (dịch vụ Spring Boot kiểm tra, chặn ghi nếu sai). Giảng viên không được gắn câu hỏi với PI tùy ý. Khi chạy tính ở chế độ chính thức, liên kết CLO–PI còn phải ở trạng thái đã duyệt.
+- Mỗi câu hỏi (và mỗi tiêu chí rubric trong bài đánh giá) ánh xạ với CLO; **một câu có thể ánh xạ với nhiều CLO** (ADR 0011). Mỗi CLO chỉ được khai báo một lần trong cùng một câu (MongoDB kiểm tra) để không tính trùng điểm. PI suy ra từ kết quả CLO.
+- Câu `ACTIVE` phải có ít nhất một CLO và tổng `weight` bằng 1 (MongoDB kiểm tra); câu `DRAFT` được để trống ánh xạ.
+- CLO gắn cho câu hỏi phải thuộc đề cương của bài đánh giá (dịch vụ Spring Boot kiểm tra, chặn ghi nếu sai). Khi chạy tính ở chế độ chính thức, liên kết CLO–PI trong `clo_pi_links` còn phải ở trạng thái đã duyệt.
 - Khi nội dung hoặc ánh xạ của một câu thay đổi, tăng `version`. Các bài đã thi giữ bản sao ánh xạ của phiên bản cũ nên kết quả cũ không bị đổi.
 
-**Ví dụ một câu ánh xạ nhiều cặp** (số liệu và các cặp chỉ để minh họa cách tính, không phải ánh xạ chính thức). Câu thực hành tối đa 10 điểm, khai báo 3 cặp, sinh viên đạt 7 điểm:
+**Ví dụ một câu ánh xạ nhiều CLO** (số liệu và các CLO chỉ để minh họa cách tính, không phải ánh xạ chính thức). Câu thực hành tối đa 10 điểm, khai báo 2 CLO, sinh viên đạt 7 điểm:
 
-| **Cặp (CLO, PI)** | `weight` | **Phần điểm tối đa của câu dành cho cặp** | **Sinh viên đạt** |
+| **CLO** | `weight` | **Phần điểm tối đa của câu dành cho CLO** | **Sinh viên đạt** |
 |---|---|---|---|
-| (CLO2, PI6.1) | 0,3 | 3,0 | 2,1 |
-| (CLO3, PI6.2) | 0,5 | 5,0 | 3,5 |
-| (CLO3, PI7.1) | 0,2 | 2,0 | 1,4 |
+| CLO2 | 0,4 | 4,0 | 2,8 |
+| CLO3 | 0,6 | 6,0 | 4,2 |
 
-Tổng hợp theo từng chuẩn: **CLO2** nhận 3,0 điểm tối đa (đạt 2,1); **CLO3** nhận 7,0 (đạt 4,9, cộng từ hai cặp); **PI6.1** 3,0 (2,1); **PI6.2** 5,0 (3,5); **PI7.1** 2,0 (1,4). Cách chia này tránh gán toàn bộ điểm của một câu cho mọi chuẩn mà câu đó liên quan; có thể đổi sang cách khác nếu Khoa quy định (Q15).
+Tổng hợp: **CLO2** nhận 4,0 điểm tối đa (đạt 2,8); **CLO3** nhận 6,0 (đạt 4,2). Sau đó, kết quả CLO được dùng để suy ra PI qua `clo_pi_links` theo phương thức `FROM_CLOS` (ADR 0011). Cách chia điểm giữa các CLO trong một câu chờ Q15.
 
-**Chỉ mục:** (`bankId`, `code`) duy nhất; `categoryId`; (`bankId`, `status`, `bloomLevel`); `outcomeMappings.cloId`; `outcomeMappings.piId`; (`bankId`, `source.system`, `source.externalQuestionId`) duy nhất khi có mã ngoài. **Khởi tạo:** rỗng — chỉ nhập khi có đề đã thi và ánh xạ CLO–PI đã duyệt.
+**Chỉ mục:** (`bankId`, `code`) duy nhất; `categoryId`; (`bankId`, `status`, `bloomLevel`); `outcomeMappings.cloId`; (`bankId`, `source.system`, `source.externalQuestionId`) duy nhất khi có mã ngoài. **Khởi tạo:** rỗng — chỉ nhập khi có đề đã thi và đề cương đã duyệt.
 
 ### 4.15 assessments — bài đánh giá và cấu trúc câu hỏi/tiêu chí
 
@@ -478,11 +481,11 @@ Mỗi document là điểm của **một sinh viên ở một câu hỏi/tiêu c
 | `confirmedBy`, `confirmedAt` | Người xác nhận quy tắc |
 | `clo` | Cách tính CLO: `method` (`WEIGHTED_ITEMS` / `POINTS_RATIO`), `defaultPassThreshold` (ngưỡng mặc định), `minCoverage` (tỷ lệ tối thiểu thành phần bắt buộc có điểm) |
 | `course` | `requireAllCloPass`: có yêu cầu đạt *từng* CLO mới đạt học phần hay không (chống học lệch — Q12); `defaultTargetPassRate`: mục tiêu tỷ lệ đạt của lớp |
-| `pi` | `method`: `DIRECT_FROM_ITEMS` (tính trực tiếp từ câu hỏi được gán PI đó) hoặc `FROM_CLOS` (tổng hợp từ kết quả CLO theo `clo_pi_links.weight`); `aggregationMethod`: `WEIGHTED_AVERAGE` / `MAX` / `LATEST` / `ACCUMULATED_EVIDENCE`; `defaultPassThreshold`; `useIrmAsWeight` (mặc định `false`) và `irmWeights {I, R, M}` |
+| `pi` | `method`: `FROM_CLOS` (tổng hợp từ kết quả CLO theo `clo_pi_links.weight`, ADR 0011; bỏ `DIRECT_FROM_ITEMS`); `aggregationMethod`: `WEIGHTED_AVERAGE` / `MAX` / `LATEST` / `ACCUMULATED_EVIDENCE`; `defaultPassThreshold`. Bỏ hoàn toàn `useIrmAsWeight` và `irmWeights` theo ADR 0012 (không quy đổi I/R/M) |
 | `plo` | `method`: `ALL_PIS_PASSED` / `WEIGHTED_PIS` / `AVERAGE_PIS`; `defaultPassThreshold`; `cohortTargetPassRate` (mục tiêu tỷ lệ đạt theo khóa) |
 | `missingDataPolicy` | `blankScoreValue` (luôn 0: `BLANK` tính 0 có ghi nhận); `excludeAbsentFromDenominator`, `excludeMissingFromDenominator` (loại `ABSENT`/`MISSING` khỏi mẫu số hay tính là chưa đủ dữ liệu — Q13). `NOT_GRADED`, `EXEMPT` luôn `rawScore = null`, không tính 0 |
 
-Mọi ngưỡng/mục tiêu nằm trong 0–1. Chỉ quy tắc `CONFIRMED` mới được dùng để kết luận chính thức. Nếu `pi.useIrmAsWeight = true` thì MongoDB bắt buộc `irmWeights` có đủ ba hệ số I, R, M dương; công thức `FROM_CLOS` nhân thêm `IRM_Factor` (bằng 1 khi cờ tắt). **Khởi tạo:** một khung bản nháp `0.1-DRAFT`, **mọi ngưỡng/trọng số để trống** chờ Khoa xác nhận (`pi.method = DIRECT_FROM_ITEMS` theo Q10, `useIrmAsWeight = false`, không đặt `irmWeights`); không có con số nào được tự đặt.
+Mọi ngưỡng/mục tiêu nằm trong 0–1. Chỉ quy tắc `CONFIRMED` mới được dùng để kết luận chính thức. Không quy đổi I/R/M thành hệ số (ADR 0012). **Khởi tạo:** một khung bản nháp `0.1-DRAFT`, **mọi ngưỡng/trọng số để trống** chờ Khoa xác nhận (`pi.method = FROM_CLOS` theo ADR 0011; trọng số `clo_pi_links.weight` chờ Q22); không có con số nào được tự đặt.
 
 ### 4.24 calculation_runs — mỗi lần chạy tính toán
 
@@ -606,7 +609,7 @@ Những ràng buộc liên kết (ví dụ `cloId` phải tồn tại, câu hỏ
 
 | **Collection** | **Số dòng** | **Nguồn** | **Lưu ý** |
 |---|---|---|---|
-| `programs`, `program_versions` | 1 + 1 | Tên file bản CTĐT | Phiên bản áp dụng chờ xác nhận (Q01) |
+| `programs`, `program_versions` | 1 + 1 | Tên file bản CTĐT | Khóa áp dụng: K23, K24, K25, K26, K27 (Q01) |
 | `plos` | 7 | `Misa.md` | Mức năng lực đúng theo tài liệu |
 | `pis` | 17 | `Misa.md` | Mức năng lực đúng theo tài liệu |
 | `courses` | 1 | `Misa.md` | OOPR230279 |
@@ -620,30 +623,30 @@ Những ràng buộc liên kết (ví dụ `cloId` phải tồn tại, câu hỏ
 
 Danh sách này được theo dõi bằng tài liệu của dự án, không lưu trong cơ sở dữ liệu.
 
-| **Mã** | **Nội dung** | **Tình trạng** | **Ảnh hưởng** |
+| **Mã** | **Nội dung** | **Tình trạng (Cập nhật 2026-11-06)** | **Ảnh hưởng** |
 |---|---|---|---|
-| Q01 | Bản CTĐT áp dụng cho khóa nào | Chưa hỏi | `program_versions.applicableCohorts` |
-| Q02 | Khi nào có đề cương chính thức | Chưa hỏi | `syllabi`, `clos` (hiện chỉ có CLO minh họa) |
-| Q03 | Thang "trình độ năng lực" PLO/PI | Chưa hỏi | Hiện lưu nguyên giá trị, chưa diễn giải |
-| Q04 | Công thức, ngưỡng, mẫu số, xử lý thiếu dữ liệu | Chưa hỏi | `measurement_rules` (đang để trống) |
-| Q05 | Điểm theo câu hỏi hay điểm tổng | **Đã trả lời, chờ xác nhận:** theo từng câu hỏi | `dataGranularity = ITEM` |
-| Q06, Q07 | Phiên bản công nghệ; nơi lưu mã, tệp, môi trường | Chưa hỏi | Môi trường triển khai; MongoDB replica set |
-| Q08 | Ai rà soát nghiệp vụ, kỹ thuật | Chưa hỏi | Quy trình xác nhận (`verification`) |
-| Q09 | Dùng mã sinh viên thật hay mã thay thế | Chưa hỏi | `students`; có thể tách `student_identities` |
-| Q10 | PI gán trực tiếp hay suy ra qua CLO | **Đã trả lời, chờ xác nhận:** gán trực tiếp cho từng câu hỏi, nhưng chỉ chọn trong các PI đã liên kết với CLO của câu đó (ánh xạ CLO–PI đã duyệt) | `outcomeMappings`; kiểm tra với `clo_pi_links`; `pi.method = DIRECT_FROM_ITEMS` |
-| Q11 | Phạm vi: có tổ chức thi không | **Phạm vi đồ án:** không tổ chức thi, không sinh đề; ngân hàng câu hỏi chỉ là danh mục câu hỏi của đề đã thi. **Từ v0.5:** Trưởng bộ môn duyệt *ma trận đề thi* (ánh xạ CLO–PI) trước khi nhập điểm; chưa rõ có tính là "duyệt đề" hay không và có làm tính năng xuất phôi in hay không. Chờ GVHD xác nhận | `assessments.status`, `approval`, `exportedFiles`; vai trò `DEPARTMENT_HEAD` |
-| Q12 | Quy tắc "phải đạt từng CLO"; tỷ trọng, ngưỡng từng CLO | Chưa hỏi | `course.requireAllCloPass`, `clos.measurement` |
-| Q13 | Phân biệt bỏ trống / vắng thi / chưa chấm / thiếu; vắng thi có vào mẫu số không | Chưa hỏi | `scores.status`, `emptyCellAs`, `aggregate_results.counts` |
-| Q14 | Khi nào Khoa cung cấp ánh xạ CLO–PI đã duyệt của các học phần thử nghiệm | Chưa hỏi | `clo_pi_links` — cần có trước khi gán ánh xạ cho câu hỏi |
-| Q15 | Khi một câu đo nhiều cặp CLO–PI, điểm của câu được chia thế nào (chia theo phần, tổng bằng 1; hay mỗi cặp tính trọn điểm) | Chưa hỏi | `outcomeMappings.weight`; thiết kế hiện chọn cách chia, tổng bằng 1 |
-| Q16 | Cấu trúc chương/chủ đề của ngân hàng câu hỏi từng học phần; nguồn nhập câu hỏi (Moodle hay Excel) | Chưa hỏi | `question_categories`, `import_batches` |
-| Q17 | Bộ môn: có cần collection `departments` không, hay `courses.departmentId` chỉ là mã tham chiếu | **Đã chốt:** KHÔNG tạo collection `departments`, bỏ trường `courses.departmentId`. Giữ vai trò `DEPARTMENT_HEAD` duyệt ma trận đề thi trực tiếp theo danh sách môn học trong `scope.courseIds` | `courses`; phạm vi duyệt của `DEPARTMENT_HEAD` qua `UserScope.courseIds` |
-| Q18 | Khoa có cho quy đổi I/R/M thành hệ số khi tổng hợp PI từ CLO không, và giá trị hệ số | Chưa hỏi. Mặc định **không** (`useIrmAsWeight = false`); không đặt giá trị mẫu | `pi.useIrmAsWeight`, `pi.irmWeights` |
-| Q19 | Chọn phương pháp mặc định: `pi.aggregationMethod`, `plo.method`, `reimportPolicy` | Chưa hỏi | `measurement_rules`, `import_batches` |
-| Q20 | Công thức CLO/học phần còn thiếu: (a) `clo.method = WEIGHTED_ITEMS` và nguồn trọng số từng câu hỏi (lược đồ chưa có); (b) vai trò của `assessments.weightInCourse` và `clos.measurement.defaultWeight` (có trong CSDL nhưng không dùng trong công thức); (c) cấp COURSE: `value`/`passed` khi `requireAllCloPass = false`; (d) `rawScore` của tiêu chí rubric lấy từ đâu | Chưa hỏi. Chi tiết: `doc/plan/F06-do-luong.md` §9 (CT-01, 02, 03, 11) | `measurement_rules.clo/course`, `assessments.items[]`, `clos.measurement` |
-| Q21 | Công thức cấp **PLO**: `ALL_PIS_PASSED`, `AVERAGE_PIS`, `WEIGHTED_PIS` (cần thêm trường trọng số PI trong PLO nếu chọn) | Chưa hỏi. `F06` §9 (CT-04) | `measurement_rules.plo`, `student_results` (level PLO) |
-| Q22 | Gộp PI qua **nhiều học phần/lớp/học kỳ** (`aggregationMethod`: `WEIGHTED_AVERAGE`, `MAX`, `LATEST`, `ACCUMULATED_EVIDENCE`); chuẩn hóa `clo_pi_links.weight` khi `FROM_CLOS`; tổng hợp cấp khóa/CTĐT (đếm sinh viên một lần hay theo lớp) | Chưa hỏi. `F06` §9 (CT-05, 06, 09) | `measurement_rules.pi`, `aggregate_results` (COHORT/PROGRAM) |
-| Q23 | Thiếu dữ liệu và ngưỡng **trong công thức**: định nghĩa `clo.minCoverage` (theo số câu hay điểm tối đa), khi nào `INSUFFICIENT_DATA`, loại vắng/thiếu khỏi mẫu số ở mức câu hay mức sinh viên; ưu tiên ngưỡng giữa `clos.measurement` và `measurement_rules`; `≥` hay `>`; làm tròn | Chưa hỏi. `F06` §9 (CT-07, 08, 10); liên quan Q12, Q13 | `measurement_rules.missingDataPolicy`, `completeness`, `passed` |
+| Q01 | Bản CTĐT áp dụng cho khóa nào | **Đã chốt (nhóm SV, 2026-11-06):** Áp dụng cho các khóa `K23`, `K24`, `K25`, `K26`, `K27` | `program_versions.applicableCohorts` |
+| Q02 | Khi nào có đề cương chính thức | **Đã có đề cương chính thức đã duyệt (nhóm SV ghi nhận 2026-11-06):** 2 học phần `APCM220307` (Tin học ứng dụng) và `ABDA433708` (Ứng dụng PT dữ liệu lớn trong KD) | `syllabi`, `clos` |
+| Q03 | Thang "trình độ năng lực" PLO/PI | **Đã làm rõ:** Hệ thống lưu nguyên giá trị `capabilityLevelRaw` (1–6) để hiển thị/đối chiếu, không diễn giải, không quy đổi ra điểm hay Bloom | `pis`, `plos`, `clos` |
+| Q04 | Công thức, ngưỡng, mẫu số, xử lý thiếu dữ liệu | **Chưa có:** Khoa chưa ban hành quy định đo lường | `measurement_rules` (đang để trống, chỉ lưu DRAFT) |
+| Q05 | Điểm theo câu hỏi hay điểm tổng | **Đã chốt (nhóm SV, 2026-11-06):** Điểm theo từng câu hỏi/tiêu chí (`dataGranularity = ITEM`) | Hết rủi ro R2; đo lường được theo CLO |
+| Q06, Q07 | Phiên bản công nghệ; nơi lưu mã, tệp, môi trường | **Đã chốt công nghệ:** Java 25, Spring Boot 4.1.2, Angular 21, MongoDB replica set. Lưu mã: GitHub. **Còn thiếu:** Nền tảng staging chưa chọn | Đóng TD-03; staging chờ chọn hạ tầng |
+| Q08 | Ai rà soát nghiệp vụ, kỹ thuật; ai xác nhận CTĐT/quy tắc | **Đã chốt (nhóm SV, 2026-11-06):** Người rà soát nghiệp vụ & kỹ thuật là GVHD; 2 SV làm kỹ thuật (Minh & Tín - IT). Vai trò xác nhận CTĐT/PLO/PI trong hệ thống: `QA_OFFICER` (ADR 0004) | Phân quyền, quy trình `verification` |
+| Q09 | Dùng mã sinh viên thật hay mã thay thế | **Đã chốt (nhóm SV, 2026-11-06):** Dùng mã sinh viên thật trên môi trường thật/staging; seed dữ liệu và commit/test vẫn dùng mã giả để bảo vệ dữ liệu (R9) | `students.studentRef` |
+| Q10 | PI gán trực tiếp hay suy ra qua CLO | **Đã chốt (ADR 0011, 2026-11-06):** PI suy ra từ kết quả CLO (`pi.method = FROM_CLOS`). Câu hỏi chỉ gán CLO (`outcomeMappings.cloId`). Bỏ `DIRECT_FROM_ITEMS` | `questions`, `assessments.items[]`, `clo_pi_links` |
+| Q11 | Phạm vi: có tổ chức thi không | **Đã chốt phạm vi:** Không tổ chức thi, không sinh đề, không duyệt nội dung đề. **NEW-01:** Trưởng bộ môn duyệt ma trận ánh xạ CLO của bài đánh giá trước khi nạp điểm (nhóm SV chốt giữ theo ADR 0001, GVHD chưa xác nhận). Không làm xuất phôi in | `assessments.status/approval`, vai trò `DEPARTMENT_HEAD` |
+| Q12 | Quy tắc "phải đạt từng CLO"; tỷ trọng, ngưỡng từng CLO | **Chưa có:** Khoa chưa cung cấp | `course.requireAllCloPass`, `clos.measurement` |
+| Q13 | Phân biệt bỏ trống / vắng thi / chưa chấm / thiếu; vắng thi có vào mẫu số không | **Chưa có:** Khoa chưa cung cấp | `scores.status`, `emptyCellAs`, `counts` |
+| Q14 | Khi nào Khoa cung cấp ánh xạ CLO–PI đã duyệt của các học phần thử nghiệm | **Đã chốt (nhóm SV, 2026-11-06):** Ánh xạ CLO–PI lấy theo 2 đề cương chính thức đã duyệt (`APCM220307`, `ABDA433708`) | `clo_pi_links` |
+| Q15 | Khi một câu đo nhiều CLO, điểm của câu được chia thế nào | **Chưa tính / Chưa quyết:** Tạm giữ thiết kế chia theo `weight` (tổng = 1) cho tới khi có ý kiến Khoa | `outcomeMappings.weight` |
+| Q16 | Cấu trúc danh mục ngân hàng câu hỏi; nguồn nhập câu hỏi | **Đã chốt (nhóm SV, 2026-11-06):** Nhập câu hỏi từ file Excel, không dùng Moodle | `question_banks.sourceSystem`, US-17 |
+| Q17 | Bộ môn: có cần collection `departments` không, hay `courses.departmentId` chỉ là mã tham chiếu | **Đã chốt:** KHÔNG tạo collection `departments`, bỏ trường `courses.departmentId`. Giữ vai trò `DEPARTMENT_HEAD` duyệt theo `scope.courseIds` (ADR 0010) | `courses`, `UserScope.courseIds` |
+| Q18 | Khoa có cho quy đổi I/R/M thành hệ số khi tổng hợp PI từ CLO không | **Đã chốt (ADR 0012, 2026-11-06):** Không quy đổi I/R/M sang điểm. Bỏ hoàn toàn `useIrmAsWeight` và `irmWeights` khỏi `measurement_rules` | `measurement_rules`, xóa trường validator |
+| Q19 | Chọn phương pháp mặc định: `pi.aggregationMethod`, `plo.method`, `reimportPolicy` | **Chưa có:** Khoa chưa cung cấp | `measurement_rules`, `import_batches` |
+| Q20 | Công thức CLO/học phần còn thiếu: `WEIGHTED_ITEMS`, vai trò `weightInCourse`/`defaultWeight`, cấp COURSE khi `requireAllCloPass = false` | **Chưa có:** Khoa chưa cung cấp (chi tiết: `doc/plan/F06-do-luong.md` §9) | `measurement_rules.clo/course` |
+| Q21 | Công thức cấp **PLO**: `ALL_PIS_PASSED`, `AVERAGE_PIS`, `WEIGHTED_PIS` | **Chưa có:** Hoàn toàn chưa có công thức PLO chính thức từ Khoa | `measurement_rules.plo`, `student_results` (PLO) |
+| Q22 | Gộp PI qua nhiều học phần/lớp/học kỳ; chuẩn hóa `clo_pi_links.weight` khi `FROM_CLOS`; tổng hợp cấp khóa/CTĐT | **Chưa có:** Chưa có quy định gộp và trọng số `W` CLO→PI trong đề cương để tính PI chính thức | `measurement_rules.pi`, `aggregate_results` |
+| Q23 | Thiếu dữ liệu và ngưỡng trong công thức: `minCoverage`, mẫu số, thứ tự ưu tiên ngưỡng, `≥` hay `>`, làm tròn | **Chưa có:** Khoa chưa cung cấp | `measurement_rules.missingDataPolicy` |
 
 Các số liệu ví dụ trong tài liệu (trọng số 40/60, ngưỡng 60%, tỷ trọng CLO 20/40/40, ngưỡng 72%/50%…) **chưa phải quy định chính thức** và không được đưa vào cơ sở dữ liệu như quy tắc.
 

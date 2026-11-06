@@ -20,9 +20,9 @@ public class ProgramReferenceRepositoryImpl implements ProgramReferenceRepositor
       return false;
     }
     ObjectId id = new ObjectId(piId);
-    return existsInCollection("clo_pi_links", "piId", id)
-        || existsInCollection("questions", "outcomeMappings.piId", id)
-        || existsInCollection("assessments", "items.outcomeMappings.piId", id);
+    // ADR 0011: câu hỏi và bài đánh giá chỉ gán CLO (outcomeMappings.cloId), không gán piId
+    // PI chỉ được tham chiếu qua clo_pi_links
+    return existsInCollection("clo_pi_links", "piId", id);
   }
 
   private boolean existsInCollection(String collection, String field, ObjectId value) {

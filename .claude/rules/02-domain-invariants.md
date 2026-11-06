@@ -31,9 +31,9 @@ Các bất biến dưới đây **chính là** mục tiêu đã thống nhất; 
   ví dụ minh họa**. Dùng trong test thì đặt tên fixture rõ là "ví dụ minh họa", không đưa vào seed hay
   cấu hình mặc định.
 - Liên kết CLO–PI dùng cho tính chính thức phải ở trạng thái `VERIFIED`.
-- Một câu hỏi/tiêu chí có thể đo nhiều cặp (CLO, PI); `weight` của các cặp trong một câu có tổng bằng 1;
-  không gán nguyên điểm một câu cho mọi chuẩn. Cách chia này đang chờ Khoa xác nhận (Q15): giữ ở dạng
-  cấu hình, không rải logic cứng.
+- Một câu hỏi/tiêu chí có thể đo nhiều CLO (ADR 0011); `weight` của các CLO trong một câu có tổng bằng 1.
+  PI luôn được suy ra từ kết quả CLO qua `clo_pi_links` (`FROM_CLOS`, ADR 0011). Cách chia điểm giữa các CLO
+  đang chờ Khoa xác nhận (Q15): giữ ở dạng cấu hình, không rải logic cứng.
 - Tính PLO từ PI theo quy tắc cấu hình, **không** lấy trung bình mức năng lực của PI để suy ra mức PLO.
 
 ## Phân biệt khái niệm (sai là lỗi nghiệp vụ)
@@ -41,7 +41,7 @@ Các bất biến dưới đây **chính là** mục tiêu đã thống nhất; 
 | Không đồng nhất | Hệ quả khi code |
 |---|---|
 | Mức Bloom ≠ điểm số | Lưu riêng `bloomLevel`, không có trường quy đổi sang điểm |
-| I/R/M ≠ trọng số | `course_pi_contributions` không được dùng làm trọng số; cấm map I=1, R=2, M=3. CSDL v0.5 có `pi.useIrmAsWeight`/`irmWeights`: engine coi `useIrmAsWeight` luôn là `false`, không đặt `irmWeights` mẫu; chỉ xem lại khi Khoa xác nhận (Q18) |
+| I/R/M ≠ trọng số | `course_pi_contributions` không được dùng làm trọng số; cấm map I=1, R=2, M=3. Không quy đổi I/R/M thành hệ số số học trong mọi công thức; loại bỏ hoàn toàn `useIrmAsWeight` và `irmWeights` khỏi `measurement_rules` (Q18, ADR 0012) |
 | `capabilityLevelRaw` ≠ Bloom | Lưu nguyên giá trị nguồn, không diễn giải (Q03) |
 | Mức rubric (1–4) ≠ Bloom | Hai trường riêng |
 | Điểm học phần ≠ mức đạt CLO | CLO tính từ điểm câu hỏi/tiêu chí gắn CLO, không từ điểm tổng kết |

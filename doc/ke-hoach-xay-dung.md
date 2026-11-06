@@ -21,8 +21,7 @@ Nguồn: `Rubric_Do_An_Mon_Hoc_CNPM_V2-1.docx.md`, `BS.md`, `Misa.md`, `GiaiThic
 - **Học phần thử nghiệm:** Đã tiếp nhận đề cương chính thức và ánh xạ CLO–PI của 2 học phần (`APCM220307`, `ABDA433708`) thuộc CTĐT Fintech v2 (2024); cùng học phần mẫu `OOPR230279` (CNTT).
 - Hai tài liệu lệch nhau thì **theo `GiaiThich_CoSoDuLieu.md`** (thiết kế CSDL).
 - Hai sinh viên **không phân công cứng nhắc**, hỗ trợ chéo tự do.
-- Thiết kế CSDL **v0.5** (theo `PLO_DB_UPDATE.md`) là bản hiện hành. Riêng ba điểm lệch phạm vi/nguyên tắc của v0.5 (duyệt
-  ma trận đề thi, `irmWeights`) **vẫn chờ GVHD/Khoa xác nhận** (Q11, Q18; Q17 đã chốt bỏ collection `departments` và bỏ `courses.departmentId`).
+- Thiết kế CSDL **v0.5** (theo `PLO_DB_UPDATE.md`) là bản hiện hành, cập nhật theo các ADR kỹ thuật: ADR 0001 (NEW-01, Trưởng bộ môn duyệt ma trận), ADR 0010 (bộ môn và giảng viên), ADR 0011 (PI suy ra từ CLO, câu hỏi chỉ gán CLO), ADR 0012 (bỏ hoàn toàn `useIrmAsWeight`/`irmWeights`, không quy đổi I/R/M). Riêng Q17 đã chốt bỏ collection `departments`.
 
 **Quy ước đọc**
 - **[ĐỀ XUẤT]**: ý của người soạn, chưa được Khoa/GVHD xác nhận; không đưa vào hồ sơ như số liệu thật.
@@ -94,8 +93,8 @@ Angular (LMS-UI) ──HTTPS/JSON──> Spring Boot API ──> MongoDB (replic
 | `audit` | `audit_logs` | xuyên suốt |
 
 CSDL v0.5 gồm **29 collection chính** (đã loại bỏ collection `ml_experiments` khỏi `database_import.js` do ML ngoài phạm vi đồ án, xem TD-06). Một số trường v0.5 có trong
-CSDL nhưng chưa có tính năng: `assessments.exportedFiles`; riêng `courses.departmentId` và collection `departments` đã chốt loại bỏ (Q17),
-`pi.useIrmAsWeight`/`irmWeights` (engine luôn coi là `false`, Q18).
+CSDL nhưng chưa có tính năng: `assessments.exportedFiles`; riêng `courses.departmentId` và collection `departments` đã chốt loại bỏ (Q17, ADR 0010),
+`pi.useIrmAsWeight`/`irmWeights` đã loại bỏ hoàn toàn khỏi CSDL theo ADR 0012 (Q18).
 
 **Quyết định kiến trúc cần ghi ADR** (`doc/adr/`): cơ chế xác thực (JWT hay session); cách đọc tệp điểm
 (Apache POI cho Excel, thư viện CSV); cách lưu tệp gốc; cách thực hiện transaction; chiến lược migrate/seed
@@ -167,7 +166,7 @@ tâm của AC.
 |---|---|---|---|---|
 | US-26 | Quản lý quy tắc đo lường có phiên bản (DRAFT/CONFIRMED/RETIRED) | M | IBS (đặc tả), IT | Ngưỡng/trọng số để trống tới khi xác nhận; chỉ CONFIRMED cho kết quả chính thức; quy tắc tách theo cấp `clo`/`course`/`pi`/`plo`/`missingDataPolicy` **[CHỜ XÁC NHẬN Q04, Q12]** |
 | US-27 | Tính CLO của từng sinh viên theo lớp | M | IT, IBS (kiểm chứng) | Kết quả tính tay độc lập khớp; trạng thái COMPUTED/INSUFFICIENT_DATA; thiếu dữ liệu ≠ 0; `Value(CLO)` = Σ điểm phần của CLO / Σ điểm tối đa phần của CLO (CSDL §4.1, xem `PLO_DB_UPDATE.md` §4.1) |
-| US-28 | Tính PI và PLO từ kết quả cấp dưới | M | IT, IBS | Không suy mức PLO bằng trung bình mức PI; `inputs[]` ghi đủ đầu vào (một cấp liền kề, `sourceType` SCORE/STUDENT_RESULT). PI theo `DIRECT_FROM_ITEMS` (Q10); `FROM_CLOS` và các `aggregationMethod`/PLO method còn lại: xem NEW-04 **[CHỜ XÁC NHẬN Q19]** |
+| US-28 | Tính PI và PLO từ kết quả cấp dưới | M | IT, IBS | Không suy mức PLO bằng trung bình mức PI; `inputs[]` ghi đủ đầu vào (một cấp liền kề, `sourceType` STUDENT_RESULT). PI theo `FROM_CLOS` (ADR 0011, câu hỏi chỉ gán CLO); `aggregationMethod`/PLO method còn lại: xem NEW-04 **[CHỜ XÁC NHẬN Q19, Q21, Q22]** |
 | US-29 | Tổng hợp cấp lớp/khóa/CTĐT kèm mẫu số | M | IT | `counts` đủ 5 số; luôn có `passRateOfEnrolled` |
 | US-30 | Chống chạy trùng và đánh dấu kết quả cũ | S | IT | `lockKey` (chỉ mục duy nhất khi `PENDING`/`PROCESSING`); `isStale` khi điểm đổi sau lần tính |
 
@@ -198,7 +197,7 @@ tâm của AC.
 | ID | Story | Ưu tiên | Chủ trì | Trọng tâm AC |
 |---|---|---|---|---|
 | NEW-03 | Vai trò `STUDENT`: sinh viên đăng nhập xem `student_results` của chính mình | S | IT | Nối `students.userId` ↔ `users`; chỉ đọc; không thấy kết quả của người khác (403) |
-| NEW-04 | Mở rộng engine: `pi.method = FROM_CLOS`, `aggregationMethod` (`MAX`, `LATEST`, `ACCUMULATED_EVIDENCE`), phương pháp PLO còn lại (`ALL_PIS_PASSED`/`WEIGHTED_PIS`/`AVERAGE_PIS`) | C | IT, IBS (kiểm chứng) | CSDL đã hỗ trợ giá trị enum; mỗi phương pháp phải có ca tính tay độc lập; `useIrmAsWeight` luôn `false` **[CHỜ KHOA, Q18, Q19]** |
+| NEW-04 | Mở rộng engine: `aggregationMethod` (`MAX`, `LATEST`, `ACCUMULATED_EVIDENCE`), phương pháp PLO còn lại (`ALL_PIS_PASSED`/`WEIGHTED_PIS`/`AVERAGE_PIS`) | C | IT, IBS (kiểm chứng) | CSDL đã hỗ trợ giá trị enum; mỗi phương pháp phải có ca tính tay độc lập; không quy đổi I/R/M (ADR 0012) **[CHỜ KHOA, Q19, Q21, Q22]** |
 
 **Tổng: 44 story = 33 Must + 9 Should + 2 Could** (40 story gốc: 32 M + 7 S + 1 C; cộng NEW-01 là M, NEW-02 và
 NEW-03 là S, NEW-04 là C; đã bỏ story ML). Tập Must (và phần Should hai bạn chọn) là ứng viên cho **bản cam kết Bước
@@ -334,7 +333,7 @@ trung xong trước T14. Mục tiêu: build xanh ≥ 90%, commit → staging ≤
 | R8 | **Lịch sử Git thiếu các tuần đầu.** Mỗi repo chỉ có 1 commit trước kỳ, nên nếu T1–T4 không có commit thì tối đa 15/19 ≈ 79% số tuần có commit, đạt Mức 4 (≥ 75%) chứ không đạt Mức 5 (≥ 90%) cho chỉ số này | Trung bình | Commit đều từ T5 trở đi. Không sửa ngày commit hay tạo commit giả để "lấp" các tuần trước. Nếu đã có công việc ở T1–T4 (đọc tài liệu, `doc/`), commit chúng ngay với ngày thật; báo cáo tiến độ T1–T4 (nếu có) là minh chứng bổ sung |
 | R9 | Lộ dữ liệu sinh viên hoặc secret | Cao | `studentRef`, dữ liệu giả, gitleaks trong CI, `.gitignore` đúng |
 | R10 | **Chậm tiến độ**: T5 mà code mới là scaffold; P0–P2 bị nén còn 5 tuần | Cao | Giữ thứ tự: nền tảng → K1 → danh mục lõi; ưu tiên Must; hỗ trợ chéo để không chờ nhau; cắt Should trước, rồi tới Could, không cắt kiểm thử |
-| R11 | **CSDL v0.5 chạm phạm vi:** duyệt ma trận đề thi (NEW-01), `exportedFiles`, `irmWeights` đi ngoài phạm vi "không duyệt đề" và nguyên tắc "I/R/M ≠ trọng số" (Q11, Q18; riêng Q17 đã chốt bỏ collection `departments` và bỏ `departmentId`, giữ `DEPARTMENT_HEAD` duyệt theo `scope.courseIds`). Nếu GVHD/Khoa không đồng ý, mã và test của NEW-01 phải sửa | Trung bình | Hỏi GVHD trước khi code NEW-01 (hạn trước P3, T8). Phương án dự phòng đã ghi ở mục 1: bỏ bước Trưởng bộ môn, giữ khóa `items`. `irmWeights`: engine luôn coi `useIrmAsWeight = false`. Ghi ADR (`adr/0001`) |
+| R11 | **CSDL v0.5 chạm phạm vi:** duyệt ma trận đề thi (NEW-01), `exportedFiles`, `irmWeights` đi ngoài phạm vi "không duyệt đề" và nguyên tắc "I/R/M ≠ trọng số" (Q11, Q18; riêng Q17 đã chốt bỏ collection `departments` và bỏ `departmentId`, giữ `DEPARTMENT_HEAD` duyệt theo `scope.courseIds`). **Tiến độ 2026-11-06:** Nhóm SV chốt giữ NEW-01 (ADR 0001, chờ GVHD ký); loại bỏ hoàn toàn `irmWeights`/`useIrmAsWeight` (ADR 0012); PI suy ra từ CLO (ADR 0011) | Trung bình | Hỏi GVHD trước khi code NEW-01 (hạn trước P3, T8). Phương án dự phòng: bỏ bước Trưởng bộ môn, giữ khóa `items`. Đã có ADR 0001, ADR 0011, ADR 0012 |
 | R12 | **Công thức đo lường còn thiếu:** `PLO_DB_UPDATE.md` chỉ có công thức CLO (§4.1) và PI (§4.2). Chưa có công thức cấp PLO, cấp học phần khi `requireAllCloPass = false`, `WEIGHTED_ITEMS`, gộp PI qua nhiều học phần, định nghĩa `minCoverage`/mẫu số, ưu tiên ngưỡng (Q20–Q23; danh sách CT-01…CT-11 ở `plan/F06-do-luong.md` §9) | **Cao** | Hỏi GVHD/Khoa sớm (trước P4, T10); trong lúc chờ chỉ cài CLO và PI theo công thức đã có, phần còn lại trả 422, không tự bịa. Nếu không có trả lời trước K3: báo cáo PLO ở chế độ không chính thức hoặc cắt phạm vi PLO bằng ADR |
 
 ---

@@ -82,7 +82,7 @@ Lệch nhau mà không tự giải quyết được thì **dừng và hỏi**, �
 1. **Không hardcode** công thức, trọng số, ngưỡng, mẫu số: đọc từ `measurement_rules`. Các số 40/60, 60%, 72%, 20/40/40,
    45/40 trong tài liệu chỉ là **ví dụ minh họa**; dùng trong test thì đặt tên fixture "ví dụ minh họa", không đưa vào seed/cấu hình.
 2. **Thiếu dữ liệu ≠ 0.** Chỉ `BLANK` tính 0; `ABSENT`, `NOT_GRADED`, `EXEMPT`, `MISSING` có `rawScore = null`.
-3. **Bloom ≠ điểm. I/R/M ≠ trọng số** (engine luôn coi `pi.useIrmAsWeight = false`). Mức rubric (1–4) ≠ Bloom.
+3. **Bloom ≠ điểm. I/R/M ≠ trọng số** (không quy đổi I/R/M thành hệ số, loại bỏ `useIrmAsWeight`/`irmWeights` theo ADR 0012). Mức rubric (1–4) ≠ Bloom.
    `capabilityLevelRaw` lưu nguyên, không diễn giải.
 4. **Tỷ lệ đạt luôn kèm mẫu số**: `counts` = ghi danh, đủ dữ liệu, đạt, chưa đạt, chưa đủ dữ liệu; luôn có `passRateOfEnrolled`.
 5. **CLO nhận diện bằng `_id`** (mã `CLO1` chỉ duy nhất trong một đề cương). **PLO/PI nhận diện bằng mã**, không bằng thứ tự dòng.
