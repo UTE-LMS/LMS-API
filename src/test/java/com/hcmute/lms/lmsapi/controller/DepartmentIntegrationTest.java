@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.hcmute.lms.lmsapi.document.Course;
+import com.hcmute.lms.lmsapi.document.Program;
 import com.hcmute.lms.lmsapi.document.RoleAssignment;
 import com.hcmute.lms.lmsapi.document.User;
 import com.hcmute.lms.lmsapi.document.UserScope;
@@ -23,25 +24,32 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
-@DisplayName("F03 / ADR 0010: Department Course Assignment Integration Tests")
+@DisplayName("F03 / ADR 0010: Department Course Assignment & Scoped Lecturer Lookup Tests")
 class DepartmentIntegrationTest extends IntegrationTestBase {
 
   @Autowired private UserRepository userRepository;
 
+  private Program program1;
+  private Program program2;
   private Course course1;
   private Course course2;
 
   private String adminToken;
   private String deptHeadInScopeToken;
   private String deptHeadOutOfScopeToken;
+  private String deptHeadProgram1Token;
   private String lecturerToken;
   private String pmToken;
 
   private User targetLecturer;
+  private User lecturerProgram1;
+  private User lecturerProgram2;
   private User studentUser;
 
   @BeforeEach
   void setUpFixtures() {
+    program1 = fixtures.program();
+    program2 = fixtures.program();
     course1 = fixtures.course();
     course2 = fixtures.course();
 
@@ -54,6 +62,14 @@ class DepartmentIntegrationTest extends IntegrationTestBase {
     deptHeadOutOfScopeToken =
         fixtures.bearerFor(
             Role.DEPARTMENT_HEAD, UserScope.builder().courseIds(List.of(course2.getId())).build());
+
+    deptHeadProgram1Token =
+        fixtures.bearerFor(
+            Role.DEPARTMENT_HEAD,
+            UserScope.builder()
+                .programIds(List.of(program1.getId()))
+                .courseIds(List.of(course1.getId()))
+                .build());
 
     lecturerToken = fixtures.bearerFor(Role.LECTURER, UserScope.builder().build());
     pmToken = fixtures.bearerFor(Role.PROGRAM_MANAGER, UserScope.builder().build());
@@ -75,6 +91,48 @@ class DepartmentIntegrationTest extends IntegrationTestBase {
                                 .build())))
                 .build());
 
+    lecturerProgram1 =
+        userRepository.save(
+            User.builder()
+                .username("lec_p1_" + fixtures.code("LP1").toLowerCase())
+                .email("lec_p1_" + fixtures.code("LP1").toLowerCase() + "@hcmute.edu.vn")
+                .fullName("Giảng viên Khoa CNTT (Program 1)")
+                .passwordHash("$2a$10$abcdefghijklmnopqrstuv")
+                .status(UserStatus.ACTIVE)
+                .roleAssignments(
+                    new ArrayList<>(
+                        List.of(
+                            RoleAssignment.builder()
+                                .role(Role.LECTURER)
+                                .scope(
+                                    UserScope.builder()
+                                        .programIds(new ArrayList<>(List.of(program1.getId())))
+                                        .courseIds(new ArrayList<>())
+                                        .build())
+                                .build())))
+                .build());
+
+    lecturerProgram2 =
+        userRepository.save(
+            User.builder()
+                .username("lec_p2_" + fixtures.code("LP2").toLowerCase())
+                .email("lec_p2_" + fixtures.code("LP2").toLowerCase() + "@hcmute.edu.vn")
+                .fullName("Giảng viên Khoa Kinh tế (Program 2)")
+                .passwordHash("$2a$10$abcdefghijklmnopqrstuv")
+                .status(UserStatus.ACTIVE)
+                .roleAssignments(
+                    new ArrayList<>(
+                        List.of(
+                            RoleAssignment.builder()
+                                .role(Role.LECTURER)
+                                .scope(
+                                    UserScope.builder()
+                                        .programIds(new ArrayList<>(List.of(program2.getId())))
+                                        .courseIds(new ArrayList<>())
+                                        .build())
+                                .build())))
+                .build());
+
     studentUser =
         userRepository.save(
             User.builder()
@@ -91,11 +149,10 @@ class DepartmentIntegrationTest extends IntegrationTestBase {
 
   @AfterEach
   void cleanUp() {
-    if (targetLecturer != null) {
-      userRepository.deleteById(targetLecturer.getId());
-    }
-    if (studentUser != null) {
-      userRepository.deleteById(studentUser.getId());
+    for (User u : List.of(targetLecturer, lecturerProgram1, lecturerProgram2, studentUser)) {
+      if (u != null && u.getId() != null) {
+        userRepository.deleteById(u.getId());
+      }
     }
   }
 
@@ -127,6 +184,51 @@ class DepartmentIntegrationTest extends IntegrationTestBase {
   }
 
   @Test
+  @DisplayName(
+      "TBM có scope.programIds chỉ nhìn thấy và phân công được Giảng viên cùng Khoa/Ngành (Phương án A)")
+  void deptHead_onlySeesAndAssignsLecturersInSameProgramScope() throws Exception {
+    // 1. Tra cứu danh sách giảng viên: chỉ thấy lecturerProgram1, KHÔNG thấy lecturerProgram2
+    mockMvc
+        .perform(
+            getAs(
+                deptHeadProgram1Token, "/api/v1/departments/lecturers?courseId=" + course1.getId()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[*].id", hasItem(lecturerProgram1.getId())))
+        .andExpect(jsonPath("$[*].id", not(hasItem(lecturerProgram2.getId()))));
+
+    // 2. Phân công cho giảng viên cùng Khoa/Ngành (Program 1) -> 200 OK
+    AssignCourseRequest validReq =
+        AssignCourseRequest.builder()
+            .courseId(course1.getId())
+            .lecturerId(lecturerProgram1.getId())
+            .build();
+    mockMvc
+        .perform(postAs(deptHeadProgram1Token, "/api/v1/departments/assign-course", validReq))
+        .andExpect(status().isOk());
+
+    // 3. Cố tình phân công cho giảng viên khác Khoa/Ngành (Program 2) -> 422 Unprocessable Entity
+    AssignCourseRequest crossDeptReq =
+        AssignCourseRequest.builder()
+            .courseId(course1.getId())
+            .lecturerId(lecturerProgram2.getId())
+            .build();
+    mockMvc
+        .perform(postAs(deptHeadProgram1Token, "/api/v1/departments/assign-course", crossDeptReq))
+        .andExpect(status().isUnprocessableEntity());
+  }
+
+  @Test
+  @DisplayName("TBM gọi GET /lecturers với courseId ngoài scope -> 403 Forbidden")
+  void deptHead_getLecturersForOutOfScopeCourse_forbidden() throws Exception {
+    mockMvc
+        .perform(
+            getAs(
+                deptHeadOutOfScopeToken,
+                "/api/v1/departments/lecturers?courseId=" + course1.getId()))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
   @DisplayName("TBM phân công môn ngoài scope -> 403 Forbidden (ADR 0010)")
   void deptHead_assignCourseOutOfScope_forbidden() throws Exception {
     AssignCourseRequest req =
@@ -141,8 +243,14 @@ class DepartmentIntegrationTest extends IntegrationTestBase {
   }
 
   @Test
-  @DisplayName("ADMIN có thể phân công bất kỳ môn học nào -> 200 OK")
+  @DisplayName("ADMIN thấy toàn bộ giảng viên và có thể phân công bất kỳ môn học nào -> 200 OK")
   void admin_assignCourse_success() throws Exception {
+    mockMvc
+        .perform(getAs(adminToken, "/api/v1/departments/lecturers"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[*].id", hasItem(lecturerProgram1.getId())))
+        .andExpect(jsonPath("$[*].id", hasItem(lecturerProgram2.getId())));
+
     AssignCourseRequest req =
         AssignCourseRequest.builder()
             .courseId(course2.getId())

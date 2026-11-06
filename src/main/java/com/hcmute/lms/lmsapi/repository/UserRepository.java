@@ -3,6 +3,7 @@ package com.hcmute.lms.lmsapi.repository;
 import com.hcmute.lms.lmsapi.document.User;
 import com.hcmute.lms.lmsapi.enums.Role;
 import com.hcmute.lms.lmsapi.enums.UserStatus;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
@@ -57,4 +58,15 @@ public interface UserRepository extends MongoRepository<User, String>, UserRepos
    */
   @Query(value = "{ 'roleAssignments.role': ?0, 'status': ?1 }", count = true)
   long countByRoleAssignmentsRoleAndStatus(Role role, UserStatus status);
+
+  /**
+   * Lấy danh sách người dùng theo vai trò và trạng thái hoạt động (phục vụ Trưởng bộ môn tra cứu
+   * giảng viên trong phạm vi Khoa/Ngành để phân công đề cương theo ADR 0010).
+   *
+   * @param role vai trò cần lọc (ví dụ: LECTURER)
+   * @param status trạng thái tài khoản (ví dụ: ACTIVE)
+   * @return danh sách người dùng thỏa mãn
+   */
+  @Query(value = "{ 'roleAssignments.role': ?0, 'status': ?1 }")
+  List<User> findByRoleAssignmentsRoleAndStatus(Role role, UserStatus status);
 }

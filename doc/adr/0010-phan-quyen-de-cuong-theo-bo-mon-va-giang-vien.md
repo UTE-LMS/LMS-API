@@ -1,7 +1,7 @@
 # ADR 0010 — Phân quyền quản lý danh mục học phần, biên soạn và phê duyệt đề cương theo Bộ môn và Giảng viên
 
 - **Trạng thái:** ĐỀ XUẤT (PROPOSED), **thay thế ADR 0009**.
-- **Ngày:** 2026-11-05
+- **Ngày:** 2026-11-05 (cập nhật 2026-11-06)
 - **Người soạn:** Antigravity theo yêu cầu của sinh viên TinMH (IT); sinh viên rà soát và chốt: [ĐIỀN]
 - **Thay thế:** ADR 0009 (`0009-phan-quyen-pham-vi-de-cuong-clo.md`)
 - **Liên quan:** ADR 0003 (xác thực, phân quyền F01), ADR 0004 (QA thẩm định CTĐT/PLO), ADR 0005 (`0005-phan-quyen-khoi-tao-danh-muc-ctdt.md`), `doc/plan/F03-hoc-phan-clo.md`, `doc/tech-debt.md` (TD-27..TD-29)
@@ -30,11 +30,16 @@ Hệ thống bãi bỏ cơ chế suy quyền qua `program_courses` của ADR 000
 * Môn học được coi là danh mục nền tảng (Master Data) đã được Nhà trường chốt và nạp sẵn vào hệ thống.
 * Quyền đọc (`GET /courses`): Mọi người dùng đã đăng nhập (`isAuthenticated()`) đều được tra cứu công khai.
 
-### 2.2. Phân công quản lý môn học theo Bộ môn (`scope.courseIds`)
-* **Admin phân môn cho Trưởng bộ môn:** Khi bổ nhiệm Trưởng bộ môn (`DEPARTMENT_HEAD`), Admin gán danh mục các môn học thuộc Bộ môn quản lý vào trường `scope.courseIds` của Trưởng bộ môn.
-* **Trưởng bộ môn phân công cho Giảng viên:** 
-  * Cung cấp API để Trưởng bộ môn phân công quyền biên soạn đề cương cho Giảng viên (`LECTURER`) trong bộ môn (gán `courseId` vào `scope.courseIds` của Giảng viên).
-  * **Ràng buộc an toàn (Safety Invariant):** Trưởng bộ môn chỉ được quyền phân công những môn học nằm trong `scope.courseIds` của chính mình.
+### 2.2. Phân công quản lý môn học theo Bộ môn (`scope.courseIds` & `scope.programIds`)
+* **Admin phân môn và đơn vị Khoa/Ngành cho Trưởng bộ môn & Giảng viên:**
+  * Khi bổ nhiệm Trưởng bộ môn (`DEPARTMENT_HEAD`), Admin gán danh mục các môn học thuộc Bộ môn quản lý vào `scope.courseIds`, đồng thời gán `scope.programIds` biểu thị Khoa/Ngành trực thuộc của Bộ môn.
+  * Khi tạo tài khoản Giảng viên (`LECTURER`), Admin gán `scope.programIds` biểu thị Khoa/Ngành trực thuộc của Giảng viên (mà không cần thay đổi `$jsonSchema` của `users`).
+* **Trưởng bộ môn tra cứu & phân công cho Giảng viên:** 
+  * Cung cấp API `GET /api/v1/departments/lecturers` để Trưởng bộ môn lấy danh sách Giảng viên (`LECTURER` đang `ACTIVE`) thuộc cùng phạm vi Khoa/Ngành (`scope.programIds` giao nhau) hoặc đã được phân công môn học của Bộ môn, mà không cần mở quyền `/api/v1/users` của Admin.
+  * Cung cấp API `POST /api/v1/departments/assign-course` và `unassign-course` để Trưởng bộ môn phân công/thu hồi quyền biên soạn đề cương cho Giảng viên (gán/gỡ `courseId` trong `scope.courseIds` của Giảng viên).
+  * **Ràng buộc an toàn kép (Dual Safety Invariant):**
+    1. Trưởng bộ môn chỉ được quyền phân công những môn học nằm trong `scope.courseIds` của chính mình (`403 Forbidden` nếu ngoài scope).
+    2. Trưởng bộ môn chỉ được quyền nhìn thấy và phân công cho Giảng viên có `scope.programIds` thuộc phạm vi Khoa/Ngành của mình (`422 LECTURER_OUT_OF_DEPARTMENT_SCOPE` nếu cố tình gán cho giảng viên Khoa/Ngành khác).
 
 ### 2.3. Biên soạn & Phê duyệt Đề cương chi tiết (`syllabi` & `clos`)
 * **Biên soạn (DRAFT):** 
@@ -57,7 +62,8 @@ Hệ thống bãi bỏ cơ chế suy quyền qua `program_courses` của ADR 000
 | Hành động | Endpoint | Vai trò cho phép | Ràng buộc Scope |
 |---|---|---|---|
 | **Tạo / Sửa / Xóa môn học** | `/api/v1/courses/**` (GHI) | `ADMIN` | Toàn hệ thống (Phòng Đào tạo) |
-| **Phân công môn cho GV** | `/api/v1/departments/assign-course` | `ADMIN`, `DEPARTMENT_HEAD` | `scope.courseIds` của TBM chứa môn được phân |
+| **Tra cứu GV trong Bộ môn** | `GET /api/v1/departments/lecturers` | `ADMIN`, `DEPARTMENT_HEAD` | Cùng `scope.programIds` với TBM (hoặc đã gán môn của Bộ môn) |
+| **Phân công môn cho GV** | `/api/v1/departments/assign-course` | `ADMIN`, `DEPARTMENT_HEAD` | `scope.courseIds` chứa môn & GV cùng `scope.programIds` |
 | **Tạo đề cương (DRAFT)** | `POST /api/v1/courses/{id}/syllabi` | `ADMIN`, `LECTURER` | `scope.courseIds` của GV chứa `courseId` |
 | **Thêm / Sửa / Xóa CLO** | `/api/v1/clos/**` (GHI) | `ADMIN`, `LECTURER` | `scope.courseIds` chứa môn của đề cương & đề cương `DRAFT` |
 | **Duyệt đề cương (CONFIRMED)** | `PUT /api/v1/syllabi/{id}/status` | `ADMIN`, `DEPARTMENT_HEAD` | `scope.courseIds` của TBM chứa môn của đề cương |
@@ -85,5 +91,5 @@ Hệ thống bãi bỏ cơ chế suy quyền qua `program_courses` của ADR 000
 
 * **Hỏi 1: Vì sao không cho Trưởng ngành (PROGRAM_MANAGER) tự tạo môn học và viết đề cương nữa?**  
   * *Trả lời:* Trong đại học theo chuẩn kiểm định quốc tế, Trưởng ngành quản lý khung chương trình đào tạo và chuẩn đầu ra cấp ngành (PLO/PI). Môn học là tài sản học thuật dùng chung do các Bộ môn chuyên môn quản lý. Nếu để Trưởng ngành sửa đề cương sẽ làm sai lệch chuẩn đầu ra của các ngành khác cùng học môn đó. Tách bạch Trưởng bộ môn duyệt và Trưởng ngành liên kết CLO-PI đảm bảo nguyên tắc phân chia trách nhiệm (Separation of Concerns).
-* **Hỏi 2: Trưởng bộ môn phân công cho Giảng viên bằng cách nào trên hệ thống?**  
-  * *Trả lời:* Thông qua cơ chế phân quyền ủy quyền (Delegated Administration). Admin gán danh mục môn của Bộ môn cho Trưởng bộ môn qua `scope.courseIds`. Trưởng bộ môn sử dụng API phân công để gán các môn đó cho giảng viên cơ hữu trong bộ môn mình, với ràng buộc an toàn: Trưởng bộ môn chỉ được phân công những môn nằm trong scope của chính mình.
+* **Hỏi 2: Trưởng bộ môn phân công cho Giảng viên bằng cách nào trên hệ thống và làm sao để Trưởng bộ môn không thấy/phân công nhầm giảng viên khoa khác?**  
+  * *Trả lời:* Thông qua cơ chế phân quyền ủy quyền (Delegated Administration) kết hợp giao tập hợp `scope.programIds`. Admin gán danh mục môn của Bộ môn (`scope.courseIds`) và ngành trực thuộc (`scope.programIds`) cho Trưởng bộ môn, đồng thời gán `scope.programIds` cho Giảng viên. Khi Trưởng bộ môn gọi `GET /api/v1/departments/lecturers` hoặc `POST /api/v1/departments/assign-course`, hệ thống đối chiếu giao (`intersect`) tập `programIds` giữa Trưởng bộ môn và Giảng viên mà không cần mở quyền quản trị `/api/v1/users` hay sửa đổi schema `database_import.js`.
