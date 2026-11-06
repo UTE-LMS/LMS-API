@@ -1,6 +1,5 @@
 package com.hcmute.lms.lmsapi.dto;
 
-import com.hcmute.lms.lmsapi.enums.ProgramVersionStatus;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.PositiveOrZero;
@@ -31,6 +30,4 @@ public class ProgramVersionUpdateRequest {
   @Builder.Default
   private List<@Size(max = 50, message = "Mỗi khóa tối đa 50 ký tự") String> applicableCohorts =
       new ArrayList<>();
-
-  private ProgramVersionStatus status;
 }

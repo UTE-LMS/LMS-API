@@ -14,6 +14,7 @@ import com.hcmute.lms.lmsapi.document.Program;
 import com.hcmute.lms.lmsapi.document.ProgramVersion;
 import com.hcmute.lms.lmsapi.document.UserScope;
 import com.hcmute.lms.lmsapi.dto.ProgramVersionRequest;
+import com.hcmute.lms.lmsapi.dto.ProgramVersionStatusUpdateRequest;
 import com.hcmute.lms.lmsapi.dto.ProgramVersionUpdateRequest;
 import com.hcmute.lms.lmsapi.enums.ProgramVersionStatus;
 import com.hcmute.lms.lmsapi.enums.Role;
@@ -40,6 +41,7 @@ class ProgramVersionApiIntegrationTest extends IntegrationTestBase {
 
   private static final String VERSIONS = "/api/v1/program-versions";
   private static final String VERSION_BY_ID = "/api/v1/program-versions/{id}";
+  private static final String VERSION_STATUS = "/api/v1/program-versions/{id}/status";
 
   private String manager;
   private Program program;
@@ -246,11 +248,11 @@ class ProgramVersionApiIntegrationTest extends IntegrationTestBase {
   void updateVersion_statusTransition(
       ProgramVersionStatus from, ProgramVersionStatus to, int expectedHttp) throws Exception {
     ProgramVersion version = fixtures.programVersion(program, from);
-    ProgramVersionUpdateRequest body =
-        ProgramVersionUpdateRequest.builder().version(version.getVersion()).status(to).build();
+    ProgramVersionStatusUpdateRequest body =
+        ProgramVersionStatusUpdateRequest.builder().status(to).build();
 
     mockMvc
-        .perform(putAs(manager, VERSION_BY_ID, body, version.getId()))
+        .perform(putAs(manager, VERSION_STATUS, body, version.getId()))
         .andExpect(status().is(expectedHttp));
 
     ProgramVersionStatus expectedStored = expectedHttp == 200 ? to : from;
@@ -259,7 +261,7 @@ class ProgramVersionApiIntegrationTest extends IntegrationTestBase {
   }
 
   @Test
-  @DisplayName("US-05/AC-4 (biên): cập nhật không gửi status thì giữ nguyên trạng thái")
+  @DisplayName("US-05/AC-4 (biên): cập nhật thông tin phiên bản thì giữ nguyên trạng thái")
   void updateVersion_withoutStatusKeepsStatus() throws Exception {
     ProgramVersion version = fixtures.programVersion(program, ProgramVersionStatus.ACTIVE);
     ProgramVersionUpdateRequest body =
@@ -281,15 +283,25 @@ class ProgramVersionApiIntegrationTest extends IntegrationTestBase {
     ProgramVersion version = fixtures.programVersion(program, ProgramVersionStatus.DRAFT);
     // "1" và 1 từng bị Jackson hiểu là thứ tự enum (ACTIVE); xem JacksonConfig.
     for (String status : new String[] {"\"PUBLISHED\"", "1", "\"1\"", "0", "\"\""}) {
-      String body = "{\"version\":\"" + version.getVersion() + "\",\"status\":" + status + "}";
+      String body = "{\"status\":" + status + "}";
 
       mockMvc
-          .perform(putAs(manager, VERSION_BY_ID, body, version.getId()))
+          .perform(putAs(manager, VERSION_STATUS, body, version.getId()))
           .andExpect(status().isBadRequest())
           .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
     }
     assertThat(mongo().findById(version.getId(), ProgramVersion.class).getStatus())
         .isEqualTo(ProgramVersionStatus.DRAFT);
+  }
+
+  @Test
+  @DisplayName("US-05/AC-4 (âm): PUT status với body rỗng hoặc thiếu status -> 400")
+  void updateVersionStatus_emptyOrMissingStatusIsBadRequest() throws Exception {
+    ProgramVersion version = fixtures.programVersion(program, ProgramVersionStatus.DRAFT);
+    mockMvc
+        .perform(putAs(manager, VERSION_STATUS, "{}", version.getId()))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
   }
 
   // ------------------------------------------------------------------ ca âm chung (US-40)

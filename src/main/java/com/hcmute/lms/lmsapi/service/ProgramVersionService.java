@@ -3,6 +3,7 @@ package com.hcmute.lms.lmsapi.service;
 import com.hcmute.lms.lmsapi.dto.PageResponse;
 import com.hcmute.lms.lmsapi.dto.ProgramVersionRequest;
 import com.hcmute.lms.lmsapi.dto.ProgramVersionResponse;
+import com.hcmute.lms.lmsapi.dto.ProgramVersionStatusUpdateRequest;
 import com.hcmute.lms.lmsapi.dto.ProgramVersionUpdateRequest;
 
 public interface ProgramVersionService {
@@ -14,4 +15,7 @@ public interface ProgramVersionService {
   ProgramVersionResponse createProgramVersion(ProgramVersionRequest request);
 
   ProgramVersionResponse updateProgramVersion(String id, ProgramVersionUpdateRequest request);
+
+  ProgramVersionResponse updateProgramVersionStatus(
+      String id, ProgramVersionStatusUpdateRequest request);
 }

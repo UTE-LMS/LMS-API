@@ -3,6 +3,7 @@ package com.hcmute.lms.lmsapi.controller;
 import com.hcmute.lms.lmsapi.dto.PageResponse;
 import com.hcmute.lms.lmsapi.dto.ProgramVersionRequest;
 import com.hcmute.lms.lmsapi.dto.ProgramVersionResponse;
+import com.hcmute.lms.lmsapi.dto.ProgramVersionStatusUpdateRequest;
 import com.hcmute.lms.lmsapi.dto.ProgramVersionUpdateRequest;
 import com.hcmute.lms.lmsapi.dto.UserPrincipal;
 import com.hcmute.lms.lmsapi.dto.VerificationRequest;
@@ -89,6 +90,21 @@ public class ProgramVersionController {
       @Valid @RequestBody ProgramVersionUpdateRequest request) {
     log.info("API request: PUT /api/v1/program-versions/{}", id);
     return ResponseEntity.ok(programVersionService.updateProgramVersion(id, request));
+  }
+
+  @PutMapping("/{id}/status")
+  @PreAuthorize(
+      "hasRole('PROGRAM_MANAGER') and @scopeAuthorizationService.canAccessProgramVersion(authentication.principal, #id, T(com.hcmute.lms.lmsapi.enums.AccessType).WRITE)")
+  public ResponseEntity<ProgramVersionResponse> updateProgramVersionStatus(
+      @PathVariable("id")
+          @Pattern(
+              regexp = "^[0-9a-fA-F]{24}$",
+              message = "ID phiên bản phải là ObjectId 24 ký tự hex")
+          String id,
+      @Valid @RequestBody ProgramVersionStatusUpdateRequest request) {
+    log.info(
+        "API request: PUT /api/v1/program-versions/{}/status to [{}]", id, request.getStatus());
+    return ResponseEntity.ok(programVersionService.updateProgramVersionStatus(id, request));
   }
 
   @PutMapping("/{id}/verification")
