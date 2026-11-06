@@ -7,8 +7,8 @@ Package: `assessment`. Phụ thuộc: `00`, `F01`, `F02`, `F03` (cần `clos`, `
 
 ## 1. Mục tiêu
 
-Khai báo **cấu trúc bài đã thi**: có những câu hỏi/tiêu chí nào, điểm tối đa, mức Bloom, đo cặp (CLO, PI) nào với phần điểm bao
-nhiêu. Đây là "bản đồ" để quy điểm lên chuẩn đầu ra. Bản lớp phải được **duyệt ma trận** rồi mới mở cổng nhập điểm, và bị
+Khai báo **cấu trúc bài đã thi**: có những câu hỏi/tiêu chí nào, điểm tối đa, mức Bloom, đo CLO nào với phần điểm bao
+nhiêu (ADR 0011: câu hỏi chỉ gán CLO, PI suy ra từ kết quả CLO qua `clo_pi_links`). Đây là "bản đồ" để quy điểm lên chuẩn đầu ra. Bản lớp phải được **duyệt ma trận** rồi mới mở cổng nhập điểm, và bị
 **khóa `items[]`** sau đó. Không sinh đề, không duyệt *nội dung* câu hỏi.
 
 ## 2. Đọc trước
@@ -35,17 +35,17 @@ nhiêu. Đây là "bản đồ" để quy điểm lên chuẩn đầu ra. Bản 
 | `coverageSummary` | `{ totalItemsSum, byClo[{cloId, points, percentage}], byBloom[{bloomLevel, questionCount, points, percentage}] }` |
 | `exportedFiles` | **không có tính năng** (xuất phôi in là khâu tổ chức thi) |
 | `items[]` | `_id`, `code`, `orderIndex`, `title`, `kind` (`QUESTION`/`CRITERION`), `maxScore` (> 0), `bloomLevel`, `topic`, `questionId`/`questionVersion` (null được), `externalRef` (chuỗi, mã câu trên Moodle để khớp cột điểm), `outcomeMappings[]` (≥ 1), `rubric` |
-| `outcomeMappings[]` | `{ cloId, piId, weight }`, `weight` ∈ (0, 1], **Σ weight = 1** trong một item, không trùng cặp |
+| `outcomeMappings[]` | `{ cloId, weight }`, `weight` ∈ (0, 1], **Σ weight = 1** trong một item, không trùng CLO (ADR 0011) |
 
-Chỉ mục: duy nhất `(syllabusId, sectionId, code)`; `(sectionId, status)`; `items.outcomeMappings.cloId`/`piId`; `items.questionId`.
+Chỉ mục: duy nhất `(syllabusId, sectionId, code)`; `(sectionId, status)`; `items.outcomeMappings.cloId`; `items.questionId`.
 Validator ở MongoDB đã ép: bản `SECTION` có `sectionId`; `isLocked` khớp `status`; từ `SUBMITTED` trở đi có ≥ 1 item; Σ weight = 1 và
-không trùng cặp. **Service vẫn phải kiểm tra trước** để trả lỗi rõ ràng (không để lộ lỗi 121 của MongoDB).
+không trùng CLO. **Service vẫn phải kiểm tra trước** để trả lỗi rõ ràng (không để lộ lỗi 121 của MongoDB).
 
 ## 4. Quy tắc nghiệp vụ
 
-1. **Bản lớp là SNAPSHOT:** `items[].outcomeMappings` sao chép tại thời điểm thi; đổi `clo_pi_links` sau đó không làm đổi bài đã thi.
-2. Mỗi cặp (`cloId`, `piId`) trong `outcomeMappings` phải **có trong `clo_pi_links` của chính CLO đó**, và CLO thuộc `syllabusId` của bài. Chạy tính chính thức (F06) yêu cầu liên kết `VERIFIED`.
-3. `Σ weight` của một item = 1 (sai số 0,0001). Không gán nguyên điểm một câu cho mọi chuẩn. Cách chia chờ Khoa (Q15): giữ ở dạng dữ liệu, không rải logic cứng.
+1. **Bản lớp là SNAPSHOT:** `items[].outcomeMappings` sao chép tại thời điểm thi; đổi `clos` sau đó không làm đổi bài đã thi.
+2. Mỗi `cloId` trong `outcomeMappings` phải **thuộc `syllabusId` của bài**. Chạy tính chính thức (F06) yêu cầu `clo_pi_links` của các CLO đó đã `VERIFIED`.
+3. `Σ weight` của một item = 1 (sai số 0,0001). Không gán nguyên điểm một câu cho mọi chuẩn. Cách chia giữa các CLO chờ Khoa (Q15): giữ ở dạng dữ liệu, không rải logic cứng.
 4. `rubric.levels[].level` ∈ 1–4 là **mức rubric**, tách khỏi `bloomLevel` (1–6). Không quy đổi lẫn nhau.
 5. **Luồng trạng thái (NEW-01) [ĐỀ XUẤT, chờ Q11]:**
    `DRAFT → SUBMITTED` (giảng viên gửi; cần ≥ 1 item và `|totalPoints − Σ maxScore| < 0,001`);
@@ -66,7 +66,7 @@ không trùng cặp. **Service vẫn phải kiểm tra trước** để trả l�
 | ID | AC |
 |---|---|
 | US-15/AC-1 | Giảng viên tạo bài `SECTION` cho lớp mình, sao chép từ khung (`templateId`) hoặc tự khai báo `items` → thành công, `status = DRAFT`, `isLocked = false` |
-| US-15/AC-2 | `outcomeMappings` có Σ `weight` ≠ 1 → 422; có cặp trùng → 422; cặp không nằm trong `clo_pi_links` của CLO → 422 |
+| US-15/AC-2 | `outcomeMappings` có Σ `weight` ≠ 1 → 422; có CLO trùng → 422; CLO không thuộc `syllabusId` của bài → 422 (ADR 0011) |
 | US-15/AC-3 | `scope = SECTION` thiếu `sectionId` → 400 |
 | US-15/AC-4 | Giảng viên sửa bài của lớp không thuộc phạm vi → 403 |
 | US-15/AC-5 | Khi `isLocked = true`, thêm/sửa/xóa item → bị từ chối; bài vẫn đọc được |
@@ -80,7 +80,7 @@ không trùng cặp. **Service vẫn phải kiểm tra trước** để trả l�
 | NEW-01/AC-6 | Màn hình duyệt đọc `coverageSummary`: `byClo` và `byBloom` khớp với tính tay từ `items` (ví dụ kiểm chứng độc lập) |
 | NEW-01/AC-7 | Chuyển trạng thái sai thứ tự (ví dụ `DRAFT → APPROVED`, `LOCKED → DRAFT`) → 422 |
 | US-13/AC-1 (MR) | Cây danh mục: cấp 1 không có cha; cấp 2–3 có `ancestorIds` đúng; cấp 4 → 422; trùng `(bankId, code)` → 409 |
-| US-14/AC-1 (MR) | Câu hỏi `ACTIVE` phải có ≥ 1 cặp, Σ `weight` = 1; câu và danh mục cùng ngân hàng; PI thuộc `clo_pi_links` của CLO |
+| US-14/AC-1 (MR) | Câu hỏi `ACTIVE` phải có ≥ 1 CLO, Σ `weight` = 1; câu và danh mục cùng ngân hàng; CLO thuộc đề cương (ADR 0011) |
 
 ## 6. API đề xuất **[ĐỀ XUẤT]**
 
@@ -96,20 +96,20 @@ không trùng cặp. **Service vẫn phải kiểm tra trước** để trả l�
 
 ## 7. Kiểm tra tham chiếu ở service
 
-`syllabusId`/`sectionId`/`templateId` tồn tại và khớp nhau (lớp thuộc đúng đề cương); mọi `cloId` thuộc `syllabusId`; mọi cặp
-nằm trong `clo_pi_links`; `questionId` (nếu có) thuộc ngân hàng của cùng đề cương; người gửi duyệt ≠ người duyệt.
+`syllabusId`/`sectionId`/`templateId` tồn tại và khớp nhau (lớp thuộc đúng đề cương); mọi `cloId` thuộc `syllabusId`;
+`questionId` (nếu có) thuộc ngân hàng của cùng đề cương; người gửi duyệt ≠ người duyệt.
 
 ## 8. Test bắt buộc
 
-Σ `weight` = 0,9999 / 1 / 1,01 / 0,5+0,5 / một cặp = 1; cặp trùng; cặp CLO–PI lạ; `maxScore` = 0 và âm; `totalPoints` lệch 0,0009 và 0,0011;
+Σ `weight` = 0,9999 / 1 / 1,01 / 0,5+0,5 / một CLO = 1; CLO trùng; CLO không thuộc đề cương; `maxScore` = 0 và âm; `totalPoints` lệch 0,0009 và 0,0011;
 mọi chuyển trạng thái hợp lệ và không hợp lệ; sửa `items` khi `isLocked`; người không đúng vai trò duyệt; người gửi tự duyệt;
-`REJECTED` không có ghi chú; sao chép từ khung rồi đổi liên kết CLO–PI (snapshot không đổi theo); đồng thời hai người cùng duyệt một bài (chỉ một thắng).
+`REJECTED` không có ghi chú; sao chép từ khung rồi sửa CLO (snapshot không đổi theo); đồng thời hai người cùng duyệt một bài (chỉ một thắng).
 
 ## 9. Không làm / chưa quyết
 
-- Không làm: sinh đề, duyệt nội dung câu hỏi, xuất phôi in (`exportedFiles`), nhập câu hỏi từ Excel/Moodle (US-17).
-- **Chờ GVHD (Q11):** có giữ NEW-01 và vai trò `DEPARTMENT_HEAD` không → quyết bằng ADR 0001 **trước khi code NEW-01**.
-- Chờ Khoa: Q15 (cách chia điểm khi một câu đo nhiều cặp), Q16 (cấu trúc ngân hàng). *(Riêng Q17 đã chốt: không tạo collection `departments`, phạm vi duyệt của `DEPARTMENT_HEAD` kiểm soát trực tiếp qua `scope.courseIds`).*
+- Không làm: sinh đề, duyệt nội dung câu hỏi, xuất phôi in (`exportedFiles`), nhập câu hỏi từ Moodle. Nhập câu hỏi từ Excel (US-17, Q16).
+- **Q11:** Nhóm SV chốt giữ NEW-01 và vai trò `DEPARTMENT_HEAD` (ADR 0001; GVHD chưa ký xác nhận).
+- Chờ Khoa: Q15 (cách chia điểm khi một câu đo nhiều CLO). *(Riêng Q16 đã chốt nhập Excel; Q17 đã chốt bỏ collection `departments`, kiểm soát qua `scope.courseIds`).*
 - US-13/14 xuống MR: item khai báo trực tiếp trong `assessments.items[]` đã đủ để đo; ngân hàng chỉ là tiện ích tái sử dụng.
 
 ## 10. Để vấn đáp

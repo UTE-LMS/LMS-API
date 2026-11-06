@@ -72,15 +72,16 @@ const schema = (required, properties) => ({
 // ----------------------------------------------------------------------------
 // 2. Khai báo collection: validator + index
 // ----------------------------------------------------------------------------
-// Cặp (CLO, PI) mà một câu hỏi/tiêu chí đo, kèm phần điểm của câu được chia cho cặp đó (tổng các cặp của một câu = 1)
+// CLO mà một câu hỏi/tiêu chí đo, kèm phần điểm của câu được chia cho CLO đó (tổng của một câu = 1).
+// ADR 0011 (Q10): câu hỏi chỉ gán CLO; PI suy ra từ kết quả CLO qua clo_pi_links. Cách chia điểm khi một câu đo nhiều CLO chờ Q15
 const OUTCOME_MAPPING = {
-  bsonType: 'object', required: ['cloId', 'piId', 'weight'],
-  properties: { cloId: OID, piId: OID, weight: { bsonType: ['double', 'int', 'long', 'decimal'], minimum: 0, exclusiveMinimum: true, maximum: 1 } }
+  bsonType: 'object', required: ['cloId', 'weight'],
+  properties: { cloId: OID, weight: { bsonType: ['double', 'int', 'long', 'decimal'], minimum: 0, exclusiveMinimum: true, maximum: 1 } }
 };
 // Biểu thức: tổng các trọng số trong mảng bằng 1 (sai số 0,0001)
-// Biểu thức: trong một câu hỏi, mỗi cặp (CLO, PI) chỉ khai báo một lần (tránh tính trùng điểm)
-const noDuplicatePairs = (mappingsPath) => ({ $eq: [ { $size: mappingsPath },
-  { $size: { $setUnion: [ { $map: { input: mappingsPath, as: 'm', in: { cloId: '$$m.cloId', piId: '$$m.piId' } } }, [] ] } } ] });
+// Biểu thức: trong một câu hỏi, mỗi CLO chỉ khai báo một lần (tránh tính trùng điểm)
+const noDuplicateClos = (mappingsPath) => ({ $eq: [ { $size: mappingsPath },
+  { $size: { $setUnion: [ { $map: { input: mappingsPath, as: 'm', in: '$$m.cloId' } }, [] ] } } ] });
 const sumsToOne = (weightsPath) => ({ $lte: [{ $abs: { $subtract: [{ $sum: weightsPath }, 1] } }, 0.0001] });
 
 const SCORE_STATUS_VALUES = ['SCORED', 'BLANK', 'ABSENT', 'NOT_GRADED', 'EXEMPT', 'MISSING'];
@@ -267,16 +268,16 @@ const COLLECTIONS = {
           bloomLevel: { bsonType: ['int', 'long', 'double'], minimum: 1, maximum: 6 },
           difficulty: { enum: ['EASY', 'MEDIUM', 'HARD', null] },
           defaultMaxScore: NUM_N,
-          outcomeMappings: arr(OUTCOME_MAPPING), // một câu có thể đo nhiều cặp (CLO, PI)
+          outcomeMappings: arr(OUTCOME_MAPPING), // một câu có thể đo nhiều CLO
           source: OBJ_N,                         // { system: INTERNAL|MOODLE|EXCEL_IMPORT, externalQuestionId, note }
           status: en('DRAFT', 'ACTIVE', 'RETIRED'),
           verification: VERIFICATION, extra: OBJ_N
         }),
-        // Câu ở trạng thái ACTIVE phải có ít nhất một cặp (CLO, PI) và tổng phần điểm = 1
+        // Câu ở trạng thái ACTIVE phải có ít nhất một CLO và tổng phần điểm = 1
         { $expr: { $or: [ { $ne: ['$status', 'ACTIVE'] },
             { $and: [ { $gte: [{ $size: '$outcomeMappings' }, 1] }, sumsToOne('$outcomeMappings.weight') ] } ] } },
-        // mỗi cặp (CLO, PI) chỉ xuất hiện một lần trong một câu
-        { $expr: noDuplicatePairs('$outcomeMappings') }
+        // mỗi CLO chỉ xuất hiện một lần trong một câu
+        { $expr: noDuplicateClos('$outcomeMappings') }
       ]
     },
     indexes: [
@@ -284,7 +285,6 @@ const COLLECTIONS = {
       [{ categoryId: 1 }],
       [{ bankId: 1, status: 1, bloomLevel: 1 }],
       [{ 'outcomeMappings.cloId': 1 }],
-      [{ 'outcomeMappings.piId': 1 }],
       // chống nhập trùng một câu từ hệ thống ngoài (Moodle...)
       [{ bankId: 1, 'source.system': 1, 'source.externalQuestionId': 1 },
        { unique: true, partialFilterExpression: { 'source.externalQuestionId': { $type: 'string' } }, name: 'uniq_external_question' }]
@@ -337,7 +337,7 @@ const COLLECTIONS = {
               kind: en('QUESTION', 'CRITERION'),
               maxScore: { bsonType: ['double', 'int', 'long', 'decimal'], minimum: 0, exclusiveMinimum: true },
               bloomLevel: bloom, topic: STR_N,
-              // Bản SNAPSHOT tại thời điểm thi: cặp (CLO, PI) và phần điểm của câu được chia cho cặp đó
+              // Bản SNAPSHOT tại thời điểm thi: CLO và phần điểm của câu được chia cho CLO đó
               outcomeMappings: { bsonType: 'array', minItems: 1, items: OUTCOME_MAPPING },
               questionId: OID_N, questionVersion: INT_N,   // câu hỏi lấy từ ngân hàng (null với tiêu chí rubric hoặc đề ngoài ngân hàng)
               externalRef: STR_N,                          // mã câu hỏi trên Moodle/LMS để khớp cột điểm
@@ -353,16 +353,15 @@ const COLLECTIONS = {
         // Đã gửi duyệt trở đi thì phải có ít nhất một câu hỏi/tiêu chí
         { $expr: { $or: [ { $not: [{ $in: ['$status', ASSESSMENT_NEED_ITEMS_STATUSES] }] },
                           { $gte: [{ $size: { $ifNull: ['$items', []] } }, 1] } ] } },
-        // Mỗi câu hỏi/tiêu chí: tổng phần điểm chia cho các cặp (CLO, PI) phải bằng 1
+        // Mỗi câu hỏi/tiêu chí: tổng phần điểm chia cho các CLO phải bằng 1, mỗi CLO một lần
         { $expr: { $allElementsTrue: [ { $map: { input: { $ifNull: ['$items', []] }, as: 'it',
-            in: { $and: [ sumsToOne('$$it.outcomeMappings.weight'), noDuplicatePairs('$$it.outcomeMappings') ] } } } ] } }
+            in: { $and: [ sumsToOne('$$it.outcomeMappings.weight'), noDuplicateClos('$$it.outcomeMappings') ] } } } ] } }
       ]
     },
     indexes: [
       [{ syllabusId: 1, sectionId: 1, code: 1 }, { unique: true }],
       [{ sectionId: 1, status: 1 }],
       [{ 'items.outcomeMappings.cloId': 1 }],
-      [{ 'items.outcomeMappings.piId': 1 }],
       [{ 'items.questionId': 1 }]
     ]
   },
@@ -488,13 +487,10 @@ const COLLECTIONS = {
           pi: {
             bsonType: ['object', 'null'],
             properties: {
-              method: { enum: ['DIRECT_FROM_ITEMS', 'FROM_CLOS', null] },
+              // ADR 0011: PI luôn suy ra từ kết quả CLO theo clo_pi_links.weight
+              method: { enum: ['FROM_CLOS', null] },
               aggregationMethod: { enum: ['WEIGHTED_AVERAGE', 'MAX', 'LATEST', 'ACCUMULATED_EVIDENCE', null] },
-              useIrmAsWeight: BOOL,        // mặc định false; I/R/M là vai trò sư phạm, không phải hệ số
-              irmWeights: {                // chỉ dùng khi useIrmAsWeight = true và Khoa đã xác nhận
-                bsonType: ['object', 'null'],
-                properties: { I: NUM_N, R: NUM_N, M: NUM_N }
-              },
+              // ADR 0012: không quy đổi I/R/M thành hệ số; không có trường useIrmAsWeight/irmWeights
               defaultPassThreshold: rate01
             }
           },
@@ -514,10 +510,7 @@ const COLLECTIONS = {
             }
           },
           notes: STR_N
-        }),
-        // Bật useIrmAsWeight thì bắt buộc có đủ ba hệ số I, R, M dương
-        { $expr: { $or: [ { $ne: ['$pi.useIrmAsWeight', true] },
-            { $and: [ { $gt: ['$pi.irmWeights.I', 0] }, { $gt: ['$pi.irmWeights.R', 0] }, { $gt: ['$pi.irmWeights.M', 0] } ] } ] } }
+        })
       ]
     },
     indexes: [[{ code: 1, version: 1 }, { unique: true }]]
@@ -688,9 +681,9 @@ const programId = seed('programs', { code: 'CNTT' }, {
   extra: { note: 'Mã nội bộ của dự án; trình độ/văn bằng sẽ điền sau khi đọc thông tin chung của bản CTĐT.' }
 });
 const pvId = seed('program_versions', { programId: programId, version: 'BM7A-2.7-Updated-2026' }, {
-  applicableCohorts: [], totalCredits: null, durationYears: null, status: 'DRAFT',
+  applicableCohorts: ['K23', 'K24', 'K25', 'K26', 'K27'], totalCredits: null, durationYears: null, status: 'DRAFT',
   verification: { status: 'NEEDS_CLARIFICATION', verifiedBy: null, verifiedAt: null,
-                  note: 'Chờ xác nhận phiên bản áp dụng cho khóa nào (Q01).' }
+                  note: 'Q01: áp dụng cho các khóa K23, K24, K25, K26, K27 (nhóm SV xác nhận 2026-11-06).' }
 });
 
 // 4.3 Bảy PLO và 17 PI (Misa.md, mục 2–3; mục 7.3 trang 7–8 của bản CTĐT)
@@ -767,8 +760,8 @@ seed('measurement_rules', { code: 'QT-PDBCL-DLCDR', version: '0.1-DRAFT' }, {
   course: { requireAllCloPass: null, defaultTargetPassRate: null },
   // BLANK luôn tính 0 (có ghi nhận); cách xử lý ABSENT/MISSING trong mẫu số chờ Khoa (Q13)
   missingDataPolicy: { blankScoreValue: 0, excludeAbsentFromDenominator: null, excludeMissingFromDenominator: null },
-  // Q10 (chờ xác nhận): PI gán trực tiếp cho câu hỏi. I/R/M không dùng làm trọng số (useIrmAsWeight = false, không đặt irmWeights)
-  pi: { method: 'DIRECT_FROM_ITEMS', aggregationMethod: null, useIrmAsWeight: false, irmWeights: null, defaultPassThreshold: null },
+  // ADR 0011 (Q10): PI suy ra từ CLO; trọng số CLO → PI (clo_pi_links.weight) chờ Q22. ADR 0012 (Q18): không quy đổi I/R/M
+  pi: { method: 'FROM_CLOS', aggregationMethod: null, defaultPassThreshold: null },
   plo: { method: null, defaultPassThreshold: null, cohortTargetPassRate: null },
   notes: 'BẢN NHÁP: các ngưỡng, trọng số, mẫu số để trống chờ Khoa xác nhận (Q04, Q12, Q13). Không dùng để kết luận chính thức.'
 });

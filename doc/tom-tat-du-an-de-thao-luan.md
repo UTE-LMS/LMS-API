@@ -338,33 +338,32 @@ diễn tập vấn đáp. GVHD duyệt báo cáo 2 tuần/lần.
 
 Nguồn: `GiaiThich_CoSoDuLieu.md` §8. Không chọn một đáp án rồi viết như thể Khoa đã duyệt.
 
-| Mã | Nội dung | Tình trạng | Ảnh hưởng |
+| Mã | Nội dung | Tình trạng (Cập nhật 2026-11-06) | Ảnh hưởng |
 |---|---|---|---|
-| Q01 | Bản CTĐT áp dụng cho khóa nào | Chưa hỏi | `program_versions.applicableCohorts` |
-| Q02 | Khi nào có đề cương chính thức | Chưa hỏi | `syllabi`, `clos` |
-| Q03 | Thang "trình độ năng lực" của PLO/PI | Chưa hỏi | Đang lưu nguyên giá trị, chưa diễn giải |
-| Q04 | Công thức, ngưỡng, mẫu số, xử lý thiếu dữ liệu | Chưa hỏi | `measurement_rules` đang để trống |
-| Q05 | Điểm theo câu hỏi hay điểm tổng | **Đã trả lời, chờ xác nhận:** theo từng câu hỏi | `dataGranularity = ITEM` |
-| Q06, Q07 | Phiên bản công nghệ; nơi lưu mã, tệp, môi trường | Chưa hỏi | Môi trường triển khai, replica set |
-| Q08 | Ai rà soát nghiệp vụ, kỹ thuật | Chưa hỏi | Quy trình `verification` |
-| Q09 | Dùng mã sinh viên thật hay mã thay thế | Chưa hỏi | `students` |
-| Q10 | PI gán trực tiếp hay suy ra qua CLO | **Đã trả lời, chờ xác nhận:** gán trực tiếp cho từng câu hỏi, trong các PI đã liên kết với CLO của câu đó | `outcomeMappings`, `pi.method = DIRECT_FROM_ITEMS` |
-| Q11 | Có tổ chức thi không; có duyệt ma trận đề thi không | **Phạm vi đồ án: không tổ chức thi, không duyệt nội dung đề.** Duyệt *ma trận ánh xạ* bởi Trưởng bộ môn (v0.5, NEW-01): chờ GVHD xác nhận | `assessments.status/isLocked/approval`, `exportedFiles`, vai trò `DEPARTMENT_HEAD` |
-| Q12 | Quy tắc "phải đạt từng CLO"; tỷ trọng, ngưỡng từng CLO | Chưa hỏi | `course.requireAllCloPass`, `clos.measurement` |
-| Q13 | Phân biệt bỏ trống / vắng / chưa chấm / thiếu; vắng thi có vào mẫu số không | Chưa hỏi | `scores.status`, `emptyCellAs`, `counts` |
-| Q14 | Khi nào Khoa cung cấp ánh xạ CLO–PI đã duyệt của các học phần thử nghiệm | Chưa hỏi | `clo_pi_links` |
-| Q15 | Khi một câu đo nhiều cặp CLO–PI, điểm chia thế nào | Chưa hỏi (thiết kế hiện chọn chia theo phần, tổng bằng 1) | `outcomeMappings.weight` |
-| Q16 | Cấu trúc chương/chủ đề ngân hàng câu hỏi; nguồn nhập (Moodle hay Excel) | Chưa hỏi | `question_categories`, `import_batches` |
-| Q17 | Bộ môn: có cần collection `departments` không, hay `courses.departmentId` chỉ là mã tham chiếu | **Đã chốt:** KHÔNG tạo collection `departments`, bỏ `courses.departmentId`. Giữ vai trò `DEPARTMENT_HEAD` duyệt theo `scope.courseIds` | `courses`; phạm vi duyệt của `DEPARTMENT_HEAD` qua `UserScope.courseIds` |
-| Q18 | Có cho quy đổi I/R/M thành hệ số khi tổng hợp PI từ CLO không, và giá trị | Chưa hỏi. Mặc định **không** (`useIrmAsWeight = false`) | `pi.useIrmAsWeight`, `pi.irmWeights` |
-| Q19 | Phương pháp mặc định: `pi.aggregationMethod`, `plo.method`, `reimportPolicy` | Chưa hỏi | `measurement_rules`, `import_batches` |
-| Q20 | Công thức CLO/học phần còn thiếu: `WEIGHTED_ITEMS` và trọng số câu hỏi; vai trò `weightInCourse`/`defaultWeight`; cấp COURSE khi `requireAllCloPass = false`; điểm tiêu chí rubric | Chưa hỏi (chi tiết: `plan/F06` §9) | `measurement_rules`, `assessments`, `clos.measurement` |
-| Q21 | Công thức cấp PLO: `ALL_PIS_PASSED`, `AVERAGE_PIS`, `WEIGHTED_PIS` (thiếu trọng số PI trong PLO) | Chưa hỏi | `measurement_rules.plo` |
-| Q22 | Gộp PI qua nhiều học phần/lớp/học kỳ (`aggregationMethod`), chuẩn hóa `W` khi `FROM_CLOS`, tổng hợp khóa/CTĐT | Chưa hỏi | `measurement_rules.pi`, `aggregate_results` |
-| Q23 | Thiếu dữ liệu và ngưỡng trong công thức (`minCoverage`, mẫu số, ưu tiên ngưỡng, `≥`/`>`, làm tròn) | Chưa hỏi | `missingDataPolicy`, `completeness`, `passed` |
+| Q01 | Bản CTĐT áp dụng cho khóa nào | **Đã chốt (nhóm SV, 2026-11-06):** Áp dụng cho các khóa `K23`, `K24`, `K25`, `K26`, `K27` | `program_versions.applicableCohorts` |
+| Q02 | Khi nào có đề cương chính thức | **Đã có đề cương chính thức đã duyệt (nhóm SV ghi nhận 2026-11-06):** 2 học phần `APCM220307` và `ABDA433708` | `syllabi`, `clos` |
+| Q03 | Thang "trình độ năng lực" của PLO/PI | **Đã làm rõ:** Lưu nguyên giá trị 1–6 (`capabilityLevelRaw`) để hiển thị/đối chiếu, không diễn giải hay quy đổi | Hiện lưu nguyên giá trị |
+| Q04 | Công thức, ngưỡng, mẫu số, xử lý thiếu dữ liệu | **Chưa có:** Khoa chưa ban hành | `measurement_rules` đang để trống |
+| Q05 | Điểm theo câu hỏi hay điểm tổng | **Đã chốt (nhóm SV, 2026-11-06):** Theo từng câu hỏi/tiêu chí (`dataGranularity = ITEM`) | Hết rủi ro R2 |
+| Q06, Q07 | Phiên bản công nghệ; nơi lưu mã, tệp, môi trường | **Đã chốt công nghệ:** Java 25, Spring Boot 4.1.2, Angular 21, MongoDB. Lưu mã: GitHub. **Còn thiếu:** Nền tảng staging chưa chọn | Môi trường triển khai, replica set |
+| Q08 | Ai rà soát nghiệp vụ, kỹ thuật; ai xác nhận CTĐT | **Đã chốt (nhóm SV, 2026-11-06):** GVHD rà soát nghiệp vụ & kỹ thuật; 2 SV làm kỹ thuật (Minh & Tín - IT). Xác nhận CTĐT/PLO/PI: `QA_OFFICER` | Quy trình `verification` |
+| Q09 | Dùng mã sinh viên thật hay mã thay thế | **Đã chốt (nhóm SV, 2026-11-06):** Dùng mã sinh viên thật trong DB thật/staging; seed/test/commit dùng mã giả (R9) | `students` |
+| Q10 | PI gán trực tiếp hay suy ra qua CLO | **Đã chốt (ADR 0011, 2026-11-06):** PI suy ra từ kết quả CLO (`pi.method = FROM_CLOS`). Câu hỏi chỉ gán CLO. Bỏ `DIRECT_FROM_ITEMS` | `outcomeMappings`, `pi.method = FROM_CLOS` |
+| Q11 | Có tổ chức thi không; có duyệt ma trận đề thi không | **Đã chốt:** Không tổ chức thi, không sinh/duyệt đề thi. **NEW-01:** Trưởng bộ môn duyệt ma trận ánh xạ CLO của bài đánh giá trước khi nạp điểm (nhóm SV chốt giữ theo ADR 0001, GVHD chưa xác nhận) | `assessments.status/isLocked/approval`, `exportedFiles`, vai trò `DEPARTMENT_HEAD` |
+| Q12 | Quy tắc "phải đạt từng CLO"; tỷ trọng, ngưỡng từng CLO | **Chưa có** | `course.requireAllCloPass`, `clos.measurement` |
+| Q13 | Phân biệt bỏ trống / vắng / chưa chấm / thiếu; vắng thi có vào mẫu số không | **Chưa có** | `scores.status`, `emptyCellAs`, `counts` |
+| Q14 | Khi nào Khoa cung cấp ánh xạ CLO–PI đã duyệt của các học phần thử nghiệm | **Đã chốt (nhóm SV, 2026-11-06):** Lấy theo 2 đề cương chính thức đã duyệt (`APCM220307`, `ABDA433708`) | `clo_pi_links` |
+| Q15 | Khi một câu đo nhiều CLO, điểm chia thế nào | **Chưa tính / Chưa quyết:** Tạm chia theo `weight` (tổng = 1) cho tới khi có ý kiến Khoa | `outcomeMappings.weight` |
+| Q16 | Cấu trúc chương/chủ đề ngân hàng câu hỏi; nguồn nhập (Moodle hay Excel) | **Đã chốt (nhóm SV, 2026-11-06):** Nhập câu hỏi từ Excel (không dùng Moodle) | `question_categories`, `import_batches` |
+| Q17 | Bộ môn: có cần collection `departments` không, hay `courses.departmentId` chỉ là mã tham chiếu | **Đã chốt:** KHÔNG tạo collection `departments`, bỏ `courses.departmentId`. Giữ vai trò `DEPARTMENT_HEAD` duyệt theo `scope.courseIds` (ADR 0010) | `courses`; phạm vi duyệt của `DEPARTMENT_HEAD` qua `UserScope.courseIds` |
+| Q18 | Có cho quy đổi I/R/M thành hệ số khi tổng hợp PI từ CLO không, và giá trị | **Đã chốt (ADR 0012, 2026-11-06):** Không quy đổi I/R/M sang điểm. Bỏ hẳn `useIrmAsWeight` và `irmWeights` khỏi `measurement_rules` | Xóa trường khỏi validator |
+| Q19 | Phương pháp mặc định: `pi.aggregationMethod`, `plo.method`, `reimportPolicy` | **Chưa có** | `measurement_rules`, `import_batches` |
+| Q20 | Công thức CLO/học phần còn thiếu: `WEIGHTED_ITEMS` và trọng số câu hỏi; vai trò `weightInCourse`/`defaultWeight`; cấp COURSE khi `requireAllCloPass = false`; điểm tiêu chí rubric | **Chưa có** (chi tiết: `plan/F06` §9) | `measurement_rules`, `assessments`, `clos.measurement` |
+| Q21 | Công thức cấp PLO: `ALL_PIS_PASSED`, `AVERAGE_PIS`, `WEIGHTED_PIS` (thiếu trọng số PI trong PLO) | **Chưa có** | `measurement_rules.plo` |
+| Q22 | Gộp PI qua nhiều học phần/lớp/học kỳ (`aggregationMethod`), chuẩn hóa `W` khi `FROM_CLOS`, tổng hợp khóa/CTĐT | **Chưa có** | `measurement_rules.pi`, `aggregate_results` |
+| Q23 | Thiếu dữ liệu và ngưỡng trong công thức (`minCoverage`, mẫu số, ưu tiên ngưỡng, `≥`/`>`, làm tròn) | **Chưa có** | `missingDataPolicy`, `completeness`, `passed` |
 
-Đến nay (theo tài liệu) **chỉ 3 câu có câu trả lời tạm** (Q05, Q10, Q11) và đều chờ xác nhận chính thức. Q17–Q19 mới
-từ CSDL v0.5. Q20–Q23 là các công thức còn thiếu (CLO/học phần, PLO, gộp PI, thiếu dữ liệu/ngưỡng): bản tổng hợp để hỏi GVHD ở `plan/F06-do-luong.md` §9.
+Đến ngày 2026-11-06, nhóm sinh viên đã tự chốt các quyết định kỹ thuật nội bộ (Q02, Q05, Q06, Q08, Q09, Q10, Q11, Q14, Q16, Q17, Q18) kèm ADR 0010, 0011, 0012; các câu này **chưa có phê duyệt chính thức từ GVHD/Khoa**. Q04, Q12, Q13, Q19, Q20–Q23 là các công thức đo lường chính thức còn thiếu từ Khoa.
 
 ---
 

@@ -83,7 +83,7 @@ Trong phân hệ F02, nhóm IBS tập trung vào việc thiết kế cấu trúc
 1. **Đóng vai trò là "Khung tọa độ tham chiếu gốc" (Immutable Reference Anchor) cho toàn bộ hệ thống:**
    - Một hệ thống đo lường chuẩn đầu ra không thể tính toán nếu không có các mốc chuẩn tham chiếu. Toàn bộ các phân hệ tiếp theo:
      - F03 (Đề cương môn học & CLO) cần liên kết `clo_pi_links` trỏ vào `piId` và `programVersionId`.
-     - F04 (Ngân hàng câu hỏi & Bài đánh giá) cần ánh xạ từng câu hỏi thi `outcomeMappings` về đúng cặp `(cloId, piId)`.
+     - F04 (Ngân hàng câu hỏi & Bài đánh giá) ánh xạ từng câu hỏi thi `outcomeMappings` về CLO; sau đó PI được suy ra qua `clo_pi_links` (ADR 0011).
      - F05 & F06 (Nhập điểm & Công cụ tính toán đo lường) cần tập hợp toàn bộ điểm số của sinh viên để tổng hợp lên mức độ đạt của từng PI và PLO theo đúng phiên bản CTĐT mà sinh viên đó theo học.
    - Nếu không có F02 làm nền móng vững chắc, mọi dữ liệu đo lường ở F03–F06 đều trở thành dữ liệu "vô thừa nhận" (unanchored data), không thể xác định được sinh viên đang được đo lường theo tiêu chuẩn nào.
 
