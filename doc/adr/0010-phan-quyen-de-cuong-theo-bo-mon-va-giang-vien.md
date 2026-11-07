@@ -37,9 +37,10 @@ Hệ thống bãi bỏ cơ chế suy quyền qua `program_courses` của ADR 000
 * **Trưởng bộ môn tra cứu & phân công cho Giảng viên:** 
   * Cung cấp API `GET /api/v1/departments/lecturers` để Trưởng bộ môn lấy danh sách Giảng viên (`LECTURER` đang `ACTIVE`) thuộc cùng phạm vi Khoa/Ngành (`scope.programIds` giao nhau) hoặc đã được phân công môn học của Bộ môn, mà không cần mở quyền `/api/v1/users` của Admin.
   * Cung cấp API `POST /api/v1/departments/assign-course` và `unassign-course` để Trưởng bộ môn phân công/thu hồi quyền biên soạn đề cương cho Giảng viên (gán/gỡ `courseId` trong `scope.courseIds` của Giảng viên).
-  * **Ràng buộc an toàn kép (Dual Safety Invariant):**
+  * **Ràng buộc an toàn & Thu hồi quyền ADMIN (Safety Invariants):**
     1. Trưởng bộ môn chỉ được quyền phân công những môn học nằm trong `scope.courseIds` của chính mình (`403 Forbidden` nếu ngoài scope).
     2. Trưởng bộ môn chỉ được quyền nhìn thấy và phân công cho Giảng viên có `scope.programIds` thuộc phạm vi Khoa/Ngành của mình (`422 LECTURER_OUT_OF_DEPARTMENT_SCOPE` nếu cố tình gán cho giảng viên Khoa/Ngành khác).
+    3. **Thu hồi hoàn toàn quyền `ADMIN` khỏi Bộ môn:** Quản trị viên không có thẩm quyền nghiệp vụ Bộ môn, bị từ chối `403 Forbidden` tại mọi endpoint `/api/v1/departments/**`. ADMIN chỉ gán môn cho Trưởng bộ môn tại màn hình Quản lý Người dùng (`PUT /api/v1/users/{id}`). Mọi giao diện phân công GV viết đề cương ở trang Admin đều bị loại bỏ hoàn toàn.
 
 ### 2.3. Biên soạn & Phê duyệt Đề cương chi tiết (`syllabi` & `clos`)
 * **Biên soạn (DRAFT):** 
@@ -63,8 +64,8 @@ Hệ thống bãi bỏ cơ chế suy quyền qua `program_courses` của ADR 000
 | Hành động | Endpoint | Vai trò cho phép | Ràng buộc Scope |
 |---|---|---|---|
 | **Tạo / Sửa / Xóa môn học** | `/api/v1/courses/**` (GHI) | `ADMIN` | Toàn hệ thống (Phòng Đào tạo) |
-| **Tra cứu GV trong Bộ môn** | `GET /api/v1/departments/lecturers` | `ADMIN`, `DEPARTMENT_HEAD` | Cùng `scope.programIds` với TBM (hoặc đã gán môn của Bộ môn) |
-| **Phân công môn cho GV** | `/api/v1/departments/assign-course` | `ADMIN`, `DEPARTMENT_HEAD` | `scope.courseIds` chứa môn & GV cùng `scope.programIds` |
+| **Tra cứu GV trong Bộ môn** | `GET /api/v1/departments/lecturers` | `DEPARTMENT_HEAD` | Cùng `scope.programIds` với TBM (Thu hồi quyền ADMIN) |
+| **Phân công môn cho GV** | `/api/v1/departments/assign-course` | `DEPARTMENT_HEAD` | `scope.courseIds` chứa môn & GV cùng `scope.programIds` (Thu hồi quyền ADMIN) |
 | **Tạo đề cương (DRAFT)** | `POST /api/v1/courses/{id}/syllabi` | `LECTURER`, `DEPARTMENT_HEAD` | `scope.courseIds` chứa `courseId` (Thu hồi quyền ADMIN) |
 | **Thêm / Sửa / Xóa CLO** | `/api/v1/clos/**` (GHI) | `LECTURER`, `DEPARTMENT_HEAD` | `scope.courseIds` chứa môn của đề cương & đề cương `DRAFT` (Thu hồi quyền ADMIN) |
 | **Duyệt đề cương (CONFIRMED)** | `PUT /api/v1/syllabi/{id}/status` | `DEPARTMENT_HEAD` | `scope.courseIds` của TBM chứa môn của đề cương (Thu hồi quyền ADMIN) |

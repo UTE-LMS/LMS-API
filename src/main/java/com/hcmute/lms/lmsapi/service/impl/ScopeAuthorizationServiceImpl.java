@@ -214,19 +214,13 @@ public class ScopeAuthorizationServiceImpl implements ScopeAuthorizationService 
       return false;
     }
 
-    boolean isAdmin =
-        principal.getRoleAssignments().stream()
-            .anyMatch(a -> a != null && a.getRole() == Role.ADMIN);
-    if (isAdmin) {
-      return true;
-    }
-
     if (!courseRepository.existsById(courseId.trim())) {
       log.debug("canAssignCourse: Fail-closed - course [{}] not found in database", courseId);
       return false;
     }
 
-    // Chỉ Trưởng bộ môn (DEPARTMENT_HEAD) có courseId trong scope.courseIds mới được phân công
+    // Chỉ duy nhất Trưởng bộ môn (DEPARTMENT_HEAD) có courseId trong scope.courseIds mới được phân
+    // công (ADMIN không có thẩm quyền Bộ môn)
     return principal.getRoleAssignments().stream()
         .anyMatch(
             a ->
