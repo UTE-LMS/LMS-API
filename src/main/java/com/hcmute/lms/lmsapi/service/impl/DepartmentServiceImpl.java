@@ -44,7 +44,7 @@ public class DepartmentServiceImpl implements DepartmentService {
     List<User> allActiveLecturers =
         userRepository.findByRoleAssignmentsRoleAndStatus(Role.LECTURER, UserStatus.ACTIVE);
 
-    if (principal == null || isAdmin(principal)) {
+    if (principal == null) {
       return allActiveLecturers.stream().map(userMapper::toResponse).toList();
     }
 
@@ -147,7 +147,7 @@ public class DepartmentServiceImpl implements DepartmentService {
 
   private void validateLecturerScopeForDepartmentHead(
       User lecturer, UserPrincipal principal, String courseId) {
-    if (principal == null || isAdmin(principal)) {
+    if (principal == null) {
       return;
     }
 
@@ -192,14 +192,6 @@ public class DepartmentServiceImpl implements DepartmentService {
     // Trường hợp Trưởng bộ môn không cấu hình giới hạn programIds: chỉ khớp các giảng viên cũng
     // không bị ràng buộc sang Khoa/Ngành khác
     return lecProgramIds.isEmpty();
-  }
-
-  private boolean isAdmin(UserPrincipal principal) {
-    if (principal.getRoleAssignments() == null) {
-      return false;
-    }
-    return principal.getRoleAssignments().stream()
-        .anyMatch(a -> a != null && a.getRole() == Role.ADMIN);
   }
 
   private Set<String> extractDepartmentProgramIds(UserPrincipal principal) {

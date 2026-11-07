@@ -243,13 +243,12 @@ class DepartmentIntegrationTest extends IntegrationTestBase {
   }
 
   @Test
-  @DisplayName("ADMIN thấy toàn bộ giảng viên và có thể phân công bất kỳ môn học nào -> 200 OK")
-  void admin_assignCourse_success() throws Exception {
+  @DisplayName(
+      "ADMIN không có thẩm quyền Bộ môn: gọi /departments/lecturers hoặc assign-course -> 403 Forbidden")
+  void admin_cannotAccessDepartmentEndpoints_returns403() throws Exception {
     mockMvc
         .perform(getAs(adminToken, "/api/v1/departments/lecturers"))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$[*].id", hasItem(lecturerProgram1.getId())))
-        .andExpect(jsonPath("$[*].id", hasItem(lecturerProgram2.getId())));
+        .andExpect(status().isForbidden());
 
     AssignCourseRequest req =
         AssignCourseRequest.builder()
@@ -259,11 +258,7 @@ class DepartmentIntegrationTest extends IntegrationTestBase {
 
     mockMvc
         .perform(postAs(adminToken, "/api/v1/departments/assign-course", req))
-        .andExpect(status().isOk())
-        .andExpect(
-            jsonPath(
-                "$.roleAssignments[?(@.role == 'LECTURER')].scope.courseIds[*]",
-                hasItem(course2.getId())));
+        .andExpect(status().isForbidden());
   }
 
   @Test
@@ -285,8 +280,9 @@ class DepartmentIntegrationTest extends IntegrationTestBase {
   }
 
   @Test
-  @DisplayName("Phân công môn học không tồn tại -> 404 Not Found")
-  void assignCourse_courseNotFound_404() throws Exception {
+  @DisplayName(
+      "Phân công môn học không tồn tại -> 403 Forbidden (fail-closed bảo vệ trước khi vào service)")
+  void assignCourse_courseNotFound_403() throws Exception {
     AssignCourseRequest req =
         AssignCourseRequest.builder()
             .courseId(new ObjectId().toHexString())
@@ -294,8 +290,8 @@ class DepartmentIntegrationTest extends IntegrationTestBase {
             .build();
 
     mockMvc
-        .perform(postAs(adminToken, "/api/v1/departments/assign-course", req))
-        .andExpect(status().isNotFound());
+        .perform(postAs(deptHeadInScopeToken, "/api/v1/departments/assign-course", req))
+        .andExpect(status().isForbidden());
   }
 
   @Test
@@ -308,7 +304,7 @@ class DepartmentIntegrationTest extends IntegrationTestBase {
             .build();
 
     mockMvc
-        .perform(postAs(adminToken, "/api/v1/departments/assign-course", req))
+        .perform(postAs(deptHeadInScopeToken, "/api/v1/departments/assign-course", req))
         .andExpect(status().isUnprocessableEntity());
   }
 }

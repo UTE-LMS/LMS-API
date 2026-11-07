@@ -164,9 +164,10 @@ class CourseScopeAuthorizationTest {
   }
 
   @Test
-  @DisplayName("canAssignCourse: ADMIN luôn được phép phân công môn học")
-  void canAssignCourse_adminAllowed() {
-    assertThat(service.canAssignCourse(principalWithCourses(Role.ADMIN, null), COURSE_ID)).isTrue();
+  @DisplayName("canAssignCourse: ADMIN không có vai trò Bộ môn -> bị từ chối")
+  void canAssignCourse_adminDenied() {
+    assertThat(service.canAssignCourse(principalWithCourses(Role.ADMIN, null), COURSE_ID))
+        .isFalse();
   }
 
   @Test
