@@ -557,7 +557,8 @@ class CloIntegrationTest extends IntegrationTestBase {
   }
 
   @Test
-  @DisplayName("US-10/AC-4: Môn học chưa gán cho ai chỉ ADMIN tạo đề cương được (fail-closed)")
+  @DisplayName(
+      "US-10/AC-4: Môn học chưa gán cho ai thì không ai tạo đề cương được, kể cả ADMIN (fail-closed)")
   void us10_ac4_orphanCourseIsAdminOnly() throws Exception {
     Course orphan = fixtures.course();
     SyllabusRequest req = SyllabusRequest.builder().version("2024.1").build();
@@ -570,21 +571,21 @@ class CloIntegrationTest extends IntegrationTestBase {
         .perform(postAs(pmToken, "/api/v1/courses/{courseId}/syllabi", req, orphan.getId()))
         .andExpect(status().isForbidden());
 
-    // ADMIN có toàn quyền -> 201
+    // ADMIN không có vai trò biên soạn học thuật (LECTURER/DEPARTMENT_HEAD) -> 403 Forbidden
     mockMvc
         .perform(postAs(adminToken, "/api/v1/courses/{courseId}/syllabi", req, orphan.getId()))
-        .andExpect(status().isCreated());
+        .andExpect(status().isForbidden());
   }
 
   @Test
-  @DisplayName("US-11/AC-5: PM và Giảng viên ngoài scope không thêm/sửa/xóa được CLO")
+  @DisplayName("US-11/AC-5: PM, ADMIN và Giảng viên ngoài scope không thêm/sửa/xóa được CLO")
   void us11_ac5_cloWriteIsScoped() throws Exception {
     String syllabusId = createSyllabusAs(lecturerToken, course1.getId(), "2024.1");
     String cloId = createCloAs(lecturerToken, syllabusId, "CLO1");
     CloRequest newClo = CloRequest.builder().code("CLO2").bloomLevel(3).build();
     CloUpdateRequest update = CloUpdateRequest.builder().code("CLO1").bloomLevel(4).build();
 
-    for (String denied : List.of(pmToken, lecturerOutOfScopeToken)) {
+    for (String denied : List.of(pmToken, lecturerOutOfScopeToken, adminToken)) {
       mockMvc
           .perform(postAs(denied, "/api/v1/syllabi/{syllabusId}/clos", newClo, syllabusId))
           .andExpect(status().isForbidden());
@@ -596,13 +597,13 @@ class CloIntegrationTest extends IntegrationTestBase {
           .andExpect(status().isForbidden());
     }
 
-    // Giảng viên trong scope và ADMIN thao tác được
+    // Giảng viên trong scope thao tác được
     mockMvc
         .perform(putAs(lecturerToken, "/api/v1/clos/{id}", update, cloId))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.bloomLevel").value(4));
     mockMvc
-        .perform(deleteAs(adminToken, "/api/v1/clos/{id}", cloId))
+        .perform(deleteAs(lecturerToken, "/api/v1/clos/{id}", cloId))
         .andExpect(status().isNoContent());
   }
 
@@ -650,8 +651,12 @@ class CloIntegrationTest extends IntegrationTestBase {
     Course foreignCourse = fixtures.course();
     fixtures.programCourse(otherVersion, foreignCourse);
 
-    String foreignSyllabusId = createSyllabusAs(adminToken, foreignCourse.getId(), "2024.1");
-    String foreignCloId = createCloAs(adminToken, foreignSyllabusId, "CLO1");
+    String foreignLecturerToken =
+        fixtures.bearerFor(
+            Role.LECTURER, UserScope.builder().courseIds(List.of(foreignCourse.getId())).build());
+    String foreignSyllabusId =
+        createSyllabusAs(foreignLecturerToken, foreignCourse.getId(), "2024.1");
+    String foreignCloId = createCloAs(foreignLecturerToken, foreignSyllabusId, "CLO1");
 
     // pmToken quản lý `programVersion`, nhưng `foreignCourse` không nằm trong `programVersion`
     CloPiLinkRequest req =

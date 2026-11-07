@@ -43,9 +43,10 @@ Hệ thống bãi bỏ cơ chế suy quyền qua `program_courses` của ADR 000
 
 ### 2.3. Biên soạn & Phê duyệt Đề cương chi tiết (`syllabi` & `clos`)
 * **Biên soạn (DRAFT):** 
-  * Giảng viên (`LECTURER`) có `courseId` nằm trong `scope.courseIds` có toàn quyền tạo đề cương (`POST /courses/{id}/syllabi`), thêm/sửa/xóa CLO (`POST/PUT/DELETE /clos`) khi đề cương đang ở trạng thái `status = DRAFT`.
+  * Giảng viên (`LECTURER`) hoặc Trưởng bộ môn (`DEPARTMENT_HEAD`) có `courseId` nằm trong `scope.courseIds` có toàn quyền tạo đề cương (`POST /courses/{id}/syllabi`), thêm/sửa/xóa CLO (`POST/PUT/DELETE /clos`) khi đề cương đang ở trạng thái `status = DRAFT`.
+  * **Thu hồi quyền của `ADMIN`:** Quản trị viên hệ thống (`ADMIN`) không có thẩm quyền học thuật để biên soạn đề cương hay chỉnh sửa CLO. Do đó, toàn bộ endpoint tạo đề cương và thay đổi CLO bị thu hồi quyền `ADMIN` (`403 Forbidden`).
 * **Phê duyệt (CONFIRMED):** 
-  * Chỉ Trưởng bộ môn (`DEPARTMENT_HEAD`) có `courseId` nằm trong `scope.courseIds` mới có quyền thẩm định và chuyển trạng thái đề cương sang `CONFIRMED` (`PUT /syllabi/{id}/status`), đồng thời hệ thống ghi nhận thông tin thẩm định vào khối `verification`.
+  * Chỉ duy nhất Trưởng bộ môn (`DEPARTMENT_HEAD`) có `courseId` nằm trong `scope.courseIds` mới có quyền thẩm định và chuyển trạng thái đề cương sang `CONFIRMED` (`PUT /syllabi/{id}/status`), đồng thời hệ thống ghi nhận thông tin thẩm định vào khối `verification`. `ADMIN` không được phép duyệt đề cương thay Trưởng bộ môn.
   * Khi đề cương chuyển sang `CONFIRMED` hoặc `ARCHIVED`, hệ thống **khóa cứng 100%**: Cấm mọi thao tác thêm/sửa/xóa CLO và liên kết CLO–PI (giải quyết TD-27). Muốn thay đổi nội dung bắt buộc phải tạo phiên bản đề cương mới (`version` mới).
 
 ### 2.4. Trách nhiệm của Trưởng ngành (`PROGRAM_MANAGER`)
@@ -64,9 +65,9 @@ Hệ thống bãi bỏ cơ chế suy quyền qua `program_courses` của ADR 000
 | **Tạo / Sửa / Xóa môn học** | `/api/v1/courses/**` (GHI) | `ADMIN` | Toàn hệ thống (Phòng Đào tạo) |
 | **Tra cứu GV trong Bộ môn** | `GET /api/v1/departments/lecturers` | `ADMIN`, `DEPARTMENT_HEAD` | Cùng `scope.programIds` với TBM (hoặc đã gán môn của Bộ môn) |
 | **Phân công môn cho GV** | `/api/v1/departments/assign-course` | `ADMIN`, `DEPARTMENT_HEAD` | `scope.courseIds` chứa môn & GV cùng `scope.programIds` |
-| **Tạo đề cương (DRAFT)** | `POST /api/v1/courses/{id}/syllabi` | `ADMIN`, `LECTURER` | `scope.courseIds` của GV chứa `courseId` |
-| **Thêm / Sửa / Xóa CLO** | `/api/v1/clos/**` (GHI) | `ADMIN`, `LECTURER` | `scope.courseIds` chứa môn của đề cương & đề cương `DRAFT` |
-| **Duyệt đề cương (CONFIRMED)** | `PUT /api/v1/syllabi/{id}/status` | `ADMIN`, `DEPARTMENT_HEAD` | `scope.courseIds` của TBM chứa môn của đề cương |
+| **Tạo đề cương (DRAFT)** | `POST /api/v1/courses/{id}/syllabi` | `LECTURER`, `DEPARTMENT_HEAD` | `scope.courseIds` chứa `courseId` (Thu hồi quyền ADMIN) |
+| **Thêm / Sửa / Xóa CLO** | `/api/v1/clos/**` (GHI) | `LECTURER`, `DEPARTMENT_HEAD` | `scope.courseIds` chứa môn của đề cương & đề cương `DRAFT` (Thu hồi quyền ADMIN) |
+| **Duyệt đề cương (CONFIRMED)** | `PUT /api/v1/syllabi/{id}/status` | `DEPARTMENT_HEAD` | `scope.courseIds` của TBM chứa môn của đề cương (Thu hồi quyền ADMIN) |
 | **Gán môn vào CTĐT** | `POST /program-versions/{id}/courses` | `ADMIN`, `PROGRAM_MANAGER` | `scope.programIds` của PM chứa CTĐT đích |
 | **Tạo liên kết CLO–PI** | `POST .../clo-pi-links` | `ADMIN`, `PROGRAM_MANAGER` | `scope.programIds` chứa CTĐT của liên kết |
 | **Thẩm định CLO–PI** | `PUT .../clo-pi-links/{id}/verification` | `QA_OFFICER` | `scope.programIds` chứa CTĐT của liên kết (ADR 0004) |
