@@ -4,20 +4,28 @@ import com.hcmute.lms.lmsapi.config.JwtConfig;
 import com.hcmute.lms.lmsapi.document.Course;
 import com.hcmute.lms.lmsapi.document.CoursePiContribution;
 import com.hcmute.lms.lmsapi.document.CourseSection;
+import com.hcmute.lms.lmsapi.document.Enrollment;
 import com.hcmute.lms.lmsapi.document.Pi;
 import com.hcmute.lms.lmsapi.document.Plo;
 import com.hcmute.lms.lmsapi.document.Program;
 import com.hcmute.lms.lmsapi.document.ProgramCourse;
 import com.hcmute.lms.lmsapi.document.ProgramVersion;
 import com.hcmute.lms.lmsapi.document.RoleAssignment;
+import com.hcmute.lms.lmsapi.document.Student;
+import com.hcmute.lms.lmsapi.document.Syllabus;
+import com.hcmute.lms.lmsapi.document.Term;
 import com.hcmute.lms.lmsapi.document.User;
 import com.hcmute.lms.lmsapi.document.UserScope;
 import com.hcmute.lms.lmsapi.document.Verification;
 import com.hcmute.lms.lmsapi.enums.CourseCategory;
 import com.hcmute.lms.lmsapi.enums.CourseType;
+import com.hcmute.lms.lmsapi.enums.EnrollmentStatus;
 import com.hcmute.lms.lmsapi.enums.PiContributionType;
 import com.hcmute.lms.lmsapi.enums.ProgramVersionStatus;
 import com.hcmute.lms.lmsapi.enums.Role;
+import com.hcmute.lms.lmsapi.enums.SectionStatus;
+import com.hcmute.lms.lmsapi.enums.SyllabusStatus;
+import com.hcmute.lms.lmsapi.enums.TermStatus;
 import com.hcmute.lms.lmsapi.enums.UserStatus;
 import com.hcmute.lms.lmsapi.enums.VerificationStatus;
 import java.time.Instant;
@@ -225,6 +233,28 @@ public final class ApiTestFixtures {
             .build());
   }
 
+  /** Tạo học kỳ giả đang mở (OPEN), mã mang tiền tố của test này để được dọn tự động. */
+  public Term term() {
+    return term(TermStatus.OPEN);
+  }
+
+  /** Tạo học kỳ giả với trạng thái cho trước. */
+  public Term term(TermStatus status) {
+    return mongo.save(
+        Term.builder().code(code("TRM")).academicYear("2025-2026").status(status).build());
+  }
+
+  /** Tạo đề cương giả của một học phần với trạng thái cho trước. */
+  public Syllabus syllabus(Course course, SyllabusStatus status) {
+    return mongo.save(
+        Syllabus.builder()
+            .courseId(course.getId())
+            .version("V-" + runId + "-" + sequence.incrementAndGet())
+            .status(status)
+            .verification(unverified())
+            .build());
+  }
+
   /** Tạo lớp học phần giả với danh sách giảng viên phụ trách cho trước. */
   public CourseSection section(String courseId, List<String> lecturerIds) {
     return mongo.save(
@@ -236,7 +266,23 @@ public final class ApiTestFixtures {
             .termId(new ObjectId().toHexString())
             .lecturerIds(new ArrayList<>(lecturerIds))
             .enrolledCount(0)
-            .status("OPEN")
+            .status(SectionStatus.OPEN)
+            .build());
+  }
+
+  /** Tạo sinh viên giả với mã thay thế mang tiền tố của test này (không phải mã sinh viên thật). */
+  public Student student() {
+    return mongo.save(Student.builder().studentRef(code("STU")).build());
+  }
+
+  /** Ghi danh một sinh viên vào lớp với trạng thái cho trước (không đụng tới sĩ số của lớp). */
+  public Enrollment enrollment(CourseSection section, Student student, EnrollmentStatus status) {
+    return mongo.save(
+        Enrollment.builder()
+            .sectionId(section.getId())
+            .studentId(student.getId())
+            .status(status)
+            .enrolledAt(Instant.now())
             .build());
   }
 
@@ -269,7 +315,19 @@ public final class ApiTestFixtures {
     removeIn("plos", "programVersionId", versionOids);
     removeIn("program_versions", "programId", programOids);
     mongo.remove(query(Criteria.where("code").regex(codePrefix)), "programs");
+    List<ObjectId> courseOids =
+        ids("courses", Criteria.where("code").regex(codePrefix)).stream()
+            .map(ObjectId::new)
+            .toList();
+    removeIn("syllabi", "courseId", courseOids);
+    mongo.remove(query(Criteria.where("code").regex(codePrefix)), "terms");
     mongo.remove(query(Criteria.where("code").regex(codePrefix)), "courses");
+    List<ObjectId> sectionOids =
+        ids("course_sections", Criteria.where("code").regex(codePrefix)).stream()
+            .map(ObjectId::new)
+            .toList();
+    removeIn("enrollments", "sectionId", sectionOids);
+    mongo.remove(query(Criteria.where("studentRef").regex(codePrefix)), "students");
     mongo.remove(query(Criteria.where("code").regex(codePrefix)), "course_sections");
 
     List<String> userIds = ids("users", Criteria.where("username").regex("^itest_" + runId + "_"));

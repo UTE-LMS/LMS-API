@@ -15,8 +15,8 @@ Liên quan: [`doc/plan/README.md`](plan/README.md) (§7 Definition of Done), [`.
 - Mục tiêu: chứng minh các chức năng **đã có mã** đáp ứng AC; liệt kê rõ AC **chưa có test** (khoảng trống) để sinh viên
   xử lý; có sẵn khung kiểm thử cho các feature chưa có mã.
 - Trong phạm vi hiện có mã: nền tảng chung (lỗi, audit, transaction, health, correlationId), **F01** (xác thực, người dùng,
-  phân quyền), **F02** (chương trình, phiên bản, PLO, PI, ma trận I/R/M, xác nhận nội dung).
-- Chưa có mã (ghi nhận, **không bịa test**): F03 (học phần, CLO), F04 (bài đánh giá), F05a (học kỳ, lớp, sinh viên), F05b
+  phân quyền), **F02** (chương trình, phiên bản, PLO, PI, ma trận I/R/M, xác nhận nội dung), **F05a** (học kỳ, lớp học phần, sinh viên, ghi danh; mục 8.5a).
+- Chưa có mã (ghi nhận, **không bịa test**): F03 (học phần, CLO), F04 (bài đánh giá), F05b
   (nhập điểm), F06 (đo lường), F07 (báo cáo), F08 (cải tiến) và UI. Xem mục 8.5.
 - Ngoài phạm vi kiểm thử: nội dung đề thi, bài làm của sinh viên, ML (đều ngoài phạm vi đề tài, `CLAUDE.md` quy tắc 1).
 
@@ -207,11 +207,33 @@ bảng dưới chỉ để không bỏ sót.
 |---|---|---|---|
 | F03 Học phần, đề cương, CLO | US-09…12 | 15 | Chưa có mã, chưa có test |
 | F04 Bài đánh giá, rubric, duyệt ma trận | US-13…16, NEW-01 | 16 | Chưa có mã, chưa có test (US-17 loại khỏi phạm vi) |
-| F05a Học kỳ, lớp, sinh viên | US-18…20 | 11 | Chưa có mã, chưa có test |
+| F05a Học kỳ, lớp, sinh viên | US-18…20 | 11 | **Có mã và test** cho US-18 (một phần), US-19, US-20, xem §8.5a |
 | F05b Nhập điểm | US-21…25 | 16 | Chưa có mã, chưa có test |
 | F06 Đo lường CLO → PI → PLO | US-26…30 | 15 | Chưa có mã, chưa có test (NEW-04 chưa có dòng AC) |
 | F07 Báo cáo, truy vết | US-31…36 | 11 | Chưa có mã, chưa có test |
 | F08 Cải tiến | US-37, 38, NEW-02 | 10 | Chưa có mã, chưa có test |
+
+#### 8.5a F05a (lớp học phần, sinh viên, ghi danh): AC ↔ test
+
+Đã có mã (US-19, US-20) và chạy được trên MongoDB replica set. US-18 có mã và test từ nhánh F03 (`TermIntegrationTest`, `TermServiceImplTest`);
+vế "từ chối nhập/sửa điểm" của US-18/AC-2 **chưa có test** vì chưa có mã nhập điểm (F05b). Tên lớp test viết tắt: `SIT` = `SectionIntegrationTest`,
+`EIT` = `EnrollmentIntegrationTest`, `IIT` = `EnrollmentImportIntegrationTest`, `SSIT` = `SectionServiceImplTest`, `ESIT` = `EnrollmentServiceImplTest`,
+`CSV` = `EnrollmentCsvParserTest`, `SSAT` = `SectionScopeAuthorizationTest`.
+
+| AC | Test | Mức |
+|---|---|---|
+| US-19/AC-1 (tạo lớp thành công, OPEN, sĩ số 0) | `SIT#us19_ac1_createSection`, `#us19_ac1_duplicateLecturersAreDeduplicated`; `SSIT#createSection_success` | Có |
+| US-19/AC-2 (đề cương sai học phần/chưa CONFIRMED, học kỳ/giảng viên/học phần không tồn tại → 422) | `SIT#us19_ac2_syllabusMustMatchCourseAndBeConfirmed`, `#us19_ac2_unknownReferences`, `#us19_ac2_lecturerMustBeActiveLecturer`, `#us19_ac2_termMustBeOpen`; `SSIT#createSection_syllabusRules`, `#createSection_termRules`, `#createSection_lecturerRules`, `#createSection_unknownCourse` | Có |
+| US-19/AC-3 (trùng mã → 409; sai định dạng → 400) | `SIT#us19_ac3_duplicateCodeAndValidation`; `SSIT#createSection_duplicateCode`, `#createSection_duplicateKeyRace` | Có |
+| US-19/AC-4 (giảng viên chỉ thấy lớp mình) | `SIT#us19_ac4_lecturerSeesOnlyOwnSections`, `#us19_updateLecturers`, `#rbac_writeScope`; `SSIT#getSections_filtersByAuthorization` | Có |
+| (ngoài AC) quyền ghi lớp theo phạm vi CTĐT của PM (D1) | `SIT#rbac_writeScope`; `SSAT#programManagerInScope_allowed`, `#programManagerOutOfScope_denied`, `#programManagerCourseWithoutProgram_denied`, `#programManagerEmptyScope_denied`, `#otherRoles_denied`, `#failClosedOnNullOrBlank`, `#canManageSection_resolvesCourseFromSection` | Có test, thiếu AC (nên thêm AC vào plan F05a) |
+| (ngoài AC) khóa lớp và mở lại có lý do | `SIT#us19_statusTransitions`; `SSIT#updateStatus_reopenLockedNeedsReason`, `#updateStatus_sameStatusNoOp` | Có test, thiếu AC |
+| US-20/AC-1 (nhập CSV → sinh viên mới, dùng lại sinh viên cũ, ENROLLED) | `IIT#us20_ac1_importCreatesStudentsAndEnrollments`, `#us20_ac1_existingStudentIsReusedAcrossSections`, `#us20_personalColumnsAreNotStored`; `ESIT#importEnrollments_createsNewAndReusesExisting`; `CSV#parsesAllColumnsWithLineNumbers`, `#personalDataColumnsAreIgnoredAndReported`, `#acceptsBomSemicolonBlankLinesAndCrlf`, `#supportsQuotedValues` | Có (chỉ CSV; Excel chưa làm) |
+| US-20/AC-2 (dòng lỗi/trùng/đã ghi danh → lỗi theo dòng, không ghi nửa chừng; nhập lại cùng tệp không nhân đôi) | `IIT#us20_ac2_rowErrorsMeanNothingIsWritten`, `#us20_ac2_reimportingTheSameFileIsRejectedWithoutDuplicates`, `#us20_ac2_withdrawnStudentMustBeReEnrolledViaStatusApi`; `ESIT#importEnrollments_collectsAllRowErrorsAndWritesNothing` | Có |
+| US-20/AC-3 (tệp rỗng, sai cột, không có dòng dữ liệu, thiếu phần tệp → 400) | `IIT#us20_ac3_malformedFilesAreRejected`; `CSV#emptyFileIsRejected`, `#headerProblemsAreRejected`, `#headerOnlyIsRejected`, `#rowLimitBoundary` | Có |
+| US-20/AC-4 (sĩ số = số ENROLLED; rút khỏi lớp làm mẫu số giảm) | `IIT#us20_ac4_denominatorFollowsWithdrawals`; `EIT#withdrawAndReEnrollRecountsTheDenominator`, `#enrolledIsTheDenominatorWithdrawnIsExcluded` (ví dụ minh họa 45 ghi danh, 3 rút → 42); `ESIT#withdraw_recountsEnrolled`, `#reEnroll_setsEnrolledAt`, `#getEnrollments_countsAndFilters` | Có |
+| (ngoài AC) ghi danh đóng băng khi lớp/học kỳ không OPEN (D6) | `EIT#frozenSectionOrTermRejectsStatusChange`; `IIT#us20_frozenSectionOrTermRejectsImport`; `ESIT#frozen_rejected` | Có test, thiếu AC |
+| (ngoài AC) phân quyền ghi danh theo lớp | `EIT#readAccessIsScopedToTheSection`, `#statusChangeAuthorizationAndValidation`; `IIT#us20_rbac`; `SSAT#canAccessEnrollment_followsTheSection` | Có test, thiếu AC |
 
 **Ca kiểm thử phân quyền scope F03 (ADR 0010 thay thế hoàn toàn ADR 0009):**
 

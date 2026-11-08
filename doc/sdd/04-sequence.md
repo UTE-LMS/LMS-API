@@ -2,7 +2,7 @@
 
 > **Dự thảo do AI soạn, đối chiếu mã ngày 2026-11-02 (`main`, commit `54ef80e`).** Mỗi sơ đồ dưới đây được viết sau khi đọc
 > đúng các lớp nêu ở mục "Căn cứ"; tên lớp, phương thức, mã lỗi là tên thật trong mã. Sinh viên đọc lại từng bước với mã
-> (hội đồng sẽ đối chiếu ngẫu nhiên). Luồng chưa có mã nằm ở mục 7, không vẽ.
+> (hội đồng sẽ đối chiếu ngẫu nhiên). Luồng chưa có mã nằm ở mục 8, không vẽ.
 
 Quy ước lỗi (từ `ErrorCode`, `GlobalExceptionHandler`): 400 `VALIDATION_ERROR`, 401 `UNAUTHORIZED`, 403 `FORBIDDEN`,
 404 `NOT_FOUND`, 409 `CONFLICT`, 422 `BUSINESS_RULE_VIOLATION`, 500 `INTERNAL_ERROR`; thân lỗi là `ErrorResponse`.
@@ -289,7 +289,50 @@ sequenceDiagram
 Điểm cần nhớ: replica set là điều kiện để transaction hoạt động (MongoDB standalone sẽ lỗi); vì vậy dev dùng image `docker/mongo`
 và CI khởi động `rs0`. `AuditServiceImpl` kiểm `SCORE_UPDATE` bắt buộc `reason`, nên khi F05b có mã, sửa điểm phải truyền lý do.
 
-## 6. Bảng đối chiếu nhanh sơ đồ ↔ mã
+## 6. Nhập danh sách lớp từ CSV (US-20)
+
+Căn cứ: `EnrollmentController#importEnrollments`, `EnrollmentServiceImpl#importEnrollments`, `EnrollmentCsvParser#parse`,
+`GlobalExceptionHandler#handleImportValidation`, `EnrollmentImportIntegrationTest`. Thao tác là **một transaction**: có dòng lỗi thì
+không ghi gì (nhánh `alt`), nên mẫu số `enrolledCount` không bao giờ lệch nửa chừng.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Client (giảng viên lớp)
+    participant CT as EnrollmentController
+    participant SA as ScopeAuthorizationServiceImpl
+    participant S as EnrollmentServiceImpl<br/>@Transactional
+    participant P as EnrollmentCsvParser
+    participant DB as MongoDB replica set rs0
+
+    C->>CT: POST /sections/{id}/enrollments/import (multipart file)
+    CT->>SA: canAccessSection(principal, id, WRITE)
+    alt không phải giảng viên của lớp / ADMIN
+        SA-->>CT: false
+        CT-->>C: 403
+    end
+    CT->>S: importEnrollments(id, InputStream, actor)
+    S->>DB: đọc lớp; đọc học kỳ của lớp
+    alt lớp hoặc học kỳ không OPEN
+        S-->>C: 422 (mẫu số đã đóng băng)
+    end
+    S->>P: parse(InputStream)
+    alt tệp rỗng / thiếu cột studentRef / quá 5000 dòng
+        P-->>C: 400 VALIDATION_ERROR
+    end
+    S->>DB: đọc students theo studentRef, enrollments hiện có của lớp
+    S->>S: validateRows: thiếu, sai mẫu, quá dài, trùng trong tệp, đã ghi danh, đã rút
+    alt có dòng lỗi
+        S-->>C: 422 + fieldErrors[line N] (chưa ghi gì)
+    else tất cả hợp lệ
+        S->>DB: saveAll(students mới)
+        S->>DB: saveAll(enrollments ENROLLED)
+        S->>DB: count(ENROLLED) rồi ghi course_sections.enrolledCount
+        S-->>C: 200 {totalRows, newStudents, reusedStudents, sectionEnrolledCount, ignoredColumns}
+    end
+```
+
+## 7. Bảng đối chiếu nhanh sơ đồ ↔ mã
 
 | Sơ đồ | Lớp/phương thức cần mở để đối chiếu |
 |---|---|
@@ -298,8 +341,9 @@ và CI khởi động `rs0`. `AuditServiceImpl` kiểm `SCORE_UPDATE` bắt bu�
 | 3 | `ProgramVersionServiceImpl#createProgramVersion`; `PloServiceImpl#createPlo`, `#requireDraftableVersion`; `PiServiceImpl#createPi`, `#requirePloInVersion` |
 | 4 | `ProgramVerificationServiceImpl#verifyPlo`, `#requireProgramAccess`; `ScopeAuthorizationServiceImpl#canAccessProgram`, `#checkProgramAssignment` |
 | 5 | `MongoConfig#transactionManager`; `AuditServiceImpl#record`; `TransactionRollbackIntegrationTest` |
+| 6 | `EnrollmentController#importEnrollments`; `EnrollmentServiceImpl#importEnrollments`, `#validateRows`, `#recountEnrolled`; `EnrollmentCsvParser#parse`; `GlobalExceptionHandler#handleImportValidation` |
 
-## 7. Thiết kế mục tiêu (chưa có mã)
+## 8. Thiết kế mục tiêu (chưa có mã)
 
 Các luồng **nhập điểm từ tệp** (F05b: tải tệp, ánh xạ cột, kiểm tra, xác nhận trong transaction có ghi `IMPORT_CONFIRM`/`SCORE_UPDATE`)
 và **chạy đo lường** (F06: CLO → PI → PLO theo `measurement_rules`, ghi `RUN_CALCULATION`) **chưa có mã** trong `src/main`
