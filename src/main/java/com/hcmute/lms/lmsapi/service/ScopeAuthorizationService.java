@@ -40,6 +40,11 @@ public interface ScopeAuthorizationService {
   /** Như {@link #canManageCourseSections} nhưng suy {@code courseId} từ lớp học phần. */
   boolean canManageSection(UserPrincipal principal, String sectionId);
 
+  /**
+   * Kiểm tra quyền trên một ghi danh thông qua lớp học phần của nó ({@code enrollments.sectionId}).
+   */
+  boolean canAccessEnrollment(UserPrincipal principal, String enrollmentId, AccessType accessType);
+
   boolean canAccessProgram(UserPrincipal principal, String programId, AccessType accessType);
 
   boolean canAccessProgramVersion(

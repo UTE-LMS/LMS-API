@@ -4,12 +4,14 @@ import com.hcmute.lms.lmsapi.config.JwtConfig;
 import com.hcmute.lms.lmsapi.document.Course;
 import com.hcmute.lms.lmsapi.document.CoursePiContribution;
 import com.hcmute.lms.lmsapi.document.CourseSection;
+import com.hcmute.lms.lmsapi.document.Enrollment;
 import com.hcmute.lms.lmsapi.document.Pi;
 import com.hcmute.lms.lmsapi.document.Plo;
 import com.hcmute.lms.lmsapi.document.Program;
 import com.hcmute.lms.lmsapi.document.ProgramCourse;
 import com.hcmute.lms.lmsapi.document.ProgramVersion;
 import com.hcmute.lms.lmsapi.document.RoleAssignment;
+import com.hcmute.lms.lmsapi.document.Student;
 import com.hcmute.lms.lmsapi.document.Syllabus;
 import com.hcmute.lms.lmsapi.document.Term;
 import com.hcmute.lms.lmsapi.document.User;
@@ -17,6 +19,7 @@ import com.hcmute.lms.lmsapi.document.UserScope;
 import com.hcmute.lms.lmsapi.document.Verification;
 import com.hcmute.lms.lmsapi.enums.CourseCategory;
 import com.hcmute.lms.lmsapi.enums.CourseType;
+import com.hcmute.lms.lmsapi.enums.EnrollmentStatus;
 import com.hcmute.lms.lmsapi.enums.PiContributionType;
 import com.hcmute.lms.lmsapi.enums.ProgramVersionStatus;
 import com.hcmute.lms.lmsapi.enums.Role;
@@ -267,6 +270,22 @@ public final class ApiTestFixtures {
             .build());
   }
 
+  /** Tạo sinh viên giả với mã thay thế mang tiền tố của test này (không phải mã sinh viên thật). */
+  public Student student() {
+    return mongo.save(Student.builder().studentRef(code("STU")).build());
+  }
+
+  /** Ghi danh một sinh viên vào lớp với trạng thái cho trước (không đụng tới sĩ số của lớp). */
+  public Enrollment enrollment(CourseSection section, Student student, EnrollmentStatus status) {
+    return mongo.save(
+        Enrollment.builder()
+            .sectionId(section.getId())
+            .studentId(student.getId())
+            .status(status)
+            .enrolledAt(Instant.now())
+            .build());
+  }
+
   /** Xác nhận ban đầu của dữ liệu mới: chưa được ai xác nhận. */
   public static Verification unverified() {
     return Verification.builder().status(VerificationStatus.NEEDS_CLARIFICATION).build();
@@ -303,6 +322,12 @@ public final class ApiTestFixtures {
     removeIn("syllabi", "courseId", courseOids);
     mongo.remove(query(Criteria.where("code").regex(codePrefix)), "terms");
     mongo.remove(query(Criteria.where("code").regex(codePrefix)), "courses");
+    List<ObjectId> sectionOids =
+        ids("course_sections", Criteria.where("code").regex(codePrefix)).stream()
+            .map(ObjectId::new)
+            .toList();
+    removeIn("enrollments", "sectionId", sectionOids);
+    mongo.remove(query(Criteria.where("studentRef").regex(codePrefix)), "students");
     mongo.remove(query(Criteria.where("code").regex(codePrefix)), "course_sections");
 
     List<String> userIds = ids("users", Criteria.where("username").regex("^itest_" + runId + "_"));

@@ -10,6 +10,7 @@ import com.hcmute.lms.lmsapi.repository.CloPiLinkRepository;
 import com.hcmute.lms.lmsapi.repository.CloRepository;
 import com.hcmute.lms.lmsapi.repository.CourseRepository;
 import com.hcmute.lms.lmsapi.repository.CourseSectionRepository;
+import com.hcmute.lms.lmsapi.repository.EnrollmentRepository;
 import com.hcmute.lms.lmsapi.repository.ProgramCourseRepository;
 import com.hcmute.lms.lmsapi.repository.ProgramVersionRepository;
 import com.hcmute.lms.lmsapi.repository.SyllabusRepository;
@@ -37,6 +38,7 @@ public class ScopeAuthorizationServiceImpl implements ScopeAuthorizationService 
   private final SyllabusRepository syllabusRepository;
   private final CloRepository cloRepository;
   private final CloPiLinkRepository cloPiLinkRepository;
+  private final EnrollmentRepository enrollmentRepository;
 
   @Override
   public boolean canAccessSection(
@@ -139,6 +141,23 @@ public class ScopeAuthorizationServiceImpl implements ScopeAuthorizationService 
         .orElseGet(
             () -> {
               log.debug("canManageSection: Fail-closed - section [{}] not found", sectionId);
+              return false;
+            });
+  }
+
+  @Override
+  public boolean canAccessEnrollment(
+      UserPrincipal principal, String enrollmentId, AccessType accessType) {
+    if (enrollmentId == null || enrollmentId.isBlank()) {
+      return false;
+    }
+    return enrollmentRepository
+        .findById(enrollmentId.trim())
+        .map(enrollment -> canAccessSection(principal, enrollment.getSectionId(), accessType))
+        .orElseGet(
+            () -> {
+              log.debug(
+                  "canAccessEnrollment: Fail-closed - enrollment [{}] not found", enrollmentId);
               return false;
             });
   }

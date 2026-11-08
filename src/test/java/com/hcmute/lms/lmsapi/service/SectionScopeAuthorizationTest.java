@@ -5,6 +5,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.hcmute.lms.lmsapi.document.CourseSection;
+import com.hcmute.lms.lmsapi.document.Enrollment;
 import com.hcmute.lms.lmsapi.document.ProgramCourse;
 import com.hcmute.lms.lmsapi.document.ProgramVersion;
 import com.hcmute.lms.lmsapi.document.RoleAssignment;
@@ -16,6 +17,7 @@ import com.hcmute.lms.lmsapi.repository.CloPiLinkRepository;
 import com.hcmute.lms.lmsapi.repository.CloRepository;
 import com.hcmute.lms.lmsapi.repository.CourseRepository;
 import com.hcmute.lms.lmsapi.repository.CourseSectionRepository;
+import com.hcmute.lms.lmsapi.repository.EnrollmentRepository;
 import com.hcmute.lms.lmsapi.repository.ProgramCourseRepository;
 import com.hcmute.lms.lmsapi.repository.ProgramVersionRepository;
 import com.hcmute.lms.lmsapi.repository.SyllabusRepository;
@@ -31,7 +33,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("canManageCourseSections/canManageSection/canAccessLoadedSection (F05a / US-19)")
+@DisplayName(
+    "canManageCourseSections/canManageSection/canAccessLoadedSection/canAccessEnrollment (F05a)")
 class SectionScopeAuthorizationTest {
 
   private static final String COURSE_ID = "671dcba5f123456789abc101";
@@ -48,6 +51,7 @@ class SectionScopeAuthorizationTest {
   @Mock private SyllabusRepository syllabusRepository;
   @Mock private CloRepository cloRepository;
   @Mock private CloPiLinkRepository cloPiLinkRepository;
+  @Mock private EnrollmentRepository enrollmentRepository;
 
   @InjectMocks private ScopeAuthorizationServiceImpl service;
 
@@ -189,6 +193,48 @@ class SectionScopeAuthorizationTest {
 
     section.setLecturerIds(new ArrayList<>(List.of("671dcba5f123456789abc0ff")));
     assertThat(service.canAccessLoadedSection(lecturer, section, AccessType.READ)).isFalse();
+  }
+
+  @Test
+  @DisplayName(
+      "canAccessEnrollment: quyền suy ra từ lớp của ghi danh; ghi danh không tồn tại -> false")
+  void canAccessEnrollment_followsTheSection() {
+    String enrollmentId = "671dcba5f123456789abc601";
+    when(enrollmentRepository.findById(enrollmentId))
+        .thenReturn(
+            Optional.of(Enrollment.builder().id(enrollmentId).sectionId(SECTION_ID).build()));
+    when(courseSectionRepository.findById(SECTION_ID))
+        .thenReturn(
+            Optional.of(
+                CourseSection.builder()
+                    .id(SECTION_ID)
+                    .courseId(COURSE_ID)
+                    .lecturerIds(new ArrayList<>(List.of(LECTURER_ID)))
+                    .build()));
+
+    assertThat(
+            service.canAccessEnrollment(
+                principal(Role.LECTURER, UserScope.builder().build()),
+                enrollmentId,
+                AccessType.WRITE))
+        .isTrue();
+    // PROGRAM_MANAGER chỉ được đọc lớp, không được sửa ghi danh
+    assertThat(
+            service.canAccessEnrollment(
+                principal(
+                    Role.PROGRAM_MANAGER,
+                    UserScope.builder().sectionIds(new ArrayList<>(List.of(SECTION_ID))).build()),
+                enrollmentId,
+                AccessType.WRITE))
+        .isFalse();
+
+    when(enrollmentRepository.findById("671dcba5f123456789abc6ff")).thenReturn(Optional.empty());
+    assertThat(
+            service.canAccessEnrollment(
+                principal(Role.ADMIN, null), "671dcba5f123456789abc6ff", AccessType.WRITE))
+        .isFalse();
+    assertThat(service.canAccessEnrollment(principal(Role.ADMIN, null), " ", AccessType.WRITE))
+        .isFalse();
   }
 
   @Test
