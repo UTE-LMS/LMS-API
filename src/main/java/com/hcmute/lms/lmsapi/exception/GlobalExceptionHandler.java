@@ -27,6 +27,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /**
@@ -513,6 +515,62 @@ public class GlobalExceptionHandler {
   // =========================================================================
   // 5. NHÓM HTTP 422: VI PHẠM QUY TẮC NGHIỆP VỤ & $jsonSchema (ErrorCode.BUSINESS_RULE_VIOLATION)
   // =========================================================================
+
+  /**
+   * Xử lý tệp nhập có dòng không hợp lệ (ImportValidationException): HTTP 422, code =
+   * BUSINESS_RULE_VIOLATION, kèm lỗi theo từng dòng trong fieldErrors (US-20/AC-2).
+   */
+  @ExceptionHandler(ImportValidationException.class)
+  public ResponseEntity<ErrorResponse> handleImportValidation(
+      ImportValidationException ex, HttpServletRequest request) {
+
+    log.warn(
+        "Import validation failed on request [{}]: {} row error(s)",
+        request.getRequestURI(),
+        ex.getRowErrors().size());
+
+    ErrorResponse response =
+        ErrorResponse.builder()
+            .timestamp(Instant.now())
+            .status(HttpStatus.UNPROCESSABLE_ENTITY.value())
+            .code(ErrorCode.BUSINESS_RULE_VIOLATION)
+            .message(ex.getMessage())
+            .path(request.getRequestURI())
+            .fieldErrors(ex.getRowErrors())
+            .build();
+
+    return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(response);
+  }
+
+  /**
+   * Xử lý yêu cầu tải tệp thiếu phần tệp bắt buộc hoặc tệp vượt giới hạn dung lượng: HTTP 400, code
+   * = VALIDATION_ERROR (US-20/AC-3).
+   */
+  @ExceptionHandler({
+    MissingServletRequestPartException.class,
+    MaxUploadSizeExceededException.class
+  })
+  public ResponseEntity<ErrorResponse> handleUploadProblems(
+      Exception ex, HttpServletRequest request) {
+
+    log.warn("Upload problem on request [{}]: {}", request.getRequestURI(), ex.getMessage());
+
+    String message =
+        ex instanceof MaxUploadSizeExceededException
+            ? "Tệp tải lên vượt quá dung lượng cho phép"
+            : "Thiếu tệp tải lên (phần 'file' của yêu cầu multipart)";
+
+    ErrorResponse response =
+        ErrorResponse.builder()
+            .timestamp(Instant.now())
+            .status(HttpStatus.BAD_REQUEST.value())
+            .code(ErrorCode.VALIDATION_ERROR)
+            .message(message)
+            .path(request.getRequestURI())
+            .build();
+
+    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+  }
 
   /**
    * Xử lý vi phạm quy tắc nghiệp vụ rõ ràng (BusinessRuleViolationException). US-40/AC-2: Vi phạm

@@ -11,13 +11,16 @@ import com.hcmute.lms.lmsapi.document.CourseSection;
 import com.hcmute.lms.lmsapi.document.Enrollment;
 import com.hcmute.lms.lmsapi.document.Student;
 import com.hcmute.lms.lmsapi.document.Term;
+import com.hcmute.lms.lmsapi.dto.EnrollmentImportResponse;
 import com.hcmute.lms.lmsapi.dto.EnrollmentListResponse;
 import com.hcmute.lms.lmsapi.dto.EnrollmentResponse;
 import com.hcmute.lms.lmsapi.dto.EnrollmentStatusUpdateRequest;
+import com.hcmute.lms.lmsapi.dto.FieldErrorDetail;
 import com.hcmute.lms.lmsapi.enums.EnrollmentStatus;
 import com.hcmute.lms.lmsapi.enums.SectionStatus;
 import com.hcmute.lms.lmsapi.enums.TermStatus;
 import com.hcmute.lms.lmsapi.exception.BusinessRuleViolationException;
+import com.hcmute.lms.lmsapi.exception.ImportValidationException;
 import com.hcmute.lms.lmsapi.exception.ResourceNotFoundException;
 import com.hcmute.lms.lmsapi.mapper.impl.EnrollmentMapperImpl;
 import com.hcmute.lms.lmsapi.repository.CourseSectionRepository;
@@ -234,6 +237,112 @@ class EnrollmentServiceImplTest {
     assertThat(response.getEnrollments())
         .extracting(EnrollmentResponse::getStudentRef)
         .containsExactly("SV-A", "SV-B");
+  }
+
+  private java.io.InputStream csv(String content) {
+    return new java.io.ByteArrayInputStream(
+        content.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+  }
+
+  @Test
+  @DisplayName(
+      "US-20/AC-1: nhập tệp -> chỉ tạo sinh viên mới, dùng lại sinh viên cũ, tính lại sĩ số")
+  void importEnrollments_createsNewAndReusesExisting() {
+    CourseSection section = section(SectionStatus.OPEN);
+    when(sectionRepository.findById(SECTION_ID)).thenReturn(Optional.of(section));
+    stubOpenTerm();
+    Student existing = Student.builder().id(STUDENT_ID).studentRef("SV-OLD").build();
+    when(studentRepository.findByStudentRefIn(List.of("SV-OLD", "SV-NEW")))
+        .thenReturn(List.of(existing));
+    when(enrollmentRepository.findBySectionId(SECTION_ID)).thenReturn(List.of());
+    when(studentRepository.saveAll(any()))
+        .thenAnswer(
+            invocation -> {
+              List<Student> students = invocation.getArgument(0);
+              students.forEach(s -> s.setId("671dcba5f123456789abc799"));
+              return students;
+            });
+    when(enrollmentRepository.saveAll(any())).thenAnswer(i -> i.getArgument(0));
+    when(enrollmentRepository.countBySectionIdAndStatus(SECTION_ID, EnrollmentStatus.ENROLLED))
+        .thenReturn(2L);
+
+    EnrollmentImportResponse response =
+        service.importEnrollments(
+            SECTION_ID, csv("studentRef,cohort\nSV-OLD,K22\nSV-NEW,K23\n"), "a");
+
+    assertThat(response.getTotalRows()).isEqualTo(2);
+    assertThat(response.getNewStudents()).isEqualTo(1);
+    assertThat(response.getReusedStudents()).isEqualTo(1);
+    assertThat(response.getSectionEnrolledCount()).isEqualTo(2);
+    ArgumentCaptor<List<Student>> saved = ArgumentCaptor.captor();
+    verify(studentRepository).saveAll(saved.capture());
+    assertThat(saved.getValue()).extracting(Student::getStudentRef).containsExactly("SV-NEW");
+    assertThat(saved.getValue().get(0).getCohort()).isEqualTo("K23");
+  }
+
+  @Test
+  @DisplayName(
+      "US-20/AC-2: gom đủ mọi lỗi theo dòng (thiếu, sai mẫu, quá dài, trùng, đã ghi danh, đã rút), không ghi gì")
+  void importEnrollments_collectsAllRowErrorsAndWritesNothing() {
+    when(sectionRepository.findById(SECTION_ID))
+        .thenReturn(Optional.of(section(SectionStatus.OPEN)));
+    stubOpenTerm();
+    Student enrolledStudent = Student.builder().id("s1").studentRef("SV-IN").build();
+    Student withdrawnStudent = Student.builder().id("s2").studentRef("SV-OUT").build();
+    when(studentRepository.findByStudentRefIn(any()))
+        .thenReturn(List.of(enrolledStudent, withdrawnStudent));
+    when(enrollmentRepository.findBySectionId(SECTION_ID))
+        .thenReturn(
+            List.of(
+                Enrollment.builder()
+                    .id("e1")
+                    .studentId("s1")
+                    .status(EnrollmentStatus.ENROLLED)
+                    .build(),
+                Enrollment.builder()
+                    .id("e2")
+                    .studentId("s2")
+                    .status(EnrollmentStatus.WITHDRAWN)
+                    .build()));
+    String tooLong = "x".repeat(51);
+
+    String content =
+        "studentRef,cohort\n"
+            + "\"\",K22\n" // line 2: thiếu
+            + "BAD REF,K22\n" // line 3: sai mẫu
+            + "SV-1,"
+            + tooLong
+            + "\n" // line 4: cohort quá dài
+            + "SV-2,K22\n" // line 5: hợp lệ
+            + "SV-2,K22\n" // line 6: trùng dòng 5
+            + "SV-IN,K22\n" // line 7: đã ghi danh
+            + "SV-OUT,K22\n"; // line 8: đã rút
+
+    assertThatThrownBy(() -> service.importEnrollments(SECTION_ID, csv(content), "a"))
+        .isInstanceOfSatisfying(
+            ImportValidationException.class,
+            ex ->
+                assertThat(ex.getRowErrors())
+                    .extracting(FieldErrorDetail::getField)
+                    .containsExactly("line 2", "line 3", "line 4", "line 6", "line 7", "line 8"));
+
+    verify(studentRepository, never()).saveAll(any());
+    verify(enrollmentRepository, never()).saveAll(any());
+    verify(sectionRepository, never()).save(any());
+  }
+
+  @Test
+  @DisplayName("US-20: lớp không tồn tại -> 404; lớp đóng băng -> 422 trước khi đọc tệp")
+  void importEnrollments_sectionRules() {
+    when(sectionRepository.findById(SECTION_ID)).thenReturn(Optional.empty());
+    assertThatThrownBy(() -> service.importEnrollments(SECTION_ID, csv("studentRef\nSV-1\n"), "a"))
+        .isInstanceOf(ResourceNotFoundException.class);
+
+    when(sectionRepository.findById(SECTION_ID))
+        .thenReturn(Optional.of(section(SectionStatus.LOCKED)));
+    assertThatThrownBy(() -> service.importEnrollments(SECTION_ID, csv("not even a csv"), "a"))
+        .isInstanceOf(BusinessRuleViolationException.class);
+    verify(studentRepository, never()).findByStudentRefIn(any());
   }
 
   @Test
