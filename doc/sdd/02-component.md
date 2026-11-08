@@ -162,3 +162,17 @@ done
 Phân quyền thêm vào `ScopeAuthorizationService`: `canManageCourseSections`/`canManageSection` (ADMIN, hoặc PROGRAM_MANAGER có CTĐT chứa học phần trong
 `scope.programIds`), `canAccessLoadedSection` (như `canAccessSection` nhưng nhận lớp đã nạp để lọc danh sách không truy vấn lặp), `canAccessEnrollment`
 (suy quyền từ lớp của ghi danh). Collection mới: `students` (chỉ `studentRef`, `cohort`, `majorCode`, `status`), `enrollments` (unique `sectionId + studentId`).
+
+**Thành phần F04 (bài đánh giá, `doc/plan/F04-bai-danh-gia.md` §11):**
+
+| Lớp | Vai trò | Phụ thuộc chính |
+|---|---|---|
+| `AssessmentController` (`/api/v1/syllabi/{id}/assessment-templates`, `/sections/{id}/assessments`, `/assessments/{id}[/items\|/coverage\|/submit\|/approve\|/reject]`) | Khung theo đề cương, bài của lớp, items, độ phủ, quy trình duyệt | `AssessmentService`, `AssessmentApprovalService`; kiểm quyền bằng `ScopeAuthorizationService` |
+| `AssessmentServiceImpl` | Tạo/sửa khung và bản lớp, sao chép khung thành snapshot, khóa sửa khi đã gửi duyệt/duyệt | `AssessmentRepository`, `SyllabusRepository`, `CourseSectionRepository`, `CloRepository`, `AssessmentItemValidator`, `AssessmentCoverageCalculator`, `AssessmentMapper` |
+| `AssessmentItemValidator` | Quy tắc items: Σ weight = 1, CLO không trùng và thuộc đề cương, rubric 1–4 | `CloRepository` (đọc) |
+| `AssessmentCoverageCalculator` | Độ phủ theo CLO và Bloom (lớp thuần, không truy cập CSDL) | không |
+| `AssessmentApprovalServiceImpl` | Gửi duyệt, duyệt, từ chối trong transaction; ghi `audit_logs` | `AssessmentRepository`, `AuditService` |
+
+Phân quyền thêm: `canAccessAssessment` (bản lớp theo quyền trên lớp, khung theo quyền trên đề cương) và `canReviewAssessment` (chỉ DEPARTMENT_HEAD có học phần
+của đề cương trong `scope.courseIds`, ADMIN không có). Collection `assessments` có thêm trường `revision` (khóa lạc quan, xem plan F04 §11 D7).
+

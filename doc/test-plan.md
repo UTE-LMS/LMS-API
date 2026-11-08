@@ -15,8 +15,8 @@ Liên quan: [`doc/plan/README.md`](plan/README.md) (§7 Definition of Done), [`.
 - Mục tiêu: chứng minh các chức năng **đã có mã** đáp ứng AC; liệt kê rõ AC **chưa có test** (khoảng trống) để sinh viên
   xử lý; có sẵn khung kiểm thử cho các feature chưa có mã.
 - Trong phạm vi hiện có mã: nền tảng chung (lỗi, audit, transaction, health, correlationId), **F01** (xác thực, người dùng,
-  phân quyền), **F02** (chương trình, phiên bản, PLO, PI, ma trận I/R/M, xác nhận nội dung), **F05a** (học kỳ, lớp học phần, sinh viên, ghi danh; mục 8.5a).
-- Chưa có mã (ghi nhận, **không bịa test**): F03 (học phần, CLO), F04 (bài đánh giá), F05b
+  phân quyền), **F02** (chương trình, phiên bản, PLO, PI, ma trận I/R/M, xác nhận nội dung), **F05a** (học kỳ, lớp học phần, sinh viên, ghi danh; mục 8.5a), **F04** (bài đánh giá, rubric, duyệt ma trận; mục 8.5b).
+- Chưa có mã (ghi nhận, **không bịa test**): F03 (học phần, CLO), F05b
   (nhập điểm), F06 (đo lường), F07 (báo cáo), F08 (cải tiến) và UI. Xem mục 8.5.
 - Ngoài phạm vi kiểm thử: nội dung đề thi, bài làm của sinh viên, ML (đều ngoài phạm vi đề tài, `CLAUDE.md` quy tắc 1).
 
@@ -79,7 +79,7 @@ Cách chạy cục bộ (theo `README.md`): bật MongoDB replica set bằng ima
 - Ca âm và ca biên bắt buộc cho miền này (rule 04): điểm > điểm tối đa; `BLANK` ≠ `MISSING`/`ABSENT`; trùng
   `(sectionId, assessmentId, itemId, studentId)`; tổng `weight` ≠ 1; cặp CLO–PI ngoài `clo_pi_links`; tệp trống/sai
   cột/trùng checksum; quy tắc `DRAFT` không chạy chính thức; lớp 45 ghi danh/40 đủ dữ liệu; người dùng ngoài phạm vi lớp
-  bị từ chối; sửa điểm đồng thời báo xung đột. **Tất cả chưa có mã để kiểm** (F04–F06) — liệt kê để không bị quên.
+  bị từ chối; sửa điểm đồng thời báo xung đột. **Tất cả chưa có mã để kiểm** (F05b–F06) — liệt kê để không bị quên.
 
 ## 6. Tiêu chí vào / ra
 
@@ -167,7 +167,7 @@ Không thấy `@Disabled` trong `src/test`.
 | US-03/AC-4 (LECTURER `lecturerIds`; VIEWER/PM chỉ `programIds` → 403) | `ScopeAuthorizationMatrixIntegrationTest#lecturer_IndependentLecturerIdsRule_Success`, `#viewer_ProgramOnlyScope_Forbidden`; `ScopeAuthorizationServiceImplTest#lecturer_IndependentLecturerIdsRule_Granted`, `#viewer_ProgramOnlyScope_IsNotEmptyScope_Denied`, `#managementRoles_Read_ProgramOnlyScope_Denied`; `UserScopeTest`, `UserScopeEmpiricalChallengeTest` | Mã thử nghiệm | |
 | US-03/AC-5 (đổi vai trò/scope trong DB có hiệu lực ngay với token cũ) | `ScopeAuthorizationMatrixIntegrationTest#dynamicPermissionReload_ImmediateEffectWithSameToken`; `ScopeDynamicReloadAndEdgeCasesEmpiricalChallengeTest#*` | Có | Kiểm qua endpoint thử nghiệm `/api/v1/test/sections/**`, nên cùng hạn chế "mã thử nghiệm" như AC-1 |
 | US-04/AC-1..5 (API xem nhật ký: phân trang, lọc, ADMIN-only, không lộ secret, 400) | `AuditLogApiIntegrationTest` (15 ca, mã AC trong `@DisplayName`); `AuditLogQueryServiceImplTest` (4 ca); `AuditLogRepositoryCustomUnitTest#testSearchLogs*`; `AuditLogMapperUnitTest#testToResponseSanitizesOnRead` | Có | Chạy được trên MongoDB đơn lẻ (không dùng transaction). Chưa kiểm thử trên `rs0` Docker vì Docker đang tắt lúc làm |
-| "ghi audit" ngoài `LOGIN` | — | Khoảng trống | Mã chỉ gọi `AuditService.record` ở đăng nhập; các hành động còn lại thuộc F04/F05b/F06 |
+| "ghi audit" ngoài `LOGIN` | — | Khoảng trống | `AuditService.record` được gọi ở đăng nhập (`LOGIN`) và khi duyệt/từ chối ma trận (`ASSESSMENT_APPROVE`/`ASSESSMENT_REJECT`, F04, xem §8.5b); các hành động còn lại thuộc F05b/F06 |
 | NEW-03 (sinh viên xem kết quả, MR) | `ScopeAuthorizationMatrixIntegrationTest#student_ReadAndWrite_Forbidden` (chỉ kiểm bị từ chối) | Khoảng trống | Chưa có AC và chưa có mã |
 
 ### 8.4 F02 — CTĐT, PLO, PI, ma trận I/R/M (`doc/plan/F02-ctdt-plo-pi.md`)
@@ -206,7 +206,7 @@ bảng dưới chỉ để không bỏ sót.
 | Feature | Story | Số dòng AC dự thảo | Trạng thái kiểm thử |
 |---|---|---|---|
 | F03 Học phần, đề cương, CLO | US-09…12 | 15 | Chưa có mã, chưa có test |
-| F04 Bài đánh giá, rubric, duyệt ma trận | US-13…16, NEW-01 | 16 | Chưa có mã, chưa có test (US-17 loại khỏi phạm vi) |
+| F04 Bài đánh giá, rubric, duyệt ma trận | US-13…16, NEW-01 | 16 | **Có mã và test** cho US-15, US-16, NEW-01, xem §8.5b (US-13, US-14 mở rộng chưa làm; US-17 loại khỏi phạm vi) |
 | F05a Học kỳ, lớp, sinh viên | US-18…20 | 11 | **Có mã và test** cho US-18 (một phần), US-19, US-20, xem §8.5a |
 | F05b Nhập điểm | US-21…25 | 16 | Chưa có mã, chưa có test |
 | F06 Đo lường CLO → PI → PLO | US-26…30 | 15 | Chưa có mã, chưa có test (NEW-04 chưa có dòng AC) |
@@ -234,6 +234,34 @@ vế "từ chối nhập/sửa điểm" của US-18/AC-2 **chưa có test** vì 
 | US-20/AC-4 (sĩ số = số ENROLLED; rút khỏi lớp làm mẫu số giảm) | `IIT#us20_ac4_denominatorFollowsWithdrawals`; `EIT#withdrawAndReEnrollRecountsTheDenominator`, `#enrolledIsTheDenominatorWithdrawnIsExcluded` (ví dụ minh họa 45 ghi danh, 3 rút → 42); `ESIT#withdraw_recountsEnrolled`, `#reEnroll_setsEnrolledAt`, `#getEnrollments_countsAndFilters` | Có |
 | (ngoài AC) ghi danh đóng băng khi lớp/học kỳ không OPEN (D6) | `EIT#frozenSectionOrTermRejectsStatusChange`; `IIT#us20_frozenSectionOrTermRejectsImport`; `ESIT#frozen_rejected` | Có test, thiếu AC |
 | (ngoài AC) phân quyền ghi danh theo lớp | `EIT#readAccessIsScopedToTheSection`, `#statusChangeAuthorizationAndValidation`; `IIT#us20_rbac`; `SSAT#canAccessEnrollment_followsTheSection` | Có test, thiếu AC |
+
+#### 8.5b F04 (bài đánh giá, rubric, duyệt ma trận): AC ↔ test
+
+Đã có mã cho US-15, US-16 và NEW-01 (US-13, US-14 mở rộng và US-17 chưa làm). Viết tắt: `AIT` = `AssessmentIntegrationTest`, `AAT` =
+`AssessmentApprovalServiceImplTest`, `AVT` = `AssessmentItemValidatorTest`, `ACT` = `AssessmentCoverageCalculatorTest`, `ASA` =
+`AssessmentScopeAuthorizationTest`, `WCT` = `WriteConflictHandlingTest`.
+
+| AC | Test | Mức |
+|---|---|---|
+| US-15/AC-1 (giảng viên tạo bài lớp mình → DRAFT, chưa khóa; sao chép từ khung) | `AIT#us15_ac1_lecturerCreatesSectionAssessment`, `#us15_ac1_copyFromTemplateIsASnapshot` | Có |
+| US-15/AC-2 (Σ weight ≠ 1, CLO trùng, CLO khác đề cương/không tồn tại → 422) | `AIT#us15_ac2_outcomeMappingRules`; `AVT#weightsSummingToOneAreAccepted`, `#weightsNotSummingToOneAreRejected`, `#toleranceIsAccepted`, `#duplicateCloIsRejected`, `#cloMustExistAndBelongToTheSyllabus`, `#duplicateCodeOrIdIsRejected` | Có |
+| US-15/AC-3 (bản lớp thiếu `sectionId` → 400) | Không áp dụng: `sectionId` lấy từ đường dẫn (plan F04 §11 D12) | Không phát sinh |
+| US-15/AC-4 (giảng viên lớp khác → 403) | `AIT#us15_ac4_onlyTheSectionLecturerCreates`, `#templateAuthorizationFollowsAdr0010`; `ASA#sectionAssessmentFollowsSectionAccess`, `#templateFollowsSyllabusAccess`, `#accessFailClosed` | Có |
+| US-15/AC-5 (isLocked → thêm/sửa/xóa phần tử bị từ chối, vẫn đọc được) | `AIT#us15_ac5_lockedAssessmentRejectsStructureChanges`, `#new01_ac1_submit` (đang chờ duyệt cũng khóa sửa) | Có |
+| (ngoài AC) `maxScore ≤ 0`, thiếu `kind`/`outcomeMappings`, Bloom ngoài 1–6, `weight` ngoài (0,1] → 400; trùng mã → 409; `TOTAL_ONLY` | `AIT#us15_validationErrors`, `#us15_duplicateCode`, `#totalOnlyIsFlaggedAsNotMeasurable` | Có test, thiếu AC |
+| US-16/AC-1 (rubric mức 1–4; mức ngoài 1–4 → 400; điểm mức > `maxScore` → 422) | `AIT#us16_ac1_rubricLevels`; `AVT#rubricRules` | Có |
+| US-16/AC-2 (Bloom và mức rubric độc lập) | `AIT#us16_ac2_bloomAndRubricLevelAreIndependent` | Có |
+| NEW-01/AC-1 (gửi duyệt → SUBMITTED, ghi người/giờ gửi, history SUBMIT) | `AIT#new01_ac1_submit`; `AAT#submit_recordsApproval` | Có |
+| NEW-01/AC-2 (0 phần tử hoặc tổng điểm lệch ≥ 0,001 → 422; biên 0,0009 và 0,0011) | `AIT#new01_ac2_submitPreconditions`; `AAT#submit_totalPointsToleranceBoundary`, `#submit_requiresItemsAndTotal` | Có |
+| NEW-01/AC-3 (duyệt → APPROVED, isLocked, reviewedBy/At, history, audit ASSESSMENT_APPROVE) | `AIT#new01_ac3_approve`; `AAT#approve_locksAndAudits` | Có |
+| NEW-01/AC-4 (từ chối kèm ghi chú; thiếu ghi chú → 400; sửa lại → DRAFT rồi gửi lại) | `AIT#new01_ac4_rejectAndResubmit`; `AAT#reject_recordsNote` | Có |
+| NEW-01/AC-5 (vai trò khác, TBM ngoài phạm vi, người gửi tự duyệt → 403) | `AIT#new01_ac5_onlyDepartmentHeadInScopeReviews`, `#new01_ac5_submitterCannotSelfApprove`; `AAT#submitterCannotReviewOwnAssessment`; `ASA#onlyDepartmentHeadInScopeMayReview`, `#reviewFailClosed` | Có |
+| NEW-01/AC-6 (`byClo`, `byBloom` khớp tính tay, ví dụ minh họa 20 điểm) | `AIT#new01_ac6_coverageMatchesHandComputation`; `ACT#handComputedExample`, `#cloPointsSumToTotal`, `#emptyItems` | Có |
+| NEW-01/AC-7 (chuyển trạng thái sai thứ tự → 422) | `AIT#new01_ac7_invalidTransitions`; `AAT#invalidTransitions`, `#templateAndMissing`, `#lockedStatuses` | Có |
+| (plan §8) hai người cùng duyệt một bài, chỉ một người thắng | `AIT#new01_concurrentApprovalHasASingleWinner` (người thua nhận 409 hoặc 422); `WCT#writeConflictIsAConflict` | Có |
+
+Chưa có test: sửa CLO sau khi sao chép rồi kiểm snapshot (chỉ kiểm sửa khung, chưa kiểm đổi chính CLO; F03 hiện chặn đổi CLO khi đề cương
+đã `CONFIRMED`); mở khóa (`UNLOCK`) vì chưa có API.
 
 **Ca kiểm thử phân quyền scope F03 (ADR 0010 thay thế hoàn toàn ADR 0009):**
 
@@ -266,7 +294,7 @@ trùng bản ghi điểm; tổng `weight` ≠ 1; cặp CLO–PI ngoài `clo_pi_l
 | G-10 | US-01/AC-4: chưa kiểm `passwordHash` không lộ ở `LoginResponse`, `/auth/me`, `GET /users`, log | Test một phần |
 | G-11 | US-02/AC-1: chưa kiểm `roleAssignments` rỗng → 400 | Test một phần |
 | G-12 | US-03: `canAccessSection` chỉ được kiểm qua controller thử nghiệm; AC-2 "mọi endpoint" không có test duyệt toàn bộ | Test trên mã thử nghiệm / một phần |
-| G-13 | NEW-03 (hoãn) chưa có mã; chỉ `LOGIN` được ghi audit — các `AuditAction` còn lại chưa có nơi gọi. US-04 (đọc nhật ký) đã có mã và test | Chưa có mã (phần còn lại) |
+| G-13 | NEW-03 (hoãn) chưa có mã; chỉ `LOGIN`, `ASSESSMENT_APPROVE`, `ASSESSMENT_REJECT` có nơi gọi — các `AuditAction` còn lại chưa có nơi gọi. US-04 (đọc nhật ký) đã có mã và test | Chưa có mã (phần còn lại) |
 | G-14 | Quy ước gắn mã AC trong `@DisplayName` mới áp dụng cho 2 lớp test; phần lớn test chưa gắn AC | Quy trình |
 | G-15 | Không có tầng E2E, không có test hiệu năng, không có bảng test thủ công/UAT | Thiếu tầng |
 | G-16 | Chưa có báo cáo coverage công bố; JaCoCo `check` với `haltOnFailure=false` không chặn build | Công cụ |

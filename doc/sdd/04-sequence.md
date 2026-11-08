@@ -2,7 +2,7 @@
 
 > **Dự thảo do AI soạn, đối chiếu mã ngày 2026-11-02 (`main`, commit `54ef80e`).** Mỗi sơ đồ dưới đây được viết sau khi đọc
 > đúng các lớp nêu ở mục "Căn cứ"; tên lớp, phương thức, mã lỗi là tên thật trong mã. Sinh viên đọc lại từng bước với mã
-> (hội đồng sẽ đối chiếu ngẫu nhiên). Luồng chưa có mã nằm ở mục 8, không vẽ.
+> (hội đồng sẽ đối chiếu ngẫu nhiên). Luồng chưa có mã nằm ở mục 9, không vẽ.
 
 Quy ước lỗi (từ `ErrorCode`, `GlobalExceptionHandler`): 400 `VALIDATION_ERROR`, 401 `UNAUTHORIZED`, 403 `FORBIDDEN`,
 404 `NOT_FOUND`, 409 `CONFLICT`, 422 `BUSINESS_RULE_VIOLATION`, 500 `INTERNAL_ERROR`; thân lỗi là `ErrorResponse`.
@@ -332,7 +332,56 @@ sequenceDiagram
     end
 ```
 
-## 7. Bảng đối chiếu nhanh sơ đồ ↔ mã
+## 7. Duyệt ma trận bài đánh giá bản lớp (NEW-01, ADR 0001)
+
+Căn cứ: `AssessmentController#submit/approve/reject`, `AssessmentApprovalServiceImpl`, `ScopeAuthorizationServiceImpl#canReviewAssessment`,
+`AuditServiceImpl#record`, `AssessmentIntegrationTest`. Gửi duyệt, duyệt và từ chối mỗi thao tác là một transaction; `status` và `isLocked`
+được ghi trong cùng một lần `save`, `revision` (`@Version`) và WriteConflict của MongoDB bảo đảm hai người cùng duyệt chỉ một người thắng.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant GV as Giảng viên của lớp
+    participant TBM as Trưởng bộ môn (đúng scope.courseIds)
+    participant C as AssessmentController
+    participant SA as ScopeAuthorizationServiceImpl
+    participant S as AssessmentApprovalServiceImpl<br/>@Transactional
+    participant AU as AuditServiceImpl
+    participant DB as MongoDB replica set rs0
+
+    GV->>C: POST /assessments/{id}/submit
+    C->>SA: canAccessAssessment(WRITE) (lớp của giảng viên)
+    C->>S: submit(id, actor)
+    S->>DB: đọc bài; phải là SECTION và DRAFT
+    alt chưa có phần tử / totalPoints thiếu hoặc lệch Σ maxScore từ 0,001
+        S-->>GV: 422
+    end
+    S->>DB: save(SUBMITTED, approval.submittedBy/At, history SUBMIT)
+
+    TBM->>C: POST /assessments/{id}/approve
+    C->>SA: canReviewAssessment (DEPARTMENT_HEAD, courseId của đề cương trong scope)
+    alt không đúng vai trò / phạm vi (kể cả ADMIN)
+        SA-->>TBM: 403
+    end
+    C->>S: approve(id, actor)
+    S->>DB: đọc bài; phải đang SUBMITTED, nếu không 422
+    alt actor là người đã gửi duyệt
+        S-->>TBM: 403
+    end
+    S->>DB: save(APPROVED, isLocked = true, reviewedBy/At, history APPROVE) kiểm revision
+    S->>AU: record(ASSESSMENT_APPROVE, before, after)
+    AU->>DB: ghi audit_logs trong cùng transaction
+    alt người duyệt khác ghi trước (revision đổi / WriteConflict 112)
+        DB-->>TBM: 409
+    else thành công
+        S-->>TBM: 200 (items[] bị khóa)
+    end
+```
+
+Từ chối (`/reject`) giống nhánh duyệt nhưng bắt buộc `reviewNote`, đặt `REJECTED`, `isLocked = false`, ghi `ASSESSMENT_REJECT`. Giảng viên sửa
+bài `REJECTED` thì bài tự về `DRAFT` (`AssessmentServiceImpl#reopenIfRejected`) rồi mới gửi duyệt lại được.
+
+## 8. Bảng đối chiếu nhanh sơ đồ ↔ mã
 
 | Sơ đồ | Lớp/phương thức cần mở để đối chiếu |
 |---|---|
@@ -342,8 +391,9 @@ sequenceDiagram
 | 4 | `ProgramVerificationServiceImpl#verifyPlo`, `#requireProgramAccess`; `ScopeAuthorizationServiceImpl#canAccessProgram`, `#checkProgramAssignment` |
 | 5 | `MongoConfig#transactionManager`; `AuditServiceImpl#record`; `TransactionRollbackIntegrationTest` |
 | 6 | `EnrollmentController#importEnrollments`; `EnrollmentServiceImpl#importEnrollments`, `#validateRows`, `#recountEnrolled`; `EnrollmentCsvParser#parse`; `GlobalExceptionHandler#handleImportValidation` |
+| 7 | `AssessmentController#submit/approve/reject`; `AssessmentApprovalServiceImpl#submit`, `#approve`, `#reject`, `#requireNotSubmitter`; `ScopeAuthorizationServiceImpl#canReviewAssessment`; `AssessmentServiceImpl#requireEditable`, `#reopenIfRejected` |
 
-## 8. Thiết kế mục tiêu (chưa có mã)
+## 9. Thiết kế mục tiêu (chưa có mã)
 
 Các luồng **nhập điểm từ tệp** (F05b: tải tệp, ánh xạ cột, kiểm tra, xác nhận trong transaction có ghi `IMPORT_CONFIRM`/`SCORE_UPDATE`)
 và **chạy đo lường** (F06: CLO → PI → PLO theo `measurement_rules`, ghi `RUN_CALCULATION`) **chưa có mã** trong `src/main`

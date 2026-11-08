@@ -220,7 +220,7 @@ Tóm tắt từ `GiaiThich_CoSoDuLieu.md` mục 2; vi phạm là lỗi nghiệp 
 
 | # | Việc | Ai trả lời | Tình trạng (2026-11-06) | Ảnh hưởng tới feature |
 |---|---|---|---|---|
-| 1 | Chấp nhận NEW-01 (Trưởng bộ môn duyệt ma trận đề thi) và không làm xuất phôi in | GVHD (Q11) | Nhóm SV chốt giữ NEW-01 (ADR 0001); chờ GVHD ký xác nhận | NEW-01, vai trò DEPARTMENT_HEAD |
+| 1 | Chấp nhận NEW-01 (Trưởng bộ môn duyệt ma trận đề thi) và không làm xuất phôi in | GVHD (Q11) | Nhóm SV chốt giữ NEW-01 (ADR 0001); **GVHD đã ký xác nhận** (ngày: [ĐIỀN]) | NEW-01, vai trò DEPARTMENT_HEAD |
 | 2 | Chọn học phần thử nghiệm; xác nhận điểm có theo từng câu hỏi (Q05) | Khoa, GVHD | **Đã chọn 2 học phần** (`APCM220307`, `ABDA433708`); điểm theo câu hỏi `ITEM` (Q05) | E06–E08 |
 | 3 | Công thức, ngưỡng, mẫu số, xử lý thiếu dữ liệu (Q04, Q12, Q13) | Khoa | **Chưa có:** Khoa chưa cung cấp | US-26–29; nếu không kịp K3 thì chạy chế độ không chính thức |
 | 4 | Phương pháp mặc định PI/PLO và chính sách nhập lại (Q19) | Khoa | **Chưa có:** Khoa chưa cung cấp | US-23, US-28 |

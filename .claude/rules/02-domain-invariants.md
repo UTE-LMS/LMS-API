@@ -14,7 +14,7 @@ Các bất biến dưới đây **chính là** mục tiêu đã thống nhất; 
   cùng ngân hàng, cặp CLO–PI nằm trong `clo_pi_links` của chính CLO đó…) trước khi ghi.
 - Xác nhận nhập điểm cần transaction nhiều document → MongoDB chạy replica set (cả dev và CI). Dev: image
   `docker/mongo/` (README).
-- **Bài đánh giá (`assessments`) có quy trình duyệt ma trận** (CSDL v0.5, NEW-01, chờ GVHD Q11): `DRAFT → SUBMITTED →
+- **Bài đánh giá (`assessments`) có quy trình duyệt ma trận** (CSDL v0.5, NEW-01, GVHD đã xác nhận Q11, ADR 0001 phương án A): `DRAFT → SUBMITTED →
   APPROVED | REJECTED → SCORE_ENTERED → LOCKED`. Chỉ nhập điểm khi `APPROVED`/`SCORE_ENTERED`; `isLocked = true` khi
   `status ∈ {APPROVED, SCORE_ENTERED, LOCKED}` và cấm sửa `items[]`; gửi duyệt cần ≥ 1 item và
   `|totalPoints − Σ items.maxScore| < 0,001`; duyệt/từ chối ghi `approval.history[]` và `audit_logs`. Chỉ duyệt
