@@ -1,5 +1,6 @@
 package com.hcmute.lms.lmsapi.document;
 
+import com.hcmute.lms.lmsapi.enums.SectionStatus;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.AllArgsConstructor;
@@ -15,8 +16,8 @@ import org.springframework.data.mongodb.core.mapping.Field;
 import org.springframework.data.mongodb.core.mapping.FieldType;
 
 /**
- * Document đại diện cho lớp học phần trong collection course_sections (§4.17 / ADR 0003). Chỉ đọc
- * trong phân hệ F01, phục vụ kiểm soát phân quyền theo phạm vi (canAccessSection).
+ * Document đại diện cho lớp học phần trong collection course_sections (§4.17 / ADR 0003 / US-19).
+ * Là nguồn phân quyền theo phạm vi (canAccessSection) và là "mẫu số" của tỷ lệ đạt cấp lớp.
  */
 @Data
 @Builder
@@ -56,11 +57,16 @@ public class CourseSection {
   @Field(name = "lecturerIds", targetType = FieldType.OBJECT_ID)
   private List<String> lecturerIds = new ArrayList<>();
 
-  /** Sĩ số sinh viên ghi danh vào lớp. */
+  /**
+   * Sĩ số: số bản ghi enrollments có status ENROLLED của lớp. Là giá trị dẫn xuất, được tính lại từ
+   * enrollments sau mỗi lần nhập danh sách/rút/ghi danh lại (không cộng dồn) để không bị lệch.
+   */
+  @Builder.Default
   @Field("enrolledCount")
-  private Integer enrolledCount;
+  private Integer enrolledCount = 0;
 
   /** Trạng thái lớp học phần (OPEN, CLOSED, LOCKED). */
+  @Builder.Default
   @Field("status")
-  private String status;
+  private SectionStatus status = SectionStatus.OPEN;
 }

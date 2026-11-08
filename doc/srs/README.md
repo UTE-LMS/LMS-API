@@ -52,7 +52,7 @@ Mỗi file dưới đây giữ story và AC dự thảo của feature; **chưa c
 |---|---|---|---|---|---|
 | F03 Học phần, đề cương, CLO | [`F03-hoc-phan-clo.md`](../plan/F03-hoc-phan-clo.md) | US-09…12 | C | 15 (US-09…12); bổ sung 3 AC phân quyền theo Bộ môn và Giảng viên (US-10/AC-4, US-11/AC-5, US-12/AC-6 theo [ADR 0010](../adr/0010-phan-quyen-de-cuong-theo-bo-mon-va-giang-vien.md) thay thế ADR 0009) | Đã hoàn thành US-09..12 cơ bản; tài liệu thiết kế ADR 0010 đã chốt, chuẩn bị bổ sung test và mã phân quyền |
 | F04 Bài đánh giá, rubric, duyệt ma trận | [`F04-bai-danh-gia.md`](../plan/F04-bai-danh-gia.md) | US-13…16, NEW-01 (US-17: K) | US-13, 14: MR; US-15, 16: C; NEW-01: C chờ GVHD Q11 | 16 (US-13…16, NEW-01) | Chưa có mã |
-| F05a Học kỳ, lớp, sinh viên | [`F05a-hoc-ky-lop-sinh-vien.md`](../plan/F05a-hoc-ky-lop-sinh-vien.md) | US-18…20 | C | 11 | Chưa có mã |
+| F05a Học kỳ, lớp, sinh viên | [`F05a-hoc-ky-lop-sinh-vien.md`](../plan/F05a-hoc-ky-lop-sinh-vien.md) | US-18…20 | C | 11 | Có mã (US-18 một phần: thiếu vế chặn nhập điểm chờ F05b; Excel chờ ADR) |
 | F05b Nhập điểm | [`F05b-nhap-diem.md`](../plan/F05b-nhap-diem.md) | US-21…25 | US-21…24: C; US-25: MR | 16 | Chưa có mã |
 | F06 Đo lường | [`F06-do-luong.md`](../plan/F06-do-luong.md) | US-26…30, NEW-04 | US-26…29: C; US-30, NEW-04: MR | 15 (US-26…30) | Chưa có mã |
 | F07 Báo cáo, truy vết | [`F07-bao-cao-truy-vet.md`](../plan/F07-bao-cao-truy-vet.md) | US-31…36 | US-31…34: C; US-35, 36: MR | 11 | Chưa có mã |

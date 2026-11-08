@@ -148,3 +148,17 @@ done
 - Đề cương môn học (`syllabi`) & CLO (`clos`): `ScopeAuthorizationService.canAccessCourse(principal, courseId)` kiểm tra tập hợp $O(1)$ trực tiếp: `principal.getScope().getCourseIds().contains(courseId)` với vai trò `DEPARTMENT_HEAD` (Trưởng bộ môn) hoặc `LECTURER` (Giảng viên được phân công). Giảng viên chỉ soạn khi đề cương ở `DRAFT`; Trưởng bộ môn duyệt chuyển trạng thái sang `CONFIRMED`. `PROGRAM_MANAGER` không có quyền can thiệp vào đề cương/CLO (bị chặn 403).
 - Liên kết CLO–PI (`clo_pi_links`): `PROGRAM_MANAGER` thiết lập ma trận liên kết cho CTĐT của ngành mình qua `@scopeAuthorizationService.canAccessProgramVersion(principal, programVersionId)`.
 - Thẩm định CLO–PI: `QA_OFFICER` kiểm tra theo `canAccessProgramVersion` (ADR 0004). Bảng endpoint và sơ đồ lớp sẽ được cập nhật khi mã F03 được tích hợp vào nhánh chứa tài liệu này.
+
+**Thành phần F05a (lớp học phần, sinh viên, ghi danh; `doc/plan/F05a-hoc-ky-lop-sinh-vien.md` §11):**
+
+| Lớp | Vai trò | Phụ thuộc chính |
+|---|---|---|
+| `SectionController` (`/api/v1/sections`) | Mở lớp, sửa giảng viên, đổi trạng thái, liệt kê/đọc lớp | `SectionService`; kiểm quyền bằng `@PreAuthorize` gọi `ScopeAuthorizationService` |
+| `SectionServiceImpl` | Kiểm tham chiếu (học phần, đề cương cùng học phần và `CONFIRMED`, học kỳ `OPEN`, giảng viên `ACTIVE` vai trò `LECTURER`); lọc danh sách theo quyền đọc | `CourseSectionRepository`, `CourseRepository`, `SyllabusRepository`, `TermRepository`, `UserRepository`, `ScopeAuthorizationService` |
+| `EnrollmentController` (`/api/v1/sections/{id}/enrollments[/import]`, `/api/v1/enrollments/{id}/status`) | Xem danh sách ghi danh, nhập CSV, rút/ghi danh lại | `EnrollmentService` |
+| `EnrollmentServiceImpl` | Nhập CSV một thao tác thống nhất (`@Transactional`), tính lại `course_sections.enrolledCount`, đóng băng ghi danh khi lớp/học kỳ không `OPEN` | `EnrollmentRepository`, `StudentRepository`, `CourseSectionRepository`, `TermRepository`, `EnrollmentCsvParser` |
+| `EnrollmentCsvParser` (`util`) | Đọc cú pháp CSV (UTF-8, `,`/`;`, nháy kép), chỉ lấy `studentRef`, `cohort`, `majorCode` | không phụ thuộc lớp nào khác (chỉ `exception`) |
+
+Phân quyền thêm vào `ScopeAuthorizationService`: `canManageCourseSections`/`canManageSection` (ADMIN, hoặc PROGRAM_MANAGER có CTĐT chứa học phần trong
+`scope.programIds`), `canAccessLoadedSection` (như `canAccessSection` nhưng nhận lớp đã nạp để lọc danh sách không truy vấn lặp), `canAccessEnrollment`
+(suy quyền từ lớp của ghi danh). Collection mới: `students` (chỉ `studentRef`, `cohort`, `majorCode`, `status`), `enrollments` (unique `sectionId + studentId`).

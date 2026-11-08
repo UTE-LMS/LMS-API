@@ -9,6 +9,7 @@ import com.hcmute.lms.lmsapi.document.UserScope;
 import com.hcmute.lms.lmsapi.dto.UserPrincipal;
 import com.hcmute.lms.lmsapi.enums.AccessType;
 import com.hcmute.lms.lmsapi.enums.Role;
+import com.hcmute.lms.lmsapi.enums.SectionStatus;
 import com.hcmute.lms.lmsapi.repository.CourseSectionRepository;
 import com.hcmute.lms.lmsapi.repository.ProgramVersionRepository;
 import com.hcmute.lms.lmsapi.service.impl.ScopeAuthorizationServiceImpl;
@@ -62,7 +63,7 @@ class ScopeAuthorizationServiceImplTest {
             .termId("term-2026-1")
             .lecturerIds(new ArrayList<>(List.of(TARGET_LECTURER_ID)))
             .enrolledCount(45)
-            .status("OPEN")
+            .status(SectionStatus.OPEN)
             .build();
   }
 

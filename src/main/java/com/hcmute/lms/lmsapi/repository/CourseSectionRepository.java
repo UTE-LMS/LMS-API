@@ -1,13 +1,14 @@
 package com.hcmute.lms.lmsapi.repository;
 
 import com.hcmute.lms.lmsapi.document.CourseSection;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 
 /**
- * Repository thao tác với collection course_sections (§4.17 / ADR 0003). Chỉ đọc trong phân hệ F01,
- * phục vụ xác thực quyền truy cập phạm vi (US-03).
+ * Repository thao tác với collection course_sections (§4.17 / ADR 0003 / US-19). Phục vụ quản lý
+ * lớp học phần (F05a) và xác thực quyền truy cập phạm vi (US-03).
  */
 @Repository
 public interface CourseSectionRepository extends MongoRepository<CourseSection, String> {
@@ -31,4 +32,10 @@ public interface CourseSectionRepository extends MongoRepository<CourseSection, 
   boolean existsByTermId(String termId);
 
   boolean existsBySyllabusId(String syllabusId);
+
+  List<CourseSection> findByTermId(String termId);
+
+  List<CourseSection> findByCourseId(String courseId);
+
+  List<CourseSection> findByTermIdAndCourseId(String termId, String courseId);
 }
