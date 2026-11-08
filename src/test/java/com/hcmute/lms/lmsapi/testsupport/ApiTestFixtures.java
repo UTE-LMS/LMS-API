@@ -1,6 +1,7 @@
 package com.hcmute.lms.lmsapi.testsupport;
 
 import com.hcmute.lms.lmsapi.config.JwtConfig;
+import com.hcmute.lms.lmsapi.document.Clo;
 import com.hcmute.lms.lmsapi.document.Course;
 import com.hcmute.lms.lmsapi.document.CoursePiContribution;
 import com.hcmute.lms.lmsapi.document.CourseSection;
@@ -244,6 +245,18 @@ public final class ApiTestFixtures {
         Term.builder().code(code("TRM")).academicYear("2025-2026").status(status).build());
   }
 
+  /** Tạo CLO giả thuộc một đề cương (nội dung nguyên văn là nhãn dữ liệu thử nghiệm). */
+  public Clo clo(Syllabus syllabus, String code) {
+    return mongo.save(
+        Clo.builder()
+            .syllabusId(syllabus.getId())
+            .courseId(syllabus.getCourseId())
+            .code(code)
+            .contentOriginal(LABEL + " CLO giả " + code)
+            .verification(unverified())
+            .build());
+  }
+
   /** Tạo đề cương giả của một học phần với trạng thái cho trước. */
   public Syllabus syllabus(Course course, SyllabusStatus status) {
     return mongo.save(
@@ -319,6 +332,12 @@ public final class ApiTestFixtures {
         ids("courses", Criteria.where("code").regex(codePrefix)).stream()
             .map(ObjectId::new)
             .toList();
+    List<ObjectId> syllabusOids =
+        ids("syllabi", Criteria.where("courseId").in(courseOids)).stream()
+            .map(ObjectId::new)
+            .toList();
+    removeIn("assessments", "syllabusId", syllabusOids);
+    removeIn("clos", "syllabusId", syllabusOids);
     removeIn("syllabi", "courseId", courseOids);
     mongo.remove(query(Criteria.where("code").regex(codePrefix)), "terms");
     mongo.remove(query(Criteria.where("code").regex(codePrefix)), "courses");

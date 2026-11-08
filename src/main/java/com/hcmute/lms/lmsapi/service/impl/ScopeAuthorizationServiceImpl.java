@@ -5,7 +5,9 @@ import com.hcmute.lms.lmsapi.document.RoleAssignment;
 import com.hcmute.lms.lmsapi.document.UserScope;
 import com.hcmute.lms.lmsapi.dto.UserPrincipal;
 import com.hcmute.lms.lmsapi.enums.AccessType;
+import com.hcmute.lms.lmsapi.enums.AssessmentScope;
 import com.hcmute.lms.lmsapi.enums.Role;
+import com.hcmute.lms.lmsapi.repository.AssessmentRepository;
 import com.hcmute.lms.lmsapi.repository.CloPiLinkRepository;
 import com.hcmute.lms.lmsapi.repository.CloRepository;
 import com.hcmute.lms.lmsapi.repository.CourseRepository;
@@ -39,6 +41,7 @@ public class ScopeAuthorizationServiceImpl implements ScopeAuthorizationService 
   private final CloRepository cloRepository;
   private final CloPiLinkRepository cloPiLinkRepository;
   private final EnrollmentRepository enrollmentRepository;
+  private final AssessmentRepository assessmentRepository;
 
   @Override
   public boolean canAccessSection(
@@ -143,6 +146,50 @@ public class ScopeAuthorizationServiceImpl implements ScopeAuthorizationService 
               log.debug("canManageSection: Fail-closed - section [{}] not found", sectionId);
               return false;
             });
+  }
+
+  @Override
+  public boolean canAccessAssessment(
+      UserPrincipal principal, String assessmentId, AccessType accessType) {
+    if (assessmentId == null || assessmentId.isBlank()) {
+      return false;
+    }
+    return assessmentRepository
+        .findById(assessmentId.trim())
+        .map(
+            assessment ->
+                assessment.getScope() == AssessmentScope.SECTION
+                    ? canAccessSection(principal, assessment.getSectionId(), accessType)
+                    : canAccessSyllabus(principal, assessment.getSyllabusId(), accessType))
+        .orElseGet(
+            () -> {
+              log.debug(
+                  "canAccessAssessment: Fail-closed - assessment [{}] not found", assessmentId);
+              return false;
+            });
+  }
+
+  @Override
+  public boolean canReviewAssessment(UserPrincipal principal, String assessmentId) {
+    if (principal == null
+        || principal.getRoleAssignments() == null
+        || assessmentId == null
+        || assessmentId.isBlank()) {
+      return false;
+    }
+    return assessmentRepository
+        .findById(assessmentId.trim())
+        .filter(assessment -> assessment.getScope() == AssessmentScope.SECTION)
+        .flatMap(assessment -> syllabusRepository.findById(assessment.getSyllabusId()))
+        .map(
+            syllabus ->
+                principal.getRoleAssignments().stream()
+                    .anyMatch(
+                        a ->
+                            a != null
+                                && a.getRole() == Role.DEPARTMENT_HEAD
+                                && matchesCourseScope(a.getScope(), syllabus.getCourseId())))
+        .orElse(false);
   }
 
   @Override

@@ -45,6 +45,18 @@ public interface ScopeAuthorizationService {
    */
   boolean canAccessEnrollment(UserPrincipal principal, String enrollmentId, AccessType accessType);
 
+  /**
+   * Kiểm tra quyền trên bài đánh giá (F04): bản lớp theo quyền trên lớp ({@link
+   * #canAccessSection}), khung theo đề cương theo quyền trên đề cương ({@link #canAccessSyllabus}).
+   */
+  boolean canAccessAssessment(UserPrincipal principal, String assessmentId, AccessType accessType);
+
+  /**
+   * Quyền duyệt/từ chối ma trận bài đánh giá bản lớp (NEW-01): chỉ DEPARTMENT_HEAD có học phần của
+   * đề cương trong {@code scope.courseIds}. ADMIN không có quyền này.
+   */
+  boolean canReviewAssessment(UserPrincipal principal, String assessmentId);
+
   boolean canAccessProgram(UserPrincipal principal, String programId, AccessType accessType);
 
   boolean canAccessProgramVersion(
