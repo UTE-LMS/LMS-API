@@ -11,6 +11,7 @@ import com.hcmute.lms.lmsapi.document.RoleAssignment;
 import com.hcmute.lms.lmsapi.document.User;
 import com.hcmute.lms.lmsapi.document.UserScope;
 import com.hcmute.lms.lmsapi.enums.Role;
+import com.hcmute.lms.lmsapi.enums.SectionStatus;
 import com.hcmute.lms.lmsapi.enums.UserStatus;
 import com.hcmute.lms.lmsapi.repository.CourseSectionRepository;
 import com.hcmute.lms.lmsapi.repository.UserRepository;
@@ -126,7 +127,7 @@ public class ScopeDynamicReloadAndEdgeCasesEmpiricalChallengeTest {
             .termId(TERM_ID)
             .lecturerIds(lecturerIds != null ? new ArrayList<>(lecturerIds) : new ArrayList<>())
             .enrolledCount(35)
-            .status("OPEN")
+            .status(SectionStatus.OPEN)
             .build();
 
     return courseSectionRepository.save(section);

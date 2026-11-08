@@ -1,5 +1,6 @@
 package com.hcmute.lms.lmsapi.service;
 
+import com.hcmute.lms.lmsapi.document.CourseSection;
 import com.hcmute.lms.lmsapi.dto.UserPrincipal;
 import com.hcmute.lms.lmsapi.enums.AccessType;
 
@@ -20,6 +21,24 @@ public interface ScopeAuthorizationService {
    *     (fail-closed)
    */
   boolean canAccessSection(UserPrincipal principal, String sectionId, AccessType accessType);
+
+  /**
+   * Như {@link #canAccessSection(UserPrincipal, String, AccessType)} nhưng nhận lớp học phần đã nạp
+   * sẵn, để lọc danh sách lớp mà không truy vấn lại từng lớp.
+   */
+  boolean canAccessLoadedSection(
+      UserPrincipal principal, CourseSection section, AccessType accessType);
+
+  /**
+   * Quyền mở/sửa/đổi trạng thái lớp học phần của một học phần (US-19, F05a). ADMIN luôn được phép.
+   * PROGRAM_MANAGER chỉ được phép khi học phần thuộc ít nhất một phiên bản CTĐT của chương trình
+   * nằm trong {@code scope.programIds} (ADR 0005 §3.2: không cho ghi ngoài phạm vi CTĐT phụ trách).
+   * Học phần chưa thuộc CTĐT nào thì chỉ ADMIN được phép. Các vai trò khác bị từ chối.
+   */
+  boolean canManageCourseSections(UserPrincipal principal, String courseId);
+
+  /** Như {@link #canManageCourseSections} nhưng suy {@code courseId} từ lớp học phần. */
+  boolean canManageSection(UserPrincipal principal, String sectionId);
 
   boolean canAccessProgram(UserPrincipal principal, String programId, AccessType accessType);
 

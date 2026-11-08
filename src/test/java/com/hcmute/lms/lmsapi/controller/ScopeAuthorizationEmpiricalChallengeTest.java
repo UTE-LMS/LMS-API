@@ -13,6 +13,7 @@ import com.hcmute.lms.lmsapi.document.UserScope;
 import com.hcmute.lms.lmsapi.dto.UserPrincipal;
 import com.hcmute.lms.lmsapi.enums.AccessType;
 import com.hcmute.lms.lmsapi.enums.Role;
+import com.hcmute.lms.lmsapi.enums.SectionStatus;
 import com.hcmute.lms.lmsapi.enums.UserStatus;
 import com.hcmute.lms.lmsapi.repository.CourseSectionRepository;
 import com.hcmute.lms.lmsapi.repository.UserRepository;
@@ -135,7 +136,7 @@ class ScopeAuthorizationEmpiricalChallengeTest {
             .termId("671dcba5f123456789abc441")
             .lecturerIds(List.of(targetLecturerUser.getId(), targetNonLecturerUser.getId()))
             .enrolledCount(35)
-            .status("OPEN")
+            .status(SectionStatus.OPEN)
             .build());
 
     // 4. Khởi tạo Section 2: KHÔNG chứa bất kỳ user nào ở trên trong lecturerIds
@@ -148,7 +149,7 @@ class ScopeAuthorizationEmpiricalChallengeTest {
             .termId("671dcba5f123456789abc442")
             .lecturerIds(List.of("671dcba5f123456789abc987"))
             .enrolledCount(28)
-            .status("OPEN")
+            .status(SectionStatus.OPEN)
             .build());
   }
 
@@ -720,7 +721,7 @@ class ScopeAuthorizationEmpiricalChallengeTest {
                   .syllabusId("671dcba5f123456789abc333")
                   .termId("671dcba5f123456789abc443")
                   .lecturerIds(null) // null list
-                  .status("OPEN")
+                  .status(SectionStatus.OPEN)
                   .build());
 
       UserPrincipal lecturer =
