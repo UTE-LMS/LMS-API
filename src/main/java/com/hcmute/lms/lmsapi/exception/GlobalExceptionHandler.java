@@ -640,6 +640,24 @@ public class GlobalExceptionHandler {
       return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
     }
 
+    if (isMongoWriteConflict(ex)) {
+      log.warn(
+          "MongoDB write conflict (code 112) on request [{}]: {}",
+          request.getRequestURI(),
+          ex.getMessage());
+
+      ErrorResponse response =
+          ErrorResponse.builder()
+              .timestamp(Instant.now())
+              .status(HttpStatus.CONFLICT.value())
+              .code(ErrorCode.CONFLICT)
+              .message("Dữ liệu vừa bị người khác thay đổi đồng thời, hãy tải lại và thử lại")
+              .path(request.getRequestURI())
+              .build();
+
+      return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+    }
+
     return handleAllUncaughtException(ex, request);
   }
 
@@ -726,6 +744,22 @@ public class GlobalExceptionHandler {
           && (message.contains("code 121")
               || message.contains("Document failed validation")
               || message.contains("DocumentValidationFailure"))) {
+        return true;
+      }
+      current = current.getCause();
+    }
+    return false;
+  }
+
+  /**
+   * Hai giao dịch cùng ghi một document thì MongoDB báo WriteConflict (mã 112, nhãn
+   * TransientTransactionError) cho giao dịch đến sau; đây là xung đột đồng thời chứ không phải lỗi
+   * hệ thống nên trả về như xung đột phiên bản (HTTP 409).
+   */
+  private boolean isMongoWriteConflict(Throwable ex) {
+    Throwable current = ex;
+    while (current != null) {
+      if (current instanceof MongoServerException mse && mse.getCode() == 112) {
         return true;
       }
       current = current.getCause();
