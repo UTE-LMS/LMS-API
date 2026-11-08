@@ -19,8 +19,8 @@ import org.springframework.http.HttpStatus;
 
 /**
  * Đọc tệp CSV danh sách lớp (US-20). Chỉ nhận ba cột: {@code studentRef} (bắt buộc), {@code
- * cohort}, {@code majorCode}. Cột khác (ví dụ họ tên, email) bị bỏ qua và được báo lại, vì Khoa
- * chưa cho phép lưu dữ liệu cá nhân (Q09).
+ * cohort}, {@code majorCode}. Cột khác (ví dụ họ tên, email) bị bỏ qua và được báo lại, vì dữ liệu
+ * cá nhân chỉ lưu khi được phép (Q09) và F05a chưa cần đến.
  *
  * <p>Định dạng: UTF-8 (chấp nhận BOM), dòng đầu là tiêu đề, phân cách bằng dấu phẩy hoặc chấm phẩy
  * (Excel tiếng Việt xuất chấm phẩy), hỗ trợ giá trị trong dấu nháy kép nhưng không hỗ trợ giá trị
@@ -40,7 +40,24 @@ public final class EnrollmentCsvParser {
   public record Row(int lineNumber, String studentRef, String cohort, String majorCode) {}
 
   /** Kết quả đọc: các dòng dữ liệu và tên các cột bị bỏ qua. */
-  public record Result(List<Row> rows, List<String> ignoredColumns) {}
+  public record Result(List<Row> rows, List<String> ignoredColumns) {
+
+    /** Sao chép bất biến để người gọi không sửa được dữ liệu bên trong. */
+    public Result {
+      rows = List.copyOf(rows);
+      ignoredColumns = List.copyOf(ignoredColumns);
+    }
+
+    @Override
+    public List<Row> rows() {
+      return List.copyOf(rows);
+    }
+
+    @Override
+    public List<String> ignoredColumns() {
+      return List.copyOf(ignoredColumns);
+    }
+  }
 
   private EnrollmentCsvParser() {}
 

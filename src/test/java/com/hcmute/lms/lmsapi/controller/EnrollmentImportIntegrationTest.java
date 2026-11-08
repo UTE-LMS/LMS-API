@@ -20,6 +20,7 @@ import com.hcmute.lms.lmsapi.testsupport.ApiTestFixtures;
 import com.hcmute.lms.lmsapi.testsupport.IntegrationTestBase;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Objects;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -84,7 +85,8 @@ class EnrollmentImportIntegrationTest extends IntegrationTestBase {
   }
 
   private int enrolledCountOf(CourseSection target) {
-    return mongo().findById(target.getId(), CourseSection.class).getEnrolledCount();
+    return Objects.requireNonNull(mongo().findById(target.getId(), CourseSection.class))
+        .getEnrolledCount();
   }
 
   @Test
@@ -346,15 +348,16 @@ class EnrollmentImportIntegrationTest extends IntegrationTestBase {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.sectionEnrolledCount").value(5));
 
-    String enrollmentId =
-        mongo()
-            .findOne(
-                Query.query(
-                    Criteria.where("sectionId").is(new org.bson.types.ObjectId(section.getId()))),
-                org.bson.Document.class,
-                "enrollments")
-            .getObjectId("_id")
-            .toHexString();
+    org.bson.Document firstEnrollment =
+        Objects.requireNonNull(
+            mongo()
+                .findOne(
+                    Query.query(
+                        Criteria.where("sectionId")
+                            .is(new org.bson.types.ObjectId(section.getId()))),
+                    org.bson.Document.class,
+                    "enrollments"));
+    String enrollmentId = firstEnrollment.getObjectId("_id").toHexString();
     mockMvc
         .perform(
             putAs(

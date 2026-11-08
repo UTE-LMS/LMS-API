@@ -13,9 +13,10 @@ import org.springframework.data.mongodb.core.mapping.Field;
 /**
  * Sinh viên trong collection students (§4.18 / US-20).
  *
- * <p>Riêng tư (Q09): chỉ lưu mã thay thế {@code studentRef}. {@code fullName}, {@code email},
- * {@code userId}, {@code programVersionId} của schema chưa được dùng ở F05a vì Khoa chưa cho phép
- * lưu dữ liệu cá nhân; thêm khi có quyết định.
+ * <p>Riêng tư (Q09): {@code studentRef} là mã dùng để nhận diện, mã thật chỉ trên CSDL thật/staging
+ * còn dữ liệu mẫu và test dùng mã giả. {@code fullName}, {@code email}, {@code userId}, {@code
+ * programVersionId} của schema chưa được dùng ở F05a vì chưa có tính năng nào cần đến và dữ liệu cá
+ * nhân chỉ lưu khi được phép; thêm khi có yêu cầu.
  */
 @Data
 @Builder
