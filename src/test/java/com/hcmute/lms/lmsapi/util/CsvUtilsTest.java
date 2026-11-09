@@ -95,4 +95,38 @@ class CsvUtilsTest {
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("dấu ngoặc kép không được đóng");
   }
+
+  @Test
+  @DisplayName("Parse file thực tế: courses_cntt.csv và courses_fintech.csv hợp lệ 100%")
+  void parse_realProgramFiles_success() throws IOException {
+    java.io.File cnttFile = new java.io.File("doc/data/courses_cntt.csv");
+    if (cnttFile.exists()) {
+      try (java.io.InputStream is = new java.io.FileInputStream(cnttFile)) {
+        List<List<String>> records = CsvUtils.parse(is);
+        assertThat(records).hasSize(94);
+        assertThat(records.get(0)).containsExactly("code", "name", "credits");
+        for (int i = 1; i < records.size(); i++) {
+          List<String> row = records.get(i);
+          assertThat(row.get(0)).matches("^[A-Za-z0-9_.-]+$");
+          assertThat(row.get(1)).isNotBlank();
+          assertThat(Integer.parseInt(row.get(2))).isNotNegative();
+        }
+      }
+    }
+
+    java.io.File fintechFile = new java.io.File("doc/data/courses_fintech.csv");
+    if (fintechFile.exists()) {
+      try (java.io.InputStream is = new java.io.FileInputStream(fintechFile)) {
+        List<List<String>> records = CsvUtils.parse(is);
+        assertThat(records).hasSize(78);
+        assertThat(records.get(0)).containsExactly("code", "name", "credits");
+        for (int i = 1; i < records.size(); i++) {
+          List<String> row = records.get(i);
+          assertThat(row.get(0)).matches("^[A-Za-z0-9_.-]+$");
+          assertThat(row.get(1)).isNotBlank();
+          assertThat(Integer.parseInt(row.get(2))).isNotNegative();
+        }
+      }
+    }
+  }
 }
