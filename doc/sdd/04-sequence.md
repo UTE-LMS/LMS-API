@@ -2,7 +2,7 @@
 
 > **Dự thảo do AI soạn, đối chiếu mã ngày 2026-11-02 (`main`, commit `54ef80e`).** Mỗi sơ đồ dưới đây được viết sau khi đọc
 > đúng các lớp nêu ở mục "Căn cứ"; tên lớp, phương thức, mã lỗi là tên thật trong mã. Sinh viên đọc lại từng bước với mã
-> (hội đồng sẽ đối chiếu ngẫu nhiên). Luồng chưa có mã nằm ở mục 9, không vẽ.
+> (hội đồng sẽ đối chiếu ngẫu nhiên). Luồng chưa có mã nằm ở mục 10, không vẽ.
 
 Quy ước lỗi (từ `ErrorCode`, `GlobalExceptionHandler`): 400 `VALIDATION_ERROR`, 401 `UNAUTHORIZED`, 403 `FORBIDDEN`,
 404 `NOT_FOUND`, 409 `CONFLICT`, 422 `BUSINESS_RULE_VIOLATION`, 500 `INTERNAL_ERROR`; thân lỗi là `ErrorResponse`.
@@ -381,7 +381,78 @@ sequenceDiagram
 Từ chối (`/reject`) giống nhánh duyệt nhưng bắt buộc `reviewNote`, đặt `REJECTED`, `isLocked = false`, ghi `ASSESSMENT_REJECT`. Giảng viên sửa
 bài `REJECTED` thì bài tự về `DRAFT` (`AssessmentServiceImpl#reopenIfRejected`) rồi mới gửi duyệt lại được.
 
-## 8. Bảng đối chiếu nhanh sơ đồ ↔ mã
+## 8. Nhập điểm từ tệp CSV (F05b, US-21..24, ADR 0013 nháp)
+
+Căn cứ: `ImportBatchController`, `ImportBatchServiceImpl#createBatch`, `#validateBatch`, `#confirmBatch`, `#rollbackBatch`, `ScoreRowValidator#validate`,
+`ScoreCsvParser#parse`, `LocalImportFileStorage`, `ScopeAuthorizationServiceImpl#canAccessImportBatch`; test `ImportBatchUploadIntegrationTest`,
+`ImportBatchValidateIntegrationTest`, `ImportBatchConfirmIntegrationTest`, `ImportConfirmRollbackIntegrationTest`. Ba bước, mỗi bước một lời gọi API;
+bước 3 là **một transaction** (`@Transactional` trên `confirmBatch`, `MongoTransactionManager` của `MongoConfig`).
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Client (giảng viên lớp)
+    participant CT as ImportBatchController
+    participant SA as ScopeAuthorizationServiceImpl
+    participant S as ImportBatchServiceImpl
+    participant P as ScoreCsvParser
+    participant V as ScoreRowValidator
+    participant FS as LocalImportFileStorage
+    participant DB as MongoDB replica set rs0
+    participant A as AuditServiceImpl
+
+    Note over C,DB: Bước 1 - US-21 tải tệp (không @Transactional)
+    C->>CT: POST /sections/{s}/assessments/{a}/import-batches (file, emptyCellAs, reimportPolicy, columnMapping?)
+    CT->>SA: hasRole(LECTURER) và canAccessSection(WRITE)
+    S->>DB: đọc lớp, học kỳ, bài (SECTION của đúng lớp)
+    alt bài chưa APPROVED/SCORE_ENTERED, TOTAL_ONLY, lớp LOCKED, học kỳ không OPEN, EXCEL, reimportPolicy khác REJECT_ON_CONFLICT
+        S-->>C: 422 (không tạo lô)
+    end
+    S->>S: SHA-256 của tệp
+    alt đã có lô CONFIRMED cùng (lớp, bài, checksum)
+        S-->>C: 409 CONFLICT
+    end
+    S->>P: parse(bytes)
+    alt tệp rỗng / không có dòng dữ liệu / quá 5000 dòng / tiêu đề trùng / thiếu cột đã ánh xạ / ánh xạ sai
+        P-->>C: 400 (không tạo lô, không ghi tệp)
+    end
+    S->>FS: save(batchId, bytes) -> fileRef
+    S->>DB: save import_batches (UPLOADED)
+    S-->>C: 201 lô UPLOADED
+
+    Note over C,DB: Bước 2 - US-22/23 kiểm tra (@Transactional)
+    C->>CT: POST /import-batches/{id}/validate
+    S->>FS: load(fileRef), kiểm checksum
+    S->>DB: đọc ghi danh ENROLLED, students, scores hiện có của (lớp, bài)
+    S->>V: validate(bảng, ánh xạ, emptyCellAs, ...)
+    V-->>S: lỗi theo dòng/cột + các điểm sẽ ghi
+    S->>DB: xóa lỗi cũ, ghi import_row_errors, cập nhật stats và status
+    S-->>C: 200 VALIDATED hoặc HAS_ERRORS
+
+    Note over C,DB: Bước 3 - US-24 xác nhận: MỘT transaction, lỗi thì không ghi gì
+    C->>CT: POST /import-batches/{id}/confirm
+    S->>DB: đọc lô (phải VALIDATED), kiểm tra lại điều kiện nhập và kiểm tra lại toàn bộ dòng với dữ liệu hiện tại
+    alt lô khác VALIDATED, hoặc dữ liệu đã đổi (có dòng lỗi)
+        S-->>C: 422 (chưa ghi gì)
+    end
+    S->>DB: save import_batches -> CONFIRMED (@Version: xác nhận đồng thời thì người sau 409)
+    S->>DB: insert scores (unique lớp+bài+câu+sinh viên)
+    opt bài đang APPROVED (lô đầu)
+        S->>DB: assessments.status = SCORE_ENTERED
+    end
+    S->>A: record(IMPORT_CONFIRM, import_batches, before, after)
+    A->>DB: insert audit_logs (cùng transaction)
+    alt bất kỳ bước nào ném lỗi
+        S-->>C: 4xx/5xx; MongoTransactionManager rollback: không có scores, lô vẫn VALIDATED, bài vẫn APPROVED, không audit
+    else thành công
+        S-->>C: 200 lô CONFIRMED
+    end
+```
+
+Hủy lô (`/rollback`) chỉ áp dụng cho lô `UPLOADED`/`VALIDATED`/`HAS_ERRORS` (đặt `ROLLED_BACK`, không đụng `scores`); lô `CONFIRMED` bị từ chối 422 (TD-36).
+Tệp gốc nằm ngoài transaction MongoDB: nếu ghi lô lỗi thì `ImportBatchServiceImpl#createBatch` xóa tệp vừa lưu.
+
+## 9. Bảng đối chiếu nhanh sơ đồ ↔ mã
 
 | Sơ đồ | Lớp/phương thức cần mở để đối chiếu |
 |---|---|
@@ -392,11 +463,12 @@ bài `REJECTED` thì bài tự về `DRAFT` (`AssessmentServiceImpl#reopenIfReje
 | 5 | `MongoConfig#transactionManager`; `AuditServiceImpl#record`; `TransactionRollbackIntegrationTest` |
 | 6 | `EnrollmentController#importEnrollments`; `EnrollmentServiceImpl#importEnrollments`, `#validateRows`, `#recountEnrolled`; `EnrollmentCsvParser#parse`; `GlobalExceptionHandler#handleImportValidation` |
 | 7 | `AssessmentController#submit/approve/reject`; `AssessmentApprovalServiceImpl#submit`, `#approve`, `#reject`, `#requireNotSubmitter`; `ScopeAuthorizationServiceImpl#canReviewAssessment`; `AssessmentServiceImpl#requireEditable`, `#reopenIfRejected` |
+| 8 | `ImportBatchController`; `ImportBatchServiceImpl#createBatch`, `#validateBatch`, `#runValidation`, `#confirmBatch`, `#rollbackBatch`; `ScoreRowValidator#validate`; `ScoreCsvParser#parse`; `LocalImportFileStorage`; `ScopeAuthorizationServiceImpl#canAccessImportBatch`; `ImportConfirmRollbackIntegrationTest` |
 
-## 9. Thiết kế mục tiêu (chưa có mã)
+## 10. Thiết kế mục tiêu (chưa có mã)
 
-Các luồng **nhập điểm từ tệp** (F05b: tải tệp, ánh xạ cột, kiểm tra, xác nhận trong transaction có ghi `IMPORT_CONFIRM`/`SCORE_UPDATE`)
-và **chạy đo lường** (F06: CLO → PI → PLO theo `measurement_rules`, ghi `RUN_CALCULATION`) **chưa có mã** trong `src/main`
+Luồng **nhập điểm từ tệp** (F05b US-21..24) đã có sơ đồ ở mục 8; còn **sửa điểm đơn lẻ** (US-25, mở rộng, `SCORE_UPDATE`) và
+**chạy đo lường** (F06: CLO → PI → PLO theo `measurement_rules`, ghi `RUN_CALCULATION`) **chưa có mã** trong `src/main`
 nên không có sơ đồ ở đây. Khi có mã, thêm sơ đồ vào file này ngay trong PR đó (rule 05: sơ đồ khớp mã, cập nhật cùng thay đổi).
 Mô tả dự kiến nằm ở [`doc/plan/F05b-nhap-diem.md`](../plan/F05b-nhap-diem.md) và [`doc/plan/F06-do-luong.md`](../plan/F06-do-luong.md)
 (bản nháp chưa ký, không phải thiết kế đã được chấp nhận).

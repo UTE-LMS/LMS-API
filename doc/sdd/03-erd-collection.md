@@ -148,7 +148,7 @@ một bên phải đối chiếu bên kia. Script là "hợp đồng dữ liệu
 ## 4. Collection có trong `database_import.js` nhưng chưa có `document` (không vẽ)
 
 `program_courses`, `syllabi`, `clos`, `clo_pi_links`, `question_banks`, `question_categories`, `questions`, `assessments`,
-`terms`, `students`, `enrollments`, `import_batches`, `import_row_errors`, `scores`, `measurement_rules`, `calculation_runs`,
+`terms`, `students`, `enrollments`, `measurement_rules`, `calculation_runs`,
 `student_results`, `aggregate_results`, `reports`, `improvement_actions` (collection `ml_experiments` đã loại bỏ hoàn toàn khỏi CSDL do ML ngoài phạm vi đồ án, TD-06).
 
 Hai điều cần biết:
@@ -165,3 +165,62 @@ Hai điều cần biết:
   sơ đồ không có.
 - `users.createdAt/updatedAt` và `fullName` có trong `document` nhưng không nằm trong danh sách `required` của validator
   (chỉ `username, email, passwordHash, status, roleAssignments` là bắt buộc).
+
+## 6. Nhập điểm (F05b): `import_batches`, `import_row_errors`, `scores`
+
+Ba collection này có `document` từ nhánh F05b (`ImportBatch`, `ImportRowError`, `Score`); các mục 1–5 ở trên chưa được
+làm mới cho F04/F05a nên không vẽ chung. Đối chiếu với `doc/database_import.js` (khối `import_batches`, `import_row_errors`, `scores`).
+
+```mermaid
+erDiagram
+    import_batches {
+        ObjectId _id PK
+        ObjectId sectionId "course_sections"
+        ObjectId assessmentId "assessments"
+        string fileName
+        string fileChecksum "SHA-256 hex"
+        string fileRef "tên tệp gốc đã lưu, ADR 0013"
+        string sourceSystem "CSV hoặc MOODLE_EXPORT (EXCEL chưa hỗ trợ)"
+        object columnMapping "studentColumn + items[{column,itemId}]"
+        string emptyCellAs "BLANK hoặc MISSING"
+        string reimportPolicy "chỉ REJECT_ON_CONFLICT"
+        string status "UPLOADED VALIDATED HAS_ERRORS CONFIRMED ROLLED_BACK"
+        object stats "totalRows validRows errorRows scoreCount"
+        ObjectId uploadedBy "users"
+        ObjectId confirmedBy "users"
+        date confirmedAt
+        date createdAt
+        long revision "khóa lạc quan"
+    }
+    import_row_errors {
+        ObjectId _id PK
+        ObjectId batchId "import_batches"
+        int rowNumber "dòng vật lý, tiêu đề là 1"
+        string column
+        string errorType "INVALID_STUDENT_CODE SCORE_OUT_OF_RANGE DUPLICATE_RECORD MISSING_FIELD"
+        string rawValue
+        string message
+    }
+    scores {
+        ObjectId _id PK
+        ObjectId sectionId UK
+        ObjectId assessmentId UK
+        ObjectId itemId UK "assessments.items._id"
+        ObjectId studentId UK "students"
+        string status "SCORED BLANK ABSENT NOT_GRADED EXEMPT MISSING"
+        double rawScore "null trừ SCORED và BLANK"
+        double maxScore "snapshot tại lúc nhập"
+        ObjectId importBatchId "import_batches"
+        int sourceRow
+        int revision "bắt đầu từ 1"
+        ObjectId updatedBy
+        date updatedAt
+    }
+    import_batches ||--o{ import_row_errors : "batchId"
+    import_batches ||--o{ scores : "importBatchId"
+```
+
+Chỉ mục (`@CompoundIndex` khớp `database_import.js`): `import_batches(sectionId, assessmentId, createdAt desc)`, `import_batches(fileChecksum)`,
+`import_row_errors(batchId, rowNumber)`, `scores(sectionId, assessmentId, itemId, studentId)` **duy nhất**. Khác biệt cần biết: `import_batches.revision`
+và `createdAt` không nằm trong `properties` của validator (validator không cấm trường thừa); `columnMapping` lưu danh sách thay vì map vì tên cột
+trong tệp có thể chứa dấu chấm; `rawScore = null` không được ghi xuống MongoDB (Spring Data bỏ trường null), validator chấp nhận trường vắng mặt.

@@ -18,7 +18,7 @@
 
 ## Còn thiếu (không có trong bộ sơ đồ này vì chưa có mã)
 
-- Sequence **nhập điểm** (F05b) và **chạy đo lường** (F06); ERD/class của 21 collection chưa có `document`
+- Sequence **sửa điểm** (US-25, mở rộng) và **chạy đo lường** (F06); ERD/class của các collection chưa có `document`
   (học phần/CLO, bài đánh giá, học kỳ/lớp/sinh viên, điểm, quy tắc đo lường, kết quả, báo cáo, cải tiến).
   Mô tả dự kiến chỉ có ở `doc/plan/` (bản nháp). Bổ sung đúng PR đưa mã tương ứng vào.
 - Sơ đồ triển khai staging/production: chờ quyết định nền tảng (Q06/Q07) rồi ghi ADR.
