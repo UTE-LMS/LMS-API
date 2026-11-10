@@ -1,6 +1,7 @@
 package com.hcmute.lms.lmsapi.controller;
 
 import static org.hamcrest.Matchers.hasSize;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -16,10 +17,13 @@ import com.hcmute.lms.lmsapi.enums.CourseType;
 import com.hcmute.lms.lmsapi.enums.ProgramVersionStatus;
 import com.hcmute.lms.lmsapi.enums.Role;
 import com.hcmute.lms.lmsapi.testsupport.IntegrationTestBase;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpHeaders;
+import org.springframework.mock.web.MockMultipartFile;
 
 @DisplayName("F03: Courses and ProgramCourses Integration Tests (US-09)")
 class CourseIntegrationTest extends IntegrationTestBase {
@@ -376,5 +380,97 @@ class CourseIntegrationTest extends IntegrationTestBase {
     mockMvc
         .perform(deleteAs(adminToken, "/api/v1/courses/{id}", course2.getId()))
         .andExpect(status().isNoContent());
+  }
+
+  @Test
+  @DisplayName("Import CSV: Admin tải lên CSV thành công theo cơ chế Best-effort (200 OK)")
+  void importCourses_asAdmin_bestEffortSuccess() throws Exception {
+    String uniqueCode1 = fixtures.code("CSV1");
+    String uniqueCode2 = fixtures.code("CSV2");
+
+    String csvContent =
+        "code,name,credits\n"
+            + uniqueCode1
+            + ",Nhập môn Khoa học máy tính,3\n"
+            + uniqueCode2
+            + ",Lập trình hướng đối tượng nâng cao,4\n"
+            + uniqueCode1
+            + ",Bị trùng trong tệp,3\n"; // Trùng lặp trong tệp
+
+    MockMultipartFile csvFile =
+        new MockMultipartFile(
+            "file", "courses.csv", "text/csv", csvContent.getBytes(StandardCharsets.UTF_8));
+
+    mockMvc
+        .perform(
+            multipart("/api/v1/courses/import")
+                .file(csvFile)
+                .header(HttpHeaders.AUTHORIZATION, adminToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalRows").value(3))
+        .andExpect(jsonPath("$.successCount").value(2))
+        .andExpect(jsonPath("$.failureCount").value(1))
+        .andExpect(jsonPath("$.errors", hasSize(1)))
+        .andExpect(jsonPath("$.errors[0].row").value(4))
+        .andExpect(jsonPath("$.errors[0].code").value(uniqueCode1));
+  }
+
+  @Test
+  @DisplayName("Import CSV: Giảng viên hoặc Trưởng CTĐT gọi API bị từ chối 403 Forbidden")
+  void importCourses_asNonAdmin_returnsForbidden() throws Exception {
+    MockMultipartFile csvFile =
+        new MockMultipartFile(
+            "file",
+            "courses.csv",
+            "text/csv",
+            "code,name,credits\nCS101,Toán,3".getBytes(StandardCharsets.UTF_8));
+
+    mockMvc
+        .perform(
+            multipart("/api/v1/courses/import")
+                .file(csvFile)
+                .header(HttpHeaders.AUTHORIZATION, lecturerToken))
+        .andExpect(status().isForbidden());
+
+    mockMvc
+        .perform(
+            multipart("/api/v1/courses/import")
+                .file(csvFile)
+                .header(HttpHeaders.AUTHORIZATION, pmToken))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
+  @DisplayName("Import CSV: Chưa đăng nhập bị từ chối 401 Unauthorized")
+  void importCourses_unauthenticated_returnsUnauthorized() throws Exception {
+    MockMultipartFile csvFile =
+        new MockMultipartFile(
+            "file",
+            "courses.csv",
+            "text/csv",
+            "code,name,credits\nCS101,Toán,3".getBytes(StandardCharsets.UTF_8));
+
+    mockMvc
+        .perform(multipart("/api/v1/courses/import").file(csvFile))
+        .andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  @DisplayName("Import CSV: Tải file sai định dạng hoặc rỗng trả về 400 Bad Request")
+  void importCourses_invalidFile_returnsBadRequest() throws Exception {
+    MockMultipartFile invalidExtFile =
+        new MockMultipartFile(
+            "file",
+            "courses.xlsx",
+            "application/vnd.ms-excel",
+            "test".getBytes(StandardCharsets.UTF_8));
+
+    mockMvc
+        .perform(
+            multipart("/api/v1/courses/import")
+                .file(invalidExtFile)
+                .header(HttpHeaders.AUTHORIZATION, adminToken))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
   }
 }

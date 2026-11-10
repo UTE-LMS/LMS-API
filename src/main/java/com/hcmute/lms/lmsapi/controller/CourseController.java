@@ -1,5 +1,6 @@
 package com.hcmute.lms.lmsapi.controller;
 
+import com.hcmute.lms.lmsapi.dto.CourseImportResultResponse;
 import com.hcmute.lms.lmsapi.dto.CourseRequest;
 import com.hcmute.lms.lmsapi.dto.CourseResponse;
 import com.hcmute.lms.lmsapi.dto.CourseUpdateRequest;
@@ -13,6 +14,7 @@ import jakarta.validation.constraints.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
@@ -25,6 +27,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 @Slf4j
 @Validated
@@ -70,6 +73,16 @@ public class CourseController {
   public ResponseEntity<CourseResponse> createCourse(@Valid @RequestBody CourseRequest request) {
     log.info("API request: POST /api/v1/courses with code [{}]", request.getCode());
     return ResponseEntity.status(HttpStatus.CREATED).body(courseService.createCourse(request));
+  }
+
+  @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+  @PreAuthorize("hasRole('ADMIN')")
+  public ResponseEntity<CourseImportResultResponse> importCourses(
+      @RequestParam("file") MultipartFile file) {
+    log.info(
+        "API request: POST /api/v1/courses/import with file [{}]",
+        file != null ? file.getOriginalFilename() : "null");
+    return ResponseEntity.ok(courseService.importCourses(file));
   }
 
   @PutMapping("/{id}")

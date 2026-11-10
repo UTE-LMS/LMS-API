@@ -36,9 +36,14 @@ Trong phân hệ F03, nhóm IT đã hiện thực hóa trọn vẹn User Story *
    - [CourseController.java](file:///D:/Code/Project/LMS-API/src/main/java/com/hcmute/lms/lmsapi/controller/CourseController.java) (`/api/v1/courses`): Theo mô hình chuẩn quản trị đại học (ADR 0010), danh mục Master Catalog `courses` thuộc quyền quản trị tập trung của `ADMIN` (Phòng Đào tạo) để đảm bảo tính nhất quán toàn trường và đồng bộ dữ liệu tín chỉ; thu hồi quyền tạo/sửa môn của `PROGRAM_MANAGER`. Tất cả người dùng xác thực được phép tra cứu (`GET`).
    - [ProgramCourseController.java](file:///D:/Code/Project/LMS-API/src/main/java/com/hcmute/lms/lmsapi/controller/ProgramCourseController.java) (`/api/v1/program-versions/{programVersionId}/courses`): Sử dụng `@PreAuthorize("@scopeAuthorizationService.canAccessProgramVersion(principal, #programVersionId)")` bảo đảm kiểm soát truy cập phân quyền chặt chẽ theo nguyên tắc fail-closed.
 
-4. **Kiểm thử tự động toàn diện:**
-   - Viết bộ kiểm thử Unit Tests và Bean Validation riêng biệt: `CourseServiceImplTest`, `ProgramCourseServiceImplTest`, `CourseValidationTest`.
-   - Viết bài kiểm thử tích hợp thực tế [CourseIntegrationTest.java](file:///D:/Code/Project/LMS-API/src/test/java/com/hcmute/lms/lmsapi/controller/CourseIntegrationTest.java) chạy trên MongoDB Replica Set thật (`rs0`), bao phủ 100% các Acceptance Criteria: US-09/AC-1 (tạo học phần, trùng mã 409), US-09/AC-2 (gán vào CTĐT, trùng 409), US-09/AC-3 (học phần tiên quyết/học trước không hợp lệ 422), kiểm tra RBAC, phạm vi scope rejection (HTTP 403), và vòng đời CRUD.
+4. **Nhập danh mục học phần hàng loạt qua CSV (US-09/AC-4, `POST /api/v1/courses/import`):**
+   - Viết parser CSV thuần Java tuân thủ chuẩn RFC 4180 (`CsvUtils.java`), tự động xử lý dấu nháy kép `""`, dấu phẩy trong tên môn, xuống dòng CRLF/LF và loại bỏ UTF-8 BOM.
+   - Cơ chế xử lý **Best-effort**: Dòng hợp lệ được nạp vào MongoDB, dòng lỗi được ghi nhận số thứ tự dòng và nguyên nhân chi tiết trả về client để người dùng hiệu chỉnh.
+   - Phân quyền nghiêm ngặt `@PreAuthorize("hasRole('ADMIN')")` đảm bảo chỉ Quản trị viên cấp trường có quyền import danh mục Master Catalog.
+
+5. **Kiểm thử tự động toàn diện:**
+   - Viết bộ kiểm thử Unit Tests và Bean Validation riêng biệt: `CsvUtilsTest`, `CourseServiceImplTest`, `ProgramCourseServiceImplTest`, `CourseValidationTest`.
+   - Viết bài kiểm thử tích hợp thực tế [CourseIntegrationTest.java](file:///D:/Code/Project/LMS-API/src/test/java/com/hcmute/lms/lmsapi/controller/CourseIntegrationTest.java) chạy trên MongoDB Replica Set thật (`rs0`), bao phủ 100% các Acceptance Criteria: US-09/AC-1 (tạo học phần, trùng mã 409), US-09/AC-2 (gán vào CTĐT, trùng 409), US-09/AC-3 (học phần tiên quyết/học trước không hợp lệ 422), US-09/AC-4 (import CSV hàng loạt, best-effort và phân quyền ADMIN), kiểm tra RBAC, phạm vi scope rejection (HTTP 403), và vòng đời CRUD.
 
 ---
 

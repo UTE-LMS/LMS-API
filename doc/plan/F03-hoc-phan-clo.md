@@ -51,6 +51,7 @@ sau này phải bám vào (câu hỏi chỉ được đo cặp (CLO, PI) có tro
 | US-09/AC-1 | Tạo `courses` với `code` mới → thành công; trùng `code` → 409 | **ĐÃ HOÀN THÀNH (PR #67)** |
 | US-09/AC-2 | Gán học phần vào một `programVersionId` (`program_courses`); trùng `(programVersionId, courseId)` → 409 | **ĐÃ HOÀN THÀNH (PR #67)** |
 | US-09/AC-3 | `prerequisiteCourseIds` / `previousCourseIds` chứa học phần không tồn tại hoặc chính nó → 422 | **ĐÃ HOÀN THÀNH (PR #67, #68)** |
+| US-09/AC-4 | Nhập danh mục học phần hàng loạt từ tệp CSV (RFC 4180) theo cơ chế Best-effort, trả về báo cáo chi tiết thành công và danh sách lỗi từng dòng; chỉ ADMIN có quyền | **ĐÃ HOÀN THÀNH** |
 | US-10/AC-1 | Tạo `syllabi` mới với `(courseId, version)` chưa có, `status = DRAFT`; trùng → 409 | **ĐÃ HOÀN THÀNH (Issue #21)** |
 | US-10/AC-2 | `effectiveToTermId` không trước `effectiveFromTermId` (nếu có thông tin học kỳ) → 422 | **ĐÃ HOÀN THÀNH (Issue #21)** *(Đã làm trước module `terms` của F05a)* |
 | US-10/AC-3 | Đề cương `CONFIRMED` không cho sửa CLO của nó (422); phải tạo phiên bản mới | **ĐÃ HOÀN THÀNH (Issue #21)** |
@@ -77,6 +78,7 @@ Quy tắc **7** (đề cương `CONFIRMED` không sửa CLO) đã có qua US-10/
 | Phương thức | Đường dẫn |
 |---|---|
 | GET/POST/PUT | `/api/v1/courses`, `/api/v1/courses/{id}` |
+| POST | `/api/v1/courses/import` (`multipart/form-data`, chỉ `ADMIN`) |
 | GET/POST/PUT/DELETE | `/api/v1/program-versions/{pvId}/courses` (`program_courses`) |
 | GET/POST/PUT | `/api/v1/courses/{courseId}/syllabi`, `/api/v1/syllabi/{id}`, `/api/v1/syllabi/{id}/status` |
 | GET/POST/PUT/DELETE | `/api/v1/syllabi/{syllabusId}/clos`, `/api/v1/clos/{id}` |

@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.hcmute.lms.lmsapi.document.Course;
+import com.hcmute.lms.lmsapi.dto.CourseImportResultResponse;
 import com.hcmute.lms.lmsapi.dto.CourseRequest;
 import com.hcmute.lms.lmsapi.dto.CourseResponse;
 import com.hcmute.lms.lmsapi.dto.CourseUpdateRequest;
@@ -20,6 +21,7 @@ import com.hcmute.lms.lmsapi.mapper.CourseMapper;
 import com.hcmute.lms.lmsapi.repository.CoursePiContributionRepository;
 import com.hcmute.lms.lmsapi.repository.CourseRepository;
 import com.hcmute.lms.lmsapi.repository.ProgramCourseRepository;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -32,6 +34,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.mock.web.MockMultipartFile;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("CourseServiceImpl Unit Tests (F03 / US-09)")
@@ -178,5 +181,113 @@ class CourseServiceImplTest {
     PageResponse<CourseResponse> response = courseService.getCourses(0, 10, "CS101");
     assertThat(response.getContent()).hasSize(1);
     assertThat(response.getContent().get(0).getCode()).isEqualTo("CS101");
+  }
+
+  @Test
+  @DisplayName("Import CSV: Tệp rỗng hoặc null ném lỗi VALIDATION_ERROR")
+  void importCourses_nullOrEmptyFile_throwsValidationException() {
+    MockMultipartFile emptyFile =
+        new MockMultipartFile("file", "courses.csv", "text/csv", new byte[0]);
+
+    assertThatThrownBy(() -> courseService.importCourses(emptyFile))
+        .isInstanceOf(AppException.class)
+        .hasFieldOrPropertyWithValue("errorCode", ErrorCode.VALIDATION_ERROR);
+
+    assertThatThrownBy(() -> courseService.importCourses(null))
+        .isInstanceOf(AppException.class)
+        .hasFieldOrPropertyWithValue("errorCode", ErrorCode.VALIDATION_ERROR);
+  }
+
+  @Test
+  @DisplayName("Import CSV: Định dạng file không phải .csv ném lỗi VALIDATION_ERROR")
+  void importCourses_invalidExtension_throwsValidationException() {
+    MockMultipartFile excelFile =
+        new MockMultipartFile(
+            "file", "courses.xlsx", "application/vnd.ms-excel", "test".getBytes());
+
+    assertThatThrownBy(() -> courseService.importCourses(excelFile))
+        .isInstanceOf(AppException.class)
+        .hasFieldOrPropertyWithValue("errorCode", ErrorCode.VALIDATION_ERROR);
+  }
+
+  @Test
+  @DisplayName("Import CSV: Thiếu cột bắt buộc (code, name, credits) ném lỗi VALIDATION_ERROR")
+  void importCourses_missingHeaders_throwsValidationException() {
+    String csv = "ma_mon,ten_mon\nCS101,Lap trinh";
+    MockMultipartFile file =
+        new MockMultipartFile(
+            "file", "courses.csv", "text/csv", csv.getBytes(StandardCharsets.UTF_8));
+
+    assertThatThrownBy(() -> courseService.importCourses(file))
+        .isInstanceOf(AppException.class)
+        .hasFieldOrPropertyWithValue("errorCode", ErrorCode.VALIDATION_ERROR)
+        .hasMessageContaining("thiếu các cột bắt buộc");
+  }
+
+  @Test
+  @DisplayName("Import CSV: Tệp chỉ có header không có dữ liệu ném lỗi VALIDATION_ERROR")
+  void importCourses_noDataRows_throwsValidationException() {
+    String csv = "code,name,credits\n";
+    MockMultipartFile file =
+        new MockMultipartFile(
+            "file", "courses.csv", "text/csv", csv.getBytes(StandardCharsets.UTF_8));
+
+    assertThatThrownBy(() -> courseService.importCourses(file))
+        .isInstanceOf(AppException.class)
+        .hasFieldOrPropertyWithValue("errorCode", ErrorCode.VALIDATION_ERROR)
+        .hasMessageContaining("không có dữ liệu học phần");
+  }
+
+  @Test
+  @DisplayName(
+      "Import CSV: Xử lý cơ chế Best effort vừa lưu dòng hợp lệ vừa báo lỗi chi tiết các dòng sai")
+  void importCourses_bestEffort_processesValidAndReportsErrors() {
+    String csv =
+        "code,name,credits\n"
+            + "MATH101,Toán rời rạc,3\n" // Hợp lệ -> Thành công (row 2)
+            + "MISSING_COLS\n" // Thiếu cột -> Lỗi (row 3)
+            + "INVALID@CODE,Tin học cơ bản,2\n" // Sai regex code -> Lỗi (row 4)
+            + "CS102,,3\n" // Tên trống -> Lỗi (row 5)
+            + "CS103,Mạng máy tính,-1\n" // Tín chỉ âm -> Lỗi (row 6)
+            + "MATH101,Toán rời rạc trùng file,3\n" // Trùng trong file -> Lỗi (row 7)
+            + "EXISTING101,Triết học Mác Lê-nin,3\n"; // Trùng trong CSDL -> Lỗi (row 8)
+
+    MockMultipartFile file =
+        new MockMultipartFile(
+            "file", "courses.csv", "text/csv", csv.getBytes(StandardCharsets.UTF_8));
+
+    when(courseRepository.existsByCode("MATH101")).thenReturn(false);
+    when(courseRepository.existsByCode("EXISTING101")).thenReturn(true);
+    when(courseRepository.save(any(Course.class)))
+        .thenAnswer(inv -> inv.getArgument(0, Course.class));
+
+    CourseImportResultResponse result = courseService.importCourses(file);
+
+    assertThat(result.getTotalRows()).isEqualTo(7);
+    assertThat(result.getSuccessCount()).isEqualTo(1);
+    assertThat(result.getFailureCount()).isEqualTo(6);
+    assertThat(result.getErrors()).hasSize(6);
+
+    // Kiểm chứng chi tiết các dòng lỗi
+    assertThat(result.getErrors().get(0).getRow()).isEqualTo(3);
+    assertThat(result.getErrors().get(0).getMessage()).contains("thiếu cột");
+
+    assertThat(result.getErrors().get(1).getRow()).isEqualTo(4);
+    assertThat(result.getErrors().get(1).getMessage()).contains("Mã học phần chỉ được chứa");
+
+    assertThat(result.getErrors().get(2).getRow()).isEqualTo(5);
+    assertThat(result.getErrors().get(2).getMessage()).contains("Tên học phần không được để trống");
+
+    assertThat(result.getErrors().get(3).getRow()).isEqualTo(6);
+    assertThat(result.getErrors().get(3).getMessage()).contains("Số tín chỉ phải không âm");
+
+    assertThat(result.getErrors().get(4).getRow()).isEqualTo(7);
+    assertThat(result.getErrors().get(4).getMessage()).contains("bị trùng lặp trong tệp CSV");
+
+    assertThat(result.getErrors().get(5).getRow()).isEqualTo(8);
+    assertThat(result.getErrors().get(5).getMessage()).contains("đã tồn tại trong hệ thống");
+
+    // Xác nhận đã lưu 1 môn thành công
+    verify(courseRepository).save(any(Course.class));
   }
 }
