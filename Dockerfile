@@ -37,6 +37,9 @@ LABEL org.opencontainers.image.title="LMS-API" \
 RUN apk upgrade --no-cache && addgroup -S -g 10001 app && adduser -S -u 10001 -G app -H -h /app -s /sbin/nologin app
 WORKDIR /app
 COPY --from=build --chown=app:app /workspace/app.jar /app/app.jar
+# F05b (ADR 0013, nháp): thư mục mặc định lưu tệp điểm gốc (app.score-import.storage-dir), ghi được bởi user không phải root.
+# Gắn volume vào đây (hoặc đặt SCORE_IMPORT_STORAGE_DIR) để tệp không mất khi container được tạo lại.
+RUN mkdir -p /app/data/score-import && chown -R app:app /app/data
 
 USER app:app
 EXPOSE 8080

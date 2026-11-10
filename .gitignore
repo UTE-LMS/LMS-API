@@ -38,3 +38,6 @@ src/main/resources/application-*.properties
 !src/main/resources/application.properties.example
 .env
 .env.*
+
+### Tệp điểm gốc của lô nhập F05b (ADR 0013)
+/data/

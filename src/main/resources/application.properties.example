@@ -44,3 +44,10 @@ app.security.jwt.issuer=lms-api
 INITIAL_ADMIN_USERNAME=${INITIAL_ADMIN_USERNAME:}
 INITIAL_ADMIN_EMAIL=${INITIAL_ADMIN_EMAIL:}
 INITIAL_ADMIN_PASSWORD=${INITIAL_ADMIN_PASSWORD:}
+
+# ==============================================================================
+# NHẬP ĐIỂM TỪ TỆP (F05b / ADR 0013, nháp chờ sinh viên xác nhận)
+# Thư mục lưu tệp điểm gốc của lô nhập (tên tệp <batchId>.csv do máy chủ đặt). Biến môi trường:
+# SCORE_IMPORT_STORAGE_DIR. Khi chạy container phải gắn volume vào thư mục này.
+# ==============================================================================
+app.score-import.storage-dir=${SCORE_IMPORT_STORAGE_DIR:./data/score-import}

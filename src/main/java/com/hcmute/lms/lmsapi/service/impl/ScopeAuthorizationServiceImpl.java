@@ -13,6 +13,7 @@ import com.hcmute.lms.lmsapi.repository.CloRepository;
 import com.hcmute.lms.lmsapi.repository.CourseRepository;
 import com.hcmute.lms.lmsapi.repository.CourseSectionRepository;
 import com.hcmute.lms.lmsapi.repository.EnrollmentRepository;
+import com.hcmute.lms.lmsapi.repository.ImportBatchRepository;
 import com.hcmute.lms.lmsapi.repository.ProgramCourseRepository;
 import com.hcmute.lms.lmsapi.repository.ProgramVersionRepository;
 import com.hcmute.lms.lmsapi.repository.SyllabusRepository;
@@ -42,6 +43,7 @@ public class ScopeAuthorizationServiceImpl implements ScopeAuthorizationService 
   private final CloPiLinkRepository cloPiLinkRepository;
   private final EnrollmentRepository enrollmentRepository;
   private final AssessmentRepository assessmentRepository;
+  private final ImportBatchRepository importBatchRepository;
 
   @Override
   public boolean canAccessSection(
@@ -165,6 +167,22 @@ public class ScopeAuthorizationServiceImpl implements ScopeAuthorizationService 
             () -> {
               log.debug(
                   "canAccessAssessment: Fail-closed - assessment [{}] not found", assessmentId);
+              return false;
+            });
+  }
+
+  @Override
+  public boolean canAccessImportBatch(
+      UserPrincipal principal, String batchId, AccessType accessType) {
+    if (batchId == null || batchId.isBlank()) {
+      return false;
+    }
+    return importBatchRepository
+        .findById(batchId.trim())
+        .map(batch -> canAccessSection(principal, batch.getSectionId(), accessType))
+        .orElseGet(
+            () -> {
+              log.debug("canAccessImportBatch: Fail-closed - import batch [{}] not found", batchId);
               return false;
             });
   }
