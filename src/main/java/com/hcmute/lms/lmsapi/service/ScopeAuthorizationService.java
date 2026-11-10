@@ -52,6 +52,12 @@ public interface ScopeAuthorizationService {
   boolean canAccessAssessment(UserPrincipal principal, String assessmentId, AccessType accessType);
 
   /**
+   * Kiểm tra quyền trên lô nhập điểm (F05b) thông qua lớp học phần của lô ({@code
+   * import_batches.sectionId}). Lô không tồn tại thì từ chối (fail-closed).
+   */
+  boolean canAccessImportBatch(UserPrincipal principal, String batchId, AccessType accessType);
+
+  /**
    * Quyền duyệt/từ chối ma trận bài đánh giá bản lớp (NEW-01): chỉ DEPARTMENT_HEAD có học phần của
    * đề cương trong {@code scope.courseIds}. ADMIN không có quyền này.
    */

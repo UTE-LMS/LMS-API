@@ -68,11 +68,9 @@ public final class EnrollmentCsvParser {
       if (headerLine == null || headerLine.isBlank()) {
         throw invalid("Tệp rỗng hoặc thiếu dòng tiêu đề");
       }
-      if (headerLine.charAt(0) == BOM) {
-        headerLine = headerLine.substring(1);
-      }
+      headerLine = stripBom(headerLine);
 
-      char delimiter = headerLine.contains(",") || !headerLine.contains(";") ? ',' : ';';
+      char delimiter = detectDelimiter(headerLine);
       List<String> headers = splitLine(headerLine, delimiter);
       Map<String, Integer> columnIndex = new HashMap<>();
       Set<String> ignored = new LinkedHashSet<>();
@@ -117,6 +115,16 @@ public final class EnrollmentCsvParser {
     } catch (IOException ex) {
       throw new UncheckedIOException(ex);
     }
+  }
+
+  /** Bỏ ký tự BOM ở đầu dòng tiêu đề nếu có. Dùng chung với {@link ScoreCsvParser} (F05b). */
+  static String stripBom(String headerLine) {
+    return headerLine.charAt(0) == BOM ? headerLine.substring(1) : headerLine;
+  }
+
+  /** Dấu phân cách theo dòng tiêu đề: chấm phẩy chỉ khi có và không có dấu phẩy. */
+  static char detectDelimiter(String headerLine) {
+    return headerLine.contains(",") || !headerLine.contains(";") ? ',' : ';';
   }
 
   private static boolean isKnownColumn(String key) {

@@ -15,9 +15,8 @@ Liên quan: [`doc/plan/README.md`](plan/README.md) (§7 Definition of Done), [`.
 - Mục tiêu: chứng minh các chức năng **đã có mã** đáp ứng AC; liệt kê rõ AC **chưa có test** (khoảng trống) để sinh viên
   xử lý; có sẵn khung kiểm thử cho các feature chưa có mã.
 - Trong phạm vi hiện có mã: nền tảng chung (lỗi, audit, transaction, health, correlationId), **F01** (xác thực, người dùng,
-  phân quyền), **F02** (chương trình, phiên bản, PLO, PI, ma trận I/R/M, xác nhận nội dung), **F05a** (học kỳ, lớp học phần, sinh viên, ghi danh; mục 8.5a), **F04** (bài đánh giá, rubric, duyệt ma trận; mục 8.5b).
-- Chưa có mã (ghi nhận, **không bịa test**): F03 (học phần, CLO), F05b
-  (nhập điểm), F06 (đo lường), F07 (báo cáo), F08 (cải tiến) và UI. Xem mục 8.5.
+  phân quyền), **F02** (chương trình, phiên bản, PLO, PI, ma trận I/R/M, xác nhận nội dung), **F05a** (học kỳ, lớp học phần, sinh viên, ghi danh; mục 8.5a), **F04** (bài đánh giá, rubric, duyệt ma trận; mục 8.5b), **F05b** (nhập điểm từ tệp CSV, US-21…24; mục 8.5c).
+- Chưa có mã (ghi nhận, **không bịa test**): F03 (học phần, CLO), US-25 (sửa điểm), F06 (đo lường), F07 (báo cáo), F08 (cải tiến) và UI. Xem mục 8.5.
 - Ngoài phạm vi kiểm thử: nội dung đề thi, bài làm của sinh viên, ML (đều ngoài phạm vi đề tài, `CLAUDE.md` quy tắc 1).
 
 ## 2. Chỉ tiêu cần đạt (lấy từ rule 04; là **mục tiêu**, chưa phải kết quả)
@@ -79,7 +78,7 @@ Cách chạy cục bộ (theo `README.md`): bật MongoDB replica set bằng ima
 - Ca âm và ca biên bắt buộc cho miền này (rule 04): điểm > điểm tối đa; `BLANK` ≠ `MISSING`/`ABSENT`; trùng
   `(sectionId, assessmentId, itemId, studentId)`; tổng `weight` ≠ 1; cặp CLO–PI ngoài `clo_pi_links`; tệp trống/sai
   cột/trùng checksum; quy tắc `DRAFT` không chạy chính thức; lớp 45 ghi danh/40 đủ dữ liệu; người dùng ngoài phạm vi lớp
-  bị từ chối; sửa điểm đồng thời báo xung đột. **Tất cả chưa có mã để kiểm** (F05b–F06) — liệt kê để không bị quên.
+  bị từ chối; sửa điểm đồng thời báo xung đột. Phần nhập điểm (F05b US-21…24) đã có test, xem §8.5c; **sửa điểm đồng thời (US-25) và đo lường (F06) chưa có mã để kiểm** — liệt kê để không bị quên.
 
 ## 6. Tiêu chí vào / ra
 
@@ -208,7 +207,7 @@ bảng dưới chỉ để không bỏ sót.
 | F03 Học phần, đề cương, CLO | US-09…12 | 15 | Chưa có mã, chưa có test |
 | F04 Bài đánh giá, rubric, duyệt ma trận | US-13…16, NEW-01 | 16 | **Có mã và test** cho US-15, US-16, NEW-01, xem §8.5b (US-13, US-14 mở rộng chưa làm; US-17 loại khỏi phạm vi) |
 | F05a Học kỳ, lớp, sinh viên | US-18…20 | 11 | **Có mã và test** cho US-18 (một phần), US-19, US-20, xem §8.5a |
-| F05b Nhập điểm | US-21…25 | 16 | Chưa có mã, chưa có test |
+| F05b Nhập điểm | US-21…25 | 16 | **Có mã và test** cho US-21…24, xem §8.5c (US-25 sửa điểm chưa làm) |
 | F06 Đo lường CLO → PI → PLO | US-26…30 | 15 | Chưa có mã, chưa có test (NEW-04 chưa có dòng AC) |
 | F07 Báo cáo, truy vết | US-31…36 | 11 | Chưa có mã, chưa có test |
 | F08 Cải tiến | US-37, 38, NEW-02 | 10 | Chưa có mã, chưa có test |
@@ -278,6 +277,34 @@ Test đặc biệt quan trọng cần có khi các feature này có mã (nhắc 
 trùng bản ghi điểm; tổng `weight` ≠ 1; cặp CLO–PI ngoài `clo_pi_links`; quy tắc `DRAFT` không chạy chính thức; lớp
 45/40; sửa điểm đồng thời; người dùng ngoài phạm vi lớp.
 
+#### 8.5c F05b (nhập điểm từ tệp CSV): AC ↔ test
+
+Đã có mã (US-21…24) và chạy được trên MongoDB replica set. Bảng đầy đủ tên phương thức nằm ở [`doc/plan/F05b-nhap-diem.md`](plan/F05b-nhap-diem.md) §11.3; ở đây là
+tóm tắt theo lớp test. `UIT`/`VIT`/`CIT` = `ImportBatchUpload/Validate/ConfirmIntegrationTest`; `RIT` = `ImportConfirmRollbackIntegrationTest`;
+`PIT` = `ImportBatchPerformanceIntegrationTest`; `SRV` = `ScoreRowValidatorTest`; `CSV` = `ScoreCsvParserTest`; `SVC` = `ImportBatchServiceImplTest`;
+`LFS` = `LocalImportFileStorageTest`; `CHK` = `ChecksumUtilsTest`; `SCA` = `ImportBatchScopeAuthorizationTest`. Giá trị kỳ vọng tính tay từ nội dung
+CSV nhỏ ngay trong từng test (Q1 tối đa 4, Q2 tối đa 6 — ví dụ minh họa, "DỮ LIỆU THỬ NGHIỆM").
+
+| AC | Test | Ghi chú |
+|---|---|---|
+| US-21/AC-1 (tải → lô `UPLOADED`, checksum, tệp gốc đã lưu) | `UIT#us21_ac1_…`; `LFS`; `CHK` (vector chuẩn NIST) | Có |
+| US-21/AC-2 (ánh xạ cột lưu và dùng lại) | `UIT#us21_ac2_…` | Có |
+| US-21/AC-3 (nhập trùng checksum đã `CONFIRMED` → 409) | `UIT#us21_ac3_…` (3 ca, gồm biên "lô trước chưa xác nhận") | Có |
+| US-21/AC-4 (bài chưa duyệt, học kỳ/lớp khóa → 422, không tạo lô) | `UIT#us21_ac4_…` (DRAFT/SUBMITTED/REJECTED/LOCKED, SCORE_ENTERED, TOTAL_ONLY, SCORE_LOCKED/CLOSED, lớp LOCKED/CLOSED) | Có; hoàn thành vế nhập điểm của US-18/AC-2 |
+| US-22/AC-1…AC-3 (lỗi đúng dòng/cột/loại/giá trị gốc, không báo nhầm) | `SRV` (biên `maxScore`, `maxScore + 0,01`, âm, chữ, `NaN`, 1 lỗi/1.000 dòng); `VIT#us22_errorsAreReportedAtTheExactRowAndColumn` (8 lỗi cài sẵn) | Có; **chưa đo KPI K2 trên tệp thật** |
+| US-22/AC-4 (tệp rỗng, sai cột, sai định dạng → 400, không 500, không tạo lô) | `UIT#us22_ac4_fileLevelErrorsCreateNoBatch`; `CSV`; `SVC#validateDetectsTamperedStoredFile` | Có (chỉ CSV) |
+| US-23/AC-1 (`BLANK` ≠ `MISSING`; không chọn → 400) | `UIT#us23_ac1_…`; `SRV#emptyCellFollowsChosenPolicy`; `VIT#us23_ac1_…` | Có |
+| US-23/AC-2 (`REJECT_ON_CONFLICT`, điểm cũ giữ nguyên) | `UIT#us23_ac2_…`; `SRV`; `VIT#us23_ac2_…`; `CIT#us24_secondBatchWithSameKeysIsRejectedAfterFirstConfirm` | Có |
+| US-24/AC-1 (điểm + lô + bài + audit cùng ghi) | `CIT#us24_ac1_…`, `#studentsAbsentFromFileHaveNoScores`, `#us24_confirmRechecksEnrollment`, `#us24_confirmRechecksTermLock`; `PIT` | Có |
+| US-24/AC-2 (rollback khi lỗi giữa chừng, replica set) | `RIT` (3 ca: lỗi sau khi đã ghi 2 điểm; lỗi ở bước audit cuối; xác nhận lại thành công); `CIT#us24_concurrentConfirmOnlyOneWins` | Có. Đã chứng minh test bắt được lỗi: tạm bỏ `@Transactional` của `confirmBatch` thì cả 3 ca đỏ |
+| US-24/AC-3 (HAS_ERRORS/CONFIRMED không xác nhận) | `CIT#us24_ac3_…` | Có |
+| US-24/AC-4 (hủy lô) | `CIT#us24_ac4_rollbackOnlyUnconfirmedBatches` | **Một phần**: gỡ điểm lô đã xác nhận chưa làm (TD-36) |
+| US-25/AC-1, AC-2 (sửa điểm) | — | **Chưa có mã, chưa có test** |
+| Chung (403 ngoài lớp, ADMIN không ghi điểm, 401, truy vết `sourceRow`/`importBatchId`) | `UIT#authorizationOnUpload`; `VIT#authorizationOnBatchEndpoints`; `CIT#authorizationOnConfirmAndRollback`; `SCA` | Có |
+
+Ví dụ minh họa lớp 45 ghi danh/40 đủ dữ liệu: `SRV#enrolledStudentsAbsentFromTheFileGetNoScores` (45 ghi danh, tệp 40 dòng → 40 điểm, 5 người không có điểm và không bị
+báo lỗi). Báo cáo "5 người chưa đủ dữ liệu" thuộc F06/F07, chưa có.
+
 ### 8.6 Khoảng trống phát hiện được (cần sinh viên xử lý)
 
 | # | Khoảng trống | Loại |
@@ -294,9 +321,9 @@ trùng bản ghi điểm; tổng `weight` ≠ 1; cặp CLO–PI ngoài `clo_pi_l
 | G-10 | US-01/AC-4: chưa kiểm `passwordHash` không lộ ở `LoginResponse`, `/auth/me`, `GET /users`, log | Test một phần |
 | G-11 | US-02/AC-1: chưa kiểm `roleAssignments` rỗng → 400 | Test một phần |
 | G-12 | US-03: `canAccessSection` chỉ được kiểm qua controller thử nghiệm; AC-2 "mọi endpoint" không có test duyệt toàn bộ | Test trên mã thử nghiệm / một phần |
-| G-13 | NEW-03 (hoãn) chưa có mã; chỉ `LOGIN`, `ASSESSMENT_APPROVE`, `ASSESSMENT_REJECT` có nơi gọi — các `AuditAction` còn lại chưa có nơi gọi. US-04 (đọc nhật ký) đã có mã và test | Chưa có mã (phần còn lại) |
+| G-13 | NEW-03 (hoãn) chưa có mã; chỉ `LOGIN`, `ASSESSMENT_APPROVE`, `ASSESSMENT_REJECT`, `IMPORT_CONFIRM` (F05b) có nơi gọi — các `AuditAction` còn lại chưa có nơi gọi. US-04 (đọc nhật ký) đã có mã và test | Chưa có mã (phần còn lại) |
 | G-14 | Quy ước gắn mã AC trong `@DisplayName` mới áp dụng cho 2 lớp test; phần lớn test chưa gắn AC | Quy trình |
-| G-15 | Không có tầng E2E, không có test hiệu năng, không có bảng test thủ công/UAT | Thiếu tầng |
+| G-15 | Không có tầng E2E, không có bảng test thủ công/UAT; test hiệu năng mới có một ca nhập 5.000 dòng (`ImportBatchPerformanceIntegrationTest`, ngưỡng 10 s là đề xuất chưa chốt), chưa có k6/JMeter | Thiếu tầng |
 | G-16 | Chưa có báo cáo coverage công bố; JaCoCo `check` với `haltOnFailure=false` không chặn build | Công cụ |
 | G-17 | Các tài nguyên F02 thiếu test ghi bị 403 cho vai trò không phải `PROGRAM_MANAGER` ngoài `programs` | Test một phần |
 

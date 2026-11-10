@@ -219,6 +219,8 @@
                         <app.security.jwt.secret>0123456789012345678901234567890123456789012345678901234567890123</app.security.jwt.secret>
                         <app.security.jwt.ttl>60m</app.security.jwt.ttl>
                         <app.security.jwt.issuer>lms-api</app.security.jwt.issuer>
+                        <!-- F05b: tệp điểm gốc của test ghi vào target/, không vào ./data (ADR 0013) -->
+                        <app.score-import.storage-dir>${project.build.directory}/score-import-test</app.score-import.storage-dir>
                     </systemPropertyVariables>
                 </configuration>
             </plugin>

@@ -176,3 +176,17 @@ Phân quyền thêm vào `ScopeAuthorizationService`: `canManageCourseSections`/
 Phân quyền thêm: `canAccessAssessment` (bản lớp theo quyền trên lớp, khung theo quyền trên đề cương) và `canReviewAssessment` (chỉ DEPARTMENT_HEAD có học phần
 của đề cương trong `scope.courseIds`, ADMIN không có). Collection `assessments` có thêm trường `revision` (khóa lạc quan, xem plan F04 §11 D7).
 
+
+**Thành phần F05b (nhập điểm từ tệp CSV; `doc/plan/F05b-nhap-diem.md` §11, ADR 0013 nháp):**
+
+| Lớp | Vai trò | Phụ thuộc chính |
+|---|---|---|
+| `ImportBatchController` (`/api/v1/sections/{s}/assessments/{a}/import-batches`, `/api/v1/import-batches/{id}[/errors\|/validate\|/confirm\|/rollback]`) | Tải tệp, xem lô/lỗi, kiểm tra, xác nhận, hủy | `ImportBatchService`; kiểm quyền bằng `ScopeAuthorizationService` (`hasRole('LECTURER')` cho ghi) |
+| `ImportBatchServiceImpl` | Luồng 3 bước; kiểm điều kiện nhập (bài, lớp, học kỳ); `confirmBatch` là một `@Transactional` ghi `scores`, lô, trạng thái bài và `audit_logs` | `ImportBatchRepository`, `ImportRowErrorRepository`, `ScoreRepository`, `AssessmentRepository`, `CourseSectionRepository`, `TermRepository`, `EnrollmentRepository`, `StudentRepository`, `ImportFileStorage`, `ScoreRowValidator`, `AuditService`, `ImportBatchMapper` |
+| `ScoreRowValidator` | Kiểm tra từng dòng/cột, sinh bản ghi điểm dự kiến (lớp thuần, nhận dữ liệu đã nạp, không truy cập CSDL) | `ScoreCsvParser` (chỉ kiểu dữ liệu) |
+| `ScoreCsvParser` (`util`) | Đọc CSV điểm thành bảng + số dòng vật lý; dùng lại `EnrollmentCsvParser#splitLine/detectDelimiter/stripBom` | `EnrollmentCsvParser` |
+| `ImportFileStorage` / `LocalImportFileStorage` | Lưu/đọc/xóa tệp gốc trong thư mục `app.score-import.storage-dir`; `fileRef` đúng mẫu `<24 hex>.csv` | hệ tệp của máy chủ |
+| `ChecksumUtils` (`util`) | SHA-256 của tệp | `java.security.MessageDigest` |
+
+Phân quyền thêm vào `ScopeAuthorizationService`: `canAccessImportBatch` (suy quyền từ lớp của lô, `canAccessSection`). Collection mới có `document`:
+`import_batches`, `import_row_errors`, `scores` (xem `03-erd-collection.md` mục 6). Không thêm dependency Maven nào.

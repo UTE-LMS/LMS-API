@@ -42,6 +42,6 @@ flowchart LR
 
 - Không có gửi email, không có WebSocket: `pom.xml` còn `spring-boot-starter-mail` và `spring-boot-starter-websocket` nhưng
   `src/` không có dòng mã nào dùng (đã `grep` `JavaMail`, `MailSender`, `WebSocket`, `SimpMessag`). Xem TD-01 trong `doc/tech-debt.md`.
-- Không có lưu trữ tệp (tệp điểm gốc) — thuộc F05b, chưa có mã.
+- Tệp điểm gốc (F05b) lưu trong một thư mục của máy chủ do cấu hình `app.score-import.storage-dir` (ADR 0013, nháp); không có object storage/dịch vụ lưu trữ ngoài.
 - Không có hệ thống ngoài khác (không có SSO, không có dịch vụ ML; ML ngoài phạm vi đề tài).
 - Môi trường staging/production: **chưa chọn nền tảng** — xem [`05-deployment.md`](05-deployment.md).

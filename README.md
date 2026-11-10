@@ -141,6 +141,10 @@ docker run -d --name lms-api --network container:lms-mongo -e JWT_SECRET=<chuỗ
 
 Cổng 8080 khi đó nằm trên container `lms-mongo`, nên cần publish `-p 8080:8080` lúc tạo container Mongo.
 
+**Nhập điểm từ tệp (F05b):** tệp CSV điểm gốc của từng lô được lưu trong thư mục `SCORE_IMPORT_STORAGE_DIR` (mặc định `./data/score-import`,
+đã `.gitignore`; xem ADR 0013, nháp). Trong image, thư mục mặc định là `/app/data/score-import` (đã tạo sẵn cho user không phải root); hãy gắn volume vào đó (ví dụ `-v lms-score-import:/app/data/score-import`)
+hoặc đặt `SCORE_IMPORT_STORAGE_DIR` tới thư mục khác đã gắn volume; nếu không tệp mất khi container được tạo lại và lô chưa xác nhận không thể kiểm tra/xác nhận tiếp.
+
 ### Pipeline CI (`.github/workflows/ci.yml`)
 
 ```mermaid
