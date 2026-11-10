@@ -31,7 +31,7 @@
 1. Component: chạy lệnh ở mục 3 của `02-component.md` và so với bảng phụ thuộc; đếm lớp trong các package.
 2. Endpoint: `grep -rnE "@(Get|Post|Put|Delete|Patch|Request)Mapping|@PreAuthorize" src/main/java/com/hcmute/lms/lmsapi/controller`.
 3. Collection: so các lớp trong `document/` với `COLLECTIONS` trong `doc/database_import.js` (tên collection, trường, chỉ mục).
-4. Sequence: mở các phương thức nêu ở bảng cuối mục 7 của `04-sequence.md`, đọc từng bước.
+4. Sequence: mở các phương thức nêu ở bảng cuối mục 8 của `04-sequence.md`, đọc từng bước.
 5. Cú pháp Mermaid: dán từng khối vào trình xem Mermaid (GitHub hiển thị trực tiếp). Người soạn đã chạy bộ phân tích cú pháp
    `mermaid@11.4.1` (chế độ `parse`, không dựng ảnh) trên cả 9 khối và không có lỗi cú pháp; **chưa** kiểm tra giao diện hiển thị.
 

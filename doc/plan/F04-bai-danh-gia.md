@@ -1,7 +1,7 @@
 # F04 — Bài đánh giá, rubric, duyệt ma trận đề thi, ngân hàng câu hỏi
 
 Story: **US-15** bài đánh giá khung và bản lớp (C), **US-16** tiêu chí rubric + mức 1–4 (C), **NEW-01** duyệt ma trận đề
-thi (C, **[CHỜ GVHD, Q11]**), **US-13** ngân hàng + cây danh mục 3 cấp (MR), **US-14** câu hỏi nhiều cặp trong ngân hàng
+thi (C, **GVHD đã xác nhận Q11**, ADR 0001 phương án A), **US-13** ngân hàng + cây danh mục 3 cấp (MR), **US-14** câu hỏi nhiều cặp trong ngân hàng
 (đề xuất MR; kế hoạch v0.3 xếp M), **US-17** nhập câu hỏi từ Excel/Moodle (K). Giai đoạn P3. Chủ trì đề xuất: IBS + IT.
 Package: `assessment`. Phụ thuộc: `00`, `F01`, `F02`, `F03` (cần `clos`, `clo_pi_links`); `F05a` cho bản lớp (`course_sections`).
 
@@ -47,7 +47,7 @@ không trùng CLO. **Service vẫn phải kiểm tra trước** để trả lỗ
 2. Mỗi `cloId` trong `outcomeMappings` phải **thuộc `syllabusId` của bài**. Chạy tính chính thức (F06) yêu cầu `clo_pi_links` của các CLO đó đã `VERIFIED`.
 3. `Σ weight` của một item = 1 (sai số 0,0001). Không gán nguyên điểm một câu cho mọi chuẩn. Cách chia giữa các CLO chờ Khoa (Q15): giữ ở dạng dữ liệu, không rải logic cứng.
 4. `rubric.levels[].level` ∈ 1–4 là **mức rubric**, tách khỏi `bloomLevel` (1–6). Không quy đổi lẫn nhau.
-5. **Luồng trạng thái (NEW-01) [ĐỀ XUẤT, chờ Q11]:**
+5. **Luồng trạng thái (NEW-01), GVHD đã xác nhận (Q11):**
    `DRAFT → SUBMITTED` (giảng viên gửi; cần ≥ 1 item và `|totalPoints − Σ maxScore| < 0,001`);
    `SUBMITTED → APPROVED | REJECTED` (Trưởng bộ môn; `REJECTED` kèm `reviewNote`); `REJECTED → DRAFT` (sửa lại);
    `APPROVED → SCORE_ENTERED` (tự động khi lô điểm đầu tiên được xác nhận, F05b); `SCORE_ENTERED → LOCKED` (khóa sổ);
@@ -108,7 +108,7 @@ mọi chuyển trạng thái hợp lệ và không hợp lệ; sửa `items` khi
 ## 9. Không làm / chưa quyết
 
 - Không làm: sinh đề, duyệt nội dung câu hỏi, xuất phôi in (`exportedFiles`), nhập câu hỏi từ Moodle. Nhập câu hỏi từ Excel (US-17, Q16).
-- **Q11:** Nhóm SV chốt giữ NEW-01 và vai trò `DEPARTMENT_HEAD` (ADR 0001; GVHD chưa ký xác nhận).
+- **Q11:** GVHD đã xác nhận giữ NEW-01 và vai trò `DEPARTMENT_HEAD` (ADR 0001 phương án A, theo báo cáo của sinh viên; ngày ký: [ĐIỀN]). Mã đã hiện thực, xem §11.
 - Chờ Khoa: Q15 (cách chia điểm khi một câu đo nhiều CLO). *(Riêng Q16 đã chốt nhập Excel; Q17 đã chốt bỏ collection `departments`, kiểm soát qua `scope.courseIds`).*
 - US-13/14 xuống MR: item khai báo trực tiếp trong `assessments.items[]` đã đủ để đo; ngân hàng chỉ là tiện ích tái sử dụng.
 
@@ -117,3 +117,35 @@ mọi chuyển trạng thái hợp lệ và không hợp lệ; sửa `items` khi
 Vì sao lưu snapshot ánh xạ trong từng bài (đổi liên kết về sau không làm sai kết quả cũ); vì sao Σ `weight` = 1 (điểm một câu chỉ
 được chia, không được nhân đôi); vì sao khóa `items` sau duyệt (điểm đã nhập gắn vào đúng cấu trúc đó); vì sao duyệt *ma trận* khác
 duyệt *đề* (chỉ kiểm ánh xạ chuẩn đầu ra, không đụng nội dung câu hỏi); bỏ `isLocked` thì sửa `maxScore` sau khi có điểm làm sai CLO.
+
+## 11. Hiện thực (2026-11-08)
+
+US-15, US-16 và NEW-01 đã có mã trên nhánh `feat/f04-assessments` (US-13, US-14 là mục tiêu mở rộng, US-17 loại khỏi phạm vi: **chưa làm**).
+Các quyết định dưới đây là lựa chọn của người hiện thực, **chờ hai sinh viên xác nhận**.
+
+**API thực tế** (tiền tố `/api/v1`):
+
+| Phương thức | Đường dẫn | Quyền |
+|---|---|---|
+| GET/POST | `/syllabi/{id}/assessment-templates` | đọc: `canAccessSyllabus` READ; tạo: LECTURER hoặc DEPARTMENT_HEAD có học phần trong `scope.courseIds` |
+| GET/POST | `/sections/{id}/assessments` | đọc: `canAccessSection` READ; tạo: LECTURER của lớp |
+| GET/PUT | `/assessments/{id}`, `PUT /assessments/{id}/items` | đọc theo lớp/đề cương; sửa: như tạo |
+| GET | `/assessments/{id}/coverage` | như đọc; trả `byClo` kèm mã CLO và `byBloom` |
+| POST | `/assessments/{id}/submit` | LECTURER của lớp |
+| POST | `/assessments/{id}/approve`, `/reject` | DEPARTMENT_HEAD có học phần của đề cương trong `scope.courseIds` (`canReviewAssessment`) |
+
+| # | Quyết định | Lý do / hệ quả |
+|---|---|---|
+| D1 | Khung theo đề cương do LECTURER hoặc DEPARTMENT_HEAD có học phần trong scope soạn; **PROGRAM_MANAGER và ADMIN chỉ đọc** | Plan §6 ghi "PROGRAM_MANAGER, LECTURER" nhưng ADR 0010 đã chuyển quyền soạn nội dung học phần về bộ môn; khung là nội dung của đề cương |
+| D2 | Bản lớp chỉ LECTURER của lớp tạo/sửa/gửi duyệt (ADMIN, PM, TBM không) | ADMIN không soạn nội dung (ADR 0010); TBM là người duyệt, không tự soạn bài của lớp |
+| D3 | Duyệt/từ chối: chỉ DEPARTMENT_HEAD đúng phạm vi, **ADMIN không có quyền**; người gửi duyệt không được duyệt/từ chối lượt của chính mình (403) kể cả khi cùng giữ vai trò DEPARTMENT_HEAD | Plan §4 quy tắc 9, NEW-01/AC-5 |
+| D4 | Khung (`SYLLABUS_TEMPLATE`) không đi qua quy trình duyệt: luôn `DRAFT`, `isLocked = false`, sửa được; gửi duyệt khung → 422 | Quy trình duyệt chỉ có ý nghĩa với bài đã/sẽ thi của một lớp |
+| D5 | Bản lớp chỉ sửa được ở `DRAFT` hoặc `REJECTED`; sửa bài `REJECTED` tự đưa về `DRAFT`; gửi duyệt chỉ từ `DRAFT` (bài bị từ chối phải sửa rồi mới gửi lại) | Plan §4 quy tắc 5 (`REJECTED → DRAFT`); `SUBMITTED` đang chờ duyệt nên cũng khóa sửa |
+| D6 | **Chưa có** API mở khóa (`UNLOCK`), xóa bài đánh giá; các chuyển `SCORE_ENTERED`, `LOCKED` thuộc F05b trở đi | Plan §4 ghi UNLOCK là [ĐỀ XUẤT], không nằm trong AC |
+| D7 | Thêm trường `revision` (`@Version`) vào `assessments` để hai người cùng duyệt chỉ một người thắng | Thiết kế CSDL §4.15 chưa có trường này (validator MongoDB không cấm trường thừa); cần cập nhật `GiaiThich_CoSoDuLieu.md` khi hai sinh viên xác nhận |
+| D8 | `coverageSummary.percentage` là phần trăm 0–100 so với Σ `maxScore`; phần tử không khai báo Bloom không vào `byBloom`; độ phủ tính lại ở mọi lần ghi `items` và khi đọc `/coverage` | NEW-01/AC-6 |
+| D9 | Σ `weight` kiểm bằng `|Σ − 1| ≤ 0,0001` tính bằng `double`, đúng phép kiểm của validator MongoDB. Hệ quả: tổng 0,9999 bị từ chối (sai số số thực làm `|0,9999 − 1|` lớn hơn 0,0001 một chút), 0,99995 được chấp nhận | Tránh trường hợp service chấp nhận mà MongoDB từ chối (lỗi 121) |
+| D10 | Rubric: mức trong một tiêu chí không trùng, điểm mỗi mức ≤ `maxScore`; mức ngoài 1–4 → 400. Không bắt buộc `CRITERION` phải có rubric, không cấm `QUESTION` có rubric | Plan chưa nói rõ; giữ quy tắc tối thiểu |
+| D11 | `TOTAL_ONLY` lưu được, phản hồi có `measurableByOutcome = false` | Plan §4 quy tắc 11 |
+| D12 | US-15/AC-3 (bản lớp thiếu `sectionId` → 400) **không phát sinh** ở API vì `sectionId` lấy từ đường dẫn; validator MongoDB vẫn ép ở tầng CSDL | Thiết kế API |
+| D13 | `DEPARTMENT_HEAD` duyệt dựa trên `scope.courseIds` chứa học phần của đề cương của bài (Q17 đã chốt không có collection `departments`) | ADR 0010 |

@@ -50,8 +50,8 @@ Mọi đầu ra của agent phải **giải thích được, đúng phạm vi, c
 1. **Đúng phạm vi.** Chỉ làm trong phạm vi của `GiaiThich_CoSoDuLieu.md` §1 và `BS.md` §3: tiếp nhận và đo
    lường kết quả có sẵn sau khi thi. KHÔNG tổ chức thi, sinh đề, duyệt *nội dung* đề thi, xuất phôi in đề; KHÔNG lưu
    bài làm sinh viên. Riêng *duyệt ma trận đề thi* (Trưởng bộ môn duyệt ánh xạ CLO–PI của bài đánh giá lớp, khóa
-   `items[]`, CSDL v0.5, story NEW-01) là **đề xuất chờ GVHD (Q11)**: có trong CSDL, được phép làm theo
-   `doc/chot-feature-do-an.md` nhưng không coi là đã duyệt; ghi ADR (`doc/adr/0001-…`).
+   `items[]`, CSDL v0.5, story NEW-01) đã được **GVHD xác nhận (Q11, ADR 0001 phương án A; ngày ký: [ĐIỀN])**: được
+   làm theo `doc/chot-feature-do-an.md`; ghi ADR (`doc/adr/0001-…`).
    **ML nằm ngoài phạm vi hiện tại**: không viết mã, collection hay dependency ML. Việc ngoài phạm vi hoặc
    ngoài bản cam kết Bước 3 → dừng và hỏi.
 2. **Không bịa minh chứng.** Không tự tạo số liệu khảo sát, biên bản, danh sách người dùng thử, điểm SUS,

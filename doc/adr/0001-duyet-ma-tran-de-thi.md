@@ -1,6 +1,6 @@
 # ADR 0001 — Duyệt ma trận đề thi trước khi nhập điểm
 
-- **Trạng thái:** ĐỀ XUẤT, **chờ GVHD xác nhận (Q11)**. Chưa phải quyết định chính thức.
+- **Trạng thái:** ĐÃ CHẤP NHẬN phương án A. GVHD đã xác nhận (Q11) theo báo cáo của sinh viên ngày 2026-11-08; **ngày ký và người ký: [ĐIỀN]**.
 - **Ngày:** 2026-10-27
 - **Người soạn:** Claude Code theo yêu cầu của sinh viên; sinh viên rà soát và ghi tên người chốt: [ĐIỀN]
 
@@ -23,9 +23,9 @@ có ADR và xin phép.
 
 ## Quyết định
 
-**[ĐIỀN sau khi GVHD trả lời.]** Đề xuất tạm thời của người soạn: làm theo A trong cam kết (`chot-feature-do-an.md`,
-NEW-01), nhưng **không viết mã NEW-01 cho tới khi GVHD trả lời**; nếu GVHD không đồng ý A thì chuyển sang B (ít thay đổi
-nhất so với CSDL hiện có).
+**Chọn phương án A.** GVHD đã xác nhận (Q11) theo báo cáo của sinh viên ngày 2026-11-08; ngày ký và người ký: [ĐIỀN].
+Giảng viên gửi duyệt, Trưởng bộ môn (đúng phạm vi `scope.courseIds`) duyệt hoặc từ chối, chỉ nhập điểm khi bài `APPROVED`
+trở đi, `items[]` bị khóa sau khi duyệt. Phương án B chỉ là dự phòng nếu GVHD đổi ý. Đã hiện thực ở F04 (xem plan F04 §11).
 
 ## Điều giữ nguyên dù chọn phương án nào
 
