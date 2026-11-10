@@ -1,11 +1,14 @@
 package com.hcmute.lms.lmsapi.testsupport;
 
 import com.hcmute.lms.lmsapi.config.JwtConfig;
+import com.hcmute.lms.lmsapi.document.Assessment;
+import com.hcmute.lms.lmsapi.document.AssessmentItem;
 import com.hcmute.lms.lmsapi.document.Clo;
 import com.hcmute.lms.lmsapi.document.Course;
 import com.hcmute.lms.lmsapi.document.CoursePiContribution;
 import com.hcmute.lms.lmsapi.document.CourseSection;
 import com.hcmute.lms.lmsapi.document.Enrollment;
+import com.hcmute.lms.lmsapi.document.OutcomeMapping;
 import com.hcmute.lms.lmsapi.document.Pi;
 import com.hcmute.lms.lmsapi.document.Plo;
 import com.hcmute.lms.lmsapi.document.Program;
@@ -18,9 +21,12 @@ import com.hcmute.lms.lmsapi.document.Term;
 import com.hcmute.lms.lmsapi.document.User;
 import com.hcmute.lms.lmsapi.document.UserScope;
 import com.hcmute.lms.lmsapi.document.Verification;
+import com.hcmute.lms.lmsapi.enums.AssessmentScope;
+import com.hcmute.lms.lmsapi.enums.AssessmentStatus;
 import com.hcmute.lms.lmsapi.enums.CourseCategory;
 import com.hcmute.lms.lmsapi.enums.CourseType;
 import com.hcmute.lms.lmsapi.enums.EnrollmentStatus;
+import com.hcmute.lms.lmsapi.enums.ItemKind;
 import com.hcmute.lms.lmsapi.enums.PiContributionType;
 import com.hcmute.lms.lmsapi.enums.ProgramVersionStatus;
 import com.hcmute.lms.lmsapi.enums.Role;
@@ -283,6 +289,49 @@ public final class ApiTestFixtures {
             .build());
   }
 
+  /**
+   * Tạo bài đánh giá bản lớp ở trạng thái cho trước (F05b). Các câu mã {@code Q1, Q2, ...} có điểm
+   * tối đa lần lượt là {@code maxScores}, {@code externalRef} là {@code EXT-<runId>-Q<i>}, mỗi câu
+   * đo một CLO giả với phần điểm 1 (thỏa validator). {@code syllabusId} lấy từ lớp.
+   */
+  public Assessment sectionAssessment(
+      CourseSection section, AssessmentStatus status, double... maxScores) {
+    List<AssessmentItem> items = new ArrayList<>();
+    double total = 0;
+    for (int i = 0; i < maxScores.length; i++) {
+      total += maxScores[i];
+      items.add(
+          AssessmentItem.builder()
+              .id(new ObjectId().toHexString())
+              .code("Q" + (i + 1))
+              .orderIndex(i + 1)
+              .title(LABEL + " Câu " + (i + 1))
+              .kind(ItemKind.QUESTION)
+              .maxScore(maxScores[i])
+              .externalRef("EXT-" + runId + "-Q" + (i + 1))
+              .outcomeMappings(
+                  new ArrayList<>(
+                      List.of(
+                          OutcomeMapping.builder()
+                              .cloId(new ObjectId().toHexString())
+                              .weight(1.0)
+                              .build())))
+              .build());
+    }
+    return mongo.save(
+        Assessment.builder()
+            .syllabusId(section.getSyllabusId())
+            .sectionId(section.getId())
+            .code(code("AS"))
+            .name(LABEL + " Bài đánh giá giả")
+            .scope(AssessmentScope.SECTION)
+            .totalPoints(total)
+            .status(status)
+            .locked(status.locksStructure())
+            .items(items)
+            .build());
+  }
+
   /** Tạo sinh viên giả với mã thay thế mang tiền tố của test này (không phải mã sinh viên thật). */
   public Student student() {
     return mongo.save(Student.builder().studentRef(code("STU")).build());
@@ -345,6 +394,13 @@ public final class ApiTestFixtures {
         ids("course_sections", Criteria.where("code").regex(codePrefix)).stream()
             .map(ObjectId::new)
             .toList();
+    List<ObjectId> batchOids =
+        ids("import_batches", Criteria.where("sectionId").in(sectionOids)).stream()
+            .map(ObjectId::new)
+            .toList();
+    removeIn("import_row_errors", "batchId", batchOids);
+    removeIn("scores", "sectionId", sectionOids);
+    removeIn("import_batches", "sectionId", sectionOids);
     removeIn("enrollments", "sectionId", sectionOids);
     mongo.remove(query(Criteria.where("studentRef").regex(codePrefix)), "students");
     mongo.remove(query(Criteria.where("code").regex(codePrefix)), "course_sections");
