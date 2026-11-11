@@ -376,4 +376,4 @@ Phần này chuẩn bị sẵn câu trả lời khoa học, chuẩn mực cho 4 
 - **Kiểm chứng đã làm:**
   - Rà soát tính nhất quán giữa `$jsonSchema` trong `doc/database_import.js`, công thức toán học 4 cấp độ (`ASSESSMENT_CLO`, `CLO`, `PI`, `PLO` kèm chuẩn hóa mẫu số $\text{Evaluated}$, lấy lần học gần nhất `LATEST`, tách $N_{\text{section}}$ và $N_{\text{cohort}}$, `PassThreshold` bắt buộc) trong `doc/dac-ta-thay-doi-nghiep-vu-va-phuong-an-tinh-clo.md`, và danh sách class/file thực tế `com.hcmute.lms.lmsapi` trong `doc/ke-hoach-sua-doi-theo-nghiep-vu-moi.md`.
 - **Sinh viên đã sửa/rà soát:** _chờ sinh viên rà soát_
-- **Commit / PR:** chưa commit.
+- **Commit / PR:** commit `df0a673` trên nhánh `docs/v0.7-adr0014-obe-4-levels` (sẵn sàng mở PR vào `main`).
