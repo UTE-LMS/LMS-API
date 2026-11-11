@@ -3,7 +3,7 @@
  *  KHỞI TẠO CƠ SỞ DỮ LIỆU MONGODB
  *  Hệ thống quản lý, đo lường và phân tích chuẩn đầu ra CTĐT
  *  (Learning Outcomes Management and Analytics System)
- *  Thiết kế: GiaiThich_CoSoDuLieu.md v0.5 (cập nhật theo PLO_DB_UPDATE.md)
+ *  Thiết kế: GiaiThich_CoSoDuLieu.md v0.6 (v0.5 theo PLO_DB_UPDATE.md, v0.6 theo ADR 0013)
  * ============================================================================
  *
  *  CÁCH CHẠY (cần mongosh):
@@ -18,11 +18,11 @@
  *      $env:LOMS_DB = "learning_outcomes"; mongosh --file database_import.js
  *
  *  SCRIPT LÀM GÌ:
- *   1. Tạo 29 collection kèm quy tắc kiểm tra cấu trúc ($jsonSchema) và index.
+ *   1. Tạo 26 collection kèm quy tắc kiểm tra cấu trúc ($jsonSchema) và index.
  *   2. Nạp dữ liệu khởi tạo lấy từ tài liệu: 7 PLO, 17 PI, ma trận I/R/M của học phần
  *      OOPR230279 (trang 46) và khung quy tắc đo lường bản nháp.
- *   Ngân hàng câu hỏi (question_banks, question_categories, questions) được tạo rỗng:
- *   danh mục và câu hỏi chỉ nhập khi có đề đã thi và ánh xạ CLO–PI đã duyệt.
+ *   Hệ thống KHÔNG lưu nội dung câu hỏi/đề bài/đáp án (ADR 0013): không có ngân hàng câu hỏi;
+ *   mỗi câu trong bài đánh giá chỉ có nhãn (Câu 1, Câu 2…) và điểm tối đa theo từng CLO.
  *
  *  AN TOÀN:
  *   - Chạy lại nhiều lần được: collection đã có thì chỉ cập nhật validator; dữ liệu khởi tạo
@@ -72,23 +72,22 @@ const schema = (required, properties) => ({
 // ----------------------------------------------------------------------------
 // 2. Khai báo collection: validator + index
 // ----------------------------------------------------------------------------
-// CLO mà một câu hỏi/tiêu chí đo, kèm phần điểm của câu được chia cho CLO đó (tổng của một câu = 1).
-// ADR 0011 (Q10): câu hỏi chỉ gán CLO; PI suy ra từ kết quả CLO qua clo_pi_links. Cách chia điểm khi một câu đo nhiều CLO chờ Q15
+// CLO mà một câu hỏi/tiêu chí đo, kèm ĐIỂM TỐI ĐA riêng của CLO đó trong câu (> 0).
+// ADR 0013: giảng viên nhập trực tiếp điểm tối đa và điểm đạt theo từng CLO của từng câu (không chia theo trọng số).
+// ADR 0011 (Q10): câu hỏi chỉ gán CLO; PI suy ra từ kết quả CLO qua clo_pi_links.
 const OUTCOME_MAPPING = {
-  bsonType: 'object', required: ['cloId', 'weight'],
-  properties: { cloId: OID, weight: { bsonType: ['double', 'int', 'long', 'decimal'], minimum: 0, exclusiveMinimum: true, maximum: 1 } }
+  bsonType: 'object', required: ['cloId', 'maxScore'],
+  properties: { cloId: OID, maxScore: { bsonType: ['double', 'int', 'long', 'decimal'], minimum: 0, exclusiveMinimum: true } }
 };
-// Biểu thức: tổng các trọng số trong mảng bằng 1 (sai số 0,0001)
 // Biểu thức: trong một câu hỏi, mỗi CLO chỉ khai báo một lần (tránh tính trùng điểm)
 const noDuplicateClos = (mappingsPath) => ({ $eq: [ { $size: mappingsPath },
   { $size: { $setUnion: [ { $map: { input: mappingsPath, as: 'm', in: '$$m.cloId' } }, [] ] } } ] });
-const sumsToOne = (weightsPath) => ({ $lte: [{ $abs: { $subtract: [{ $sum: weightsPath }, 1] } }, 0.0001] });
 
 const SCORE_STATUS_VALUES = ['SCORED', 'BLANK', 'ABSENT', 'NOT_GRADED', 'EXEMPT', 'MISSING'];
 const RESULT_LEVELS = ['CLO', 'COURSE', 'PI', 'PLO'];
-// Bài đánh giá đã được Trưởng bộ môn duyệt (hoặc sau đó) thì khóa cấu trúc items[]
-const ASSESSMENT_LOCKED_STATUSES = ['APPROVED', 'SCORE_ENTERED', 'LOCKED'];
-const ASSESSMENT_NEED_ITEMS_STATUSES = ['SUBMITTED', 'APPROVED', 'SCORE_ENTERED', 'LOCKED'];
+// ADR 0013: giảng viên tự khóa ma trận đề (không qua duyệt); từ MATRIX_LOCKED trở đi khóa cấu trúc items[]
+const ASSESSMENT_LOCKED_STATUSES = ['MATRIX_LOCKED', 'SCORE_ENTERED', 'LOCKED'];
+const ASSESSMENT_NEED_ITEMS_STATUSES = ['MATRIX_LOCKED', 'SCORE_ENTERED', 'LOCKED'];
 const rate01 = { bsonType: ['double', 'int', 'long', 'decimal', 'null'], minimum: 0, maximum: 1 };
 // Mức năng lực/Bloom nguyên văn trong tài liệu: số nguyên 1–6
 const level16 = { bsonType: ['int', 'long', 'double', 'null'], minimum: 1, maximum: 6 };
@@ -222,75 +221,6 @@ const COLLECTIONS = {
     indexes: [[{ cloId: 1, piId: 1 }, { unique: true }], [{ piId: 1 }], [{ programVersionId: 1 }]]
   },
 
-  // ----- Ngân hàng câu hỏi (danh mục câu hỏi của đề ĐÃ THI; không sinh đề, không duyệt đề) -----
-  question_banks: {
-    validator: schema(['code', 'name', 'courseId', 'syllabusId', 'sourceSystem', 'status'], {
-      code: STR, name: STR, description: STR_N,
-      courseId: OID, syllabusId: OID,            // ngân hàng gắn với phiên bản đề cương vì CLO chỉ có nghĩa trong một đề cương
-      sourceSystem: en('INTERNAL', 'MOODLE', 'EXCEL_IMPORT'),
-      externalBankId: STR_N,
-      status: en('ACTIVE', 'ARCHIVED'),
-      extra: OBJ_N
-    }),
-    indexes: [[{ code: 1 }, { unique: true }], [{ courseId: 1, syllabusId: 1 }]]
-  },
-
-  // Cây danh mục nội dung của một ngân hàng: Chương/Phần (cấp 1) → Chủ đề (cấp 2) → Nhóm nhỏ (cấp 3)
-  question_categories: {
-    validator: {
-      $and: [
-        schema(['bankId', 'code', 'name', 'parentId', 'ancestorIds', 'level', 'status'], {
-          bankId: OID, code: STR, name: STR, description: STR_N,
-          parentId: OID_N, ancestorIds: arr(OID),
-          level: { bsonType: ['int', 'long', 'double'], minimum: 1, maximum: 3 },
-          order: INT_N, status: en('ACTIVE', 'ARCHIVED')
-        }),
-        // cấp 1 ⇔ không có cha; số tổ tiên = cấp − 1
-        { $expr: { $eq: [{ $eq: ['$level', 1] }, { $eq: [{ $type: '$parentId' }, 'null'] }] } },
-        { $expr: { $eq: [{ $size: '$ancestorIds' }, { $subtract: ['$level', 1] }] } }
-      ]
-    },
-    indexes: [
-      [{ bankId: 1, code: 1 }, { unique: true }],
-      [{ bankId: 1, parentId: 1, order: 1 }],
-      [{ ancestorIds: 1 }]
-    ]
-  },
-
-  questions: {
-    validator: {
-      $and: [
-        schema(['bankId', 'code', 'version', 'questionType', 'categoryId', 'bloomLevel', 'outcomeMappings', 'status'], {
-          bankId: OID, code: STR, version: INT,
-          questionType: en('MCQ', 'SHORT_ANSWER', 'ESSAY', 'PRACTICAL', 'PROJECT_TASK'),
-          content: STR_N,                        // nội dung câu hỏi (có thể để trống nếu đề còn bảo mật)
-          categoryId: OID,                       // mỗi câu thuộc đúng MỘT danh mục lá hoặc nhánh của cây
-          bloomLevel: { bsonType: ['int', 'long', 'double'], minimum: 1, maximum: 6 },
-          difficulty: { enum: ['EASY', 'MEDIUM', 'HARD', null] },
-          defaultMaxScore: NUM_N,
-          outcomeMappings: arr(OUTCOME_MAPPING), // một câu có thể đo nhiều CLO
-          source: OBJ_N,                         // { system: INTERNAL|MOODLE|EXCEL_IMPORT, externalQuestionId, note }
-          status: en('DRAFT', 'ACTIVE', 'RETIRED'),
-          verification: VERIFICATION, extra: OBJ_N
-        }),
-        // Câu ở trạng thái ACTIVE phải có ít nhất một CLO và tổng phần điểm = 1
-        { $expr: { $or: [ { $ne: ['$status', 'ACTIVE'] },
-            { $and: [ { $gte: [{ $size: '$outcomeMappings' }, 1] }, sumsToOne('$outcomeMappings.weight') ] } ] } },
-        // mỗi CLO chỉ xuất hiện một lần trong một câu
-        { $expr: noDuplicateClos('$outcomeMappings') }
-      ]
-    },
-    indexes: [
-      [{ bankId: 1, code: 1 }, { unique: true }],
-      [{ categoryId: 1 }],
-      [{ bankId: 1, status: 1, bloomLevel: 1 }],
-      [{ 'outcomeMappings.cloId': 1 }],
-      // chống nhập trùng một câu từ hệ thống ngoài (Moodle...)
-      [{ bankId: 1, 'source.system': 1, 'source.externalQuestionId': 1 },
-       { unique: true, partialFilterExpression: { 'source.externalQuestionId': { $type: 'string' } }, name: 'uniq_external_question' }]
-    ]
-  },
-
   assessments: {
     validator: {
       $and: [
@@ -301,23 +231,13 @@ const COLLECTIONS = {
           type: { enum: ['QUIZ', 'PRACTICAL', 'PROJECT', 'MIDTERM', 'FINAL', 'OTHER', null] },
           phase: { enum: ['FORMATIVE', 'MIDTERM', 'SUMMATIVE', null] },
           scheduledAt: DATE_N,
-          totalPoints: { bsonType: ['double', 'int', 'long', 'decimal', 'null'], minimum: 0 },  // backend so khớp với tổng items.maxScore (dung sai 0,001)
+          // ADR 0013: không tính, không lưu tổng điểm bài. weightInCourse không tham gia công thức CLO (chờ Q20)
           weightInCourse: rate01,
           dataGranularity: en('ITEM', 'TOTAL_ONLY'),
-          // Quy trình Trưởng bộ môn duyệt ma trận đề thi (đề thi → điểm); xem GiaiThich §4.15
-          status: en('DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED', 'SCORE_ENTERED', 'LOCKED'),
-          isLocked: BOOL,                    // true khi status ∈ APPROVED, SCORE_ENTERED, LOCKED: cấm sửa items[]
-          approval: {
-            bsonType: ['object', 'null'],
-            properties: {
-              submittedBy: OID_N, submittedAt: DATE_N, reviewedBy: OID_N, reviewedAt: DATE_N, reviewNote: STR_N,
-              history: arr({
-                bsonType: 'object', required: ['action', 'actorId', 'at'],
-                properties: { action: en('SUBMIT', 'APPROVE', 'REJECT', 'UNLOCK'), actorId: OID, at: DATE, note: STR_N }
-              })
-            }
-          },
-          coverageSummary: {                 // thống kê độ phủ phục vụ màn hình duyệt nhanh
+          // ADR 0013: giảng viên tự khóa ma trận đề, rồi mới nhập điểm; xem GiaiThich §4.15
+          status: en('DRAFT', 'MATRIX_LOCKED', 'SCORE_ENTERED', 'LOCKED'),
+          isLocked: BOOL,                    // true khi status ∈ MATRIX_LOCKED, SCORE_ENTERED, LOCKED: cấm sửa items[]
+          coverageSummary: {                 // thống kê độ phủ (điểm tối đa theo CLO) để giảng viên kiểm tra trước khi khóa
             bsonType: ['object', 'null'],
             properties: {
               totalItemsSum: NUM_N,
@@ -331,16 +251,15 @@ const COLLECTIONS = {
             properties: { fileRef: STR_N, templateCode: STR_N, includeOutcomeLabels: BOOL, exportedBy: OID_N, exportedAt: DATE_N }
           }),
           items: arr({
-            bsonType: 'object', required: ['_id', 'code', 'kind', 'maxScore', 'outcomeMappings'],
+            bsonType: 'object', required: ['_id', 'code', 'kind', 'outcomeMappings'],
             properties: {
-              _id: OID, code: STR, orderIndex: INT_N, title: STR_N,
+              // code là NHÃN định danh (ví dụ 'Câu 1'); KHÔNG có trường lưu nội dung câu hỏi/đề bài/đáp án (ADR 0013)
+              _id: OID, code: STR, orderIndex: INT_N,
               kind: en('QUESTION', 'CRITERION'),
-              maxScore: { bsonType: ['double', 'int', 'long', 'decimal'], minimum: 0, exclusiveMinimum: true },
-              bloomLevel: bloom, topic: STR_N,
-              // Bản SNAPSHOT tại thời điểm thi: CLO và phần điểm của câu được chia cho CLO đó
+              bloomLevel: bloom,
+              // Bản SNAPSHOT tại thời điểm thi: mỗi CLO của câu kèm điểm tối đa riêng; điểm tối đa của câu = tổng, không lưu
               outcomeMappings: { bsonType: 'array', minItems: 1, items: OUTCOME_MAPPING },
-              questionId: OID_N, questionVersion: INT_N,   // câu hỏi lấy từ ngân hàng (null với tiêu chí rubric hoặc đề ngoài ngân hàng)
-              externalRef: STR_N,                          // mã câu hỏi trên Moodle/LMS để khớp cột điểm
+              externalRef: STR_N,                          // nhãn cột điểm trên tệp nguồn để khớp khi nhập
               rubric: OBJ_N                                // { levels: [{ level, description, score }] }
             }
           }),
@@ -348,21 +267,20 @@ const COLLECTIONS = {
         }),
         // Bản đánh giá theo lớp (scope=SECTION) bắt buộc có sectionId
         { $expr: { $or: [ { $ne: ['$scope', 'SECTION'] }, { $eq: [{ $type: '$sectionId' }, 'objectId'] } ] } },
-        // isLocked khớp với trạng thái duyệt
+        // isLocked khớp với trạng thái bài
         { $expr: { $eq: ['$isLocked', { $in: ['$status', ASSESSMENT_LOCKED_STATUSES] }] } },
-        // Đã gửi duyệt trở đi thì phải có ít nhất một câu hỏi/tiêu chí
+        // Đã khóa ma trận trở đi thì phải có ít nhất một câu hỏi/tiêu chí
         { $expr: { $or: [ { $not: [{ $in: ['$status', ASSESSMENT_NEED_ITEMS_STATUSES] }] },
                           { $gte: [{ $size: { $ifNull: ['$items', []] } }, 1] } ] } },
-        // Mỗi câu hỏi/tiêu chí: tổng phần điểm chia cho các CLO phải bằng 1, mỗi CLO một lần
+        // Mỗi câu hỏi/tiêu chí: mỗi CLO chỉ khai báo một lần
         { $expr: { $allElementsTrue: [ { $map: { input: { $ifNull: ['$items', []] }, as: 'it',
-            in: { $and: [ sumsToOne('$$it.outcomeMappings.weight'), noDuplicateClos('$$it.outcomeMappings') ] } } } ] } }
+            in: noDuplicateClos('$$it.outcomeMappings') } } ] } }
       ]
     },
     indexes: [
       [{ syllabusId: 1, sectionId: 1, code: 1 }, { unique: true }],
       [{ sectionId: 1, status: 1 }],
-      [{ 'items.outcomeMappings.cloId': 1 }],
-      [{ 'items.questionId': 1 }]
+      [{ 'items.outcomeMappings.cloId': 1 }]
     ]
   },
 
@@ -431,9 +349,10 @@ const COLLECTIONS = {
         {
           $jsonSchema: {
             bsonType: 'object',
-            required: ['sectionId', 'assessmentId', 'itemId', 'studentId', 'status', 'importBatchId'],
+            required: ['sectionId', 'assessmentId', 'itemId', 'cloId', 'studentId', 'status', 'importBatchId'],
             properties: {
-              sectionId: OID, assessmentId: OID, itemId: OID, studentId: OID,
+              // ADR 0013: một document là điểm của một sinh viên ở một CLO của một câu (ô câu × CLO)
+              sectionId: OID, assessmentId: OID, itemId: OID, cloId: OID, studentId: OID,
               status: { enum: SCORE_STATUS_VALUES },
               rawScore: { bsonType: ['double', 'int', 'long', 'decimal', 'null'], minimum: 0 },
               maxScore: { bsonType: ['double', 'int', 'long', 'decimal'], minimum: 0 },
@@ -457,7 +376,7 @@ const COLLECTIONS = {
       ]
     },
     indexes: [
-      [{ sectionId: 1, assessmentId: 1, itemId: 1, studentId: 1 }, { unique: true }],
+      [{ sectionId: 1, assessmentId: 1, itemId: 1, cloId: 1, studentId: 1 }, { unique: true }],
       [{ studentId: 1 }],
       [{ importBatchId: 1 }]
     ]
@@ -636,7 +555,7 @@ const COLLECTIONS = {
   audit_logs: {
     validator: schema(['at', 'action', 'entity'], {
       at: DATE, userId: OID_N,
-      action: en('SCORE_UPDATE', 'IMPORT_CONFIRM', 'ASSESSMENT_APPROVE', 'ASSESSMENT_REJECT',
+      action: en('SCORE_UPDATE', 'IMPORT_CONFIRM', 'ASSESSMENT_LOCK',
                  'RUN_CALCULATION', 'RULE_CONFIRM', 'LOGIN'),
       entity: OBJ, before: OBJ_N, after: OBJ_N, reason: STR_N, ip: STR_N
     }),
@@ -794,7 +713,7 @@ if (LOAD_ILLUSTRATIVE_SAMPLE) {
 // ----------------------------------------------------------------------------
 print('>>> Số document khởi tạo:');
 ['programs', 'program_versions', 'plos', 'pis', 'courses',
- 'course_pi_contributions', 'measurement_rules', 'syllabi', 'clos', 'question_banks', 'questions'].forEach(function (n) {
+ 'course_pi_contributions', 'measurement_rules', 'syllabi', 'clos'].forEach(function (n) {
   print('      ' + n + ': ' + d.getCollection(n).countDocuments({}));
 });
 print('>>> HOÀN TẤT. Tổng số collection: ' + d.getCollectionNames().length);

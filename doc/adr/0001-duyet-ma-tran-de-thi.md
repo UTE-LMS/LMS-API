@@ -1,6 +1,7 @@
 # ADR 0001 — Duyệt ma trận đề thi trước khi nhập điểm
 
-- **Trạng thái:** ĐÃ CHẤP NHẬN phương án A. GVHD đã xác nhận (Q11) theo báo cáo của sinh viên ngày 2026-11-08; **ngày ký và người ký: [ĐIỀN]**.
+- **Trạng thái:** **BỊ THAY THẾ bởi ADR 0013 (2026-11-11)**: GVHD xác nhận bỏ bước duyệt, giảng viên tự khóa ma trận. Nội dung dưới đây giữ nguyên làm lịch sử quyết định.
+- **Trạng thái trước đó:** ĐÃ CHẤP NHẬN phương án A. GVHD đã xác nhận (Q11) theo báo cáo của sinh viên ngày 2026-11-08; **ngày ký và người ký: [ĐIỀN]**.
 - **Ngày:** 2026-10-27
 - **Người soạn:** Claude Code theo yêu cầu của sinh viên; sinh viên rà soát và ghi tên người chốt: [ĐIỀN]
 

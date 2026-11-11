@@ -2,6 +2,8 @@
 
 - **Trạng thái:** ĐÃ CHẤP NHẬN (ACCEPTED) theo **quyết định của nhóm sinh viên** ngày 2026-11-06.
   **Chưa có xác nhận của GVHD/Khoa**; nếu GVHD/Khoa yêu cầu khác thì viết ADR mới thay thế.
+- **Cập nhật 2026-11-11:** ADR 0013 đóng Q15 (điểm nhập trực tiếp theo từng CLO, `outcomeMappings = {cloId, maxScore}`,
+  bỏ `weight`). Quyết định về PI (mục 2.2–2.4) giữ nguyên; các câu "giữ `weight` (tổng = 1)" ở mục 4 không còn hiệu lực.
 - **Ngày:** 2026-11-06
 - **Người soạn:** Antigravity theo yêu cầu của sinh viên Minh (`minhat5`); sinh viên rà soát và chốt: [ĐIỀN]
 - **Thay thế:** câu trả lời tạm cũ của Q10 (`pi.method = DIRECT_FROM_ITEMS`, PI gán trực tiếp cho từng câu hỏi)

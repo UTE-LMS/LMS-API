@@ -17,10 +17,10 @@ tính vào cam kết), **K** = không làm.
 
 | Hạng mục | Số lượng | Ghi chú |
 |---|---|---|
-| Story cam kết (C) | **32** | 31 story trong backlog gốc + 1 story mới do CSDL v0.5 (NEW-01) |
-| Mục tiêu mở rộng (MR) | 11 | Gồm 8 story gốc và 3 story mới (NEW-02 đến NEW-04) |
-| Không làm (K) | 8 | Mục 4 |
-| Collection dùng | 29 | CSDL gồm 29 collection (đã bỏ hoàn toàn `ml_experiments` khỏi script CSDL và tài liệu, xem TD-06) |
+| Story cam kết (C) | **32** | 31 story trong backlog gốc + NEW-01 (đổi nghĩa: giảng viên tự khóa ma trận, ADR 0013) |
+| Mục tiêu mở rộng (MR) | 9 | Gồm 6 story gốc và 3 story mới (NEW-02 đến NEW-04); US-13, US-14 đã bỏ hẳn (ADR 0013) |
+| Không làm (K) | 10 | Mục 4; thêm US-13, US-14 (bỏ theo ADR 0013), US-17 giữ K |
+| Collection dùng | 26 | CSDL v0.6 gồm 26 collection (đã bỏ `ml_experiments`, xem TD-06, và 3 collection ngân hàng câu hỏi, ADR 0013) |
 
 Khối lượng 32 story cho hai người trong khoảng 10 tuần lập trình là **nặng**. Thay vì cắt ngay, mục 5 đặt thứ tự cắt
 theo từng cổng để quyết định có căn cứ. Nếu hai bạn muốn cam kết nhẹ hơn trước khi ký, hạ US-33 và US-38 xuống MR
@@ -32,8 +32,8 @@ theo từng cổng để quyết định có căn cứ. Nếu hai bạn muốn c
 
 ```
 Khai báo CTĐT, PLO/PI, học phần, CLO, liên kết CLO–PI
-  → Lập bài đánh giá bản lớp (items kèm cặp CLO–PI, weight)
-  → Trưởng bộ môn duyệt ma trận (APPROVED) → mở cổng nhập điểm
+  → Lập bài đánh giá bản lớp (items chỉ có nhãn, kèm CLO và điểm tối đa của từng CLO)
+  → Giảng viên tự khóa ma trận (MATRIX_LOCKED) → mở cổng nhập điểm
   → Giảng viên tải tệp điểm → kiểm tra, báo lỗi dòng/cột → xác nhận (transaction) hoặc rollback
   → Chạy đo lường theo quy tắc cấu hình → CLO → PI → PLO (student_results)
   → Tổng hợp lớp có mẫu số (aggregate_results)
@@ -81,12 +81,12 @@ Cột "Đề xuất" phân biệt story gốc (giữ nguyên ưu tiên) với th
 
 | ID | Story | Quyết định | Ghi chú |
 |---|---|---|---|
-| US-13 | Ngân hàng câu hỏi và cây danh mục 3 cấp | MR | **Đổi từ Should**: xem lý do ở US-14 |
-| US-14 | Câu hỏi kèm ánh xạ nhiều cặp trong ngân hàng | MR | **Đổi từ Must.** Câu hỏi/tiêu chí khai báo trực tiếp trong `assessments.items[]` (US-15) đã đủ để đo CLO/PI, nên ngân hàng chỉ là tiện ích tái sử dụng. Bỏ khỏi cam kết để giảm khối lượng; CSDL vẫn giữ nguyên |
-| US-15 | Bài đánh giá khung (theo đề cương) và bản lớp | **C** | `items[]` có `outcomeMappings`; tổng `weight` mỗi câu bằng 1; cặp (CLO, PI) phải thuộc `clo_pi_links` |
+| US-13 | Ngân hàng câu hỏi và cây danh mục 3 cấp | **K** | **Bỏ (ADR 0013):** hệ thống không lưu nội dung câu hỏi |
+| US-14 | Câu hỏi kèm ánh xạ nhiều cặp trong ngân hàng | **K** | **Bỏ (ADR 0013):** câu đo nhiều CLO được khai báo trực tiếp trong `assessments.items[]` (US-15) |
+| US-15 | Bài đánh giá khung (theo đề cương) và bản lớp | **C** | `items[]` chỉ có nhãn và `outcomeMappings = {cloId, maxScore}` (ADR 0013); CLO phải thuộc đề cương của bài; không có trường nội dung câu hỏi |
 | US-16 | Tiêu chí rubric, mức rubric 1–4 | **C** | Mức rubric khác mức Bloom |
-| US-17 | Nhập câu hỏi từ Excel/Moodle | K | |
-| **NEW-01** | **Duyệt ma trận đề thi:** giảng viên gửi duyệt, Trưởng bộ môn duyệt hoặc từ chối, khóa `items` sau khi duyệt, kèm bảng độ phủ theo CLO và theo Bloom (`coverageSummary`) | **C** | **Story mới từ CSDL v0.5.** Điều kiện: chỉ nhập điểm khi `APPROVED`/`SCORE_ENTERED`. **[CHỜ GVHD]** vì chạm vào phạm vi "không duyệt đề" (Q11). Phương án nếu GVHD không đồng ý: bỏ bước Trưởng bộ môn, giảng viên tự xác nhận ma trận (DRAFT → APPROVED), giữ nguyên khóa `items` |
+| US-17 | Nhập câu hỏi từ Excel/Moodle | K | Bỏ hẳn (ADR 0013, Q16 không còn áp dụng) |
+| **NEW-01** | **Giảng viên tự khóa ma trận đề** (đổi nghĩa từ "duyệt ma trận", giữ mã để truy vết): giảng viên của lớp khóa, khóa `items`, bảng độ phủ theo CLO và theo Bloom (`coverageSummary`) | **C** | **ADR 0013, GVHD đã xác nhận (ngày ký: [ĐIỀN]).** Điều kiện: chỉ nhập điểm khi `MATRIX_LOCKED`/`SCORE_ENTERED`; ghi `audit_logs` (`ASSESSMENT_LOCK`). Không còn vai trò duyệt của `DEPARTMENT_HEAD`. `UNLOCK` chưa quyết |
 
 ### E05 Học kỳ, lớp, sinh viên
 
@@ -103,7 +103,7 @@ Cột "Đề xuất" phân biệt story gốc (giữ nguyên ưu tiên) với th
 | US-21 | Tải tệp (CSV/Excel) và ánh xạ cột | **C** | |
 | US-22 | Kiểm tra, báo lỗi theo dòng/cột | **C** | 4 loại lỗi: mã sinh viên sai, điểm vượt thang, trùng bản ghi, thiếu trường |
 | US-23 | Chọn BLANK/MISSING cho ô trống; chính sách nhập lại | **C** | Chính sách nhập lại cam kết: `REJECT_ON_CONFLICT`. `OVERWRITE`, `UPDATE_BLANK_ONLY` là MR |
-| US-24 | Xác nhận nhập trong một transaction hoặc rollback | **C** | Cần MongoDB replica set. Chỉ nhập được khi bài ở `APPROVED`/`SCORE_ENTERED` |
+| US-24 | Xác nhận nhập trong một transaction hoặc rollback | **C** | Cần MongoDB replica set. Chỉ nhập được khi bài ở `MATRIX_LOCKED`/`SCORE_ENTERED` |
 | US-25 | Sửa điểm đơn lẻ có lý do | MR | Nếu làm: dùng `scores.revision`, ghi audit trước/sau |
 
 ### E07 Đo lường (F06)
@@ -155,7 +155,7 @@ Cột "Đề xuất" phân biệt story gốc (giữ nguyên ưu tiên) với th
 
 | Hạng mục | Lý do |
 |---|---|
-| Tổ chức thi, sinh đề; duyệt **nội dung** đề thi | Ngoài phạm vi đã chốt. NEW-01 chỉ duyệt ma trận ánh xạ chuẩn đầu ra, không duyệt nội dung câu hỏi |
+| Tổ chức thi, sinh đề; duyệt **nội dung** đề thi | Ngoài phạm vi đã chốt. Hệ thống không lưu nội dung câu hỏi (ADR 0013); ma trận đề chỉ gồm nhãn câu và điểm tối đa theo CLO |
 | Xuất phôi in đề thi (`assessments.exportedFiles`) | Thuộc khâu tổ chức thi. Trường vẫn nằm trong CSDL nhưng không có tính năng. **[CHỜ GVHD]** |
 | Lưu bài làm của sinh viên | Chỉ lưu điểm và tham chiếu tệp điểm gốc |
 | Machine Learning (`ml_experiments`) | Ngoài phạm vi đồ án; đã loại bỏ collection `ml_experiments` khỏi `database_import.js` (TD-06) |
@@ -177,7 +177,7 @@ Chỉ cắt trong cột MR trước; story C chỉ hạ xuống khi có ADR và 
 | K4 (cuối T13) | Engine chưa khớp bộ kiểm chứng | Bỏ US-36, US-35, US-30, NEW-02 |
 | K5 (cuối T15) | Chưa đủ coverage lõi ≥ 70% | Dừng thêm tính năng, chỉ sửa lỗi; không cắt kiểm thử |
 
-Thứ tự ưu tiên làm: nền tảng và staging (T5–T7) → US-01–03 → CTĐT/CLO (E02, E03) → NEW-01 và E04 → E05 → E06 → E07
+Thứ tự ưu tiên làm: nền tảng và staging (T5–T7) → US-01–03 → CTĐT/CLO (E02, E03) → E04 (kể cả NEW-01) → E05 → E06 → E07
 → E08 → E09. Mỗi giai đoạn là lát cắt dọc (UI + API + test + tài liệu chạy trên staging).
 
 ---
@@ -220,7 +220,7 @@ Tóm tắt từ `GiaiThich_CoSoDuLieu.md` mục 2; vi phạm là lỗi nghiệp 
 
 | # | Việc | Ai trả lời | Tình trạng (2026-11-06) | Ảnh hưởng tới feature |
 |---|---|---|---|---|
-| 1 | Chấp nhận NEW-01 (Trưởng bộ môn duyệt ma trận đề thi) và không làm xuất phôi in | GVHD (Q11) | Nhóm SV chốt giữ NEW-01 (ADR 0001); **GVHD đã ký xác nhận** (ngày: [ĐIỀN]) | NEW-01, vai trò DEPARTMENT_HEAD |
+| 1 | ~~Chấp nhận NEW-01 (Trưởng bộ môn duyệt ma trận đề thi)~~ → **Thay bằng ADR 0013:** bỏ duyệt, giảng viên tự khóa; không lưu nội dung câu hỏi; điểm theo từng CLO. Không làm xuất phôi in | GVHD (Q11, Q15, Q16) | **GVHD đã xác nhận** (ngày ký: [ĐIỀN]) | NEW-01, US-13/14/17, vai trò DEPARTMENT_HEAD |
 | 2 | Chọn học phần thử nghiệm; xác nhận điểm có theo từng câu hỏi (Q05) | Khoa, GVHD | **Đã chọn 2 học phần** (`APCM220307`, `ABDA433708`); điểm theo câu hỏi `ITEM` (Q05) | E06–E08 |
 | 3 | Công thức, ngưỡng, mẫu số, xử lý thiếu dữ liệu (Q04, Q12, Q13) | Khoa | **Chưa có:** Khoa chưa cung cấp | US-26–29; nếu không kịp K3 thì chạy chế độ không chính thức |
 | 4 | Phương pháp mặc định PI/PLO và chính sách nhập lại (Q19) | Khoa | **Chưa có:** Khoa chưa cung cấp | US-23, US-28 |
@@ -228,7 +228,7 @@ Tóm tắt từ `GiaiThich_CoSoDuLieu.md` mục 2; vi phạm là lỗi nghiệp 
 | 6 | Ai được xác nhận quy tắc đo và CTĐT (Q08) | Khoa | **Đã chốt nội bộ:** `QA_OFFICER` xác nhận CTĐT/PLO/PI (ADR 0004); người xác nhận quy tắc đo chờ Khoa | Phân quyền mục 6 |
 | 7 | Dùng mã sinh viên thật hay mã thay thế (Q09) | Khoa | **Đã chốt:** Dùng mã thật trên DB thật/staging; dữ liệu mẫu/test giữ mã giả (R9) | US-20 |
 | 8 | Chấp nhận chạy chế độ không chính thức nếu K3 trượt | GVHD | Chờ GVHD xác nhận | Bản cam kết mục 3 |
-| 9 | ADR cập nhật thiết kế: ADR 0001 (NEW-01), ADR 0010 (bộ môn/GV), ADR 0011 (PI suy ra từ CLO), ADR 0012 (bỏ quy đổi I/R/M) | Hai sinh viên | **Đã ban hành ADR 0001, 0010, 0011, 0012** | Giữ mã và tài liệu nhất quán |
+| 9 | ADR cập nhật thiết kế: ADR 0001 (đã bị ADR 0013 thay thế), ADR 0010 (bộ môn/GV), ADR 0011 (PI suy ra từ CLO), ADR 0012 (bỏ quy đổi I/R/M), ADR 0013 (tự khóa ma trận, bỏ ngân hàng câu hỏi, điểm theo từng CLO) | Hai sinh viên | **Đã ban hành ADR 0001, 0010, 0011, 0012, 0013** | Giữ mã và tài liệu nhất quán |
 | 10 | **Công thức còn thiếu** (cấp PLO; cấp học phần khi `requireAllCloPass = false`; `WEIGHTED_ITEMS`; gộp PI nhiều học phần; thiếu dữ liệu/ngưỡng trong công thức): 11 mục CT-01…CT-11 ở `plan/F06-do-luong.md` §9 | GVHD, Khoa (Q20–Q23) | **Chưa có:** PLO không thể báo cáo chính thức nếu chưa có | US-27, US-28, US-29, US-32 |
 
 ---

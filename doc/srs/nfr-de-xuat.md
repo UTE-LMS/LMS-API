@@ -102,7 +102,7 @@ cần hai bạn xác nhận chọn nhắm mức đó.)
 
 ### NFR-10 — Truy vết thao tác quan trọng
 - **Mô tả:** thao tác quan trọng đều để lại dấu vết kiểm toán, không lộ dữ liệu nhạy cảm.
-- **Số đề xuất:** 100% thao tác thuộc `AuditAction` (`SCORE_UPDATE`, `IMPORT_CONFIRM`, `ASSESSMENT_APPROVE`, `ASSESSMENT_REJECT`, `RUN_CALCULATION`, `RULE_CONFIRM`, `LOGIN`) có bản ghi `audit_logs` đúng `entity`, `userId`, `at`; `reason` bắt buộc với `SCORE_UPDATE`; 0 trường nhạy cảm (mật khẩu, token…) trong `before`/`after`.
+- **Số đề xuất:** 100% thao tác thuộc `AuditAction` (`SCORE_UPDATE`, `IMPORT_CONFIRM`, `ASSESSMENT_LOCK`, `RUN_CALCULATION`, `RULE_CONFIRM`, `LOGIN`) có bản ghi `audit_logs` đúng `entity`, `userId`, `at`; `reason` bắt buộc với `SCORE_UPDATE`; 0 trường nhạy cảm (mật khẩu, token…) trong `before`/`after`.
 - **Cách đo:** test tích hợp mỗi thao tác trên replica set; truy vấn đối chiếu số thao tác và số bản ghi.
 - **Công cụ:** JUnit + MongoDB.
 - **Hiện trạng:** `AuditService` có (che trường nhạy cảm, bắt buộc `reason` với `SCORE_UPDATE`), nhưng **chỉ `LOGIN` đang được gọi** từ nghiệp vụ; các hành động còn lại thuộc feature chưa có mã.

@@ -16,7 +16,7 @@ Mỗi file là **một feature, tự đủ để giao cho một LLM** (kèm file
 | [F01-nguoi-dung-phan-quyen.md](F01-nguoi-dung-phan-quyen.md) | Người dùng và phân quyền | US-01…04, NEW-03 | `auth` | P2 |
 | [F02-ctdt-plo-pi.md](F02-ctdt-plo-pi.md) | CTĐT, PLO, PI, ma trận I/R/M | US-05…08 | `program` | P2 |
 | [F03-hoc-phan-clo.md](F03-hoc-phan-clo.md) | Học phần, đề cương, CLO, liên kết CLO–PI | US-09…12 | `course` | P2 |
-| [F04-bai-danh-gia.md](F04-bai-danh-gia.md) | Bài đánh giá, rubric, duyệt ma trận, ngân hàng câu hỏi | US-13…17, NEW-01 | `assessment` | P3 |
+| [F04-bai-danh-gia.md](F04-bai-danh-gia.md) | Bài đánh giá, rubric, ma trận đề (giảng viên tự khóa; không ngân hàng câu hỏi, ADR 0013) | US-15, US-16, NEW-01 | `assessment` | P3 |
 | [F05a-hoc-ky-lop-sinh-vien.md](F05a-hoc-ky-lop-sinh-vien.md) | Học kỳ, lớp học phần, sinh viên, ghi danh | US-18…20 | `academic` | P3 |
 | [F05b-nhap-diem.md](F05b-nhap-diem.md) | Nhập điểm từ tệp | US-21…25 | `scoreimport` | P3 |
 | [F06-do-luong.md](F06-do-luong.md) | Quy tắc và engine đo lường CLO → PI → PLO | US-26…30, NEW-04 | `measurement` | P4 |
@@ -55,7 +55,7 @@ là mức Must/Should/Could của `ke-hoach-xay-dung.md`; hai nguồn lệch ở
 
 ## 3. Nguồn sự thật và thứ tự ưu tiên khi tài liệu lệch nhau
 
-1. `doc/database_import.js`: validator `$jsonSchema`, enum, chỉ mục **thực tế** của 29 collection (đã bỏ `ml_experiments` do ML ngoài phạm vi đồ án). Đây là hợp đồng dữ liệu.
+1. `doc/database_import.js`: validator `$jsonSchema`, enum, chỉ mục **thực tế** của 26 collection (đã bỏ `ml_experiments` do ML ngoài phạm vi đồ án). Đây là hợp đồng dữ liệu.
 2. `doc/GiaiThich_CoSoDuLieu.md` (v0.5): ý nghĩa nghiệp vụ, 14 nguyên tắc (§2), từng collection (§4), câu hỏi Q01–Q23 (§8).
 3. `doc/chot-feature-do-an.md` rồi `doc/ke-hoach-xay-dung.md`: phạm vi và ưu tiên.
 4. `doc/PLO_DB_UPDATE.md`: đặc tả nguồn của v0.5. **Chỉ lấy nội dung dữ liệu và công thức (§3, §4)**; dòng đầu của file ghi
@@ -86,10 +86,10 @@ Lệch nhau mà không tự giải quyết được thì **dừng và hỏi**, �
    `capabilityLevelRaw` lưu nguyên, không diễn giải.
 4. **Tỷ lệ đạt luôn kèm mẫu số**: `counts` = ghi danh, đủ dữ liệu, đạt, chưa đạt, chưa đủ dữ liệu; luôn có `passRateOfEnrolled`.
 5. **CLO nhận diện bằng `_id`** (mã `CLO1` chỉ duy nhất trong một đề cương). **PLO/PI nhận diện bằng mã**, không bằng thứ tự dòng.
-6. Một câu hỏi/tiêu chí đo nhiều cặp (CLO, PI): `weight` các cặp **tổng bằng 1**; cặp phải nằm trong `clo_pi_links` của chính CLO đó.
+6. Một câu hỏi/tiêu chí đo nhiều CLO: mỗi CLO có `maxScore` riêng (> 0), giảng viên nhập điểm đạt riêng (ADR 0013); CLO phải thuộc đề cương của bài; PI suy ra qua `clo_pi_links`.
 7. **MongoDB không có khóa ngoại:** service tự kiểm tra tham chiếu trước khi ghi.
 8. Mọi kết quả gắn `programVersionId`, `syllabusId`, `ruleId`; truy vết được về `scores` → `import_batches` + số dòng tệp gốc.
-9. Sửa điểm, xác nhận nhập, duyệt/từ chối bài đánh giá, chạy tính, xác nhận quy tắc, đăng nhập đều ghi `audit_logs`.
+9. Sửa điểm, xác nhận nhập, khóa ma trận bài đánh giá, chạy tính, xác nhận quy tắc, đăng nhập đều ghi `audit_logs`.
 10. `contentOriginal` của PLO/PI/CLO để trống tới khi đối chiếu bản gốc; **không điền nguyên văn từ trí nhớ**.
 11. Dùng `studentRef` (mã thay thế). Test/seed chỉ dùng dữ liệu giả có nhãn "DỮ LIỆU THỬ NGHIỆM". Không lưu bài làm của sinh viên.
 12. **Ngoài phạm vi:** tổ chức thi, sinh đề, duyệt *nội dung* đề, xuất phôi in, lưu bài làm, **mọi thứ ML**, quản lý "minh chứng"

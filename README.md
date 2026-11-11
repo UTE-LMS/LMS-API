@@ -38,7 +38,7 @@ Frontend: repo riêng `LMS-UI` (Angular 21 + TypeScript).
    máy khác, ví dụ `set MONGODB_URI=mongodb://localhost:27018/learning_outcomes?replicaSet=rs0`.
 
 2. **MongoDB + nạp CSDL ban đầu** — chọn một trong hai cách (xem mục [MongoDB bằng Docker](#mongodb-bằng-docker)
-   và [MongoDB cài sẵn trên máy](#mongodb-cài-sẵn-trên-máy)). Script dựng **29 collection** (thiết kế CSDL v0.5,
+   và [MongoDB cài sẵn trên máy](#mongodb-cài-sẵn-trên-máy)). Script dựng **26 collection** (thiết kế CSDL v0.6,
    đã loại bỏ `ml_experiments` do ML nằm ngoài phạm vi đồ án) kèm validator và chỉ mục. Dữ liệu khởi tạo gồm 1 chương trình,
    7 PLO, 17 PI, 1 học phần, 4 dòng ma trận I/R/M và một bản quy tắc đo lường nháp (ngưỡng/trọng số để trống).
    Chi tiết: `doc/GiaiThich_CoSoDuLieu.md` §7, §9 (tóm tắt thay đổi v0.4 → v0.5 ở §0).
@@ -206,12 +206,12 @@ logsAI/                 # Nhật ký sử dụng AI (Rubric TC2.3)
 
 ## Tài liệu chính
 
-- `doc/GiaiThich_CoSoDuLieu.md` — thiết kế CSDL MongoDB v0.5 (30 collection, 14 nguyên tắc); `doc/PLO_DB_UPDATE.md`
+- `doc/GiaiThich_CoSoDuLieu.md` — thiết kế CSDL MongoDB v0.6 (26 collection, 15 nguyên tắc); `doc/PLO_DB_UPDATE.md`
   là đặc tả nguồn của các thay đổi v0.5; `doc/database_import.js` là script dựng CSDL.
 - `doc/ke-hoach-xay-dung.md` — kế hoạch v0.3, backlog, lộ trình, rủi ro; `doc/plan/` — kế hoạch tách theo từng feature (F01…F08) để giao cho LLM hỗ trợ code.
 - `doc/chot-feature-do-an.md` — đề xuất chốt danh sách tính năng (chưa ký); `doc/tom-tat-du-an-de-thao-luan.md` — tóm tắt để thảo luận.
 - `doc/cam-ket-san-pham-metric.md` — bản cam kết Bước 3 (dự thảo).
-- `doc/adr/` — quyết định thiết kế (ADR 0001: duyệt ma trận đề thi, đang chờ GVHD; ADR 0006: CI/CD và staging).
+- `doc/adr/` — quyết định thiết kế (ADR 0001: duyệt ma trận đề thi, đã bị ADR 0013 thay thế; ADR 0013: giảng viên tự khóa ma trận, bỏ ngân hàng câu hỏi, điểm theo từng CLO; ADR 0006: CI/CD và staging).
 - `doc/deploy/staging.md` — triển khai staging, health check, rollback, log, biến môi trường.
 - `doc/coding-convention.md`, `doc/tech-debt.md`, `doc/rubric-checklist.md`.
 - `doc/BS.md`, `doc/Misa.md` — kế hoạch và hướng dẫn đọc CTĐT.

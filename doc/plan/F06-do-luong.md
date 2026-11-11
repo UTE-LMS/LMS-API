@@ -3,7 +3,7 @@
 Story: **US-26** quy tắc đo lường có phiên bản (C), **US-27** tính CLO từng sinh viên (C), **US-28** tính PI và PLO (C),
 **US-29** tổng hợp lớp/khóa/CTĐT kèm mẫu số (C), **US-30** chống chạy trùng + `isStale` (MR; ghi `lockKey` đi kèm US-27 là C),
 **NEW-04** phương pháp mở rộng (MR). Giai đoạn P4. Chủ trì đề xuất: IBS (đặc tả, kiểm chứng) + IT (lập trình).
-Package: `measurement`. Phụ thuộc: `00`, `F02`–`F05b` (cần CTĐT, CLO, liên kết, bài đã duyệt, điểm).
+Package: `measurement`. Phụ thuộc: `00`, `F02`–`F05b` (cần CTĐT, CLO, liên kết, bài đã khóa ma trận, điểm).
 **Đây là mô-đun lõi** (coverage ≥ 70%, cả hai sinh viên giải thích được từng công thức). **Có công thức chưa được đặc tả: xem mục 9 trước khi code cấp PLO, COURSE, gộp PI nhiều học phần.**
 
 ## 1. Mục tiêu
@@ -41,12 +41,10 @@ Công thức, trọng số, ngưỡng **đọc từ `measurement_rules`**, khôn
 ### 4.2 Công thức triển khai (nguồn: `PLO_DB_UPDATE.md` §4.1–4.2, **đã chọn làm công thức của đồ án**)
 Công thức nằm trong mã dưới dạng *phương pháp có tên*, được chọn bằng `measurement_rules` (`clo.method`, `pi.method`); **ngưỡng, mẫu số, chính sách thiếu dữ liệu vẫn đọc từ quy tắc**, không đặt cứng. Kết luận *chính thức* vẫn cần quy tắc `CONFIRMED` (4.1 mục 2); việc chọn công thức này không thay bước Khoa xác nhận (Q04).
 
-Ký hiệu: sinh viên *s*, câu hỏi/tiêu chí *k* (điểm tối đa `MaxScore_k`, điểm thô `Raw_{s,k}`), cặp `(CLO_j, PI_m)` của *k* với phần điểm chia `w_{k,j,m}`, Σ_{(j,m)} `w_{k,j,m}` = 1.
+Ký hiệu (ADR 0013): sinh viên *s*, câu hỏi/tiêu chí *k*, CLO *j* của câu đó với điểm tối đa `MaxScore_{k,j}` (`outcomeMappings[].maxScore`) và điểm đạt `Score_{s,k,j}` (**giảng viên nhập trực tiếp**, `scores`). Không còn phần điểm chia `w`.
 
-**CLO** (§4.1; ánh xạ vào `clo.method = POINTS_RATIO`):
+**CLO** (đặc tả §4.2, §4.3; ánh xạ vào `clo.method = POINTS_RATIO`). Cấp một bài lấy *k* trong bài đó; cấp học phần lấy *k* qua mọi bài có đánh giá CLO *j*:
 ```
-MaxScore_{k,j}  = MaxScore_k × Σ_m w_{k,j,m}
-Score_{s,k,j}   = Raw_{s,k}  × Σ_m w_{k,j,m}
 Value(CLO_{s,j}) = Σ_{k∈CLO_j} Score_{s,k,j}  /  Σ_{k∈CLO_j} MaxScore_{k,j}
 đạt  ⇔  Value(CLO_{s,j}) ≥ PassThreshold(CLO_j)
 ```
@@ -61,7 +59,7 @@ Value(PI_{s,m}) = Σ_{j∈PI_m} Value(CLO_{s,j}) × W_{CLO_j→PI_m}
 - Chỉ các item có điểm tham gia tổng. `BLANK` (`Raw = 0`) vào cả tử và mẫu. Item `ABSENT`/`NOT_GRADED`/`EXEMPT`/`MISSING` bị loại khỏi tử và mẫu *hoặc* khiến kết quả `INSUFFICIENT_DATA`, theo `missingDataPolicy` và `clo.minCoverage` (4.1 mục 4). Policy `null` ⇒ không đoán, `INSUFFICIENT_DATA`.
 - Mẫu số bằng 0 (không còn item nào có điểm) ⇒ `INSUFFICIENT_DATA`, không chia cho 0.
 - `value` ∈ [0, 1]; so sánh với ngưỡng bằng `≥` (đạt khi bằng ngưỡng). So sánh số thực dùng dung sai (ví dụ 1e-9), tiền xử lý `BigDecimal` nếu cần.
-- Mọi item tham gia phải ghi vào `inputs[]` (`refId` = `scores._id`, `weight` = phần `Σ w` đã dùng, `normalizedValue` = `Raw/MaxScore`) để truy vết (4.6).
+- Mọi item tham gia phải ghi vào `inputs[]` (`refId` = `scores._id`, `weight` = null ở cấp CLO vì điểm không chia theo trọng số, `normalizedValue` = `Score/MaxScore` của ô (câu, CLO)) để truy vết (4.6).
 
 **Phần tài liệu `PLO_DB_UPDATE.md` KHÔNG có công thức** (không tự bịa; xem 4.4): `clo.method = WEIGHTED_ITEMS`, cấp PLO (`ALL_PIS_PASSED`/`WEIGHTED_PIS`/`AVERAGE_PIS`), `pi.aggregationMethod` ngoài `WEIGHTED_AVERAGE`, cấp COURSE ngoài `requireAllCloPass`. Giá trị enum chưa có công thức ⇒ API từ chối khi chạy (422, "phương pháp chưa được đặc tả"), không âm thầm dùng công thức khác.
 
@@ -107,7 +105,7 @@ Cấp CLO → `scores`; cấp PI → `student_results` cấp CLO (`FROM_CLOS`, A
 | US-26/AC-4 | *(Bãi bỏ theo ADR 0012: loại bỏ hoàn toàn useIrmAsWeight và irmWeights khỏi measurement_rules, không quy đổi I/R/M)* |
 | US-27/AC-1 | Kết quả CLO (công thức §4.1) của từng sinh viên khớp **tính tay độc lập** trên bộ kiểm chứng, gồm ví dụ minh họa ở 4.2 (CLO1 = 0,8; CLO2 ≈ 0,57778) (lớp nhỏ, có vắng/chưa chấm/miễn, câu đo nhiều CLO, ca sát ngưỡng) |
 | US-27/AC-2 | `BLANK` vào tử và mẫu; `MISSING`/`ABSENT`/`NOT_GRADED`/`EXEMPT` không bị coi là 0; kết quả theo `missingDataPolicy`, thiếu thì `INSUFFICIENT_DATA` |
-| US-27/AC-3 | Một câu đo 2 CLO weight 0,4/0,6: phần điểm tối đa chia 4/6 (ví dụ minh họa với câu 10 điểm) và CLO chỉ nhận phần của mình (ADR 0011) |
+| US-27/AC-3 | Một câu đo 2 CLO, mỗi CLO có điểm tối đa và điểm đạt nhập riêng (ví dụ minh họa: `Câu 3` có CLO2 tối đa 2,0 đạt 1,6 và CLO3 tối đa 2,0 đạt 1,2); CLO chỉ nhận phần của mình, không bù lẫn nhau (ADR 0013, đặc tả §5) |
 | US-27/AC-4 | `inputs[]` của mỗi `student_results` CLO chỉ ra đúng các `scores._id` đã dùng |
 | US-27/AC-5 | Quy tắc `DRAFT` ⇒ `isOfficial = false`, `passed = null` nếu ngưỡng `null`; chạy đồng thời cùng phạm vi + quy tắc ⇒ 409 |
 | US-28/AC-1 | PI tính theo `FROM_CLOS` (ADR 0011) từ kết quả CLO theo `clo_pi_links.weight`; khi `W` chưa có hoặc quy tắc chưa đủ ⇒ 422; PLO theo `plo.method` đã chọn khớp tính tay; phương pháp chưa có công thức ⇒ 422; PLO **không** suy từ trung bình `capabilityLevelRaw` |
@@ -135,7 +133,7 @@ nếu `isOfficial`: quy tắc `CONFIRMED`, liên kết `VERIFIED`, học kỳ đ
 
 Giá trị kỳ vọng **tính tay độc lập** (ghi cách tính), không lấy kết quả của chính mã. Ca: lớp nhỏ có sinh viên `ABSENT`/`NOT_GRADED`/`EXEMPT`/`MISSING`/`BLANK`; câu đo nhiều cặp; ca sát ngưỡng
 (`value = ngưỡng` ⇒ đạt, `ngưỡng − ε` ⇒ không); sinh viên không có điểm nào; PI không có câu hỏi nào gán; CLO không có câu nào (`NOT_APPLICABLE`); mẫu số 0; quy tắc `DRAFT` chạy chính thức bị
-từ chối; tổng `weight` ≠ 1 trong dữ liệu (engine từ chối/ghi cảnh báo); chạy trùng đồng thời; chạy lỗi giữa chừng nhả khóa; sửa điểm sau tính ⇒ `isStale`; hiệu năng ~60 sinh viên ≤ 5 giây (N2).
+từ chối; `rawScore` > `maxScore` hoặc `maxScore` ≤ 0 trong dữ liệu (engine từ chối/ghi cảnh báo); chạy trùng đồng thời; chạy lỗi giữa chừng nhả khóa; sửa điểm sau tính ⇒ `isStale`; hiệu năng ~60 sinh viên ≤ 5 giây (N2).
 Đặt tên fixture "ví dụ minh họa"; **không** đưa 40/60, 72%, 20/40/40 vào seed/cấu hình mặc định.
 
 ## 9. Công thức còn thiếu — câu hỏi cho GVHD/Khoa
@@ -146,7 +144,7 @@ hoặc trả `INSUFFICIENT_DATA`/`passed = null`. Mã Q20–Q23 đã thêm vào 
 
 | Mã | Còn thiếu gì | Vì sao thiếu (đối chiếu lược đồ) | Phương án gợi ý để chọn | Chặn | Q |
 |---|---|---|---|---|---|
-| CT-01 | Công thức CLO khi `clo.method = WEIGHTED_ITEMS` và **nguồn trọng số của từng câu hỏi/tiêu chí** | `items[]` chỉ có `maxScore`, không có trường trọng số item | (a) bỏ giá trị này, chỉ giữ `POINTS_RATIO`; (b) dùng `assessments.weightInCourse` kết hợp tỷ lệ điểm; (c) thêm `items[].weight` vào CSDL | Chỉ khi chọn giá trị này | Q20 |
+| CT-01 | Công thức CLO khi `clo.method = WEIGHTED_ITEMS` và **nguồn trọng số của từng câu hỏi/tiêu chí** | `items[]` không có trường trọng số item (ADR 0013: điểm tối đa theo từng CLO của câu đã thay trọng số item; đề xuất (a) bỏ giá trị `WEIGHTED_ITEMS`) | (a) bỏ giá trị này, chỉ giữ `POINTS_RATIO`; (b) dùng `assessments.weightInCourse` kết hợp tỷ lệ điểm; (c) thêm `items[].weight` vào CSDL | Chỉ khi chọn giá trị này | Q20 |
 | CT-02 | Vai trò của `assessments.weightInCourse` và `clos.measurement.defaultWeight` | Hai trường có trong CSDL nhưng không xuất hiện trong công thức §4.1–4.2 | Dùng cho điểm học phần/tỷ trọng CLO trong học phần, hoặc bỏ khỏi cam kết | Cấp COURSE (CT-03) | Q20 |
 | CT-03 | Kết quả cấp **COURSE**: `value` và `passed` khi `course.requireAllCloPass = false` | Chỉ biết: `true` ⇒ đạt khi mọi CLO đạt; không nêu `value` hay trường hợp `false` | (a) không tính `value`, chỉ `passed` theo mọi CLO đạt; (b) `value = Σ Value(CLO)×defaultWeight` (cần CT-02) | Báo cáo cấp học phần | Q20 |
 | CT-04 | Cấp **PLO**: `value` và `passed` của `ALL_PIS_PASSED`, `AVERAGE_PIS`, `WEIGHTED_PIS` | Không có công thức PLO. `WEIGHTED_PIS` còn thiếu trường trọng số PI trong PLO | `ALL_PIS_PASSED`: đạt khi mọi PI đạt (value = tỷ lệ PI đạt hay null?); `AVERAGE_PIS`: TB `value` PI (PI không dữ liệu thì loại hay chặn?); `WEIGHTED_PIS`: cần trường trọng số mới | **US-28 phần PLO** | Q21 |
@@ -165,7 +163,7 @@ Ghi câu trả lời của GVHD/Khoa vào bảng này (cột Quyết định, ng
 
 - Không làm: ML, quy đổi I/R/M thành hệ số (ADR 0012), kết luận mức đạt toàn chương trình khi chỉ có dữ liệu hai học phần thử nghiệm, suy PLO từ trung bình mức năng lực, dùng điểm tổng kết học phần làm đầu vào CLO.
 - **Công thức còn thiếu (mục 9, Q20–Q23) cần hỏi GVHD/Khoa trước khi cài.**
-- **Chờ Khoa:** Q04 (xác nhận công thức, ngưỡng, mẫu số để có kết luận chính thức; công thức CLO/PI đã chọn theo `PLO_DB_UPDATE.md` §4), Q12 (đạt từng CLO, tỷ trọng/ngưỡng CLO), Q13 (xử lý vắng/chưa chấm/thiếu trong mẫu số), Q15 (chia điểm câu đo nhiều CLO), Q19 (phương pháp mặc định). Nếu đến K3 vẫn chưa có: chạy chế độ không chính thức, ghi rõ giới hạn (cần GVHD đồng ý). Đã chốt: Q18 không quy đổi I/R/M (ADR 0012).
+- **Chờ Khoa:** Q04 (xác nhận công thức, ngưỡng, mẫu số để có kết luận chính thức; công thức CLO/PI đã chọn theo `PLO_DB_UPDATE.md` §4), Q12 (đạt từng CLO, tỷ trọng/ngưỡng CLO), Q13 (xử lý vắng/chưa chấm/thiếu trong mẫu số), Q15 (đã đóng bởi ADR 0013), Q19 (phương pháp mặc định). Nếu đến K3 vẫn chưa có: chạy chế độ không chính thức, ghi rõ giới hạn (cần GVHD đồng ý). Đã chốt: Q18 không quy đổi I/R/M (ADR 0012).
 - Cần bổ sung CSDL nếu chọn `WEIGHTED_PIS` (thiếu trọng số PI trong PLO), `WEIGHTED_ITEMS` (thiếu trọng số item): ghi ADR và cập nhật `GiaiThich_CoSoDuLieu.md` + `database_import.js` cùng PR.
 
 ## 11. Để vấn đáp

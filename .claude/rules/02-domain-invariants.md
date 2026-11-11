@@ -1,6 +1,6 @@
 # Rule 02 — Bất biến nghiệp vụ và kiến trúc
 
-Căn cứ: `doc/GiaiThich_CoSoDuLieu.md` (14 nguyên tắc §2, §4, §8), `doc/BS.md` §4, `doc/Misa.md` §3F.
+Căn cứ: `doc/GiaiThich_CoSoDuLieu.md` (15 nguyên tắc §2, §4, §8), `doc/BS.md` §4, `doc/Misa.md` §3F.
 Rubric Nguyên tắc 2: nghiệp vụ chỉ có "hợp lý / không hợp lý so với mục tiêu và sản phẩm đã thống nhất".
 Các bất biến dưới đây **chính là** mục tiêu đã thống nhất; mã vi phạm chúng là không hợp lý (TC2.1, TC2.2).
 
@@ -10,15 +10,17 @@ Các bất biến dưới đây **chính là** mục tiêu đã thống nhất; 
 - Công thức đo lường chính thức chỉ chạy ở backend. UI hiển thị kết quả API trả về, không tự tính lại.
 - Backend kiểm tra quyền và dữ liệu trước khi xử lý. Quyền theo `users.roleAssignments` (vai trò + phạm vi);
   ẩn nút ở UI không thay cho kiểm tra ở backend.
-- MongoDB không có khóa ngoại: tầng service phải kiểm tra tham chiếu (cloId tồn tại, câu hỏi và danh mục
-  cùng ngân hàng, cặp CLO–PI nằm trong `clo_pi_links` của chính CLO đó…) trước khi ghi.
+- MongoDB không có khóa ngoại: tầng service phải kiểm tra tham chiếu (cloId tồn tại và thuộc đề cương của bài,
+  `scores.cloId` là một CLO của item, cặp CLO–PI nằm trong `clo_pi_links` của chính CLO đó…) trước khi ghi.
 - Xác nhận nhập điểm cần transaction nhiều document → MongoDB chạy replica set (cả dev và CI). Dev: image
   `docker/mongo/` (README).
-- **Bài đánh giá (`assessments`) có quy trình duyệt ma trận** (CSDL v0.5, NEW-01, GVHD đã xác nhận Q11, ADR 0001 phương án A): `DRAFT → SUBMITTED →
-  APPROVED | REJECTED → SCORE_ENTERED → LOCKED`. Chỉ nhập điểm khi `APPROVED`/`SCORE_ENTERED`; `isLocked = true` khi
-  `status ∈ {APPROVED, SCORE_ENTERED, LOCKED}` và cấm sửa `items[]`; gửi duyệt cần ≥ 1 item và
-  `|totalPoints − Σ items.maxScore| < 0,001`; duyệt/từ chối ghi `approval.history[]` và `audit_logs`. Chỉ duyệt
-  *ma trận ánh xạ*, không duyệt nội dung câu hỏi. `exportedFiles` (xuất phôi in) không có tính năng.
+- **Bài đánh giá (`assessments`): giảng viên tự khóa ma trận, không qua duyệt** (CSDL v0.6, NEW-01, GVHD đã xác nhận, ADR 0013 thay
+  ADR 0001): `DRAFT → MATRIX_LOCKED → SCORE_ENTERED → LOCKED`. Chỉ nhập điểm khi `MATRIX_LOCKED`/`SCORE_ENTERED`;
+  `isLocked = true` khi `status ∈ {MATRIX_LOCKED, SCORE_ENTERED, LOCKED}` và cấm sửa `items[]`; khóa cần ≥ 1 item;
+  khóa ghi `audit_logs` (`ASSESSMENT_LOCK`). Không có `totalPoints`, không tính/lưu tổng điểm bài.
+  `exportedFiles` (xuất phôi in) không có tính năng.
+- **Không lưu nội dung câu hỏi/đề bài/đáp án** (ADR 0013): không có ngân hàng câu hỏi; item chỉ có nhãn `code`,
+  `outcomeMappings[] = {cloId, maxScore}`. Điểm lưu theo từng ô (sinh viên, câu, CLO) trong `scores` (có `cloId`).
 - Phân quyền theo 7 vai trò của CSDL v0.5: `ADMIN`, `PROGRAM_MANAGER`, `DEPARTMENT_HEAD`, `QA_OFFICER`, `LECTURER`,
   `STUDENT` (chỉ đọc kết quả của chính mình), `VIEWER`; `scope = {programIds, courseIds, sectionIds}`.
 - Tệp minh chứng/tệp điểm gốc: lưu thông tin mô tả và tham chiếu trong MongoDB, nơi lưu tệp thiết kế riêng.
@@ -31,9 +33,9 @@ Các bất biến dưới đây **chính là** mục tiêu đã thống nhất; 
   ví dụ minh họa**. Dùng trong test thì đặt tên fixture rõ là "ví dụ minh họa", không đưa vào seed hay
   cấu hình mặc định.
 - Liên kết CLO–PI dùng cho tính chính thức phải ở trạng thái `VERIFIED`.
-- Một câu hỏi/tiêu chí có thể đo nhiều CLO (ADR 0011); `weight` của các CLO trong một câu có tổng bằng 1.
-  PI luôn được suy ra từ kết quả CLO qua `clo_pi_links` (`FROM_CLOS`, ADR 0011). Cách chia điểm giữa các CLO
-  đang chờ Khoa xác nhận (Q15): giữ ở dạng cấu hình, không rải logic cứng.
+- Một câu hỏi/tiêu chí có thể đo nhiều CLO; mỗi CLO có **điểm tối đa riêng** và giảng viên nhập **điểm đạt riêng**
+  (ADR 0013, đóng Q15): không chia điểm theo `weight`. `CLO = Σ điểm đạt / Σ điểm tối đa` của CLO (cấp bài và cấp
+  học phần). PI luôn được suy ra từ kết quả CLO qua `clo_pi_links` (`FROM_CLOS`, ADR 0011).
 - Tính PLO từ PI theo quy tắc cấu hình, **không** lấy trung bình mức năng lực của PI để suy ra mức PLO.
 
 ## Phân biệt khái niệm (sai là lỗi nghiệp vụ)
@@ -66,7 +68,7 @@ Các bất biến dưới đây **chính là** mục tiêu đã thống nhất; 
   `UNVERIFIED`/`NEEDS_CLARIFICATION`. Agent không tự điền nguyên văn từ trí nhớ.
 - ML **ngoài phạm vi đồ án** (người dùng đã chốt). Không tạo mã, dependency hay dữ liệu ML. Collection
   `ml_experiments` đã bị loại bỏ hoàn toàn khỏi `database_import.js` và tài liệu CSDL (TD-06); hệ thống
-  gồm 29 collection chính, không làm tới ML hay `ml_experiments`.
+  gồm 26 collection chính (đã bỏ thêm 3 collection ngân hàng câu hỏi, ADR 0013), không làm tới ML hay `ml_experiments`.
 - Khi `GiaiThich_CoSoDuLieu.md` lệch với `Misa.md`/`BS.md`, theo `GiaiThich_CoSoDuLieu.md`.
 
 ## Riêng tư

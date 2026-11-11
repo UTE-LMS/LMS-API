@@ -10,7 +10,7 @@ Learning Outcomes Management and Analytics System. Tiểu luận chuyên ngành 
   Frontend dùng **Angular hiện đại theo repo `LMS-UI` (Angular 21, TypeScript)**, đã được người dùng xác nhận.
   Không dùng AngularJS 1.x (đã hết hỗ trợ).
 - Tài liệu: `doc/BS.md`, `doc/Misa.md` (kế hoạch, hướng dẫn đọc CTĐT), `doc/GiaiThich_CoSoDuLieu.md`
-  (thiết kế CSDL v0.5, 14 nguyên tắc; v0.5 cập nhật theo `doc/PLO_DB_UPDATE.md`), `doc/database_import.js`
+  (thiết kế CSDL v0.6, 15 nguyên tắc; v0.5 theo `doc/PLO_DB_UPDATE.md`, v0.6 theo ADR 0013), `doc/database_import.js`
   (script dựng CSDL), `docker/mongo/` (image MongoDB replica set nạp script này, xem `README.md`).
 - Chuỗi nghiệp vụ: Điểm câu hỏi/tiêu chí → CLO → PI → PLO → Báo cáo → Hành động cải tiến.
 
@@ -49,9 +49,9 @@ Mọi đầu ra của agent phải **giải thích được, đúng phạm vi, c
 
 1. **Đúng phạm vi.** Chỉ làm trong phạm vi của `GiaiThich_CoSoDuLieu.md` §1 và `BS.md` §3: tiếp nhận và đo
    lường kết quả có sẵn sau khi thi. KHÔNG tổ chức thi, sinh đề, duyệt *nội dung* đề thi, xuất phôi in đề; KHÔNG lưu
-   bài làm sinh viên. Riêng *duyệt ma trận đề thi* (Trưởng bộ môn duyệt ánh xạ CLO–PI của bài đánh giá lớp, khóa
-   `items[]`, CSDL v0.5, story NEW-01) đã được **GVHD xác nhận (Q11, ADR 0001 phương án A; ngày ký: [ĐIỀN])**: được
-   làm theo `doc/chot-feature-do-an.md`; ghi ADR (`doc/adr/0001-…`).
+   bài làm sinh viên; **KHÔNG lưu nội dung câu hỏi, đề bài, đáp án** (câu hỏi chỉ có nhãn và điểm tối đa theo từng
+   CLO; không có ngân hàng câu hỏi). *Ma trận đề thi* do **giảng viên tự khóa**, không còn bước Trưởng bộ môn duyệt
+   (**GVHD đã xác nhận, ADR 0013 thay ADR 0001; ngày ký: [ĐIỀN]**); xem `doc/chot-feature-do-an.md`.
    **ML nằm ngoài phạm vi hiện tại**: không viết mã, collection hay dependency ML. Việc ngoài phạm vi hoặc
    ngoài bản cam kết Bước 3 → dừng và hỏi.
 2. **Không bịa minh chứng.** Không tự tạo số liệu khảo sát, biên bản, danh sách người dùng thử, điểm SUS,

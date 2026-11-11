@@ -10,6 +10,11 @@ mới NEW-01); thêm 3 story mới NEW-02…04; sửa phạm vi "duyệt đề" 
 collection (30, dùng 29), rủi ro R11, câu hỏi Q17–Q19, hiện trạng (đã có image MongoDB Docker). Danh sách tính năng
 đề xuất chốt nằm ở `chot-feature-do-an.md`.
 
+**Cập nhật 2026-11-11 (ADR 0013, GVHD đã xác nhận):** bỏ duyệt ma trận đề thi (giảng viên tự khóa; NEW-01 đổi nghĩa);
+bỏ ngân hàng câu hỏi và không lưu nội dung câu hỏi (bỏ US-13, US-14, US-17; 3 collection); điểm nhập theo từng CLO của
+từng câu (`outcomeMappings = {cloId, maxScore}`, đóng Q15). Backlog 44 → **41 story = 32 Must + 8 Should + 1 Could**;
+CSDL **v0.6, 26 collection**. Các mục dưới đây đã sửa theo; riêng các dòng lịch sử (R11) giữ để truy vết.
+
 **Bản chia theo từng feature (để giao cho LLM hỗ trợ code): `doc/plan/README.md`.** File này là bản tổng.
 
 Nguồn: `Rubric_Do_An_Mon_Hoc_CNPM_V2-1.docx.md`, `BS.md`, `Misa.md`, `GiaiThich_CoSoDuLieu.md` (v0.5),
@@ -21,7 +26,7 @@ Nguồn: `Rubric_Do_An_Mon_Hoc_CNPM_V2-1.docx.md`, `BS.md`, `Misa.md`, `GiaiThic
 - **Học phần thử nghiệm:** Đã tiếp nhận đề cương chính thức và ánh xạ CLO–PI của 2 học phần (`APCM220307`, `ABDA433708`) thuộc CTĐT Fintech v2 (2024); cùng học phần mẫu `OOPR230279` (CNTT).
 - Hai tài liệu lệch nhau thì **theo `GiaiThich_CoSoDuLieu.md`** (thiết kế CSDL).
 - Hai sinh viên **không phân công cứng nhắc**, hỗ trợ chéo tự do.
-- Thiết kế CSDL **v0.5** (theo `PLO_DB_UPDATE.md`) là bản hiện hành, cập nhật theo các ADR kỹ thuật: ADR 0001 (NEW-01, Trưởng bộ môn duyệt ma trận), ADR 0010 (bộ môn và giảng viên), ADR 0011 (PI suy ra từ CLO, câu hỏi chỉ gán CLO), ADR 0012 (bỏ hoàn toàn `useIrmAsWeight`/`irmWeights`, không quy đổi I/R/M). Riêng Q17 đã chốt bỏ collection `departments`.
+- Thiết kế CSDL **v0.5** (theo `PLO_DB_UPDATE.md`) là bản hiện hành, cập nhật theo các ADR kỹ thuật: ADR 0001 (đã bị ADR 0013 thay thế), ADR 0013 (giảng viên tự khóa ma trận, bỏ ngân hàng câu hỏi, điểm theo từng CLO), ADR 0010 (bộ môn và giảng viên), ADR 0011 (PI suy ra từ CLO, câu hỏi chỉ gán CLO), ADR 0012 (bỏ hoàn toàn `useIrmAsWeight`/`irmWeights`, không quy đổi I/R/M). Riêng Q17 đã chốt bỏ collection `departments`.
 
 **Quy ước đọc**
 - **[ĐỀ XUẤT]**: ý của người soạn, chưa được Khoa/GVHD xác nhận; không đưa vào hồ sơ như số liệu thật.
@@ -47,10 +52,9 @@ Nguồn: `Rubric_Do_An_Mon_Hoc_CNPM_V2-1.docx.md`, `BS.md`, `Misa.md`, `GiaiThic
 đạt của toàn chương trình; thay thế quy trình đo lường chính thức của Khoa; **thử nghiệm ML**; quản lý "minh chứng"
 như một danh mục dữ liệu (chỉ lưu tệp điểm gốc và tham chiếu, theo thiết kế CSDL); quy đổi I/R/M thành hệ số.
 
-**Điều chỉnh phạm vi theo CSDL v0.5 [CHỜ GVHD, Q11]:** *duyệt ma trận đề thi* (cấu trúc câu hỏi/tiêu chí và ánh xạ
-CLO–PI của một bài đánh giá lớp) do Trưởng bộ môn duyệt trước khi mở cổng nhập điểm. Đây là duyệt ánh xạ chuẩn đầu
-ra, không phải duyệt nội dung câu hỏi. Nếu GVHD không đồng ý thì giữ cơ chế khóa `items` nhưng bỏ bước Trưởng bộ
-môn (giảng viên tự xác nhận). Thay đổi phạm vi này phải ghi ADR: bản nháp ở `adr/0001-duyet-ma-tran-de-thi.md`.
+**Điều chỉnh phạm vi (ADR 0013, GVHD đã xác nhận):** *ma trận đề thi* (danh sách câu hỏi theo nhãn và điểm tối đa theo từng CLO của
+một bài đánh giá lớp) do **giảng viên tự khóa** rồi mới nhập điểm, không còn bước Trưởng bộ môn duyệt (thay ADR 0001). Hệ thống
+**không lưu nội dung câu hỏi, đề bài, đáp án** và không có ngân hàng câu hỏi. Hệ thống không tính tổng điểm bài kiểm tra.
 
 **Công nghệ đã chốt**: Java, Spring Boot 4.1.0, MongoDB (replica set), Angular 21 + TypeScript. Kiến trúc: một
 ứng dụng backend phân module (modular monolith), Angular chỉ gọi API.
@@ -84,7 +88,7 @@ Angular (LMS-UI) ──HTTPS/JSON──> Spring Boot API ──> MongoDB (replic
 | `auth` | `users` | F01 |
 | `program` | `programs`, `program_versions`, `plos`, `pis`, `program_courses`, `course_pi_contributions` | F02 |
 | `course` | `courses`, `syllabi`, `clos`, `clo_pi_links` | F03 |
-| `assessment` | `question_banks`, `question_categories`, `questions`, `assessments` | F04, gồm quy trình duyệt ma trận đề thi (NEW-01) |
+| `assessment` | `assessments` | F04, gồm giảng viên tự khóa ma trận đề (NEW-01, ADR 0013) |
 | `academic` | `terms`, `course_sections`, `students`, `enrollments` | hỗ trợ F05 |
 | `scoreimport` | `import_batches`, `import_row_errors`, `scores` | F05 |
 | `measurement` | `measurement_rules`, `calculation_runs`, `student_results`, `aggregate_results` | F06 |
@@ -92,7 +96,7 @@ Angular (LMS-UI) ──HTTPS/JSON──> Spring Boot API ──> MongoDB (replic
 | `improvement` | `improvement_actions` | F08 |
 | `audit` | `audit_logs` | xuyên suốt |
 
-CSDL v0.5 gồm **29 collection chính** (đã loại bỏ collection `ml_experiments` khỏi `database_import.js` do ML ngoài phạm vi đồ án, xem TD-06). Một số trường v0.5 có trong
+CSDL v0.6 gồm **26 collection chính** (đã loại bỏ `ml_experiments` do ML ngoài phạm vi đồ án, xem TD-06, và 3 collection ngân hàng câu hỏi theo ADR 0013). Một số trường v0.5 có trong
 CSDL nhưng chưa có tính năng: `assessments.exportedFiles`; riêng `courses.departmentId` và collection `departments` đã chốt loại bỏ (Q17, ADR 0010),
 `pi.useIrmAsWeight`/`irmWeights` đã loại bỏ hoàn toàn khỏi CSDL theo ADR 0012 (Q18).
 
@@ -138,12 +142,12 @@ tâm của AC.
 ### E04 — Ngân hàng câu hỏi và bài đánh giá (F04)
 | ID | Story | Ưu tiên | Chủ trì | Trọng tâm AC |
 |---|---|---|---|---|
-| US-13 | Quản lý ngân hàng và cây danh mục nội dung 3 cấp | S | IBS, IT | Cấp 1 không có cha; không vượt cấp 3; trùng mã bị từ chối |
-| US-14 | Khai báo câu hỏi kèm ánh xạ nhiều cặp (CLO, PI, weight) | M | IBS | Tổng weight = 1 với câu ACTIVE; PI phải thuộc `clo_pi_links` của chính CLO; không trùng cặp |
-| US-15 | Lập bài đánh giá theo đề cương (khung) và theo lớp (bản SECTION có `items[]`) | M | IBS, IT | Copy ánh xạ tại thời điểm thi; `totalPoints` khớp tổng `items.maxScore` (dung sai 0,001); bản `isLocked` (APPROVED trở đi) bị khóa `items` |
+| US-13 | ~~Quản lý ngân hàng và cây danh mục nội dung 3 cấp~~ **BỎ (ADR 0013: không lưu nội dung câu hỏi)** | — | — | — |
+| US-14 | ~~Khai báo câu hỏi kèm ánh xạ nhiều cặp (CLO, PI, weight)~~ **BỎ (ADR 0013)**; một câu đo nhiều CLO được khai báo ngay trong `assessments.items[]` (US-15) | — | — | — |
+| US-15 | Lập bài đánh giá theo đề cương (khung) và theo lớp (bản SECTION có `items[]`, mỗi item chỉ có nhãn và `outcomeMappings = {cloId, maxScore}`) | M | IBS, IT | Copy ánh xạ tại thời điểm thi; điểm tối đa theo từng CLO của câu > 0, không trùng CLO trong một câu; không có trường nội dung câu hỏi; bản `isLocked` (`MATRIX_LOCKED` trở đi) bị khóa `items` |
 | US-16 | Khai báo tiêu chí rubric và mức rubric 1–4 | M | IBS | Mức rubric tách khỏi Bloom |
-| US-17 | Nhập câu hỏi từ Excel/Moodle, chống nhập trùng | C | IT | Trùng `(bank, system, externalQuestionId)` bị từ chối **[CHỜ XÁC NHẬN Q16]** |
-| NEW-01 | **Duyệt ma trận đề thi:** giảng viên gửi duyệt (`SUBMITTED`), Trưởng bộ môn duyệt/từ chối (`APPROVED`/`REJECTED`), khóa `items`, ghi `approval.history[]` và `audit_logs`; bảng độ phủ theo CLO và Bloom (`coverageSummary`) | M | IBS (quy trình), IT | Chỉ nhập điểm khi `APPROVED`/`SCORE_ENTERED`; gửi duyệt cần ≥ 1 item và `totalPoints` khớp; vai trò khác `DEPARTMENT_HEAD` không duyệt được; `PUT items` bị từ chối khi `isLocked` **[CHỜ GVHD, Q11]** |
+| US-17 | ~~Nhập câu hỏi từ Excel/Moodle~~ **BỎ (ADR 0013, Q16 không còn áp dụng)** | — | — | — |
+| NEW-01 | **Giảng viên tự khóa ma trận đề** (ADR 0013, thay "duyệt ma trận"): giảng viên của lớp khóa (`DRAFT → MATRIX_LOCKED`), khóa `items`, ghi `audit_logs` (`ASSESSMENT_LOCK`); bảng độ phủ theo CLO và Bloom (`coverageSummary`) | M | IBS (quy trình), IT | Chỉ nhập điểm khi `MATRIX_LOCKED`/`SCORE_ENTERED`; khóa cần ≥ 1 item; vai trò khác giảng viên của lớp không khóa được; `PUT items` bị từ chối khi `isLocked`; `UNLOCK` chưa quyết (TD-35) |
 
 ### E05 — Học kỳ, lớp học phần, sinh viên
 | ID | Story | Ưu tiên | Chủ trì | Trọng tâm AC |
@@ -155,10 +159,10 @@ tâm của AC.
 ### E06 — Nhập điểm (F05)
 | ID | Story | Ưu tiên | Chủ trì | Trọng tâm AC |
 |---|---|---|---|---|
-| US-21 | Tải tệp điểm và ánh xạ cột → câu hỏi/tiêu chí (lưu để dùng lại) | M | IT | Tính checksum, phát hiện nhập trùng |
+| US-21 | Tải tệp điểm và ánh xạ cột → ô (câu hỏi/tiêu chí, CLO) (lưu để dùng lại) | M | IT | Tính checksum, phát hiện nhập trùng |
 | US-22 | Kiểm tra tệp, báo lỗi theo dòng và cột | M | IT | Mã sinh viên không hợp lệ, điểm vượt thang, trùng bản ghi, thiếu trường; lưu `import_row_errors` |
 | US-23 | Chọn cách hiểu ô trống (BLANK hay MISSING) và chính sách nhập lại cho từng lô | M | IBS, IT | Hệ thống không tự đoán **[CHỜ XÁC NHẬN Q13]**. Chính sách nhập lại: `REJECT_ON_CONFLICT` / `OVERWRITE` / `UPDATE_BLANK_ONLY` **[CHỜ XÁC NHẬN Q19]** |
-| US-24 | Xác nhận nhập (một transaction) hoặc rollback lô | M | IT | Lỗi giữa chừng không để lại điểm nửa vời; chỉ nhập khi bài đánh giá `APPROVED`/`SCORE_ENTERED`; ghi `audit_logs` cùng transaction |
+| US-24 | Xác nhận nhập (một transaction) hoặc rollback lô | M | IT | Lỗi giữa chừng không để lại điểm nửa vời; chỉ nhập khi bài đánh giá `MATRIX_LOCKED`/`SCORE_ENTERED`; ghi `audit_logs` cùng transaction |
 | US-25 | Sửa điểm đơn lẻ có lý do | S | IT | Ghi audit trước/sau; khóa lạc quan `revision`; học kỳ đã khóa thì từ chối |
 
 ### E07 — Đo lường (F06)
@@ -199,12 +203,11 @@ tâm của AC.
 | NEW-03 | Vai trò `STUDENT`: sinh viên đăng nhập xem `student_results` của chính mình | S | IT | Nối `students.userId` ↔ `users`; chỉ đọc; không thấy kết quả của người khác (403) |
 | NEW-04 | Mở rộng engine: `aggregationMethod` (`MAX`, `LATEST`, `ACCUMULATED_EVIDENCE`), phương pháp PLO còn lại (`ALL_PIS_PASSED`/`WEIGHTED_PIS`/`AVERAGE_PIS`) | C | IT, IBS (kiểm chứng) | CSDL đã hỗ trợ giá trị enum; mỗi phương pháp phải có ca tính tay độc lập; không quy đổi I/R/M (ADR 0012) **[CHỜ KHOA, Q19, Q21, Q22]** |
 
-**Tổng: 44 story = 33 Must + 9 Should + 2 Could** (40 story gốc: 32 M + 7 S + 1 C; cộng NEW-01 là M, NEW-02 và
+**Tổng: 41 story = 32 Must + 8 Should + 1 Could** (sau ADR 0013 bỏ US-13 Should, US-14 Must, US-17 Could; NEW-01 giữ Must nhưng đổi nghĩa. Trước đó 44 = 33 M + 9 S + 2 C: 40 story gốc (32 M + 7 S + 1 C) cộng NEW-01 là M, NEW-02 và
 NEW-03 là S, NEW-04 là C; đã bỏ story ML). Tập Must (và phần Should hai bạn chọn) là ứng viên cho **bản cam kết Bước
-3**. Rubric TC2.2 chấm theo đúng bản cam kết đó nên đừng cam kết quá sức: tuần 5 mà code mới là scaffold, 33 Must
+3**. Rubric TC2.2 chấm theo đúng bản cam kết đó nên đừng cam kết quá sức: tuần 5 mà code mới là scaffold, 32 Must
 trong ~10 tuần code là nặng cho hai người. **[ĐỀ XUẤT]** cân nhắc đưa vào cam kết chỉ Must + vài Should, và nói rõ
-US-35/36 là mục tiêu mở rộng. Phương án cụ thể (32 story cam kết, US-13/14 hạ xuống mục tiêu mở rộng vì câu hỏi khai
-báo thẳng trong `assessments.items[]` đã đủ để đo) nằm ở `chot-feature-do-an.md`, chưa ký.
+US-35/36 là mục tiêu mở rộng. Phương án cụ thể (32 story cam kết; US-13/14/17 đã bỏ hẳn theo ADR 0013 vì hệ thống không lưu nội dung câu hỏi) nằm ở `chot-feature-do-an.md`, chưa ký.
 
 ---
 
@@ -220,7 +223,7 @@ còn ~12 tuần, nên mục tiêu này vẫn đạt được nếu mỗi lần m
 | **P1 Khảo sát** | T5–T8 (song song) | Hiểu nhu cầu thật | Phỏng vấn ≥ 3 bên liên quan; so sánh ≥ 3 giải pháp; chân dung người dùng; trả lời Q01–Q23; danh mục MC01–MC09 với trạng thái |
 | **P2 Danh mục lõi** | **T6–T9** | E01, E02, E03 | Đăng nhập + phân quyền; CTĐT/PLO/PI/ma trận I/R/M; học phần/đề cương/CLO/liên kết CLO–PI; UI quản lý; **staging đầu tiên (mục tiêu T7)** |
 | **K1: cam kết Bước 3** | **mục tiêu hết T7, hạn cuối T10** | Chốt sản phẩm và metric có chữ ký | `doc/cam-ket-san-pham-metric.md` (mục 8) |
-| **P3 Đánh giá và nhập điểm** | T8–T11 | E04 (kể cả NEW-01), E05, E06 | Ngân hàng câu hỏi, bài đánh giá, ánh xạ, duyệt ma trận đề thi; học kỳ/lớp/ghi danh; nhập tệp, báo lỗi, xác nhận/rollback; sửa điểm có audit |
+| **P3 Đánh giá và nhập điểm** | T8–T11 | E04 (kể cả NEW-01), E05, E06 | Bài đánh giá, ma trận đề (giảng viên tự khóa); học kỳ/lớp/ghi danh; nhập tệp, báo lỗi, xác nhận/rollback; sửa điểm có audit |
 | **P4 Đo lường** | T10–T13 | E07 | Rule engine cấu hình; tính CLO → PI → PLO; tổng hợp có mẫu số; truy vết `inputs[]`; so sánh với kết quả đối chứng nếu có |
 | **P5 Báo cáo và cải tiến** | T12–T15 | E08, E09 | Báo cáo CLO/PI/PLO/độ đầy đủ; drill-down; xuất tệp; dashboard; theo dõi cải tiến |
 | **P6 Củng cố chất lượng** | T14–T16 | Phi chức năng, bảo mật, hiệu năng, coverage | E2E, hiệu năng theo NFR; quét phụ thuộc; sửa lỗi Critical; rà sơ đồ khớp mã |
@@ -333,7 +336,7 @@ trung xong trước T14. Mục tiêu: build xanh ≥ 90%, commit → staging ≤
 | R8 | **Lịch sử Git thiếu các tuần đầu.** Mỗi repo chỉ có 1 commit trước kỳ, nên nếu T1–T4 không có commit thì tối đa 15/19 ≈ 79% số tuần có commit, đạt Mức 4 (≥ 75%) chứ không đạt Mức 5 (≥ 90%) cho chỉ số này | Trung bình | Commit đều từ T5 trở đi. Không sửa ngày commit hay tạo commit giả để "lấp" các tuần trước. Nếu đã có công việc ở T1–T4 (đọc tài liệu, `doc/`), commit chúng ngay với ngày thật; báo cáo tiến độ T1–T4 (nếu có) là minh chứng bổ sung |
 | R9 | Lộ dữ liệu sinh viên hoặc secret | Cao | `studentRef`, dữ liệu giả, gitleaks trong CI, `.gitignore` đúng |
 | R10 | **Chậm tiến độ**: T5 mà code mới là scaffold; P0–P2 bị nén còn 5 tuần | Cao | Giữ thứ tự: nền tảng → K1 → danh mục lõi; ưu tiên Must; hỗ trợ chéo để không chờ nhau; cắt Should trước, rồi tới Could, không cắt kiểm thử |
-| R11 | **CSDL v0.5 chạm phạm vi:** duyệt ma trận đề thi (NEW-01), `exportedFiles`, `irmWeights` đi ngoài phạm vi "không duyệt đề" và nguyên tắc "I/R/M ≠ trọng số" (Q11, Q18; riêng Q17 đã chốt bỏ collection `departments` và bỏ `departmentId`, giữ `DEPARTMENT_HEAD` duyệt theo `scope.courseIds`). **Tiến độ 2026-11-06:** Nhóm SV chốt giữ NEW-01 (ADR 0001); **2026-11-08: GVHD đã xác nhận (Q11), NEW-01 đã có mã (F04)**; loại bỏ hoàn toàn `irmWeights`/`useIrmAsWeight` (ADR 0012); PI suy ra từ CLO (ADR 0011) | Trung bình | Hỏi GVHD trước khi code NEW-01 (hạn trước P3, T8). Phương án dự phòng: bỏ bước Trưởng bộ môn, giữ khóa `items`. Đã có ADR 0001, ADR 0011, ADR 0012 |
+| R11 | **[ĐÃ ĐÓNG bởi ADR 0013, 2026-11-11: GVHD xác nhận bỏ duyệt ma trận; không còn ngân hàng câu hỏi.]** **CSDL v0.5 chạm phạm vi:** duyệt ma trận đề thi (NEW-01), `exportedFiles`, `irmWeights` đi ngoài phạm vi "không duyệt đề" và nguyên tắc "I/R/M ≠ trọng số" (Q11, Q18; riêng Q17 đã chốt bỏ collection `departments` và bỏ `departmentId`, giữ `DEPARTMENT_HEAD` duyệt theo `scope.courseIds`). **Tiến độ 2026-11-06:** Nhóm SV chốt giữ NEW-01 (ADR 0001); **2026-11-08: GVHD đã xác nhận (Q11), NEW-01 đã có mã (F04)**; loại bỏ hoàn toàn `irmWeights`/`useIrmAsWeight` (ADR 0012); PI suy ra từ CLO (ADR 0011) | Trung bình | Hỏi GVHD trước khi code NEW-01 (hạn trước P3, T8). Phương án dự phòng: bỏ bước Trưởng bộ môn, giữ khóa `items`. Đã có ADR 0001, ADR 0011, ADR 0012 |
 | R12 | **Công thức đo lường còn thiếu:** `PLO_DB_UPDATE.md` chỉ có công thức CLO (§4.1) và PI (§4.2). Chưa có công thức cấp PLO, cấp học phần khi `requireAllCloPass = false`, `WEIGHTED_ITEMS`, gộp PI qua nhiều học phần, định nghĩa `minCoverage`/mẫu số, ưu tiên ngưỡng (Q20–Q23; danh sách CT-01…CT-11 ở `plan/F06-do-luong.md` §9) | **Cao** | Hỏi GVHD/Khoa sớm (trước P4, T10); trong lúc chờ chỉ cài CLO và PI theo công thức đã có, phần còn lại trả 422, không tự bịa. Nếu không có trả lời trước K3: báo cáo PLO ở chế độ không chính thức hoặc cắt phạm vi PLO bằng ADR |
 
 ---
@@ -360,7 +363,7 @@ trung xong trước T14. Mục tiêu: build xanh ≥ 90%, commit → staging ≤
 | 6 | Dựng CI sườn (build + test), quét gitleaks, bảo vệ nhánh `main` (≥ 1 review) | |
 | 7 | Viết coding convention và `README` | |
 | 8 | Chốt bản khung phân công `doc/quy-trinh/phan-cong.md` (một trang) | cả hai |
-| 9 | Gửi lại danh mục MC01–MC09 và Q01–Q23 cho đầu mối của Khoa, kèm hạn; đề xuất chọn ba học phần. Hỏi GVHD riêng về Q11 (duyệt ma trận đề thi), vì ảnh hưởng NEW-01 | |
+| 9 | Gửi lại danh mục MC01–MC09 và Q01–Q23 cho đầu mối của Khoa, kèm hạn; đề xuất chọn ba học phần. Hỏi GVHD riêng về Q11 (duyệt ma trận đề thi), vì ảnh hưởng NEW-01 *(đã xong: ADR 0013, 2026-11-11)* | |
 | 10 | Lên danh sách ≥ 3 bên liên quan để phỏng vấn, ≥ 10 người dùng cho thực nghiệm | |
 | 11 | Đối chiếu bản CTĐT gốc để trích đủ 7 PLO/17 PI nguyên văn | |
 | 12 | Bắt đầu viết SRS/AC cho tập Must, nháp bản cam kết K1 | |
@@ -376,8 +379,7 @@ trung xong trước T14. Mục tiêu: build xanh ≥ 90%, commit → staging ≤
 4. Tập story đưa vào bản cam kết Bước 3 (mục 3, cuối).
 5. Con số KPI và NFR (mục 8).
 6. Java 25 hay LTS; nơi đặt staging; SSR của UI.
-7. **NEW-01 (duyệt ma trận đề thi) có nằm trong phạm vi không** (Q11) và có giữ vai trò `DEPARTMENT_HEAD`. *(Riêng Q17 đã chốt: không làm collection `departments`, bỏ `courses.departmentId`, giữ `DEPARTMENT_HEAD` quản lý theo `scope.courseIds`).*
-   Hỏi GVHD trước P3 về NEW-01.
+7. ~~NEW-01 (duyệt ma trận đề thi) có nằm trong phạm vi không~~ **Đã chốt (ADR 0013): bỏ duyệt, giảng viên tự khóa**; `DEPARTMENT_HEAD` giữ vai trò quản lý học phần (ADR 0010). *(Riêng Q17 đã chốt: không làm collection `departments`, bỏ `courses.departmentId`, giữ `DEPARTMENT_HEAD` quản lý theo `scope.courseIds`).*
 8. Phương pháp mặc định của engine: `pi.aggregationMethod`, `plo.method`, `reimportPolicy` (Q19); có cho quy đổi I/R/M
    không (Q18, mặc định không).
 9. **Công thức đo lường còn thiếu (Q20–Q23):** cấp PLO, cấp học phần khi `requireAllCloPass = false`, `WEIGHTED_ITEMS`, gộp PI qua nhiều học phần, thiếu dữ liệu/ngưỡng trong công thức. Danh sách đầy đủ để hỏi GVHD: `plan/F06-do-luong.md` §9. Hạn đề xuất: trước P4 (T10).

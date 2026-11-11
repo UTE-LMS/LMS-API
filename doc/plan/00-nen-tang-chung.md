@@ -30,12 +30,12 @@ viết nghiệp vụ tuân thủ đúng mô hình 3 tầng.
   path, fieldErrors[]? }`; `code` là hằng enum (ví dụ `VALIDATION_ERROR`, `NOT_FOUND`, `FORBIDDEN`, `CONFLICT`,
   `BUSINESS_RULE_VIOLATION`), không phải chuỗi tự do.
 - Phân biệt: 400 (validation), 401, 403, 404, 409 (xung đột `revision`, trùng khóa duy nhất), 422 (vi phạm quy tắc nghiệp vụ như
-  tổng `weight` ≠ 1, cặp CLO–PI không có trong `clo_pi_links`).
+  `maxScore` ≤ 0, cặp CLO–PI không có trong `clo_pi_links`).
 - Không lộ stack trace hay thông tin nội bộ ra ngoài; log chi tiết ở phía server.
 
 ### 3.3 Dịch vụ ghi nhật ký (`audit`) và Kiến trúc SOLID
 - Interface `AuditService` đặt tại `com.hcmute.lms.lmsapi.service`, triển khai `AuditServiceImpl` đặt tại `com.hcmute.lms.lmsapi.service.impl`.
-- `action` thuộc enum của validator: `SCORE_UPDATE`, `IMPORT_CONFIRM`, `ASSESSMENT_APPROVE`, `ASSESSMENT_REJECT`, `RUN_CALCULATION`, `RULE_CONFIRM`, `LOGIN` đặt tại `com.hcmute.lms.lmsapi.enums`.
+- `action` thuộc enum của validator: `SCORE_UPDATE`, `IMPORT_CONFIRM`, `ASSESSMENT_LOCK`, `RUN_CALCULATION`, `RULE_CONFIRM`, `LOGIN` (ADR 0013: `ASSESSMENT_LOCK` thay `ASSESSMENT_APPROVE`/`ASSESSMENT_REJECT`; mã hiện còn hai giá trị cũ, chờ sửa) đặt tại `com.hcmute.lms.lmsapi.enums`.
 - **Nguyên lý Single Responsibility (SRP):** Tách logic làm sạch dữ liệu nhạy cảm (sanitization cho password, hash, token, secret) và khởi tạo tài liệu ra interface riêng `AuditLogMapper` (`com.hcmute.lms.lmsapi.mapper`) và lớp hiện thực `AuditLogMapperImpl` (`com.hcmute.lms.lmsapi.mapper.impl`), không trộn lẫn vào `AuditServiceImpl`.
 - **Nguyên lý Open-Closed & Dependency Inversion (OCP & DIP):** Tầng Data Access tách `AuditLogRepository` và `AuditLogRepositoryCustom` (`com.hcmute.lms.lmsapi.repository`) kèm `AuditLogRepositoryCustomImpl` (`com.hcmute.lms.lmsapi.repository.impl`) sử dụng `MongoTemplate` cho truy vấn động mở rộng. `AuditServiceImpl` chỉ phụ thuộc vào `AuditLogRepository` và `AuditLogMapper` abstractions.
 - Khi được gọi trong một thao tác có transaction thì bản ghi audit **nằm cùng transaction** (lỗi giữa chừng không để lại audit mồ côi).
@@ -64,7 +64,7 @@ viết nghiệp vụ tuân thủ đúng mô hình 3 tầng.
 | ID | Given / When / Then |
 |---|---|
 | US-40/AC-1 | Khi gọi API với body sai kiểu/thiếu trường bắt buộc → 400, `code = VALIDATION_ERROR`, `fieldErrors` nêu từng trường |
-| US-40/AC-2 | Khi vi phạm quy tắc nghiệp vụ (ví dụ tổng `weight` ≠ 1) → 422, `code = BUSINESS_RULE_VIOLATION`, thông báo nêu quy tắc |
+| US-40/AC-2 | Khi vi phạm quy tắc nghiệp vụ (ví dụ `maxScore` ≤ 0) → 422, `code = BUSINESS_RULE_VIOLATION`, thông báo nêu quy tắc |
 | US-40/AC-3 | Khi ghi trùng khóa duy nhất (ví dụ `plos(programVersionId, code)`) → 409, `code = CONFLICT` |
 | US-40/AC-4 | Khi có lỗi không lường trước → 500, thân lỗi không chứa stack trace; log phía server có chi tiết |
 | US-39/AC-1 | `GET /actuator/health` trả `UP` khi Mongo kết nối được và `DOWN` khi không |
