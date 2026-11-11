@@ -9,10 +9,11 @@ Learning Outcomes Management and Analytics System. Tiểu luận chuyên ngành 
   Không đề xuất hay thêm công nghệ chính khác (JPA/SQL, framework UI khác…) khi chưa hỏi.
   Frontend dùng **Angular hiện đại theo repo `LMS-UI` (Angular 21, TypeScript)**, đã được người dùng xác nhận.
   Không dùng AngularJS 1.x (đã hết hỗ trợ).
-- Tài liệu: `doc/BS.md`, `doc/Misa.md` (kế hoạch, hướng dẫn đọc CTĐT), `doc/GiaiThich_CoSoDuLieu.md`
-  (thiết kế CSDL v0.5, 14 nguyên tắc; v0.5 cập nhật theo `doc/PLO_DB_UPDATE.md`), `doc/database_import.js`
-  (script dựng CSDL), `docker/mongo/` (image MongoDB replica set nạp script này, xem `README.md`).
-- Chuỗi nghiệp vụ: Điểm câu hỏi/tiêu chí → CLO → PI → PLO → Báo cáo → Hành động cải tiến.
+- Tài liệu: `doc/BS.md`, `doc/Misa.md` (kế hoạch, hướng dẫn đọc CTĐT), `doc/dac-ta-thay-doi-nghiep-vu-va-phuong-an-tinh-clo.md`
+  (đặc tả luồng nghiệp vụ và công thức đo lường 4 cấp độ mới), `doc/GiaiThich_CoSoDuLieu.md`
+  (thiết kế CSDL v0.7 — 25 collections), `doc/database_import.js`
+  (script dựng CSDL 25 collections), `docker/mongo/` (image MongoDB replica set nạp script này, xem `README.md`).
+- Chuỗi nghiệp vụ: Điểm từng CLO của từng câu hỏi → `ASSESSMENT_CLO` (Cấp 1: từng bài kiểm tra) → `CLO` (Cấp 2: toàn học phần) → `PI` (Cấp 3) → `PLO` (Cấp 4) → Báo cáo → Hành động cải tiến.
 
 ## Nhóm 2 sinh viên dùng chung repo
 
@@ -47,11 +48,11 @@ Mọi đầu ra của agent phải **giải thích được, đúng phạm vi, c
 
 ## Quy tắc cứng (không được vi phạm, không cần người dùng nhắc lại)
 
-1. **Đúng phạm vi.** Chỉ làm trong phạm vi của `GiaiThich_CoSoDuLieu.md` §1 và `BS.md` §3: tiếp nhận và đo
-   lường kết quả có sẵn sau khi thi. KHÔNG tổ chức thi, sinh đề, duyệt *nội dung* đề thi, xuất phôi in đề; KHÔNG lưu
-   bài làm sinh viên. Riêng *duyệt ma trận đề thi* (Trưởng bộ môn duyệt ánh xạ CLO–PI của bài đánh giá lớp, khóa
-   `items[]`, CSDL v0.5, story NEW-01) đã được **GVHD xác nhận (Q11, ADR 0001 phương án A; ngày ký: [ĐIỀN])**: được
-   làm theo `doc/chot-feature-do-an.md`; ghi ADR (`doc/adr/0001-…`).
+1. **Đúng phạm vi.** Chỉ làm trong phạm vi của `GiaiThich_CoSoDuLieu.md` §1 và `dac-ta-thay-doi-nghiep-vu-va-phuong-an-tinh-clo.md`:
+   tiếp nhận và đo lường chuẩn đầu ra 4 cấp độ (`ASSESSMENT_CLO`, `CLO`, `PI`, `PLO`) từ kết quả đánh giá sau khi thi. KHÔNG tổ chức thi, KHÔNG lưu nội dung
+   câu hỏi/đề thi/đáp án hay ngân hàng câu hỏi (đã bỏ 3 collections `question_banks`, `question_categories`, `questions` và bỏ `measurement_rules` $\to$ còn 25 collections),
+   KHÔNG đo kết quả bài kiểm tra tổng và KHÔNG tính điểm tổng kết học phần (`COURSE`). Giảng viên lớp học phần thiết lập ma trận
+   câu hỏi – CLO kèm điểm tối đa (`maxScore`) cho từng CLO ở mỗi câu hỏi, khai báo tỷ lệ đóng góp bài kiểm tra `cloWeights`, **tự khóa ma trận** (`DRAFT -> LOCKED -> SCORE_ENTERED`) và nhập điểm đạt được trực tiếp cho từng CLO của từng câu hỏi qua CSV mẫu (vắng thi / bỏ trống = `0.0`).
    **ML nằm ngoài phạm vi hiện tại**: không viết mã, collection hay dependency ML. Việc ngoài phạm vi hoặc
    ngoài bản cam kết Bước 3 → dừng và hỏi.
 2. **Không bịa minh chứng.** Không tự tạo số liệu khảo sát, biên bản, danh sách người dùng thử, điểm SUS,

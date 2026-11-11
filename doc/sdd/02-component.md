@@ -1,8 +1,7 @@
 # Sơ đồ thành phần (component) theo package thật
 
-> **Dự thảo do AI soạn, đối chiếu mã ngày 2026-11-02 (`main`, commit `54ef80e`).** Gốc package:
-> `com.hcmute.lms.lmsapi`. Danh sách lớp và đường dẫn endpoint lấy từ `src/main/java`; mũi tên phụ thuộc lấy từ
-> các dòng `import com.hcmute.lms.lmsapi.…` (mục 3), không suy diễn. Sinh viên kiểm lại mỗi khi mã đổi.
+> **Dự thảo do AI soạn, đối chiếu mã gốc và cập nhật thiết kế mục tiêu theo [ADR 0013](../adr/0013-import-ctdt-de-cuong-va-nhap-diem-clo-truc-tiep.md) ngày 2026-11-10.** Gốc package:
+> `com.hcmute.lms.lmsapi`. Danh sách lớp cần sửa/xóa trong đợt refactor F03/F04 theo ADR 0013 được đặc tả chi tiết tại [`doc/ke-hoach-sua-doi-theo-nghiep-vu-moi.md`](../ke-hoach-sua-doi-theo-nghiep-vu-moi.md) (xóa `AssessmentApproval`, `ApprovalHistoryEntry`, `AssessmentRubric`, `RubricLevel`, `DataGranularity`, `ItemKind`, `ApprovalAction`; đổi `AssessmentApprovalService` thành cơ chế giảng viên tự khóa/mở khóa ma trận `lock`/`unlock` trong `AssessmentService`; đổi `OutcomeMapping.weight` thành `OutcomeMapping.maxScore`).
 
 ## 1. Sơ đồ phân tầng
 

@@ -4,660 +4,165 @@
 
 *(Learning Outcomes Management and Analytics System)*
 
-Công nghệ: Spring Boot – Angular – MongoDB · Phiên bản tài liệu: v0.5 (dự thảo) · File đi kèm: `database_import.js`
+Công nghệ: Spring Boot – Angular – MongoDB · Phiên bản tài liệu: v0.7 (25 collections) · File đi kèm: `database_import.js`
 
-# 0. Thay đổi so với v0.4
+# 0. Thay đổi ở v0.7 (theo ADR 0014 & `dac-ta-thay-doi-nghiep-vu-va-phuong-an-tinh-clo.md`)
 
-v0.5 cập nhật theo `PLO_DB_UPDATE.md`. Số collection không đổi (30). Chi tiết từng trường nằm ở mục 4; dưới đây là tóm tắt.
+v0.7 tinh gọn cơ sở dữ liệu từ 29 xuống **25 collection** và loại bỏ toàn bộ các bảng/cột không phục vụ đo lường chuẩn đầu ra:
 
-| **Nhóm thay đổi** | **Nội dung** |
+| **Nhóm thay đổi** | **Nội dung (v0.7 — ADR 0014)** |
 |---|---|
-| Vai trò | Thêm `DEPARTMENT_HEAD` (Trưởng bộ môn, duyệt ma trận đề thi) và `STUDENT` (chỉ đọc kết quả của chính mình); `scope` có cấu trúc `{programIds, courseIds, sectionIds}` |
-| CTĐT | `program_versions`: `totalCredits`, `durationYears`. `plos`: `category` (GENERAL/SPECIALIZED/UNSPECIFIED), mã PLO/PI không bắt đầu bằng số 0. `program_courses.type`: `REQUIRED` → `COMPULSORY` |
-| CLO | `clos.measurement` đổi tên: `weightInCourse` → `defaultWeight`, `passThreshold` → `defaultPassThreshold` |
-| Bài đánh giá | `assessments` có quy trình duyệt (`status`, `isLocked`, `approval`), `totalPoints`, `coverageSummary`, `exportedFiles`; đổi bộ giá trị `type`, `phase`; `items[].orderIndex`, `items[].externalRef` thành chuỗi |
-| Sinh viên | `students`: `userId`, `email`, `majorCode`, `status`; `enrollments.enrolledAt` |
-| Nhập điểm | `import_batches.reimportPolicy` đổi giá trị; `fileRef` là chuỗi; `scores`: `updatedBy`, `updatedAt` |
-| Đo lường | `measurement_rules` tách theo cấp (CLO/PI/PLO), thêm `pi.method = FROM_CLOS`, `aggregationMethod`, `useIrmAsWeight`/`irmWeights`, `missingDataPolicy` dạng cờ; `calculation_runs.scope` thành chuỗi, trạng thái `PENDING/PROCESSING/SUCCESS/FAILED`; `student_results` thêm `evidenceCount`, `inputs[]` có kiểu; `aggregate_results.scope = {type, refId}` |
-| Cải tiến | `improvement_actions` thêm `programVersionId`, `rootCause`, `expectedTarget`, `targetTermId`, `evaluation` (đánh giá hiệu quả), mức `CRITICAL` |
-| Nhật ký | `audit_logs.action` thêm `ASSESSMENT_APPROVE`, `ASSESSMENT_REJECT` |
-
-**Các điểm lệch với phạm vi/nguyên tắc cũ đã được xử lý bằng ADR (ADR 0011, 0012, 0010; xem Q10, Q11, Q17, Q18 ở mục 8):**
-(1) Quy trình duyệt ma trận đề thi (NEW-01) là duyệt *ma trận ánh xạ CLO của bài đánh giá*, không duyệt nội dung đề (ADR 0001; nhóm SV chốt giữ, GVHD chưa xác nhận);
-(2) Không quy đổi I/R/M thành hệ số, loại bỏ hoàn toàn `useIrmAsWeight` và `irmWeights` khỏi `measurement_rules` (ADR 0012);
-(3) Câu hỏi/tiêu chí chỉ gán CLO (`outcomeMappings.cloId`), PI luôn suy ra từ kết quả CLO qua `clo_pi_links` (`FROM_CLOS`, ADR 0011);
-(4) Không tạo collection `departments`, bỏ trường `courses.departmentId`; vai trò `DEPARTMENT_HEAD` duyệt theo danh sách môn học trong `scope.courseIds` (Q17, ADR 0010).
+| Khởi tạo CTĐT & Đề cương (`UNVERIFIED -> VERIFIED`) | Một vai trò Quản lý học thuật (`PROGRAM_MANAGER` / `ADMIN`) Import tệp CSV chuẩn hóa của CTĐT và Đề cương kèm sẵn ngưỡng đạt bắt buộc (`passThreshold` $\in (0, 1]$, không để trống) trên `plos`, `pis`, `clos` và trọng số đóng góp ($W_{PI \to PLO} \in (0, 1]$ với tổng mỗi PLO $= 1.0$; $W_{CLO \to PI} \in (0, 1]$ không ép tổng $= 1.0$). Dữ liệu vừa Import lưu `UNVERIFIED` để kiểm tra trên UI (sai thì sửa CSV import lại), bấm Lưu chuyển sang `VERIFIED` |
+| Xóa 4 collection dư thừa (29 $\to$ 25 collection) | **Xóa hoàn toàn** 3 collection ngân hàng câu hỏi (`question_banks`, `question_categories`, `questions`) để bảo mật đề thi và **xóa hoàn toàn** collection `measurement_rules` (cùng cột `ruleId` trên các bảng kết quả/báo cáo) vì toàn bộ ngưỡng đạt và trọng số đã gắn trực tiếp trên `plos`, `pis`, `clos`, `clo_pi_links`, `assessments.cloWeights` |
+| Bài đánh giá, `cloWeights` & Tự khóa ma trận | Giảng viên lớp học phần (`LECTURER`) thiết lập ma trận câu hỏi – CLO (`items[]`), khai báo tỷ lệ đóng góp của bài kiểm tra cho từng CLO xuất hiện trong bài (`cloWeights[]: { cloId, weight }` với $\sum_p W_{p,j} = 1.0$ khi tổng hợp học phần) và **tự khóa ma trận** (`DRAFT` $\to$ `LOCKED` $\to$ `SCORE_ENTERED`; bỏ `totalPoints`, `weightInCourse`, `dataGranularity`, `approval`, `exportedFiles`) |
+| Xuất CSV mẫu & Nhập điểm trực tiếp (Vắng / Trống = `0.0`) | Hệ thống sinh tệp CSV mẫu từ ma trận đề đã khóa; giảng viên nhập điểm trực tiếp theo từng cặp `(itemId, cloId)`. Sinh viên vắng thi hoặc bỏ trống câu hỏi lưu trực tiếp `rawScore = 0.0` (xóa `scores.status`, `rubricLevel`, `emptyCellAs`, `reimportPolicy`, `columnMapping`) |
+| Đo lường 4 cấp độ (`ASSESSMENT_CLO -> CLO -> PI -> PLO`) | Mở rộng `RESULT_LEVELS = ['ASSESSMENT_CLO', 'CLO', 'PI', 'PLO']` (bỏ `COURSE`). Cấp 1 (`ASSESSMENT_CLO`) gắn `assessmentId != null`; Cấp 2 (`CLO`) gắn `assessmentId = null`; Cấp 3 (`PI`) tính trung bình có trọng số chuẩn hóa trên tập CLO đã học (học lại lấy lần học gần nhất `LATEST`); Cấp 4 (`PLO`) tổng hợp từ các PI. Tách mẫu số $N_{\text{section}}$ (`ENROLLED`) và $N_{\text{cohort}}$ |
 
 # 1. Mục đích và phạm vi
 
-Tài liệu mô tả chi tiết các collection của cơ sở dữ liệu MongoDB, để giảng viên hướng dẫn xem xét và cho ý kiến trước khi triển khai.
+Tài liệu mô tả chi tiết **25 collection** của cơ sở dữ liệu MongoDB, đồng bộ 1–1 với `doc/database_import.js` và `doc/dac-ta-thay-doi-nghiep-vu-va-phuong-an-tinh-clo.md`.
 
-**Phạm vi đã chốt:** hệ thống chỉ **tiếp nhận và đo lường các kết quả có sẵn sau khi thi** (điểm theo câu hỏi/tiêu chí, rubric). Hệ thống **không tổ chức thi**: không tự sinh đề. Từ v0.5, **ma trận đề thi** (cấu trúc câu hỏi/tiêu chí và ánh xạ CLO của bài đánh giá) phải được Trưởng bộ môn duyệt trước khi mở cổng nhập điểm; đây là duyệt *ma trận ánh xạ chuẩn đầu ra*, không phải duyệt nội dung đề thi (nhóm SV chốt giữ theo NEW-01, ADR 0001; GVHD chưa xác nhận). Có **ngân hàng câu hỏi dạng danh mục** để lưu các câu hỏi của đề đã thi cùng ánh xạ CLO, mức Bloom, nhằm khai báo một lần và dùng lại qua nhiều đề, nhiều học kỳ. Bài đánh giá trong cơ sở dữ liệu *khai báo cấu trúc của bài đã thi* (câu nào được dùng, điểm tối đa, đo CLO nào theo ADR 0011) để quy điểm lên chuẩn đầu ra.
-
-**Về "minh chứng":** các tài liệu, dữ liệu nhóm thu thập trong quá trình khảo sát và xây dựng hệ thống (bản mô tả CTĐT, đề cương, quy trình đo lường, bảng điểm…) là hồ sơ của dự án, **không phải dữ liệu hệ thống quản lý khi vận hành**, nên không có collection quản lý danh mục này. Nguồn của từng PLO, PI, CLO chỉ được ghi ngắn gọn (tên tài liệu, trang) trong khối `source`. Hệ thống cũng không lưu bài làm của sinh viên; chỉ lưu điểm và truy vết về file điểm gốc.
+**Phạm vi đã chốt:** hệ thống chỉ **tiếp nhận và đo lường chuẩn đầu ra 4 cấp độ (`ASSESSMENT_CLO`, `CLO`, `PI`, `PLO`) từ kết quả đánh giá sau khi thi**. Hệ thống **không tổ chức thi**, **không lưu nội dung câu hỏi/đề thi/đáp án**, **không chấm điểm tổng kết bài kiểm tra** và **không xét điểm qua môn học phần (`COURSE`)**.
 
 **Chuỗi nghiệp vụ được hỗ trợ:**
 
 ```
-Điểm từng câu hỏi/tiêu chí → CLO và PI → PLO → Báo cáo → Hành động cải tiến
+Điểm từng CLO của từng câu hỏi → ASSESSMENT_CLO (từng bài kiểm tra) → CLO (toàn học phần) → PI → PLO → Báo cáo → Hành động cải tiến
 ```
 
-**Nguồn thiết kế:** hai tài liệu `BS.md`, `Misa.md` (kế hoạch dự án và hướng dẫn đọc CTĐT), nội dung trao đổi kỹ thuật bổ sung và file góp ý (`fb.md`) về ngân hàng câu hỏi và khái niệm minh chứng. Những điểm chưa được Khoa CNTT xác nhận đều được thiết kế dạng **cấu hình có trạng thái xác nhận** thay vì cố định trong mã (xem mục 8).
+# 2. Tổng quan: 25 collection chia thành 8 nhóm
 
-# 2. Nguyên tắc thiết kế
-
-| **#** | **Nguyên tắc** | **Cách thể hiện** |
-|---|---|---|
-| 1 | Mọi dữ liệu và kết quả gắn với **phiên bản** CTĐT, đề cương, quy tắc đo lường | `programVersionId`, `syllabusId`, `ruleId` có trong kết quả; báo cáo cũ vẫn đọc được khi quy tắc đổi |
-| 2 | Mã CLO chỉ có nghĩa trong một học phần (CLO1 của OOP khác CLO1 của Cơ sở dữ liệu) | CLO nhận diện bằng `_id`; `code` chỉ duy nhất trong một đề cương |
-| 3 | PLO/PI nhận diện bằng **mã**, không dùng thứ tự dòng (tài liệu xếp PLO1, 6, 7, 4, 5, 2, 3) | `code` và `displayOrder` là hai trường riêng |
-| 4 | Lưu **nội dung nguyên văn, nguồn, trang, người xác nhận**; tách "tài liệu nói gì" khỏi "nhóm diễn giải" | Khối `source`, `verification`, `reviewNote` |
-| 5 | Mức Bloom ≠ điểm số; ký hiệu I/R/M ≠ trọng số; mức năng lực của PLO không suy ra bằng trung bình các PI | Lưu riêng từng loại. Bloom và mức năng lực: **không có trường quy đổi**. I/R/M: không quy đổi thành hệ số số học; loại bỏ hoàn toàn `useIrmAsWeight` và `irmWeights` khỏi quy tắc đo (Q18, ADR 0012) |
-| 6 | Công thức, trọng số, ngưỡng đạt phải được người có thẩm quyền xác nhận | `measurement_rules` có trạng thái `DRAFT/CONFIRMED`; chỉ quy tắc đã xác nhận mới cho kết luận chính thức |
-| 7 | Dữ liệu thiếu **không mặc định bằng 0**; riêng câu bỏ trống của sinh viên đã dự thi tính 0 có ghi nhận | `scores.status`: `SCORED`, `BLANK`, `ABSENT`, `NOT_GRADED`, `EXEMPT`, `MISSING` |
-| 8 | Điểm theo **từng câu hỏi/tiêu chí**; mỗi câu gắn CLO và mức Bloom; một câu có thể đo nhiều CLO (ADR 0011) | `outcomeMappings[]` gồm các `{cloId, weight}` trong `questions` và `assessments.items[]`; `bloomLevel`, `maxScore`. PI suy ra từ kết quả CLO |
-| 9 | Tỷ lệ đạt phải rõ mẫu số; báo cáo kèm số sinh viên chưa đủ dữ liệu | `aggregate_results.counts` (ghi danh, đủ dữ liệu, đạt, chưa đủ dữ liệu) |
-| 10 | Truy vết từ kết quả về dữ liệu gốc | `student_results.inputs[]` → `scores` → `import_batches` + số dòng trong file gốc |
-| 11 | Angular không truy cập MongoDB; backend kiểm tra quyền, dữ liệu và thực hiện công thức đo lường | Phân quyền theo `users.roleAssignments`; công thức đọc từ `measurement_rules` |
-| 12 | CLO gắn cho câu hỏi phải thuộc đề cương của bài đánh giá; PI suy ra qua `clo_pi_links` đã duyệt | Dịch vụ kiểm tra `cloId` thuộc `syllabi`; PI suy ra từ CLO qua `clo_pi_links`; chạy tính chính thức yêu cầu liên kết đã `VERIFIED` (ADR 0011) |
-| 13 | Chỉ thu thập thông tin cần thiết, ưu tiên mã sinh viên thay thế; không lưu bài làm của sinh viên | `students.studentRef` |
-| 14 | Không triển khai học máy (Machine Learning) | Đồ án không thực hiện ML; loại bỏ collection `ml_experiments`, không ghi dữ liệu thử nghiệm ML vào CSDL |
-
-# 3. Tổng quan: 29 collection chia thành 8 nhóm
-
-Gồm **29 collection chính** (đã loại bỏ collection tùy chọn `ml_experiments` do ML nằm ngoài phạm vi đồ án, xem TD-06).
+Gồm **25 collection chính** (đã loại bỏ `ml_experiments`, `question_banks`, `question_categories`, `questions`, `measurement_rules`).
 
 | **Nhóm** | **Collection** |
 |---|---|
 | A. Người dùng | `users` |
 | B. Chương trình đào tạo | `programs`, `program_versions`, `plos`, `pis`, `courses`, `program_courses`, `course_pi_contributions` |
 | C. Học phần & CLO | `syllabi`, `clos`, `clo_pi_links` |
-| D. Ngân hàng câu hỏi & bài đánh giá | `question_banks`, `question_categories`, `questions`, `assessments` |
+| D. Bài đánh giá & Ma trận CLO | `assessments` |
 | E. Học kỳ, lớp, sinh viên | `terms`, `course_sections`, `students`, `enrollments` |
-| F. Nhập điểm | `import_batches`, `import_row_errors`, `scores` |
-| G. Đo lường | `measurement_rules`, `calculation_runs`, `student_results`, `aggregate_results` |
+| F. Nhập điểm CLO | `import_batches`, `import_row_errors`, `scores` |
+| G. Đo lường chuẩn đầu ra (4 cấp) | `calculation_runs`, `student_results`, `aggregate_results` |
 | H. Báo cáo, cải tiến, hỗ trợ | `reports`, `improvement_actions`, `audit_logs` |
 
 ## Sơ đồ quan hệ chính
 
 ```
-programs ─< program_versions ─┬─< plos ─< pis
+programs ─< program_versions ─┬─< plos (passThreshold) ─< pis (weight, passThreshold)
                               ├─< program_courses >─ courses
                               └─< course_pi_contributions (I/R/M) >─ courses, pis
 ```
 
 ```
-courses ─< syllabi (đề cương) ─┬─< clos ─< clo_pi_links >─ pis
-                               ├─< question_banks ─┬─< question_categories (cây 3 cấp: chương → chủ đề → nhóm nhỏ)
-                               │                   └─< questions (thuộc 1 danh mục; mỗi câu đo các cặp CLO–PI)
-                               └─< assessments
-                                     ├─ scope = SYLLABUS_TEMPLATE : khung theo đề cương
-                                     └─ scope = SECTION           : bản của từng lớp, chứa items[]
-                                            (mỗi item là bản sao của một câu hỏi hoặc một tiêu chí rubric,
-                                             kèm cặp CLO–PI và điểm tối đa)
+courses ─< syllabi (đề cương) ─┬─< clos (measurement.defaultPassThreshold) ─< clo_pi_links (weight) >─ pis
+                               └─< assessments (cloWeights[{cloId, weight}], items[{code, outcomeMappings[{cloId, maxScore}]}])
 ```
 
 ```
-terms ─< course_sections ─< enrollments >─ students
+terms ─< course_sections ─< enrollments (ENROLLED / WITHDRAWN) >─ students
              ├─< import_batches ─< import_row_errors
-             └─< scores  (sinh viên × câu hỏi/tiêu chí)
+             └─< scores (sectionId × assessmentId × itemId × cloId × studentId, rawScore >= 0)
 ```
 
 ```
-measurement_rules ─< calculation_runs ─┬─< student_results   (CLO / COURSE / PI / PLO của từng sinh viên)
-                                       └─< aggregate_results (cấp lớp / khóa / CTĐT)
-                                                  └─< reports ─< improvement_actions
+calculation_runs ─┬─< student_results   (level: ASSESSMENT_CLO | CLO | PI | PLO)
+                  └─< aggregate_results (level: ASSESSMENT_CLO | CLO | PI | PLO)
+                             └─< reports ─< improvement_actions
 users, audit_logs: dùng chung cho toàn hệ thống
 ```
 
-**Quy ước chung**
-
-- Khóa chính `_id` kiểu `ObjectId`. Mã nghiệp vụ (`code`) là trường riêng, có chỉ mục duy nhất trong phạm vi phù hợp.
-- Mỗi collection có `createdAt`, `updatedAt` (và `createdBy`, `updatedBy` khi triển khai).
-- Các collection danh mục (`programs`, `program_versions`, `courses`, `syllabi`, `clos`, `assessments`) có vùng `extra: {}` để mở rộng trường linh hoạt mà không phải đổi cấu trúc. Vùng này không được dùng làm đầu vào của công thức đo lường nếu chưa đưa vào cấu trúc chính thức.
-- MongoDB không có khóa ngoại; các ràng buộc liên kết do tầng dịch vụ Spring Boot kiểm tra trước khi ghi.
-- Khối dùng lại ở nhiều nơi:
-   - `verification`: `{status: UNVERIFIED | VERIFIED | NEEDS_CLARIFICATION, verifiedBy, verifiedAt, note}` — trạng thái xác nhận nghiệp vụ.
-
-# 4. Chi tiết từng collection
+# 3. Chi tiết từng collection
 
 ## Nhóm A — Người dùng
 
-### 4.1 users — người dùng và phân quyền
-
-**Mục đích:** đăng nhập và phân quyền theo vai trò, phạm vi phụ trách.
-
-| **Trường** | **Ý nghĩa** |
-|---|---|
-| `username`, `email`, `passwordHash`, `fullName` | Thông tin tài khoản (mật khẩu chỉ lưu băm) |
-| `status` | `ACTIVE` / `LOCKED` |
-| `tokenVersion` | Số nguyên (`number` / `['int','long']`, mặc định 0 nếu thiếu). Số phiên đăng nhập/bảo mật, tăng nguyên tử qua `UserRepositoryCustom.incrementTokenVersion` khi logout hoặc khi tài khoản bị khóa (`LOCKED`). Kiểm tra để vô hiệu hóa tức thời và vĩnh viễn các JWT token được cấp trước đó. |
-| `roleAssignments[]` | Mỗi phần tử: `role` (`ADMIN`, `PROGRAM_MANAGER`, `DEPARTMENT_HEAD`, `QA_OFFICER`, `LECTURER`, `STUDENT`, `VIEWER`) và `scope` = `{programIds[], courseIds[], sectionIds[]}` (CTĐT/học phần/lớp được phụ trách) |
-
-`DEPARTMENT_HEAD` có thẩm quyền duyệt ma trận đề thi (`assessments`) và ánh xạ CLO–PI. `STUDENT` chỉ đọc `student_results` của chính mình (nối qua `students.userId`).
-
-**Chỉ mục:** `username`, `email` duy nhất. Quyền chi tiết theo hành vi (nhập điểm, xác nhận nhập, xác nhận quy tắc, chạy tính toán…) được định nghĩa trong mã backend, ánh xạ từ `role`; ma trận quyền dự kiến nằm trong tài liệu thiết kế. **Dữ liệu khởi tạo:** chưa tạo tài khoản nào.
+### 3.1 `users` — người dùng và phân quyền
+- Các trường: `username`, `email`, `passwordHash`, `fullName`, `status` (`ACTIVE` / `LOCKED`), `tokenVersion`, `roleAssignments[]` (`role` $\in$ `ADMIN | PROGRAM_MANAGER | DEPARTMENT_HEAD | QA_OFFICER | LECTURER | STUDENT | VIEWER`, `scope = { programIds[], courseIds[], sectionIds[] }`).
+- Chỉ mục: `username` (unique), `email` (unique).
 
 ## Nhóm B — Chương trình đào tạo
 
-### 4.2 programs — chương trình đào tạo
+### 3.2 `programs` & 3.3 `program_versions`
+- `programs`: `code` (unique), `name`, `level`, `degree`, `extra`.
+- `program_versions`: `programId`, `version` (unique cùng `programId`), `applicableCohorts[]`, `totalCredits`, `durationYears`, `status` (`DRAFT | ACTIVE | ARCHIVED`), `verification`.
 
-| **Trường** | **Ý nghĩa** |
-|---|---|
-| `code`, `name` | Mã nội bộ và tên ngành (Công nghệ thông tin) |
-| `level`, `degree` | Trình độ, văn bằng (chờ đọc từ phần thông tin chung của bản CTĐT) |
+### 3.4 `plos` — chuẩn đầu ra chương trình
+- Các trường bắt buộc: `programVersionId`, `code` (`^PLO[1-9][0-9]*$`), `displayOrder`, **`passThreshold` $\in (0, 1]$ (ngưỡng đạt bắt buộc của PLO, không được để trống)**, `verification`.
+- Các trường tùy chọn: `category`, `contentOriginal`, `contentSummary`, `capabilityLevelRaw` (1–6), `reviewNote`.
+- Chỉ mục: `{ programVersionId: 1, code: 1 }` (unique).
 
-**Chỉ mục:** `code` duy nhất. **Khởi tạo:** 1 dòng (`CNTT`).
+### 3.5 `pis` — chỉ số thực hiện
+- Các trường bắt buộc: `programVersionId`, `ploId`, `code` (`^PI[1-9][0-9]*\.[1-9][0-9]*$`), `displayOrder`, **`weight` $\in (0, 1]$ (trọng số đóng góp $W_{PI \to PLO}$, tổng các PI thuộc cùng PLO $= 1.0$)**, **`passThreshold` $\in (0, 1]$ (ngưỡng đạt bắt buộc của PI, không được để trống)**, `verification`.
+- Đã bỏ cột `targetPassRate` (thay bằng `passThreshold` bắt buộc).
+- Chỉ mục: `{ programVersionId: 1, code: 1 }` (unique), `{ ploId: 1 }`.
 
-### 4.3 program_versions — phiên bản CTĐT
-
-**Mục đích:** một CTĐT có thể có nhiều phiên bản áp dụng cho các khóa khác nhau; PLO/PI/ma trận đều gắn với phiên bản để báo cáo cũ không bị sai khi CTĐT cập nhật.
-
-| **Trường** | **Ý nghĩa** |
-|---|---|
-| `programId` | Tham chiếu `programs` |
-| `version` | Tên phiên bản (khởi tạo: `BM7A-2.7-Updated-2026`) |
-| `totalCredits`, `durationYears` | Tổng số tín chỉ tốt nghiệp và thời gian đào tạo (năm) theo quy định; để trống cho đến khi đối chiếu bản CTĐT |
-| `applicableCohorts[]` | Các khóa tuyển sinh áp dụng: `['K23', 'K24', 'K25', 'K26', 'K27']` (Q01, nhóm SV xác nhận 2026-11-06) |
-| `status` | `DRAFT` / `ACTIVE` / `ARCHIVED` |
-| `verification` | Trạng thái xác nhận |
-
-**Chỉ mục:** (`programId`, `version`) duy nhất.
-
-### 4.4 plos — chuẩn đầu ra chương trình (7 PLO)
-
-| **Trường** | **Ý nghĩa** |
-|---|---|
-| `programVersionId` | Thuộc phiên bản CTĐT nào |
-| `code` | `PLO1`…`PLO7` (định dạng `^PLO[1-9][0-9]*$` được kiểm tra) |
-| `displayOrder` | Thứ tự trình bày trong tài liệu (PLO1, 6, 7, 4, 5, 2, 3) — tách khỏi mã |
-| `category` | `GENERAL` (chuẩn chung) / `SPECIALIZED` (chuẩn chuyên biệt) / `UNSPECIFIED`; khởi tạo là `UNSPECIFIED` vì chưa đối chiếu bản gốc |
-| `contentOriginal` | Nguyên văn trong CTĐT (để trống cho đến khi đối chiếu bản gốc) |
-| `contentSummary` | Diễn giải ngắn |
-| `capabilityLevelRaw` | Số nguyên 1–6 ghi trong cột "Trình độ năng lực" của tài liệu; lưu đúng như nguồn, **không** tính lại từ PI |
-| `verification`, `reviewNote` | Trạng thái xác nhận, nhận xét cần làm rõ |
-
-**Chỉ mục:** (`programVersionId`, `code`) duy nhất. **Khởi tạo:** 7 dòng; mức năng lực PLO1=3, PLO2=4, PLO3=3, PLO4=3, PLO5=4, PLO6=6, PLO7=6.
-
-### 4.5 pis — chỉ số thực hiện (17 PI)
-
-| **Trường** | **Ý nghĩa** |
-|---|---|
-| `ploId` | PLO mà PI thuộc về (một PLO có nhiều PI) |
-| `code` | `PI1.1`…`PI7.2` (định dạng `^PI[1-9][0-9]*\.[1-9][0-9]*$` được kiểm tra) |
-| `contentOriginal`, `contentShort` | Nguyên văn (chờ đối chiếu) và nội dung rút gọn |
-| `capabilityLevelRaw` | Số nguyên 1–6 ghi trong tài liệu (ví dụ PI6.1=4, PI6.2=6, PI6.3=5) |
-| `targetPassRate` | Mục tiêu tỷ lệ đạt do đơn vị quy định, 0 ≤ x ≤ 1 (chưa có) |
-| `verification`, `reviewNote` | Trạng thái, ghi chú |
-
-**Chỉ mục:** (`programVersionId`, `code`) duy nhất; `ploId`. **Khởi tạo:** 17 dòng. PI2.2, PI7.1, PI7.2 được ghi chú cần làm rõ thang mức năng lực (động từ và mức ghi trong tài liệu chưa tương ứng — Q03).
-
-### 4.6 courses — học phần
-
-Học phần là *môn học có mã và nội dung xác định*, khác với *lớp học phần* (một lần tổ chức giảng dạy trong học kỳ).
-
-| **Trường** | **Ý nghĩa** |
-|---|---|
-| `code`, `name`, `credits` | Mã (ví dụ `OOPR230279`), tên, số tín chỉ (số nguyên) |
-| `extra` | Thông tin mở rộng tùy chọn (Map key-value). *Lưu ý (Q17 chốt):* Không tạo collection `departments` và bỏ trường `departmentId`. Trưởng bộ môn (`DEPARTMENT_HEAD`) quản lý học phần trực tiếp thông qua `scope.courseIds`. |
-
-**Chỉ mục:** `code` duy nhất. **Khởi tạo:** học phần `OOPR230279 — Lập trình hướng đối tượng` (các học phần thử nghiệm khác sẽ nhập khi Khoa xác nhận danh sách).
-
-### 4.7 program_courses — vị trí học phần trong CTĐT
-
-| **Trường** | **Ý nghĩa** |
-|---|---|
-| `programVersionId`, `courseId` | Học phần thuộc phiên bản CTĐT nào |
-| `semester`, `credits`, `type` | Học kỳ dự kiến, tín chỉ, `COMPULSORY` (bắt buộc) / `ELECTIVE` (tự chọn) |
-| `category` | Nhóm: cơ sở / cơ sở ngành / chuyên ngành / đồ án / khóa luận |
-| `prerequisiteCourseIds[]` | Học phần tiên quyết |
-| `previousCourseIds[]` | Học phần học trước |
-
-**Chỉ mục:** (`programVersionId`, `courseId`) duy nhất. **Khởi tạo:** chưa có (cần danh mục học phần từ bản CTĐT).
-
-### 4.8 course_pi_contributions — ma trận học phần đóng góp vào PI (Phụ lục II)
-
-**Mục đích:** lưu mức **I** (Introduced – giới thiệu), **R** (Reinforced – củng cố), **M** (Mastered – thành thạo) mà mỗi học phần được bố trí cho từng PI. Đây là *thiết kế đóng góp dự kiến*, không phải kết quả của sinh viên; không dùng làm trọng số tính điểm.
-
-| **Trường** | **Ý nghĩa** |
-|---|---|
-| `programVersionId`, `courseId`, `piId` | Bộ ba xác định một ô trong ma trận |
-| `contribution` | `I`, `R` hoặc `M` |
-| `verification` | Trạng thái xác nhận |
-
-Ô trống trong ma trận nghĩa là *không có bản ghi*, không kết luận học phần "không liên quan" về nội dung.
-
-**Chỉ mục:** (`programVersionId`, `courseId`, `piId`) duy nhất; `piId`. **Khởi tạo:** 4 dòng của OOPR230279 (trang 46): PI1.2=R, PI6.1=R, PI6.2=I, PI7.1=R.
+### 3.6 `courses`, 3.7 `program_courses`, 3.8 `course_pi_contributions`
+- `courses`: `code` (unique), `name`, `credits`, `extra`.
+- `program_courses`: `{ programVersionId, courseId }` (unique), `semester`, `credits`, `type` (`COMPULSORY | ELECTIVE`), `category`, `prerequisiteCourseIds[]`, `previousCourseIds[]`.
+- `course_pi_contributions`: `{ programVersionId, courseId, piId }` (unique), `contribution` (`I | R | M`, không dùng làm trọng số tính điểm), `verification`.
 
 ## Nhóm C — Học phần & CLO
 
-### 4.9 syllabi — phiên bản đề cương học phần
+### 3.9 `syllabi` — phiên bản đề cương học phần
+- `courseId`, `version` (unique cùng `courseId`), `effectiveFromTermId`, `effectiveToTermId`, `status` (`DRAFT | CONFIRMED | ARCHIVED`), `verification`.
 
-| **Trường** | **Ý nghĩa** |
-|---|---|
-| `courseId`, `version` | Học phần và phiên bản đề cương |
-| `effectiveFromTermId`, `effectiveToTermId` | Học kỳ bắt đầu/kết thúc áp dụng |
-| `status` | `DRAFT` / `CONFIRMED` / `ARCHIVED` |
+### 3.10 `clos` — chuẩn đầu ra học phần
+- Các trường bắt buộc: `syllabusId`, `courseId`, `code` (`^CLO[0-9]+$`), `contentOriginal`, **`measurement: { defaultPassThreshold }` với `defaultPassThreshold` $\in (0, 1]$ bắt buộc không được để trống** (đã xóa `defaultWeight`).
+- Chỉ mục: `{ syllabusId: 1, code: 1 }` (unique).
 
-**Chỉ mục:** (`courseId`, `version`) duy nhất. **Khởi tạo:** chưa có (chờ đề cương chính thức).
+### 3.11 `clo_pi_links` — liên kết CLO ↔ PI
+- Các trường bắt buộc: `programVersionId`, `syllabusId`, `cloId`, `piId`, **`weight` $\in (0, 1]$ (trọng số đóng góp $W_{CLO_{c,j} \to PI_m}$, bắt buộc không để trống; không ép tổng qua các học phần $= 1.0$)**.
+- Chỉ mục: `{ cloId: 1, piId: 1 }` (unique), `{ piId: 1 }`, `{ programVersionId: 1 }`.
 
-### 4.10 clos — chuẩn đầu ra học phần
+## Nhóm D — Bài đánh giá & Ma trận Câu hỏi – CLO
 
-| **Trường** | **Ý nghĩa** |
-|---|---|
-| `syllabusId`, `courseId` | CLO thuộc đề cương nào |
-| `code` | `CLO1`, `CLO2`… (duy nhất **trong một đề cương**) |
-| `contentOriginal` | Nội dung nguyên văn trong đề cương |
-| `bloomLevel` (1–6), `bloomNote` | Mức tư duy theo Bloom — phân loại nhiệm vụ, không phải điểm số |
-| `verification` | `Trạng thái xác nhận` |
-| `measurement` | Cấu hình đo riêng của CLO: `defaultWeight` (tỷ trọng trong học phần), `defaultPassThreshold` (ngưỡng đạt riêng), cùng thang 0–1; để trống cho đến khi được xác nhận |
-
-**Chỉ mục:** (`syllabusId`, `code`) duy nhất.
-
-### 4.11 clo_pi_links — liên kết CLO ↔ PI (nhiều–nhiều)
-
-Một CLO có thể đóng góp nhiều PI; một PI được nhiều CLO của nhiều học phần cùng đo.
-
-| **Trường** | **Ý nghĩa** |
-|---|---|
-| `cloId`, `piId`, `syllabusId`, `programVersionId` | Hai đầu liên kết và phiên bản áp dụng |
-| `weight` | Tỷ trọng đóng góp của CLO vào PI, 0 < x ≤ 1, dùng khi tổng hợp gián tiếp (`pi.method = FROM_CLOS`); để trống cho đến khi quy tắc được xác nhận |
-
-Vai trò: hiển thị ma trận CLO–PI và **kiểm tra nhất quán** với PI gán trực tiếp cho câu hỏi. **Chỉ mục:** (`cloId`, `piId`) duy nhất. **Khởi tạo:** chưa có.
-
-## Nhóm D — Ngân hàng câu hỏi & bài đánh giá
-
-**Vai trò của nhóm này.** Ngân hàng câu hỏi là *danh mục các câu hỏi của đề đã thi* (nhập từ Moodle, Excel hoặc nhập tay). Mỗi câu được khai báo một lần: thuộc danh mục nội dung nào, mức Bloom nào, đo cặp CLO–PI nào. Khi lập bài đánh giá cho một lớp, câu hỏi được sao chép vào bài kèm ánh xạ tại thời điểm thi. Ngân hàng **không** sinh đề tự động và **không** có quy trình duyệt đề.
-
-**Cách sắp xếp danh mục.** Có hai loại thông tin, cần phân biệt:
-
-| **Loại** | **Lưu ở đâu** | **Vì sao** |
-|---|---|---|
-| **Danh mục nội dung** (cây): Chương/Phần → Chủ đề → Nhóm nhỏ | `question_categories` | Mỗi câu hỏi chỉ thuộc **một** vị trí nội dung, nên phù hợp với cây phân cấp; xem được theo chương, theo chủ đề |
-| **Thuộc tính phân loại**: CLO, PI, mức Bloom, loại câu hỏi, độ khó, trạng thái | Trường của `questions` | Một câu có thể đo **nhiều** CLO/PI nên không thể đặt vào cây; lọc bằng chỉ mục |
-
-Các cách duyệt ngân hàng: theo chương/chủ đề (đi theo cây), theo CLO, theo PI, theo mức Bloom, theo loại câu hỏi, theo trạng thái (đều có chỉ mục). Thống kê độ phủ (số câu theo CLO × mức Bloom) tính được bằng truy vấn tổng hợp trên `questions`.
-
-### 4.12 question_banks — ngân hàng câu hỏi
-
-Một học phần có thể có một hoặc nhiều ngân hàng (ví dụ ngân hàng trắc nghiệm, ngân hàng tự luận). Không bắt buộc mỗi CLO một ngân hàng riêng: một ngân hàng chứa câu hỏi của nhiều CLO.
-
-| **Trường** | **Ý nghĩa** |
-|---|---|
-| `code`, `name`, `description` | Mã (duy nhất), tên, mô tả |
-| `courseId`, `syllabusId` | Học phần và **phiên bản đề cương** mà ngân hàng áp dụng — bắt buộc, vì CLO chỉ có nghĩa trong một đề cương |
-| `sourceSystem`, `externalBankId` | Nguồn: `INTERNAL` / `MOODLE` / `EXCEL_IMPORT`; mã ngân hàng ở hệ thống ngoài (nếu có) |
-| `status` | `ACTIVE` / `ARCHIVED` |
-
-**Chỉ mục:** `code` duy nhất; (`courseId`, `syllabusId`). **Khởi tạo:** rỗng.
-
-### 4.13 question_categories — danh mục nội dung (cây tối đa 3 cấp)
-
-Mỗi ngân hàng có một cây danh mục riêng: cấp 1 là Chương/Phần, cấp 2 là Chủ đề, cấp 3 là Nhóm nhỏ. Giới hạn 3 cấp để cây dễ dùng và dễ báo cáo. Tên chương, chủ đề lấy từ đề cương của từng học phần; ví dụ dưới đây chỉ minh họa cấu trúc:
-
-```
-Ngân hàng: Lập trình hướng đối tượng
-├── C1    Chương 1                (cấp 1)
-│   ├── C1.1   Chủ đề 1.1         (cấp 2)
-│   │   └── C1.1.1  Nhóm nhỏ     (cấp 3)
-│   └── C1.2   Chủ đề 1.2         (cấp 2)
-└── C2    Chương 2                (cấp 1)
-```
-
-| **Trường** | **Ý nghĩa** |
-|---|---|
-| `bankId`, `code`, `name` | Ngân hàng, mã (duy nhất trong ngân hàng), tên danh mục |
-| `parentId` | Danh mục cha (`null` ở cấp 1) |
-| `ancestorIds[]` | Danh sách tổ tiên từ gốc đến cha — lấy toàn bộ câu hỏi dưới một chương bằng một truy vấn |
-| `level` | 1, 2 hoặc 3 |
-| `order`, `status` | Thứ tự hiển thị; `ACTIVE` / `ARCHIVED` |
-
-**Quy tắc kiểm tra:** cấp 1 không có cha; cấp 2–3 phải có cha và số tổ tiên bằng cấp − 1; không vượt cấp 3. **Chỉ mục:** (`bankId`, `code`) duy nhất; (`bankId`, `parentId`, `order`); `ancestorIds`.
-
-### 4.14 questions — câu hỏi
-
-| **Trường** | **Ý nghĩa** |
-|---|---|
-| `bankId`, `code`, `version` | Ngân hàng, mã câu (duy nhất trong ngân hàng, ví dụ Q001), phiên bản của câu |
-| `questionType` | `MCQ` (trắc nghiệm) / `SHORT_ANSWER` / `ESSAY` (tự luận) / `PRACTICAL` (thực hành) / `PROJECT_TASK` (nhiệm vụ đồ án) |
-| `content` | Nội dung câu hỏi (có thể để trống nếu đề còn bảo mật) |
-| `categoryId` | Danh mục nội dung chứa câu hỏi |
-| `bloomLevel` | Mức Bloom của nhiệm vụ (1–6, bắt buộc). Lưu riêng, **không** mặc định bằng trình độ năng lực của PI |
-| `difficulty`, `defaultMaxScore` | Độ khó (tùy chọn); điểm tối đa gợi ý |
-| `outcomeMappings[]` | Các phần tử `{cloId, weight}`: câu hỏi đo CLO nào. `weight` là phần điểm của câu được chia cho CLO đó; tổng các CLO của một câu bằng 1. Một câu có thể đo nhiều CLO (ADR 0011). PI suy ra qua `clo_pi_links` |
-| `source` | `{system, externalQuestionId}` — nguồn nhập (Excel…) và mã câu bên ngoài, để đối chiếu và chống nhập trùng (Q16: nhập từ Excel) |
-| `status` | `DRAFT` (mới nhập, chưa xác định ánh xạ) / `ACTIVE` / `RETIRED` |
-| `verification` | Trạng thái xác nhận ánh xạ |
-
-**Quy tắc:**
-
-- Mỗi câu hỏi (và mỗi tiêu chí rubric trong bài đánh giá) ánh xạ với CLO; **một câu có thể ánh xạ với nhiều CLO** (ADR 0011). Mỗi CLO chỉ được khai báo một lần trong cùng một câu (MongoDB kiểm tra) để không tính trùng điểm. PI suy ra từ kết quả CLO.
-- Câu `ACTIVE` phải có ít nhất một CLO và tổng `weight` bằng 1 (MongoDB kiểm tra); câu `DRAFT` được để trống ánh xạ.
-- CLO gắn cho câu hỏi phải thuộc đề cương của bài đánh giá (dịch vụ Spring Boot kiểm tra, chặn ghi nếu sai). Khi chạy tính ở chế độ chính thức, liên kết CLO–PI trong `clo_pi_links` còn phải ở trạng thái đã duyệt.
-- Khi nội dung hoặc ánh xạ của một câu thay đổi, tăng `version`. Các bài đã thi giữ bản sao ánh xạ của phiên bản cũ nên kết quả cũ không bị đổi.
-
-**Ví dụ một câu ánh xạ nhiều CLO** (số liệu và các CLO chỉ để minh họa cách tính, không phải ánh xạ chính thức). Câu thực hành tối đa 10 điểm, khai báo 2 CLO, sinh viên đạt 7 điểm:
-
-| **CLO** | `weight` | **Phần điểm tối đa của câu dành cho CLO** | **Sinh viên đạt** |
-|---|---|---|---|
-| CLO2 | 0,4 | 4,0 | 2,8 |
-| CLO3 | 0,6 | 6,0 | 4,2 |
-
-Tổng hợp: **CLO2** nhận 4,0 điểm tối đa (đạt 2,8); **CLO3** nhận 6,0 (đạt 4,2). Sau đó, kết quả CLO được dùng để suy ra PI qua `clo_pi_links` theo phương thức `FROM_CLOS` (ADR 0011). Cách chia điểm giữa các CLO trong một câu chờ Q15.
-
-**Chỉ mục:** (`bankId`, `code`) duy nhất; `categoryId`; (`bankId`, `status`, `bloomLevel`); `outcomeMappings.cloId`; (`bankId`, `source.system`, `source.externalQuestionId`) duy nhất khi có mã ngoài. **Khởi tạo:** rỗng — chỉ nhập khi có đề đã thi và đề cương đã duyệt.
-
-### 4.15 assessments — bài đánh giá và cấu trúc câu hỏi/tiêu chí
-
-**Mục đích:** khai báo cấu trúc của bài đã thi để quy điểm lên chuẩn đầu ra. Có **hai tầng**:
-
-- `SYLLABUS_TEMPLATE`: khung theo đề cương (loại bài, trọng số dự kiến). Đề cương dùng nhiều năm nên khung ít thay đổi.
-- `SECTION`: bản thực tế của từng lớp trong học kỳ (câu hỏi/tiêu chí đã thi, sao chép từ ngân hàng câu hỏi hoặc khai báo trực tiếp với tiêu chí rubric). Điểm luôn trỏ vào bản này, nên đổi đề ở kỳ sau không làm sai kết quả kỳ trước. Bản đã có điểm bị khóa không cho sửa `items`.
-
-| **Trường** | **Ý nghĩa** |
-|---|---|
-| `syllabusId`, `code`, `name` | Đề cương, mã và tên bài |
-| `scope`, `sectionId`, `templateId` | Tầng (khung/lớp); bản `SECTION` bắt buộc có `sectionId` và trỏ về khung |
-| `type`, `phase`, `scheduledAt` | Loại (`QUIZ`, `PRACTICAL`, `PROJECT`, `MIDTERM`, `FINAL`, `OTHER`), giai đoạn (`FORMATIVE` định kỳ / `MIDTERM` / `SUMMATIVE` tổng kết), thời điểm |
-| `totalPoints` | Tổng điểm quy định của bài (ví dụ 10). Backend kiểm tra \|`totalPoints` − Σ`items[].maxScore`\| < 0,001 trước khi cho `SUBMITTED` |
-| `weightInCourse` | Trọng số của bài trong điểm tổng kết, 0 ≤ x ≤ 1 |
-| `dataGranularity` | `ITEM` (mặc định — điểm theo từng câu hỏi/tiêu chí) hoặc `TOTAL_ONLY` (chỉ điểm tổng, dự phòng; khi đó không đo được CLO/PI) |
-| `status` | Trạng thái duyệt: `DRAFT` (giảng viên đang soạn ma trận) → `SUBMITTED` (gửi Trưởng bộ môn) → `APPROVED` (đã duyệt, mở cổng nhập điểm) hoặc `REJECTED` (yêu cầu sửa) → `SCORE_ENTERED` (đã nạp điểm) → `LOCKED` (khóa sổ) |
-| `isLocked` | `true` khi `status` ∈ {`APPROVED`, `SCORE_ENTERED`, `LOCKED`}; cấm mọi thay đổi `items[]`. MongoDB kiểm tra `isLocked` khớp `status` |
-| `approval` | `submittedBy/At`, `reviewedBy/At`, `reviewNote` và `history[]` = `{action: SUBMIT/APPROVE/REJECT/UNLOCK, actorId, at, note}` |
-| `coverageSummary` | Thống kê cho màn hình duyệt nhanh: `totalItemsSum`, `byClo[]` (điểm và % theo CLO), `byBloom[]` (số câu, điểm, % theo mức Bloom). Tính từ `items[]`, không phải nguồn của công thức đo lường |
-| `exportedFiles[]` | Lịch sử xuất tệp (`fileRef`, `templateCode`, `includeOutcomeLabels`, `exportedBy`, `exportedAt`). Chỉ là bản ghi lịch sử; tính năng xuất phôi in thuộc phạm vi đang chờ xác nhận (Q11) |
-| `items[]` | Danh sách câu hỏi hoặc tiêu chí rubric (bên dưới) |
-
-**Quy tắc:** từ `SUBMITTED` trở đi phải có ít nhất một phần tử `items[]` (MongoDB kiểm tra). Backend chỉ ghi `scores` khi bài ở `APPROVED` hoặc `SCORE_ENTERED`, và từ chối `PUT /api/assessments/{id}/items` khi `isLocked = true`. Duyệt/từ chối ghi `audit_logs` (`ASSESSMENT_APPROVE`, `ASSESSMENT_REJECT`).
-
-Mỗi phần tử `items[]` (nhúng trong bài vì chỉ tồn tại cùng bài, số lượng giới hạn):
-
-| **Trường** | **Ý nghĩa** |
-|---|---|
-| `_id`, `code`, `orderIndex`, `title`, `kind` | Định danh, thứ tự hiển thị; `QUESTION` (câu hỏi) hoặc `CRITERION` (tiêu chí rubric) |
-| `maxScore` | Điểm tối đa (> 0) — chính là tỷ trọng điểm riêng của câu hỏi |
-| `bloomLevel`, `topic` | Mức Bloom của nhiệm vụ; chương/chủ đề (chuỗi, để xem điểm thành phần theo chương) |
-| `outcomeMappings[]` | Các cặp `{cloId, piId, weight}` — câu hỏi/tiêu chí đo cặp CLO–PI nào; `weight` là phần điểm chia cho cặp, tổng các cặp của một câu bằng 1 (MongoDB kiểm tra). Là **bản sao tại thời điểm thi** nên không đổi khi ngân hàng câu hỏi sửa sau này |
-| `questionId`, `questionVersion` | Câu hỏi gốc trong ngân hàng và phiên bản tại thời điểm thi; để trống với tiêu chí rubric hoặc câu ngoài ngân hàng |
-| `rubric.levels[]` | Các mức rubric (1–4) có mô tả và điểm; *mức rubric khác mức Bloom* |
-| `externalRef` | Chuỗi định danh câu hỏi trên hệ thống LMS/Moodle để khớp cột điểm khi nhập |
-
-**Chỉ mục:** (`syllabusId`, `sectionId`, `code`) duy nhất; (`sectionId`, `status`); `items.outcomeMappings.cloId`; `items.outcomeMappings.piId`; `items.questionId`. **Khởi tạo:** chưa có.
+### 3.12 `assessments` — bài đánh giá và ma trận câu hỏi – CLO
+- Các trường chính:
+  - `syllabusId`, `code`, `name`, `scope` (`SYLLABUS_TEMPLATE | SECTION`), `sectionId`, `templateId`, `type`, `phase`, `scheduledAt`.
+  - `status` (`DRAFT | LOCKED | SCORE_ENTERED`), `isLocked` (`true` khi `status` $\in \{ \text{LOCKED}, \text{SCORE_ENTERED} \}$).
+  - **`cloWeights[]`:** Danh sách `{ cloId, weight }` ($0 < weight \le 1.0$) biểu diễn tỷ lệ đóng góp $W_{p,j}$ của bài kiểm tra cho từng CLO xuất hiện trong bài (khi khóa bài lẻ: $\sum_p W_{p,j} \le 1.0$; khi chạy tổng hợp học phần Cấp độ 2: $\sum_{p \in P(CLO_j)} W_{p,j} = 1.0$).
+  - `items[]`: Danh sách câu hỏi ẩn danh `{ _id, code, orderIndex, bloomLevel, outcomeMappings: [{ cloId, maxScore }] }` ($maxScore > 0$).
+  - `coverageSummary`: `{ totalItemsSum, byClo[], byBloom[] }`.
+- Đã loại bỏ hoàn toàn: `totalPoints`, `weightInCourse`, `dataGranularity`, `approval`, `exportedFiles`, và các trường nội dung câu hỏi (`title`, `kind`, `maxScore` cấp câu hỏi, `topic`, `questionId`, `questionVersion`, `externalRef`, `rubric`).
 
 ## Nhóm E — Học kỳ, lớp học phần, sinh viên
 
-### 4.16 terms — học kỳ
+### 3.13 `terms`, 3.14 `course_sections`, 3.15 `students`, 3.16 `enrollments`
+- `terms`: `code` (unique), `academicYear`, `startDate`, `endDate`, `status` (`OPEN | SCORE_LOCKED | CLOSED`).
+- `course_sections`: `code` (unique), `courseId`, `syllabusId`, `termId`, `lecturerIds[]`, `enrolledCount`, `status` (`OPEN | CLOSED | LOCKED`).
+- `students`: `studentRef` (unique), `userId`, `cohort`, `majorCode`, `programVersionId`, `fullName`, `email`, `status`.
+- `enrollments`: `{ sectionId, studentId }` (unique), `status` (`ENROLLED | WITHDRAWN`), `enrolledAt`. Tập sinh viên có `status = ENROLLED` của lớp là mẫu số $N_{\text{section}}$.
 
-| **Trường** | **Ý nghĩa** |
-|---|---|
-| `code`, `academicYear`, `startDate`, `endDate` | Ví dụ `2026-HK1` |
-| `status` | `OPEN` / `SCORE_LOCKED` (khóa nhập/sửa điểm) / `CLOSED` |
+## Nhóm F — Nhập điểm CLO
 
-Tránh dùng chuỗi tự do rải rác (sai chính tả làm gãy thống kê) và cho phép khóa sổ điểm. **Chỉ mục:** `code` duy nhất.
+### 3.17 `import_batches` & 3.18 `import_row_errors`
+- `import_batches`: `sectionId`, `assessmentId`, `fileName`, `fileChecksum`, `fileRef`, `status` (`UPLOADED | VALIDATED | HAS_ERRORS | CONFIRMED | ROLLED_BACK`), `stats`, `uploadedBy`, `confirmedBy`, `confirmedAt` (đã loại bỏ các cột dư thừa `sourceSystem`, `columnMapping`, `emptyCellAs`, `reimportPolicy`).
+- `import_row_errors`: `batchId`, `rowNumber`, `column`, `errorType`, `rawValue`, `message`.
 
-### 4.17 course_sections — lớp học phần
+### 3.19 `scores` — điểm theo từng cặp (câu hỏi, CLO) của sinh viên
+- Các trường bắt buộc: `sectionId`, `assessmentId`, `itemId`, `cloId`, `studentId`, **`rawScore` ($\ge 0.0$)**, **`maxScore` ($> 0.0$)**, thỏa mãn $0 \le \text{rawScore} \le \text{maxScore}$.
+- Sinh viên vắng thi hoặc bỏ trống câu hỏi được ghi nhận trực tiếp `rawScore = 0.0`.
+- Đã loại bỏ hoàn toàn: `status` (`SCORE_STATUS_VALUES`), `rubricLevel`, `revision`.
+- Chỉ mục: `{ sectionId: 1, assessmentId: 1, itemId: 1, cloId: 1, studentId: 1 }` (unique).
 
-| **Trường** | **Ý nghĩa** |
-|---|---|
-| `code` | Mã lớp |
-| `courseId`, `syllabusId`, `termId` | Học phần, đề cương áp dụng, học kỳ |
-| `lecturerIds[]` | Giảng viên phụ trách (dùng để phân quyền theo phạm vi) |
-| `enrolledCount`, `status` | Sĩ số; `OPEN` / `CLOSED` / `LOCKED` |
+## Nhóm G — Đo lường chuẩn đầu ra 4 cấp độ (`ASSESSMENT_CLO`, `CLO`, `PI`, `PLO`)
 
-Không gắn phiên bản CTĐT ở cấp lớp, vì một lớp có thể có sinh viên của nhiều khóa; phiên bản CTĐT lấy từ `students.programVersionId`. **Chỉ mục:** `code` duy nhất; (`courseId`, `termId`); `lecturerIds`.
+### 3.20 `calculation_runs`
+- Các trường: `scope` (`SECTION | COHORT | PROGRAM`), `scopeRef`, `lockKey`, `programVersionId`, `syllabusIds[]`, `isOfficial`, `dataSnapshot`, `isStale`, `staleReason`, `status` (`PENDING | PROCESSING | SUCCESS | FAILED`), `errorMessage`, `triggeredBy`, `startedAt`, `finishedAt`.
+- Đã loại bỏ cột `ruleId`.
 
-### 4.18 students — sinh viên
+### 3.21 `student_results` — kết quả chuẩn đầu ra 4 cấp độ của từng sinh viên
+- `runId`, **`level` $\in$ `['ASSESSMENT_CLO', 'CLO', 'PI', 'PLO']`** (đã bỏ `'COURSE'`, thêm `'ASSESSMENT_CLO'`), `subjectId`, `sectionId`, **`assessmentId` (khác `null` khi `level = 'ASSESSMENT_CLO'`, bằng `null` ở các cấp còn lại)**, `studentId`, `termId`.
+- `status` (`COMPUTED | INSUFFICIENT_DATA | NOT_APPLICABLE`), `value` $\in [0, 1]$, `passThreshold` $\in (0, 1]$, `passed` (`true | false`), `completeness`, `inputs[]`, `programVersionId`, `syllabusId` (đã loại bỏ `ruleId`, `evidenceCount`).
+- Chỉ mục duy nhất: `{ runId: 1, level: 1, subjectId: 1, sectionId: 1, assessmentId: 1, studentId: 1 }`.
 
-| **Trường** | **Ý nghĩa** |
-|---|---|
-| `studentRef` | **Mã thay thế** (không dùng mã thật nếu chưa được phép) — duy nhất |
-| `userId` | Trỏ về `users._id` khi sinh viên được cấp tài khoản xem kết quả của chính mình (vai trò `STUDENT`); để trống nếu chưa cấp |
-| `cohort`, `majorCode`, `programVersionId` | Khóa, mã ngành, phiên bản CTĐT áp dụng cho sinh viên |
-| `status` | `ACTIVE` / `SUSPENDED` / `GRADUATED` / `DROPPED_OUT` |
-| `fullName`, `email` | Tùy chọn, chỉ lưu khi được phép (Q09); không đưa dữ liệu thật vào seed/test |
-
-Quyết định dùng mã thật hay mã thay thế phụ thuộc Khoa (Q09). **Chỉ mục:** `studentRef` duy nhất; (`programVersionId`, `cohort`); `userId`.
-
-### 4.19 enrollments — ghi danh vào lớp học phần
-
-`sectionId`, `studentId`, `status` (`ENROLLED`/`WITHDRAWN`), `enrolledAt`. Đây là **mẫu số** của tỷ lệ đạt: lớp 45 sinh viên mà chỉ 40 người đủ dữ liệu thì phải báo cáo thêm 5 người chưa đủ dữ liệu. **Chỉ mục:** (`sectionId`, `studentId`) duy nhất.
-
-## Nhóm F — Nhập điểm
-
-### 4.20 import_batches — mỗi lần nhập file điểm
-
-| **Trường** | **Ý nghĩa** |
-|---|---|
-| `sectionId`, `assessmentId` | Nhập cho lớp và bài đánh giá nào |
-| `fileName`, `fileChecksum`, `fileRef` | File gốc; mã băm SHA-256 để phát hiện nhập trùng; `fileRef` là chuỗi đường dẫn nơi lưu tệp gốc |
-| `sourceSystem` | `EXCEL` / `CSV` / `MOODLE_EXPORT` |
-| `columnMapping` | Ánh xạ cột trong file → câu hỏi/tiêu chí (lưu để dùng lại) |
-| `emptyCellAs` | Ô trống là `BLANK` (bỏ trống, tính 0) hay `MISSING` (thiếu dữ liệu) — người nhập chọn rõ cho từng lô, hệ thống không tự đoán |
-| `reimportPolicy` | Nhập lại khi đã có điểm: `REJECT_ON_CONFLICT` (từ chối nếu xung đột) / `OVERWRITE` (ghi đè) / `UPDATE_BLANK_ONLY` (chỉ điền ô còn trống). Chờ quyết định chọn mặc định |
-| `status` | `UPLOADED` → `VALIDATED` → `HAS_ERRORS` / `CONFIRMED` / `ROLLED_BACK` |
-| `stats`, `uploadedBy`, `confirmedBy`, `confirmedAt` | Thống kê dòng hợp lệ/lỗi; người nhập, người xác nhận |
-
-**Chỉ mục:** (`sectionId`, `assessmentId`, `createdAt`); `fileChecksum`.
-
-### 4.21 import_row_errors — lỗi từng dòng khi nhập
-
-`batchId`, `rowNumber`, `column`, `errorType` (`INVALID_STUDENT_CODE`, `SCORE_OUT_OF_RANGE`, `DUPLICATE_RECORD`, `MISSING_FIELD`), `rawValue`, `message`. Tách riêng khỏi lô nhập vì số lỗi không giới hạn trước. **Chỉ mục:** (`batchId`, `rowNumber`).
-
-### 4.22 scores — điểm theo từng câu hỏi/tiêu chí (collection lớn nhất)
-
-Mỗi document là điểm của **một sinh viên ở một câu hỏi/tiêu chí**.
-
-| **Trường** | **Ý nghĩa** |
-|---|---|
-| `sectionId`, `assessmentId`, `itemId`, `studentId` | Khóa nghiệp vụ (duy nhất) |
-| `status` | Xem bảng dưới |
-| `rawScore`, `maxScore` | Điểm đạt; điểm tối đa chụp tại thời điểm nhập |
-| `rubricLevel` | Mức rubric sinh viên đạt (1–4), nếu câu hỏi/tiêu chí có rubric |
-| `importBatchId`, `sourceRow` | Truy vết về lô nhập và dòng trong file gốc |
-| `revision` | Số lần sửa (khóa lạc quan: sửa đồng thời sẽ báo xung đột) |
-| `updatedBy`, `updatedAt` | Người và thời điểm sửa gần nhất |
-
-| `status` | **Ý nghĩa** | `rawScore` |
-|---|---|---|
-| `SCORED` | Đã chấm | có điểm |
-| `BLANK` | Sinh viên có dự thi nhưng bỏ trống câu này | bằng 0 (có ghi nhận) |
-| `ABSENT` | Vắng cả bài | `null` |
-| `NOT_GRADED` | Chưa chấm | `null` |
-| `EXEMPT` | Được miễn | `null` |
-| `MISSING` | Thiếu dữ liệu nhập | `null` |
-
-**Quy tắc kiểm tra tự động:** `rawScore ≤ maxScore`; `BLANK` phải bằng 0; các trạng thái thiếu dữ liệu bắt buộc `rawScore = null` (không được ngầm bằng 0); không trùng (`sectionId`, `assessmentId`, `itemId`, `studentId`). Mọi lần sửa điểm ghi vào `audit_logs`.
-
-## Nhóm G — Đo lường
-
-### 4.23 measurement_rules — quy tắc đo lường có phiên bản
-
-**Mục đích:** lưu công thức, trọng số, ngưỡng dưới dạng **dữ liệu cấu hình** để backend đọc và thực hiện. Nhờ vậy khi Khoa xác nhận hoặc thay đổi quy tắc, không phải sửa mã và các báo cáo cũ vẫn truy được quy tắc đã dùng.
-
-| **Trường** | **Ý nghĩa** |
-|---|---|
-| `code`, `version`, `status` | Mã (QT-PĐBCL-ĐLCĐR), phiên bản; `DRAFT` / `CONFIRMED` / `RETIRED` |
-| `confirmedBy`, `confirmedAt` | Người xác nhận quy tắc |
-| `clo` | Cách tính CLO: `method` (`WEIGHTED_ITEMS` / `POINTS_RATIO`), `defaultPassThreshold` (ngưỡng mặc định), `minCoverage` (tỷ lệ tối thiểu thành phần bắt buộc có điểm) |
-| `course` | `requireAllCloPass`: có yêu cầu đạt *từng* CLO mới đạt học phần hay không (chống học lệch — Q12); `defaultTargetPassRate`: mục tiêu tỷ lệ đạt của lớp |
-| `pi` | `method`: `FROM_CLOS` (tổng hợp từ kết quả CLO theo `clo_pi_links.weight`, ADR 0011; bỏ `DIRECT_FROM_ITEMS`); `aggregationMethod`: `WEIGHTED_AVERAGE` / `MAX` / `LATEST` / `ACCUMULATED_EVIDENCE`; `defaultPassThreshold`. Bỏ hoàn toàn `useIrmAsWeight` và `irmWeights` theo ADR 0012 (không quy đổi I/R/M) |
-| `plo` | `method`: `ALL_PIS_PASSED` / `WEIGHTED_PIS` / `AVERAGE_PIS`; `defaultPassThreshold`; `cohortTargetPassRate` (mục tiêu tỷ lệ đạt theo khóa) |
-| `missingDataPolicy` | `blankScoreValue` (luôn 0: `BLANK` tính 0 có ghi nhận); `excludeAbsentFromDenominator`, `excludeMissingFromDenominator` (loại `ABSENT`/`MISSING` khỏi mẫu số hay tính là chưa đủ dữ liệu — Q13). `NOT_GRADED`, `EXEMPT` luôn `rawScore = null`, không tính 0 |
-
-Mọi ngưỡng/mục tiêu nằm trong 0–1. Chỉ quy tắc `CONFIRMED` mới được dùng để kết luận chính thức. Không quy đổi I/R/M thành hệ số (ADR 0012). **Khởi tạo:** một khung bản nháp `0.1-DRAFT`, **mọi ngưỡng/trọng số để trống** chờ Khoa xác nhận (`pi.method = FROM_CLOS` theo ADR 0011; trọng số `clo_pi_links.weight` chờ Q22); không có con số nào được tự đặt.
-
-### 4.24 calculation_runs — mỗi lần chạy tính toán
-
-| **Trường** | **Ý nghĩa** |
-|---|---|
-| `scope` | Loại phạm vi tính, chuỗi: `SECTION` (lớp) / `COURSE` / `COHORT` (khóa) / `PROGRAM` (CTĐT) |
-| `scopeRef` | **Bổ sung ngoài PLO_DB_UPDATE:** đối tượng cụ thể của phạm vi (`sectionIds[]`, `courseIds[]`, `cohorts[]`, `termId`); cần để biết lượt tính áp dụng cho lớp/khóa nào |
-| `ruleId`, `programVersionId`, `syllabusIds` | Quy tắc và phiên bản đã dùng |
-| `isOfficial` | `true` chỉ khi quy tắc đã `CONFIRMED` và dữ liệu đã chốt |
-| `dataSnapshot` | Dấu vết dữ liệu đầu vào: `scoreChecksum`, `totalScores`, `lastScoreUpdatedAt`, để chứng minh và tái lập kết quả |
-| `lockKey` | Khóa chống chạy trùng: hai lượt tính cùng phạm vi, cùng quy tắc không chạy đồng thời. Chỉ mục duy nhất áp dụng khi `status` là `PENDING` hoặc `PROCESSING`, nên lượt tính đã xong không chặn lần chạy sau |
-| `isStale`, `staleReason` | Đánh dấu kết quả đã cũ khi điểm trong phạm vi bị nhập/sửa sau lần tính |
-| `status`, `triggeredBy`, `startedAt`, `finishedAt` | Trạng thái `PENDING` → `PROCESSING` → `SUCCESS` / `FAILED`; người/thời điểm chạy |
-
-### 4.25 student_results — kết quả từng sinh viên
-
-| **Trường** | **Ý nghĩa** |
-|---|---|
-| `runId`, `level`, `subjectId` | Lượt tính; cấp (`CLO` / `COURSE` / `PI` / `PLO`); đối tượng (CLO/đề cương/PI/PLO) |
-| `sectionId`, `studentId`, `termId` | Lớp (nếu có), sinh viên, học kỳ (để xem tiến trình qua các học kỳ) |
-| `status` | `COMPUTED` / `INSUFFICIENT_DATA` / `NOT_APPLICABLE` |
-| `value`, `passed` | Kết quả (tỷ lệ 0–1) và đạt/không đạt; `null` nếu chưa đủ dữ liệu |
-| `evidenceCount` | Số điểm/kết quả tham gia tính |
-| `completeness` | Độ đầy đủ: `requiredCount`, `availableCount`, `ratio` |
-| `inputs[]` | **Truy vết một cấp liền kề:** `{sourceType: SCORE / STUDENT_RESULT, refId, normalizedValue, weight}`. CLO trỏ về `scores`; PI trỏ về `scores` hoặc `student_results` (CLO); PLO trỏ về `student_results` (PI). Một cấp để tránh vượt giới hạn 16MB của BSON |
-
-**Chỉ mục:** (`runId`, `level`, `subjectId`, `sectionId`, `studentId`) duy nhất; (`studentId`, `level`, `subjectId`, `termId`).
-
-### 4.26 aggregate_results — kết quả cấp lớp / khóa / CTĐT
-
-| **Trường** | **Ý nghĩa** |
-|---|---|
-| `level`, `subjectId`, `scope` | Cấp CLO/COURSE/PI/PLO; đối tượng; phạm vi `{type: SECTION / COURSE / COHORT / PROGRAM, refId}`, kèm `cohort`, `termId` khi phạm vi theo khóa/học kỳ |
-| `counts` | `enrolled` (ghi danh), `evaluable` (đủ dữ liệu), `passed`, `failed`, `insufficientData` |
-| `passRate` | Đạt / đủ dữ liệu |
-| `passRateOfEnrolled` | Đạt / ghi danh — luôn kèm theo để tỷ lệ cao không che phần còn thiếu |
-| `targetPassRate`, `targetMet` | Mục tiêu do đơn vị quy định và đã đạt hay chưa |
-| `dataCompleteness` | Độ đầy đủ dữ liệu |
+### 3.22 `aggregate_results` — kết quả thống kê tổng hợp 4 cấp độ
+- `runId`, **`level` $\in$ `['ASSESSMENT_CLO', 'CLO', 'PI', 'PLO']`**, `subjectId`, `sectionId`, `assessmentId`, `scope` (`type` $\in$ `ASSESSMENT | SECTION | COHORT | PROGRAM`, `refId`, `cohort`, `termId`).
+- `counts: { enrolled, passed, failed }` (trong đó `enrolled` là $N_{\text{section}}$ ở Cấp 1–2 và $N_{\text{cohort}}$ ở Cấp 3–4; đã bỏ `evaluable`, `insufficientData`), `mean`, `passRate`, `passThreshold`, `dataCompleteness`, `programVersionId` (đã bỏ `passRateOfEnrolled`, `targetPassRate`, `targetMet`, `ruleId`).
+- Chỉ mục duy nhất: `{ runId: 1, level: 1, subjectId: 1, sectionId: 1, assessmentId: 1, 'scope.type': 1, 'scope.refId': 1, 'scope.cohort': 1, 'scope.termId': 1 }`.
 
 ## Nhóm H — Báo cáo, cải tiến, hỗ trợ
 
-### 4.27 reports — báo cáo đã sinh
-
-`type` (`SECTION_CLO`, `COURSE_PI`, `PROGRAM_PLO`, `DATA_COMPLETENESS`), `params`, `runId`, `ruleId`, `programVersionId` (gắn phiên bản để đọc lại báo cáo cũ), `summary`, `limitations` (ghi rõ phạm vi và giới hạn — ví dụ dữ liệu ba học phần chưa đủ để kết luận toàn chương trình), `exports[]` (`{format, fileRef, generatedAt}` mỗi bản xuất), `generatedBy`, `createdAt`. **Chỉ mục:** `runId`; (`type`, `programVersionId`, `createdAt` giảm dần).
-
-### 4.28 improvement_actions — vấn đề và hành động cải tiến
-
-| **Trường** | **Ý nghĩa** |
-|---|---|
-| `programVersionId`, `courseId` | Phiên bản CTĐT và (tùy chọn) học phần liên quan |
-| `issue` | Vấn đề: `level` (`CLO`/`PI`/`PLO`), `subjectId`, `reportId`, `aggregateResultId`, `observedPassRate`, `description`, `rootCause` (nguyên nhân gốc) |
-| `actionPlan`, `expectedTarget` | Kế hoạch hành động và chỉ tiêu kỳ vọng (0–1) |
-| `ownerId`, `targetTermId`, `dueDate`, `priority` | Người phụ trách, học kỳ áp dụng, hạn, mức ưu tiên (`LOW`/`MEDIUM`/`HIGH`/`CRITICAL`) |
-| `status` | `OPEN` → `IN_PROGRESS` → `DONE` → `VERIFIED` (hoặc `CANCELLED`) |
-| `evaluation` | Đánh giá hiệu quả ở chu kỳ đo lường kế tiếp: `evaluationRunId`, `newPassRate`, `isEffective`, `evaluatedBy`, `evaluatedAt`, `completionNote` |
-| `history[]` | Lịch sử đổi trạng thái `{status, changedBy, changedAt, note}` |
-
-**Chỉ mục:** (`programVersionId`, `status`); `ownerId`; `targetTermId`.
-
-### 4.29 audit_logs — nhật ký thao tác quan trọng
-
-Ghi lại: sửa điểm (`SCORE_UPDATE`, kèm giá trị trước/sau và lý do), xác nhận nhập (`IMPORT_CONFIRM`), duyệt/từ chối ma trận đề thi (`ASSESSMENT_APPROVE`, `ASSESSMENT_REJECT`), chạy tính (`RUN_CALCULATION`), xác nhận quy tắc (`RULE_CONFIRM`), đăng nhập. Trường: `at`, `userId`, `action`, `entity {collection, id}`, `before`, `after`, `reason`, `ip`.
-
-### 4.30 ml_experiments — ĐÃ LOẠI BỎ (ngoài phạm vi đồ án)
-
-Đồ án đã xác nhận **không thực hiện Machine Learning** trong phạm vi nghiên cứu và phát triển. Collection `ml_experiments` đã được loại bỏ hoàn toàn khỏi CSDL (`database_import.js`) và hệ thống (xem TD-06). Không tạo mã, validator, index hay dữ liệu cho collection này.
-
-# 5. Luồng dữ liệu và ví dụ truy vết
-
-Ví dụ minh họa (số liệu **chỉ để giải thích**, chưa phải quy tắc chính thức):
-
-1. Chuẩn bị câu hỏi và bài đã thi: câu hỏi A (có trong `questions`, đo cặp CLO3–PI6.2) và tiêu chí rubric B (khai báo trực tiếp, cũng đo CLO3–PI6.2). Lập bài đánh giá (`assessments`, bản `SECTION`) bằng cách sao chép câu A kèm ánh xạ, thêm tiêu chí B; câu A tối đa 10 điểm, tiêu chí B tối đa 20 điểm.
-2. Giảng viên nhập file điểm → `import_batches` (+ `import_row_errors` nếu có lỗi) → xác nhận → ghi `scores`: sinh viên X đạt 6/10 ở câu A, 16/20 ở tiêu chí B.
-3. Chạy tính (`calculation_runs`) theo `measurement_rules`:
-   - **CLO3** của sinh viên X = 60%×0,4 + 80%×0,6 = 72% → ghi `student_results` (level `CLO`), `inputs` chứa hai điểm gốc.
-   - **PI6.2** của sinh viên X tính trực tiếp từ các câu hỏi gán PI6.2 → ghi `student_results` (level `PI`).
-   - PLO6 tổng hợp từ các kết quả PI thuộc PLO6.
-4. Tổng hợp lớp → `aggregate_results` (ví dụ 45 ghi danh, 40 đủ dữ liệu, 32 đạt, 5 chưa đủ dữ liệu).
-5. Sinh báo cáo (`reports`) có ghi giới hạn phạm vi; vấn đề phát hiện → `improvement_actions`.
-6. Truy vết ngược: từ một kết quả PLO → `inputs` → `scores` → `import_batches` + dòng trong file điểm gốc.
-
-**Bốn trường hợp cần phân biệt:** điểm học phần ≠ mức đạt CLO; kết quả CLO cá nhân ≠ tỷ lệ đạt của lớp; ngưỡng đạt cá nhân ≠ mục tiêu cấp lớp; tỷ lệ đạt luôn đi kèm mẫu số và số sinh viên chưa đủ dữ liệu.
-
-# 6. Kiểm tra tính hợp lệ của dữ liệu (đã thử nghiệm)
-
-Mỗi collection có quy tắc kiểm tra cấu trúc (`$jsonSchema`) do MongoDB thực thi. Các quy tắc chính đã được chạy thử trên MongoDB 8.2.6 bằng `database_import.js`:
-
-| **Quy tắc** | **Kết quả thử** |
-|---|---|
-| Điểm lớn hơn điểm tối đa bị từ chối | Đạt |
-| `BLANK` phải bằng 0; trạng thái thiếu dữ liệu (ví dụ `ABSENT`) không được kèm điểm 0 | Đạt |
-| Trạng thái điểm ngoài danh sách bị từ chối | Đạt |
-| Trùng (lớp, bài, câu hỏi, sinh viên) bị từ chối | Đạt |
-| Mã PLO/PI sai định dạng bị từ chối | Đạt |
-| Ký hiệu ma trận ngoài I/R/M bị từ chối | Đạt |
-| Bài đánh giá cấp lớp thiếu `sectionId` bị từ chối; mức Bloom ngoài 1–6 bị từ chối | Đạt |
-| Hai lượt tính cùng phạm vi/quy tắc không chạy đồng thời | Đạt |
-| Danh mục câu hỏi: cấp 1 không có cha; cấp 2–3 phải có cha và đủ tổ tiên; cấp 4 bị từ chối; trùng mã trong ngân hàng bị từ chối | Đạt |
-| Câu hỏi `ACTIVE`: phải có ít nhất một cặp CLO–PI và tổng phần điểm bằng 1 (0,5 + 0,5 được; 0,5 + 0,3 hoặc rỗng bị từ chối); câu `DRAFT` được để trống ánh xạ | Đạt |
-| Câu hỏi thiếu Bloom, Bloom ngoài 1–6, loại câu hỏi lạ, thiếu `piId` trong cặp bị từ chối | Đạt |
-| Một câu ánh xạ nhiều cặp được chấp nhận (3 cặp qua 2 CLO; một CLO đo 2 PI; một PI từ 2 CLO; 5 cặp); khai báo trùng một cặp trong cùng câu bị từ chối (cả ở ngân hàng câu hỏi và ở bài đánh giá) | Đạt |
-| Nhập trùng một câu từ Moodle (cùng ngân hàng, cùng mã ngoài) bị từ chối; nhiều câu nội bộ không có mã ngoài vẫn nhập được | Đạt |
-| Câu hỏi/tiêu chí trong bài đánh giá: thiếu cặp CLO–PI, cặp rỗng, hoặc tổng phần điểm khác 1 bị từ chối | Đạt |
-| Chạy lại script không tạo dữ liệu trùng | Đạt |
-
-Các quy tắc bổ sung ở v0.5 đã được thử bằng 59 ca (chấp nhận và từ chối) trên MongoDB 8.0 chạy trong container tạm; script nạp được hai lần liên tiếp:
-
-| **Quy tắc (v0.5)** | **Kết quả thử** |
-|---|---|
-| Bài đánh giá từ `SUBMITTED` trở đi phải có ít nhất một `items`; `isLocked` phải khớp `status` (true với `APPROVED`/`SCORE_ENTERED`/`LOCKED`); `type`/`phase` giá trị cũ (`LAB`) bị từ chối; `maxScore` = 0 bị từ chối | Đạt |
-| Vai trò `DEPARTMENT_HEAD`, `STUDENT` được chấp nhận; vai trò lạ bị từ chối | Đạt |
-| Mã `PLO0`, `PI1.0` bị từ chối; `capabilityLevelRaw` = 7 bị từ chối; `targetPassRate` > 1 bị từ chối | Đạt |
-| `program_courses.type` = `REQUIRED` (giá trị cũ) bị từ chối; `clo_pi_links.weight` = 0 bị từ chối, `null` được chấp nhận | Đạt |
-| `useIrmAsWeight = true` thiếu `irmWeights` bị từ chối; `blankScoreValue` ≠ 0 bị từ chối; ngưỡng > 1 bị từ chối | Đạt |
-| `calculation_runs`: hai lượt `PENDING`/`PROCESSING` cùng `lockKey` bị từ chối; lượt `SUCCESS` cùng `lockKey` được chấp nhận (khóa đã nhả) | Đạt |
-| `aggregate_results.counts` thiếu một trong năm số bị từ chối; `student_results.inputs[].sourceType` ngoài `SCORE`/`STUDENT_RESULT` bị từ chối | Đạt |
-
-Những ràng buộc liên kết (ví dụ `cloId` phải tồn tại, câu hỏi thuộc đúng bài đánh giá, cặp CLO–PI của câu hỏi phải có trong `clo_pi_links`, câu hỏi và danh mục phải cùng một ngân hàng) do tầng dịch vụ Spring Boot kiểm tra, vì MongoDB không có khóa ngoại. Thao tác xác nhận nhập điểm cần transaction nhiều document, nên MongoDB cần chạy ở dạng replica set.
-
-# 7. Dữ liệu khởi tạo trong database_import.js
-
-| **Collection** | **Số dòng** | **Nguồn** | **Lưu ý** |
-|---|---|---|---|
-| `programs`, `program_versions` | 1 + 1 | Tên file bản CTĐT | Khóa áp dụng: K23, K24, K25, K26, K27 (Q01) |
-| `plos` | 7 | `Misa.md` | Mức năng lực đúng theo tài liệu |
-| `pis` | 17 | `Misa.md` | Mức năng lực đúng theo tài liệu |
-| `courses` | 1 | `Misa.md` | OOPR230279 |
-| `course_pi_contributions` | 4 | `Misa.md`, trang 46 | Chỉ học phần OOP |
-| `measurement_rules` | 1 | Khung | Bản nháp, ngưỡng/trọng số để trống |
-| `question_banks`, `question_categories`, `questions` | 0 | — | Tạo rỗng; nhập khi có đề đã thi và ánh xạ CLO–PI đã duyệt |
-
-**Lưu ý quan trọng:** nội dung PLO/PI trong dữ liệu khởi tạo là **diễn giải ngắn** lấy từ tài liệu hướng dẫn, chưa phải nguyên văn bản CTĐT. Vì vậy `contentOriginal` để trống và `verification.status = NEEDS_CLARIFICATION` cho đến khi đối chiếu bản gốc. Chưa có học phần, CLO, điểm hay sinh viên thật nào được đưa vào.
-
-# 8. Các điểm cần xác nhận (ảnh hưởng đến cơ sở dữ liệu)
-
-Danh sách này được theo dõi bằng tài liệu của dự án, không lưu trong cơ sở dữ liệu.
-
-| **Mã** | **Nội dung** | **Tình trạng (Cập nhật 2026-11-06)** | **Ảnh hưởng** |
-|---|---|---|---|
-| Q01 | Bản CTĐT áp dụng cho khóa nào | **Đã chốt (nhóm SV, 2026-11-06):** Áp dụng cho các khóa `K23`, `K24`, `K25`, `K26`, `K27` | `program_versions.applicableCohorts` |
-| Q02 | Khi nào có đề cương chính thức | **Đã có đề cương chính thức đã duyệt (nhóm SV ghi nhận 2026-11-06):** 2 học phần `APCM220307` (Tin học ứng dụng) và `ABDA433708` (Ứng dụng PT dữ liệu lớn trong KD) | `syllabi`, `clos` |
-| Q03 | Thang "trình độ năng lực" PLO/PI | **Đã làm rõ:** Hệ thống lưu nguyên giá trị `capabilityLevelRaw` (1–6) để hiển thị/đối chiếu, không diễn giải, không quy đổi ra điểm hay Bloom | `pis`, `plos`, `clos` |
-| Q04 | Công thức, ngưỡng, mẫu số, xử lý thiếu dữ liệu | **Chưa có:** Khoa chưa ban hành quy định đo lường | `measurement_rules` (đang để trống, chỉ lưu DRAFT) |
-| Q05 | Điểm theo câu hỏi hay điểm tổng | **Đã chốt (nhóm SV, 2026-11-06):** Điểm theo từng câu hỏi/tiêu chí (`dataGranularity = ITEM`) | Hết rủi ro R2; đo lường được theo CLO |
-| Q06, Q07 | Phiên bản công nghệ; nơi lưu mã, tệp, môi trường | **Đã chốt công nghệ:** Java 25, Spring Boot 4.1.2, Angular 21, MongoDB replica set. Lưu mã: GitHub. **Còn thiếu:** Nền tảng staging chưa chọn | Đóng TD-03; staging chờ chọn hạ tầng |
-| Q08 | Ai rà soát nghiệp vụ, kỹ thuật; ai xác nhận CTĐT/quy tắc | **Đã chốt (nhóm SV, 2026-11-06):** Người rà soát nghiệp vụ & kỹ thuật là GVHD; 2 SV làm kỹ thuật (Minh & Tín - IT). Vai trò xác nhận CTĐT/PLO/PI trong hệ thống: `QA_OFFICER` (ADR 0004) | Phân quyền, quy trình `verification` |
-| Q09 | Dùng mã sinh viên thật hay mã thay thế | **Đã chốt (nhóm SV, 2026-11-06):** Dùng mã sinh viên thật trên môi trường thật/staging; seed dữ liệu và commit/test vẫn dùng mã giả để bảo vệ dữ liệu (R9) | `students.studentRef` |
-| Q10 | PI gán trực tiếp hay suy ra qua CLO | **Đã chốt (ADR 0011, 2026-11-06):** PI suy ra từ kết quả CLO (`pi.method = FROM_CLOS`). Câu hỏi chỉ gán CLO (`outcomeMappings.cloId`). Bỏ `DIRECT_FROM_ITEMS` | `questions`, `assessments.items[]`, `clo_pi_links` |
-| Q11 | Phạm vi: có tổ chức thi không | **Đã chốt phạm vi:** Không tổ chức thi, không sinh đề, không duyệt nội dung đề. **NEW-01:** Trưởng bộ môn duyệt ma trận ánh xạ CLO của bài đánh giá trước khi nạp điểm (nhóm SV chốt giữ theo ADR 0001, GVHD chưa xác nhận). Không làm xuất phôi in | `assessments.status/approval`, vai trò `DEPARTMENT_HEAD` |
-| Q12 | Quy tắc "phải đạt từng CLO"; tỷ trọng, ngưỡng từng CLO | **Chưa có:** Khoa chưa cung cấp | `course.requireAllCloPass`, `clos.measurement` |
-| Q13 | Phân biệt bỏ trống / vắng thi / chưa chấm / thiếu; vắng thi có vào mẫu số không | **Chưa có:** Khoa chưa cung cấp | `scores.status`, `emptyCellAs`, `counts` |
-| Q14 | Khi nào Khoa cung cấp ánh xạ CLO–PI đã duyệt của các học phần thử nghiệm | **Đã chốt (nhóm SV, 2026-11-06):** Ánh xạ CLO–PI lấy theo 2 đề cương chính thức đã duyệt (`APCM220307`, `ABDA433708`) | `clo_pi_links` |
-| Q15 | Khi một câu đo nhiều CLO, điểm của câu được chia thế nào | **Chưa tính / Chưa quyết:** Tạm giữ thiết kế chia theo `weight` (tổng = 1) cho tới khi có ý kiến Khoa | `outcomeMappings.weight` |
-| Q16 | Cấu trúc danh mục ngân hàng câu hỏi; nguồn nhập câu hỏi | **Đã chốt (nhóm SV, 2026-11-06):** Nhập câu hỏi từ file Excel, không dùng Moodle | `question_banks.sourceSystem`, US-17 |
-| Q17 | Bộ môn: có cần collection `departments` không, hay `courses.departmentId` chỉ là mã tham chiếu | **Đã chốt:** KHÔNG tạo collection `departments`, bỏ trường `courses.departmentId`. Giữ vai trò `DEPARTMENT_HEAD` duyệt theo `scope.courseIds` (ADR 0010) | `courses`, `UserScope.courseIds` |
-| Q18 | Khoa có cho quy đổi I/R/M thành hệ số khi tổng hợp PI từ CLO không | **Đã chốt (ADR 0012, 2026-11-06):** Không quy đổi I/R/M sang điểm. Bỏ hoàn toàn `useIrmAsWeight` và `irmWeights` khỏi `measurement_rules` | `measurement_rules`, xóa trường validator |
-| Q19 | Chọn phương pháp mặc định: `pi.aggregationMethod`, `plo.method`, `reimportPolicy` | **Chưa có:** Khoa chưa cung cấp | `measurement_rules`, `import_batches` |
-| Q20 | Công thức CLO/học phần còn thiếu: `WEIGHTED_ITEMS`, vai trò `weightInCourse`/`defaultWeight`, cấp COURSE khi `requireAllCloPass = false` | **Chưa có:** Khoa chưa cung cấp (chi tiết: `doc/plan/F06-do-luong.md` §9) | `measurement_rules.clo/course` |
-| Q21 | Công thức cấp **PLO**: `ALL_PIS_PASSED`, `AVERAGE_PIS`, `WEIGHTED_PIS` | **Chưa có:** Hoàn toàn chưa có công thức PLO chính thức từ Khoa | `measurement_rules.plo`, `student_results` (PLO) |
-| Q22 | Gộp PI qua nhiều học phần/lớp/học kỳ; chuẩn hóa `clo_pi_links.weight` khi `FROM_CLOS`; tổng hợp cấp khóa/CTĐT | **Chưa có:** Chưa có quy định gộp và trọng số `W` CLO→PI trong đề cương để tính PI chính thức | `measurement_rules.pi`, `aggregate_results` |
-| Q23 | Thiếu dữ liệu và ngưỡng trong công thức: `minCoverage`, mẫu số, thứ tự ưu tiên ngưỡng, `≥` hay `>`, làm tròn | **Chưa có:** Khoa chưa cung cấp | `measurement_rules.missingDataPolicy` |
-
-Các số liệu ví dụ trong tài liệu (trọng số 40/60, ngưỡng 60%, tỷ trọng CLO 20/40/40, ngưỡng 72%/50%…) **chưa phải quy định chính thức** và không được đưa vào cơ sở dữ liệu như quy tắc.
-
-# 9. Hướng dẫn nạp cơ sở dữ liệu
-
-1. Cài MongoDB (khuyến nghị chạy dạng replica set) và `mongosh`.
-2. Chạy:
-
-```
-mongosh "mongodb://localhost:27017" --file database_import.js
-```
-
-3. Tùy chọn (biến môi trường): `LOMS_DB` đổi tên cơ sở dữ liệu (mặc định `learning_outcomes`); `LOMS_SAMPLE=1` nạp thêm 4 CLO minh họa của OOP.
-4. Script chạy lại nhiều lần được và **không xóa dữ liệu**: collection đã có chỉ được cập nhật quy tắc kiểm tra, dữ liệu khởi tạo chỉ chèn khi chưa tồn tại.
+### 3.23 `reports`, 3.24 `improvement_actions`, 3.25 `audit_logs`
+- `reports`: `type` (`SECTION_CLO | COURSE_PI | PROGRAM_PLO | DATA_COMPLETENESS`), `title`, `params`, `runId`, `programVersionId`, `summary`, `limitations`, `exports[]`, `generatedBy`, `createdAt` (đã bỏ `ruleId`).
+- `improvement_actions`: `programVersionId`, `courseId`, `issue`, `actionPlan`, `expectedTarget`, `ownerId`, `targetTermId`, `dueDate`, `priority`, `status`, `evaluation`, `history[]`.
+- `audit_logs`: `at`, `userId`, `action` (`SCORE_UPDATE | IMPORT_CONFIRM | ASSESSMENT_LOCK | ASSESSMENT_UNLOCK | RUN_CALCULATION | LOGIN`), `entity`, `before`, `after`, `reason`, `ip` (đã bỏ `RULE_CONFIRM`).

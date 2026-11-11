@@ -1,6 +1,6 @@
 # ADR 0010 — Phân quyền quản lý danh mục học phần, biên soạn và phê duyệt đề cương theo Bộ môn và Giảng viên
 
-- **Trạng thái:** ĐỀ XUẤT (PROPOSED), **thay thế ADR 0009**.
+- **Trạng thái:** ĐÃ CẬP NHẬT bởi **[ADR 0013](file:///D:/Code/Project/LMS-API/doc/adr/0013-import-ctdt-de-cuong-va-nhap-diem-clo-truc-tiep.md)** ngày 2026-11-10 (Bổ sung luồng R1: một vai trò Quản lý học thuật `PROGRAM_MANAGER` / `ADMIN` được quyền Import đồng bộ Bản mô tả CTĐT và Đề cương chi tiết học phần đã ban hành). *(Trước đó: thay thế ADR 0009).*
 - **Ngày:** 2026-11-05 (cập nhật 2026-11-06)
 - **Người soạn:** Antigravity theo yêu cầu của sinh viên TinMH (IT); sinh viên rà soát và chốt: [ĐIỀN]
 - **Thay thế:** ADR 0009 (`0009-phan-quyen-pham-vi-de-cuong-clo.md`)

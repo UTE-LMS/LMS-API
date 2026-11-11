@@ -1,12 +1,12 @@
 # Chốt danh sách feature của đồ án LOMS
 
-> **Trạng thái: ĐỀ XUẤT CHỐT, chưa ký.** File này là bản quyết định phạm vi tính năng, soạn từ
-> `tom-tat-du-an-de-thao-luan.md` (2026-10-21) và thiết kế CSDL v0.5 (`GiaiThich_CoSoDuLieu.md`, cập nhật theo
-> `PLO_DB_UPDATE.md`). Nó trả lời các câu hỏi phạm vi ở mục 12 của bản tóm tắt. Nó **không thay** bản cam kết
+> **Trạng thái: ĐỀ XUẤT CHỐT (cập nhật 2026-11-10 theo ADR 0013), chưa ký.** File này là bản quyết định phạm vi tính năng, soạn từ
+> `tom-tat-du-an-de-thao-luan.md` (2026-10-21), `dac-ta-thay-doi-nghiep-vu-va-phuong-an-tinh-clo.md` và thiết kế CSDL v0.6 (`GiaiThich_CoSoDuLieu.md`, cập nhật theo
+> ADR 0013). Nó trả lời các câu hỏi phạm vi ở mục 12 của bản tóm tắt. Nó **không thay** bản cam kết
 > `cam-ket-san-pham-metric.md` (cổng K1, cần chữ ký GVHD): sau khi hai bạn đồng ý, chép cột "Quyết định" ở mục 3
-> sang mục 4 của bản cam kết. Mục nào ghi **[CHỜ GVHD]** hoặc **[CHỜ KHOA]** thì chưa được coi là đã duyệt.
+> sang mục 4 của bản cam kết.
 >
-> Ngày soạn: 2026-10-23 (tuần 5 của kế hoạch 19 tuần; đóng băng tính năng cuối T15).
+> Ngày soạn: 2026-10-23 (cập nhật 2026-11-10 theo ADR 0013).
 
 Quy ước: **C** = cam kết (phải chạy được khi bảo vệ), **MR** = mục tiêu mở rộng (làm nếu còn thời gian, không
 tính vào cam kết), **K** = không làm.
@@ -17,26 +17,23 @@ tính vào cam kết), **K** = không làm.
 
 | Hạng mục | Số lượng | Ghi chú |
 |---|---|---|
-| Story cam kết (C) | **32** | 31 story trong backlog gốc + 1 story mới do CSDL v0.5 (NEW-01) |
-| Mục tiêu mở rộng (MR) | 11 | Gồm 8 story gốc và 3 story mới (NEW-02 đến NEW-04) |
-| Không làm (K) | 8 | Mục 4 |
-| Collection dùng | 29 | CSDL gồm 29 collection (đã bỏ hoàn toàn `ml_experiments` khỏi script CSDL và tài liệu, xem TD-06) |
-
-Khối lượng 32 story cho hai người trong khoảng 10 tuần lập trình là **nặng**. Thay vì cắt ngay, mục 5 đặt thứ tự cắt
-theo từng cổng để quyết định có căn cứ. Nếu hai bạn muốn cam kết nhẹ hơn trước khi ký, hạ US-33 và US-38 xuống MR
-(ít ảnh hưởng nhất tới luồng chính).
+| Story cam kết (C) | **31** | Đã bỏ US-16 (rubric) sang K theo ADR 0013; giữ NEW-01 (giảng viên tự khóa ma trận) |
+| Mục tiêu mở rộng (MR) | 9 | Đã chuyển US-13, US-14 (ngân hàng câu hỏi) sang K theo ADR 0013 |
+| Không làm (K) | 11 | Mục 4 (gồm US-13, US-14, US-16, US-17) |
+| Collection dùng | **25** | CSDL v0.7 gồm 25 collection (đã bỏ `ml_experiments`, 3 collection ngân hàng câu hỏi và collection `measurement_rules` theo ADR 0014) |
 
 ---
 
-## 2. Luồng nghiệp vụ cam kết (tiêu chí nghiệm thu)
+## 2. Luồng nghiệp vụ cam kết (tiêu chí nghiệm thu — cập nhật theo ADR 0014)
 
 ```
-Khai báo CTĐT, PLO/PI, học phần, CLO, liên kết CLO–PI
-  → Lập bài đánh giá bản lớp (items kèm cặp CLO–PI, weight)
-  → Trưởng bộ môn duyệt ma trận (APPROVED) → mở cổng nhập điểm
-  → Giảng viên tải tệp điểm → kiểm tra, báo lỗi dòng/cột → xác nhận (transaction) hoặc rollback
-  → Chạy đo lường theo quy tắc cấu hình → CLO → PI → PLO (student_results)
-  → Tổng hợp lớp có mẫu số (aggregate_results)
+Import CSV CTĐT & Đề cương kèm sẵn Ngưỡng đạt bắt buộc và Trọng số (PROGRAM_MANAGER / ADMIN — UNVERIFIED -> VERIFIED)
+  → Khởi tạo tự động CTĐT, PLO/PI (kèm passThreshold và weight PI->PLO), học phần, đề cương, CLO (kèm defaultPassThreshold), liên kết CLO–PI (kèm weight CLO->PI)
+  → Giảng viên lớp học phần tạo bài đánh giá bản lớp (items[] kèm outcomeMappings: [{cloId, maxScore}], cloWeights: [{cloId, weight}])
+  → Giảng viên tự khóa ma trận (DRAFT → LOCKED) → xuất tệp CSV mẫu từ ma trận đề đã khóa
+  → Giảng viên nhập điểm trực tiếp từng CLO của từng câu hỏi qua CSV mẫu (Vắng thi / Bỏ trống = 0.0) → xem trước trên UI → Lưu vào scores
+  → Chạy đo lường 4 cấp độ (ASSESSMENT_CLO -> CLO toàn học phần -> PI chuẩn hóa mẫu số -> PLO)
+  → Tổng hợp bài đánh giá / lớp học phần (N_section) và cấp khóa / CTĐT (N_cohort)
   → Báo cáo (có limitations) → truy vết ngược về dòng tệp gốc
   → Ghi nhận vấn đề và hành động cải tiến
 ```
@@ -63,30 +60,30 @@ Cột "Đề xuất" phân biệt story gốc (giữ nguyên ưu tiên) với th
 
 | ID | Story | Quyết định | Ghi chú |
 |---|---|---|---|
-| US-05 | Chương trình và phiên bản CTĐT | **C** | `(programId, version)` duy nhất; có `totalCredits`, `durationYears` |
+| US-05 | Chương trình và phiên bản CTĐT (hỗ trợ Import CTĐT — Phương án R1, ADR 0013) | **C** | `(programId, version)` duy nhất; có `totalCredits`, `durationYears`; `PROGRAM_MANAGER` nạp từ file CTĐT |
 | US-06 | 7 PLO, 17 PI theo mã | **C** | Nhận diện bằng mã; `category`, `displayOrder`; không tự điền nguyên văn |
 | US-07 | Ma trận học phần đóng góp PI (I/R/M) | **C** | I/R/M chỉ là thiết kế sư phạm, không là trọng số |
-| US-08 | Quy trình xác nhận nội dung | MR | Trạng thái `verification` vẫn có trong dữ liệu; chỉ làm màn hình luồng xác nhận nếu còn thời gian. Người xác nhận CTĐT, PLO, PI: `QA_OFFICER` **[ĐỀ XUẤT, chờ Q08; ADR 0004]** |
+| US-08 | Quy trình xác nhận nội dung | MR | Trạng thái `verification` vẫn có trong dữ liệu; chỉ làm màn hình luồng xác nhận nếu còn thời gian. Người xác nhận CTĐT, PLO, PI: `QA_OFFICER` |
 
 ### E03 Học phần, CLO (F03)
 
 | ID | Story | Quyết định | Ghi chú |
 |---|---|---|---|
 | US-09 | Học phần và vị trí trong CTĐT | **C** | `type` là `COMPULSORY`/`ELECTIVE` |
-| US-10 | Đề cương theo phiên bản | **C** | |
+| US-10 | Đề cương theo phiên bản (hỗ trợ Import Đề cương — Phương án R1, ADR 0013) | **C** | `PROGRAM_MANAGER` nạp từ file Đề cương học phần |
 | US-11 | CLO thuộc một đề cương | **C** | `code` duy nhất trong một đề cương; Bloom 1–6 |
 | US-12 | Liên kết CLO–PI và xác nhận | **C** | Chỉ liên kết `VERIFIED` được dùng để tính chính thức |
 
-### E04 Bài đánh giá (F04)
+### E04 Bài đánh giá & Ma trận Câu hỏi – CLO (F04)
 
 | ID | Story | Quyết định | Ghi chú |
 |---|---|---|---|
-| US-13 | Ngân hàng câu hỏi và cây danh mục 3 cấp | MR | **Đổi từ Should**: xem lý do ở US-14 |
-| US-14 | Câu hỏi kèm ánh xạ nhiều cặp trong ngân hàng | MR | **Đổi từ Must.** Câu hỏi/tiêu chí khai báo trực tiếp trong `assessments.items[]` (US-15) đã đủ để đo CLO/PI, nên ngân hàng chỉ là tiện ích tái sử dụng. Bỏ khỏi cam kết để giảm khối lượng; CSDL vẫn giữ nguyên |
-| US-15 | Bài đánh giá khung (theo đề cương) và bản lớp | **C** | `items[]` có `outcomeMappings`; tổng `weight` mỗi câu bằng 1; cặp (CLO, PI) phải thuộc `clo_pi_links` |
-| US-16 | Tiêu chí rubric, mức rubric 1–4 | **C** | Mức rubric khác mức Bloom |
-| US-17 | Nhập câu hỏi từ Excel/Moodle | K | |
-| **NEW-01** | **Duyệt ma trận đề thi:** giảng viên gửi duyệt, Trưởng bộ môn duyệt hoặc từ chối, khóa `items` sau khi duyệt, kèm bảng độ phủ theo CLO và theo Bloom (`coverageSummary`) | **C** | **Story mới từ CSDL v0.5.** Điều kiện: chỉ nhập điểm khi `APPROVED`/`SCORE_ENTERED`. **[CHỜ GVHD]** vì chạm vào phạm vi "không duyệt đề" (Q11). Phương án nếu GVHD không đồng ý: bỏ bước Trưởng bộ môn, giảng viên tự xác nhận ma trận (DRAFT → APPROVED), giữ nguyên khóa `items` |
+| US-13 | Ngân hàng câu hỏi và cây danh mục 3 cấp | **K** | **Đã loại bỏ hoàn toàn theo ADR 0013** để bảo mật đề thi (xóa 3 collection `question_banks`, `question_categories`, `questions`) |
+| US-14 | Câu hỏi trong ngân hàng | **K** | **Đã loại bỏ hoàn toàn theo ADR 0013** (không lưu nội dung câu hỏi/ngân hàng đề) |
+| US-15 | Bài đánh giá khung (theo đề cương) và bản lớp | **C** | `items[]` chỉ lưu mã câu hỏi (`Câu 1`, `Câu 2`...) và `outcomeMappings: [{cloId, maxScore}]` ($maxScore > 0$ do giảng viên khai báo trực tiếp cho từng CLO của câu hỏi, không dùng `weight`) |
+| US-16 | Tiêu chí rubric, mức rubric 1–4 | **K** | **Đã loại bỏ theo ADR 0013**: hệ thống chỉ nhận điểm số trực tiếp của từng CLO trong từng câu hỏi |
+| US-17 | Nhập câu hỏi từ Excel/Moodle | **K** | Đã loại bỏ để bảo mật đề thi |
+| **NEW-01** | **Giảng viên tự khóa ma trận bài đánh giá:** giảng viên phụ trách lớp thiết lập ma trận câu hỏi – CLO và tự khóa ma trận (`DRAFT → LOCKED`), mở cổng nhập điểm CLO, kèm bảng độ phủ theo CLO và theo Bloom (`coverageSummary`) | **C** | **Cập nhật theo ADR 0013 (thay thế ADR 0001):** Bỏ bước Trưởng bộ môn duyệt ma trận; giảng viên tự khóa (`LOCKED`) và có thể mở khóa (`UNLOCK`) nếu chưa có điểm trong `scores` |
 
 ### E05 Học kỳ, lớp, sinh viên
 
@@ -96,24 +93,24 @@ Cột "Đề xuất" phân biệt story gốc (giữ nguyên ưu tiên) với th
 | US-19 | Lớp học phần, giảng viên phụ trách | **C** | |
 | US-20 | Nhập danh sách lớp → sinh viên, ghi danh | **C** | Ghi danh là mẫu số; dùng `studentRef` (mã thay thế) |
 
-### E06 Nhập điểm (F05)
+### E06 Nhập điểm CLO (F05b)
 
 | ID | Story | Quyết định | Ghi chú |
 |---|---|---|---|
-| US-21 | Tải tệp (CSV/Excel) và ánh xạ cột | **C** | |
-| US-22 | Kiểm tra, báo lỗi theo dòng/cột | **C** | 4 loại lỗi: mã sinh viên sai, điểm vượt thang, trùng bản ghi, thiếu trường |
+| US-21 | Nhập điểm trực tiếp từng CLO của từng câu hỏi (trên lưới hoặc tải tệp CSV/Excel) | **C** | Khớp từng cặp `(itemId, cloId)` trong ma trận đã khóa (`LOCKED`/`SCORE_ENTERED`) |
+| US-22 | Kiểm tra, báo lỗi theo dòng/cột | **C** | 4 loại lỗi: mã sinh viên sai, điểm vượt `maxScore` của CLO tại câu hỏi đó, trùng bản ghi, thiếu trường |
 | US-23 | Chọn BLANK/MISSING cho ô trống; chính sách nhập lại | **C** | Chính sách nhập lại cam kết: `REJECT_ON_CONFLICT`. `OVERWRITE`, `UPDATE_BLANK_ONLY` là MR |
-| US-24 | Xác nhận nhập trong một transaction hoặc rollback | **C** | Cần MongoDB replica set. Chỉ nhập được khi bài ở `APPROVED`/`SCORE_ENTERED` |
+| US-24 | Xác nhận nhập trong một transaction hoặc rollback | **C** | Cần MongoDB replica set. Chỉ nhập được khi bài ở `LOCKED`/`SCORE_ENTERED` |
 | US-25 | Sửa điểm đơn lẻ có lý do | MR | Nếu làm: dùng `scores.revision`, ghi audit trước/sau |
 
-### E07 Đo lường (F06)
+### E07 Đo lường chuẩn đầu ra (F06)
 
 | ID | Story | Quyết định | Ghi chú |
 |---|---|---|---|
-| US-26 | Quy tắc đo lường có phiên bản | **C** | Cấu hình `measurement_rules`; chỉ `CONFIRMED` mới cho kết luận chính thức |
-| US-27 | Tính CLO của từng sinh viên | **C** | Kèm khóa chống chạy trùng bằng `lockKey` (chỉ mục duy nhất, chi phí thấp) |
-| US-28 | Tính PI và PLO | **C** | PI: `DIRECT_FROM_ITEMS` (theo Q10) và `FROM_CLOS`, công thức theo `PLO_DB_UPDATE.md` §4.2. **Công thức cấp PLO chưa có trong tài liệu (Q21)**: cài sau khi GVHD/Khoa trả lời, xem `plan/F06-do-luong.md` §9. PLO: cài đặt phương pháp Khoa xác nhận, tối thiểu một trong `ALL_PIS_PASSED`/`WEIGHTED_PIS`/`AVERAGE_PIS` **[CHỜ KHOA, Q04, Q19]**. `pi.aggregationMethod`: tối thiểu `WEIGHTED_AVERAGE` |
-| US-29 | Tổng hợp lớp/khóa/CTĐT kèm mẫu số | **C** | Luôn trả đủ `counts` (ghi danh, đủ dữ liệu, đạt, chưa đạt, chưa đủ dữ liệu) và `passRateOfEnrolled` |
+| US-26 | Quy tắc đo lường có phiên bản | **C** | Cấu hình `measurement_rules`; chỉ `CONFIRMED` mới cho kết luận chính thức (đã bỏ khối `course`) |
+| US-27 | Tính CLO của từng sinh viên (cả từng bài đánh giá và tích lũy toàn học phần) | **C** | **Phương án B1 (`POINTS_RATIO`, ADR 0013):** tỷ lệ tổng điểm thực tế đạt được trên tổng điểm tối đa của CLO; kèm khóa chống chạy trùng bằng `lockKey` |
+| US-28 | Tính PI và PLO | **C** | PI: `FROM_CLOS` (suy ra từ kết quả CLO toàn học phần theo `clo_pi_links.weight`, ADR 0011). PLO: cài đặt phương pháp cấu hình trong `measurement_rules.plo` |
+| US-29 | Tổng hợp cấp bài đánh giá / lớp / học phần / khóa / CTĐT kèm mẫu số | **C** | Luôn trả đủ `counts` (ghi danh, đủ dữ liệu, đạt, chưa đạt, chưa đủ dữ liệu) và `passRateOfEnrolled` |
 | US-30 | Đánh dấu kết quả cũ (`isStale`) | MR | |
 
 ### E08 Báo cáo và truy vết (F07)
@@ -155,14 +152,14 @@ Cột "Đề xuất" phân biệt story gốc (giữ nguyên ưu tiên) với th
 
 | Hạng mục | Lý do |
 |---|---|
-| Tổ chức thi, sinh đề; duyệt **nội dung** đề thi | Ngoài phạm vi đã chốt. NEW-01 chỉ duyệt ma trận ánh xạ chuẩn đầu ra, không duyệt nội dung câu hỏi |
-| Xuất phôi in đề thi (`assessments.exportedFiles`) | Thuộc khâu tổ chức thi. Trường vẫn nằm trong CSDL nhưng không có tính năng. **[CHỜ GVHD]** |
-| Lưu bài làm của sinh viên | Chỉ lưu điểm và tham chiếu tệp điểm gốc |
+| Tổ chức thi, sinh đề; lưu nội dung đề thi / ngân hàng câu hỏi (US-13, US-14, US-17) | Bảo mật đề thi tuyệt đối (ADR 0013): đã xóa hoàn toàn `question_banks`, `question_categories`, `questions` khỏi CSDL |
+| Xuất phôi in đề thi (`assessments.exportedFiles`) & Quy trình Trưởng bộ môn duyệt ma trận (`approval`) | Đã xóa khỏi CSDL theo ADR 0013; giảng viên lớp học phần tự khóa ma trận (`DRAFT → LOCKED`) |
+| Đo kết quả bài kiểm tra tổng (`totalPoints`, `TOTAL_ONLY`) và xét điểm qua môn học phần (`level = COURSE`, `measurement_rules.course`) | Hệ thống chỉ đo lường chuẩn đầu ra (`CLO`, `PI`, `PLO`), không phải hệ thống quản lý điểm học vụ (ADR 0013) |
+| Tiêu chí rubric (US-16) và chia điểm CLO theo trọng số (`weight`) | Giảng viên nhập trực tiếp điểm tối đa (`maxScore`) và điểm đạt được (`rawScore`) cho từng CLO của từng câu hỏi (ADR 0013) |
+| Lưu bài làm của sinh viên | Chỉ lưu điểm CLO từng câu hỏi và tham chiếu tệp điểm gốc |
 | Machine Learning (`ml_experiments`) | Ngoài phạm vi đồ án; đã loại bỏ collection `ml_experiments` khỏi `database_import.js` (TD-06) |
-| Quy đổi I/R/M thành hệ số (`pi.useIrmAsWeight`, `irmWeights`) | Trái bất biến "I/R/M ≠ trọng số". Engine luôn coi cờ này là `false`; không đặt giá trị mẫu. Chỉ xem lại khi Khoa xác nhận (Q18) |
-| Collection bộ môn (`departments`) | **Đã chốt loại bỏ (Q17):** Không tạo collection này, lược bỏ `courses.departmentId`. Phân quyền `DEPARTMENT_HEAD` kiểm soát trực tiếp qua `scope.courseIds` |
-| Đo CLO/PI khi chỉ có điểm tổng (`dataGranularity = TOTAL_ONLY`) | Không đo được CLO/PI. Nếu dữ liệu thật chỉ có điểm tổng thì phải đổi phạm vi bằng ADR trước K1 |
-| Nhập câu hỏi từ Excel/Moodle (US-17), đồng bộ trực tiếp với Moodle, xuất PDF | Giữ phạm vi chặt; tránh phình to |
+| Quy đổi I/R/M thành hệ số (`pi.useIrmAsWeight`, `irmWeights`) | Trái bất biến "I/R/M ≠ trọng số"; đã loại bỏ khỏi CSDL (ADR 0012) |
+| Collection bộ môn (`departments`) | Đã chốt loại bỏ (Q17): không tạo collection này |
 
 ---
 
@@ -190,12 +187,11 @@ Vai trò là bên *chủ trì* thao tác; backend kiểm tra theo `roleAssignmen
 | Thao tác | ADMIN | PROGRAM_MANAGER | DEPARTMENT_HEAD | QA_OFFICER | LECTURER | VIEWER |
 |---|---|---|---|---|---|---|
 | Quản lý người dùng | ✔ | | | | | |
-| Soạn CTĐT, PLO/PI, ma trận I/R/M, học phần, đề cương, CLO, liên kết CLO–PI | | ✔ | | | | |
+| Import CTĐT & Đề cương học phần (Phương án R1, ADR 0013); quản lý PLO/PI, ma trận I/R/M, đề cương, CLO, liên kết CLO–PI | ✔ | ✔ | | | | |
 | Xác nhận nội dung phiên bản CTĐT, PLO, PI (`verification`, US-08; ADR 0004) | | | | ✔ | | |
-| Lập và gửi duyệt bài đánh giá lớp | | | | | ✔ | |
-| Duyệt / từ chối ma trận đề thi | | | ✔ | | | |
-| Nhập điểm, xác nhận lô | | | | | ✔ (lớp mình) | |
-| Xác nhận quy tắc đo | | ? | | ? | | |
+| Lập bài đánh giá lớp, thiết lập ma trận câu hỏi – CLO và **tự khóa ma trận** (`DRAFT → LOCKED`, ADR 0013) | | | | | ✔ (lớp mình) | |
+| Nhập điểm trực tiếp từng CLO của từng câu hỏi, xác nhận lô | | | | | ✔ (lớp mình) | |
+| Xác nhận quy tắc đo | | ? | | ✔ | | |
 | Chạy đo lường, xem báo cáo | | ✔ | ✔ | ✔ | ✔ (lớp mình) | đọc |
 | Tạo / theo dõi hành động cải tiến | | ✔ | ✔ | ✔ | | |
 
@@ -203,13 +199,13 @@ Vai trò là bên *chủ trì* thao tác; backend kiểm tra theo `roleAssignmen
 
 ## 7. Quy tắc nghiệp vụ ràng buộc mọi feature
 
-Tóm tắt từ `GiaiThich_CoSoDuLieu.md` mục 2; vi phạm là lỗi nghiệp vụ.
+Tóm tắt từ `GiaiThich_CoSoDuLieu.md` mục 2 và ADR 0013; vi phạm là lỗi nghiệp vụ.
 
-1. Không hardcode công thức, trọng số, ngưỡng, mẫu số; đọc từ `measurement_rules`. Các số 40/60, 60%, 72%, 20/40/40 chỉ là ví dụ minh họa.
+1. Không hardcode công thức, trọng số, ngưỡng, mẫu số; đọc từ `measurement_rules`.
 2. Thiếu dữ liệu không mặc định bằng 0: chỉ `BLANK` tính 0; `ABSENT`, `NOT_GRADED`, `EXEMPT`, `MISSING` có `rawScore = null`.
-3. Bloom ≠ điểm; I/R/M ≠ trọng số; mức rubric ≠ Bloom; `capabilityLevelRaw` lưu nguyên, không diễn giải.
+3. Bloom ≠ điểm; I/R/M ≠ trọng số; `capabilityLevelRaw` lưu nguyên, không diễn giải. Hệ thống chỉ đo chuẩn đầu ra (`CLO`, `PI`, `PLO`), không tính điểm bài kiểm tra hay điểm học phần (`COURSE`).
 4. Tỷ lệ đạt luôn kèm mẫu số: ghi danh, đủ dữ liệu, đạt, chưa đạt, chưa đủ dữ liệu.
-5. Một câu đo nhiều cặp (CLO, PI) chia điểm theo `weight` (tổng bằng 1); PI chỉ chọn trong PI đã liên kết với CLO của câu đó.
+5. Một câu hỏi có thể đánh giá 1 hoặc nhiều CLO; mỗi CLO trong câu hỏi có `maxScore` riêng và được giảng viên nhập `rawScore` trực tiếp riêng (không chia điểm theo trọng số `weight`). Mức đạt CLO tính theo Phương án B1 (`POINTS_RATIO`) cho cả từng bài đánh giá và toàn học phần.
 6. Mọi kết quả gắn `programVersionId`, `syllabusId`, `ruleId`; truy vết được về lô nhập và dòng tệp gốc.
 7. Không bịa nguyên văn PLO/PI/CLO, ánh xạ CLO–PI, công thức hay ngưỡng: để trống, đánh dấu chờ xác nhận.
 8. Angular chỉ gọi API; công thức đo lường chỉ chạy ở backend.

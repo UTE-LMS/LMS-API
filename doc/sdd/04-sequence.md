@@ -332,80 +332,37 @@ sequenceDiagram
     end
 ```
 
-## 7. Duyệt ma trận bài đánh giá bản lớp (NEW-01, ADR 0001)
+## 7. Giảng viên tự khóa / mở khóa ma trận bài đánh giá bản lớp (NEW-01, ADR 0013 thay thế ADR 0001)
 
-Căn cứ: `AssessmentController#submit/approve/reject`, `AssessmentApprovalServiceImpl`, `ScopeAuthorizationServiceImpl#canReviewAssessment`,
-`AuditServiceImpl#record`, `AssessmentIntegrationTest`. Gửi duyệt, duyệt và từ chối mỗi thao tác là một transaction; `status` và `isLocked`
-được ghi trong cùng một lần `save`, `revision` (`@Version`) và WriteConflict của MongoDB bảo đảm hai người cùng duyệt chỉ một người thắng.
+> **Cập nhật theo [ADR 0013](../adr/0013-import-ctdt-de-cuong-va-nhap-diem-clo-truc-tiep.md):** Bãi bỏ quy trình gửi Trưởng bộ môn duyệt (`submit`/`approve`/`reject`). Giảng viên phụ trách lớp học phần (`LECTURER` trong `course_sections.lecturerIds`) thiết lập ma trận câu hỏi – CLO (`items[]` kèm `outcomeMappings: [{cloId, maxScore}]`) và **tự khóa ma trận** (`POST /api/v1/assessments/{id}/lock`, chuyển `DRAFT -> LOCKED`, `isLocked = true`, ghi `ASSESSMENT_LOCK`). Giảng viên có thể mở khóa (`POST /api/v1/assessments/{id}/unlock`, chuyển `LOCKED -> DRAFT`, `isLocked = false`, ghi `ASSESSMENT_UNLOCK`) khi và chỉ khi chưa có bản ghi điểm nào trong `scores`.
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant GV as Giảng viên của lớp
-    participant TBM as Trưởng bộ môn (đúng scope.courseIds)
+    participant GV as Giảng viên phụ trách lớp
     participant C as AssessmentController
     participant SA as ScopeAuthorizationServiceImpl
-    participant S as AssessmentApprovalServiceImpl<br/>@Transactional
+    participant S as AssessmentServiceImpl<br/>@Transactional
     participant AU as AuditServiceImpl
     participant DB as MongoDB replica set rs0
 
-    GV->>C: POST /assessments/{id}/submit
-    C->>SA: canAccessAssessment(WRITE) (lớp của giảng viên)
-    C->>S: submit(id, actor)
-    S->>DB: đọc bài; phải là SECTION và DRAFT
-    alt chưa có phần tử / totalPoints thiếu hoặc lệch Σ maxScore từ 0,001
-        S-->>GV: 422
+    GV->>C: POST /api/v1/assessments/{id}/lock
+    C->>SA: canAccessAssessment(WRITE) (LECTURER thuộc section.lecturerIds)
+    alt không thuộc giảng viên phụ trách lớp
+        SA-->>GV: 403 FORBIDDEN
     end
-    S->>DB: save(SUBMITTED, approval.submittedBy/At, history SUBMIT)
-
-    TBM->>C: POST /assessments/{id}/approve
-    C->>SA: canReviewAssessment (DEPARTMENT_HEAD, courseId của đề cương trong scope)
-    alt không đúng vai trò / phạm vi (kể cả ADMIN)
-        SA-->>TBM: 403
+    C->>S: lock(id, actor)
+    S->>DB: đọc bài đánh giá; kiểm tra scope = SECTION và status = DRAFT
+    alt items[] rỗng hoặc trạng thái khác DRAFT
+        S-->>GV: 422 BUSINESS_RULE_VIOLATION
     end
-    C->>S: approve(id, actor)
-    S->>DB: đọc bài; phải đang SUBMITTED, nếu không 422
-    alt actor là người đã gửi duyệt
-        S-->>TBM: 403
-    end
-    S->>DB: save(APPROVED, isLocked = true, reviewedBy/At, history APPROVE) kiểm revision
-    S->>AU: record(ASSESSMENT_APPROVE, before, after)
+    S->>DB: save(status = LOCKED, isLocked = true) kèm kiểm tra @Version revision
+    S->>AU: record(ASSESSMENT_LOCK, before, after)
     AU->>DB: ghi audit_logs trong cùng transaction
-    alt người duyệt khác ghi trước (revision đổi / WriteConflict 112)
-        DB-->>TBM: 409
-    else thành công
-        S-->>TBM: 200 (items[] bị khóa)
-    end
+    S-->>GV: 200 OK (ma trận đã khóa, sẵn sàng nhập điểm CLO)
 ```
 
-Từ chối (`/reject`) giống nhánh duyệt nhưng bắt buộc `reviewNote`, đặt `REJECTED`, `isLocked = false`, ghi `ASSESSMENT_REJECT`. Giảng viên sửa
-bài `REJECTED` thì bài tự về `DRAFT` (`AssessmentServiceImpl#reopenIfRejected`) rồi mới gửi duyệt lại được.
-
-## 8. Nhập điểm từ tệp CSV (F05b, US-21..24, ADR 0013 nháp)
-
-Căn cứ: `ImportBatchController`, `ImportBatchServiceImpl#createBatch`, `#validateBatch`, `#confirmBatch`, `#rollbackBatch`, `ScoreRowValidator#validate`,
-`ScoreCsvParser#parse`, `LocalImportFileStorage`, `ScopeAuthorizationServiceImpl#canAccessImportBatch`; test `ImportBatchUploadIntegrationTest`,
-`ImportBatchValidateIntegrationTest`, `ImportBatchConfirmIntegrationTest`, `ImportConfirmRollbackIntegrationTest`. Ba bước, mỗi bước một lời gọi API;
-bước 3 là **một transaction** (`@Transactional` trên `confirmBatch`, `MongoTransactionManager` của `MongoConfig`).
-
-```mermaid
-sequenceDiagram
-    autonumber
-    participant C as Client (giảng viên lớp)
-    participant CT as ImportBatchController
-    participant SA as ScopeAuthorizationServiceImpl
-    participant S as ImportBatchServiceImpl
-    participant P as ScoreCsvParser
-    participant V as ScoreRowValidator
-    participant FS as LocalImportFileStorage
-    participant DB as MongoDB replica set rs0
-    participant A as AuditServiceImpl
-
-    Note over C,DB: Bước 1 - US-21 tải tệp (không @Transactional)
-    C->>CT: POST /sections/{s}/assessments/{a}/import-batches (file, emptyCellAs, reimportPolicy, columnMapping?)
-    CT->>SA: hasRole(LECTURER) và canAccessSection(WRITE)
-    S->>DB: đọc lớp, học kỳ, bài (SECTION của đúng lớp)
-    alt bài chưa APPROVED/SCORE_ENTERED, TOTAL_ONLY, lớp LOCKED, học kỳ không OPEN, EXCEL, reimportPolicy khác REJECT_ON_CONFLICT
+    alt bài chưa LOCKED/SCORE_ENTERED, TOTAL_ONLY, lớp LOCKED, học kỳ không OPEN, EXCEL, reimportPolicy khác REJECT_ON_CONFLICT
         S-->>C: 422 (không tạo lô)
     end
     S->>S: SHA-256 của tệp
@@ -436,14 +393,14 @@ sequenceDiagram
         S-->>C: 422 (chưa ghi gì)
     end
     S->>DB: save import_batches -> CONFIRMED (@Version: xác nhận đồng thời thì người sau 409)
-    S->>DB: insert scores (unique lớp+bài+câu+sinh viên)
-    opt bài đang APPROVED (lô đầu)
+    S->>DB: insert scores (unique lớp+bài+câu+CLO+sinh viên)
+    opt bài đang LOCKED (lô đầu)
         S->>DB: assessments.status = SCORE_ENTERED
     end
     S->>A: record(IMPORT_CONFIRM, import_batches, before, after)
     A->>DB: insert audit_logs (cùng transaction)
     alt bất kỳ bước nào ném lỗi
-        S-->>C: 4xx/5xx; MongoTransactionManager rollback: không có scores, lô vẫn VALIDATED, bài vẫn APPROVED, không audit
+        S-->>C: 4xx/5xx; MongoTransactionManager rollback: không có scores, lô vẫn VALIDATED, bài vẫn LOCKED, không audit
     else thành công
         S-->>C: 200 lô CONFIRMED
     end
