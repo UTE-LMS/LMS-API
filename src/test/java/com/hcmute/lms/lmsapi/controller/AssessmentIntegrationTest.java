@@ -51,7 +51,6 @@ class AssessmentIntegrationTest extends IntegrationTestBase {
   private String lecturerToken;
   private String otherLecturerToken;
   private String deptHeadToken;
-  private String otherDeptHeadToken;
   private String pmToken;
 
   @BeforeEach
@@ -68,12 +67,6 @@ class AssessmentIntegrationTest extends IntegrationTestBase {
     lecturer = fixtures.user(Role.LECTURER, courseScope);
     departmentHead = fixtures.user(Role.DEPARTMENT_HEAD, courseScope);
     User otherLecturer = fixtures.user(Role.LECTURER, UserScope.builder().build());
-    User otherDeptHead =
-        fixtures.user(
-            Role.DEPARTMENT_HEAD,
-            UserScope.builder()
-                .courseIds(new ArrayList<>(List.of(ApiTestFixtures.missingId())))
-                .build());
 
     section = fixtures.section(course.getId(), List.of(lecturer.getId()));
     section.setSyllabusId(syllabus.getId());
@@ -83,7 +76,6 @@ class AssessmentIntegrationTest extends IntegrationTestBase {
     lecturerToken = fixtures.bearer(lecturer);
     otherLecturerToken = fixtures.bearer(otherLecturer);
     deptHeadToken = fixtures.bearer(departmentHead);
-    otherDeptHeadToken = fixtures.bearer(otherDeptHead);
     pmToken =
         fixtures.bearerFor(
             Role.PROGRAM_MANAGER,
