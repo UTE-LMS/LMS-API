@@ -31,11 +31,17 @@ class F02ValidationTest {
   }
 
   private PloRequest ploRequest(String code) {
-    return PloRequest.builder().code(code).displayOrder(1).build();
+    return PloRequest.builder().code(code).displayOrder(1).passThreshold(0.5).build();
   }
 
   private PiRequest piRequest(String code) {
-    return PiRequest.builder().ploId("671dcba5f123456789abc003").code(code).displayOrder(1).build();
+    return PiRequest.builder()
+        .ploId("671dcba5f123456789abc003")
+        .code(code)
+        .displayOrder(1)
+        .weight(0.5)
+        .passThreshold(0.5)
+        .build();
   }
 
   @ParameterizedTest

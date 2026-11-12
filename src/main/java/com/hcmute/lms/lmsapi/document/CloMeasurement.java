@@ -12,9 +12,6 @@ import org.springframework.data.mongodb.core.mapping.Field;
 @AllArgsConstructor
 public class CloMeasurement {
 
-  @Field("defaultWeight")
-  private Double defaultWeight;
-
   @Field("defaultPassThreshold")
   private Double defaultPassThreshold;
 }

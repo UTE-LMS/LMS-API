@@ -49,7 +49,7 @@ class ImportConfirmRollbackIntegrationTest extends ScoreImportIntegrationBase {
         .as("lô không CONFIRMED")
         .isEqualTo("VALIDATED");
     assertThat(batchDocument(batchId).get("confirmedAt")).isNull();
-    assertThat(assessmentStatus()).as("bài vẫn APPROVED").isEqualTo("APPROVED");
+    assertThat(assessmentStatus()).as("bài vẫn LOCKED").isEqualTo("LOCKED");
     assertThat(importConfirmAudits(batchId)).as("không có audit mồ côi").isZero();
   }
 

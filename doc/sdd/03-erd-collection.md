@@ -145,17 +145,13 @@ Trong `database_import.js` mỗi collection có `$jsonSchema` với `validationA
 `GlobalExceptionHandler` đổi thành 422). Hai file (`@Document` và script) là hai nơi định nghĩa độc lập: khi đổi
 một bên phải đối chiếu bên kia. Script là "hợp đồng dữ liệu" (`doc/plan/README.md` §3).
 
-## 4. Collection có trong `database_import.js` nhưng chưa có `document` (không vẽ)
+## 4. Collection có trong `database_import.js` (25 collections theo CSDL v0.7 — ADR 0014)
 
-`program_courses`, `syllabi`, `clos`, `clo_pi_links`, `question_banks`, `question_categories`, `questions`, `assessments`,
-`terms`, `students`, `enrollments`, `measurement_rules`, `calculation_runs`,
-`student_results`, `aggregate_results`, `reports`, `improvement_actions` (collection `ml_experiments` đã loại bỏ hoàn toàn khỏi CSDL do ML ngoài phạm vi đồ án, TD-06).
+Tổng số collection trong `database_import.js` v0.7 là **25 collections** (đã loại bỏ `ml_experiments`, loại bỏ hoàn toàn 3 collection ngân hàng câu hỏi `question_banks`, `question_categories`, `questions`, và loại bỏ `measurement_rules` theo [ADR 0014](../adr/0014-import-ctdt-de-cuong-va-do-luong-4-cap-clo-pi-plo.md)).
 
-Hai điều cần biết:
-- `ProgramReferenceRepositoryImpl.existsPiReference` đọc thẳng ba collection **theo tên chuỗi** (`clo_pi_links`, `questions`,
-  `assessments`) bằng `MongoTemplate` để chặn xóa PI còn được tham chiếu — không qua `document`.
-- `courses` và `course_sections` có `document` + repository nhưng **chưa có API nào ghi** chúng; dữ liệu đến từ
-  `database_import.js` (một học phần mẫu) hoặc từ test. Mã hiện chỉ dùng chúng để kiểm tra tồn tại và phân quyền theo lớp.
+Các collection đã có `@Document` trong `src/main` (F01–F05a): `users`, `programs`, `program_versions`, `plos`, `pis`, `courses`, `program_courses`, `course_pi_contributions`, `syllabi`, `clos`, `clo_pi_links`, `assessments`, `terms`, `course_sections`, `students`, `enrollments`, `audit_logs` (17 collections).
+
+Các collection của F05b–F08 (8 collections): `import_batches`, `import_row_errors`, `scores` (khóa duy nhất `{sectionId, assessmentId, itemId, cloId, studentId}`, `rawScore >= 0`), `calculation_runs`, `student_results` (kết quả 4 cấp `['ASSESSMENT_CLO', 'CLO', 'PI', 'PLO']` có `assessmentId`), `aggregate_results` (4 cấp, scope `ASSESSMENT`, `SECTION`, `COHORT`, `PROGRAM`), `reports`, `improvement_actions`.
 
 ## 5. Khác biệt đã thấy giữa thiết kế dữ liệu và `document` (để sinh viên rà)
 

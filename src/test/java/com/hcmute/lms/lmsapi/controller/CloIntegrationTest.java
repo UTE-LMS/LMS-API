@@ -278,8 +278,7 @@ class CloIntegrationTest extends IntegrationTestBase {
             .code("CLO1")
             .contentOriginal("Hiểu các khái niệm cơ bản về lập trình hướng đối tượng")
             .bloomLevel(2)
-            .measurement(
-                CloMeasurementDto.builder().defaultWeight(0.4).defaultPassThreshold(0.5).build())
+            .measurement(CloMeasurementDto.builder().defaultPassThreshold(0.5).build())
             .build();
 
     mockMvc
@@ -287,7 +286,7 @@ class CloIntegrationTest extends IntegrationTestBase {
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.code").value("CLO1"))
         .andExpect(jsonPath("$.bloomLevel").value(2))
-        .andExpect(jsonPath("$.measurement.defaultWeight").value(0.4));
+        .andExpect(jsonPath("$.measurement.defaultPassThreshold").value(0.5));
 
     // 2. Tạo CLO1 trên syl2 thành công (cùng code khác syllabusId) (US-11/AC-2)
     mockMvc
@@ -315,7 +314,7 @@ class CloIntegrationTest extends IntegrationTestBase {
             .code("CLO2")
             .contentOriginal("Nội dung hợp lệ")
             .bloomLevel(3)
-            .measurement(CloMeasurementDto.builder().defaultWeight(1.5).build())
+            .measurement(CloMeasurementDto.builder().defaultPassThreshold(1.5).build())
             .build();
     mockMvc
         .perform(
@@ -412,6 +411,7 @@ class CloIntegrationTest extends IntegrationTestBase {
             .programVersionId(programVersion.getId())
             .cloId(cloId)
             .piId(otherPi.getId())
+            .weight(0.5)
             .build();
 
     mockMvc
@@ -617,6 +617,7 @@ class CloIntegrationTest extends IntegrationTestBase {
             .programVersionId(programVersion.getId())
             .cloId(cloId)
             .piId(pi.getId())
+            .weight(0.5)
             .build();
 
     for (String denied : List.of(pmOutOfScopeToken, lecturerToken)) {
@@ -664,6 +665,7 @@ class CloIntegrationTest extends IntegrationTestBase {
             .programVersionId(programVersion.getId())
             .cloId(foreignCloId)
             .piId(pi.getId())
+            .weight(0.5)
             .build();
 
     mockMvc

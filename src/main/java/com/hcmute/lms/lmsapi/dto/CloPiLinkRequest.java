@@ -3,6 +3,7 @@ package com.hcmute.lms.lmsapi.dto;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -27,6 +28,7 @@ public class CloPiLinkRequest {
   @Pattern(regexp = "^[0-9a-fA-F]{24}$", message = "piId phải là ObjectId 24 ký tự hex")
   private String piId;
 
+  @NotNull(message = "weight không được để trống")
   @DecimalMin(
       value = "0.0",
       inclusive = false,

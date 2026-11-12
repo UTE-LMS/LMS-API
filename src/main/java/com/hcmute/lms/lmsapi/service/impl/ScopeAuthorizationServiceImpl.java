@@ -188,29 +188,6 @@ public class ScopeAuthorizationServiceImpl implements ScopeAuthorizationService 
   }
 
   @Override
-  public boolean canReviewAssessment(UserPrincipal principal, String assessmentId) {
-    if (principal == null
-        || principal.getRoleAssignments() == null
-        || assessmentId == null
-        || assessmentId.isBlank()) {
-      return false;
-    }
-    return assessmentRepository
-        .findById(assessmentId.trim())
-        .filter(assessment -> assessment.getScope() == AssessmentScope.SECTION)
-        .flatMap(assessment -> syllabusRepository.findById(assessment.getSyllabusId()))
-        .map(
-            syllabus ->
-                principal.getRoleAssignments().stream()
-                    .anyMatch(
-                        a ->
-                            a != null
-                                && a.getRole() == Role.DEPARTMENT_HEAD
-                                && matchesCourseScope(a.getScope(), syllabus.getCourseId())))
-        .orElse(false);
-  }
-
-  @Override
   public boolean canAccessEnrollment(
       UserPrincipal principal, String enrollmentId, AccessType accessType) {
     if (enrollmentId == null || enrollmentId.isBlank()) {

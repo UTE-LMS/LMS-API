@@ -4,7 +4,6 @@ import com.hcmute.lms.lmsapi.enums.AssessmentPhase;
 import com.hcmute.lms.lmsapi.enums.AssessmentScope;
 import com.hcmute.lms.lmsapi.enums.AssessmentStatus;
 import com.hcmute.lms.lmsapi.enums.AssessmentType;
-import com.hcmute.lms.lmsapi.enums.DataGranularity;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -21,10 +20,8 @@ import org.springframework.data.mongodb.core.mapping.Field;
 import org.springframework.data.mongodb.core.mapping.FieldType;
 
 /**
- * Bài đánh giá trong collection assessments (§4.15 / F04, US-15, US-16, NEW-01). Có hai dạng: khung
- * theo đề cương ({@code SYLLABUS_TEMPLATE}) và bản của một lớp ({@code SECTION}); chỉ bản lớp đi
- * qua quy trình duyệt ma trận. {@code items[].outcomeMappings} của bản lớp là bản sao (snapshot)
- * tại thời điểm khai báo, nên đổi CLO về sau không làm đổi bài đã thi.
+ * Bài đánh giá trong collection assessments (ADR 0014, Schema v0.7). Vòng đời: DRAFT -> LOCKED ->
+ * SCORE_ENTERED.
  */
 @Data
 @Builder
@@ -71,28 +68,18 @@ public class Assessment {
   @Field("scheduledAt")
   private Instant scheduledAt;
 
-  /** Tổng điểm khai báo; phải khớp Σ items.maxScore (dung sai 0,001) khi gửi duyệt. */
-  @Field("totalPoints")
-  private Double totalPoints;
-
-  /** Tỷ trọng của bài trong điểm học phần, trong [0, 1]. */
-  @Field("weightInCourse")
-  private Double weightInCourse;
-
-  @Builder.Default
-  @Field("dataGranularity")
-  private DataGranularity dataGranularity = DataGranularity.ITEM;
-
   @Builder.Default
   @Field("status")
   private AssessmentStatus status = AssessmentStatus.DRAFT;
 
-  /** true khi status thuộc APPROVED/SCORE_ENTERED/LOCKED; luôn được ghi cùng lúc với status. */
+  /** true khi status thuộc LOCKED / SCORE_ENTERED. Luôn được ghi cùng lúc với status. */
   @Field("isLocked")
   private boolean locked;
 
-  @Field("approval")
-  private AssessmentApproval approval;
+  /** Tỷ lệ đóng góp W_{p,j} của bài kiểm tra cho từng CLO có mặt trong bài. */
+  @Builder.Default
+  @Field("cloWeights")
+  private List<AssessmentCloWeight> cloWeights = new ArrayList<>();
 
   /** Do service tính từ items, không cho người dùng nhập tay. */
   @Field("coverageSummary")
@@ -102,10 +89,7 @@ public class Assessment {
   @Field("items")
   private List<AssessmentItem> items = new ArrayList<>();
 
-  /**
-   * Khóa lạc quan: hai người cùng duyệt một bài thì chỉ một người ghi thành công, người còn lại
-   * nhận xung đột phiên bản (HTTP 409).
-   */
+  /** Khóa lạc quan. */
   @Version
   @Field("revision")
   private Long revision;

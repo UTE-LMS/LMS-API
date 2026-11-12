@@ -3,7 +3,7 @@
  *  KHỞI TẠO CƠ SỞ DỮ LIỆU MONGODB
  *  Hệ thống quản lý, đo lường và phân tích chuẩn đầu ra CTĐT
  *  (Learning Outcomes Management and Analytics System)
- *  Thiết kế: GiaiThich_CoSoDuLieu.md v0.5 (cập nhật theo PLO_DB_UPDATE.md)
+ *  Thiết kế: GiaiThich_CoSoDuLieu.md v0.7 (25 collections — cập nhật theo dac-ta-thay-doi-nghiep-vu-va-phuong-an-tinh-clo.md)
  * ============================================================================
  *
  *  CÁCH CHẠY (cần mongosh):
@@ -18,18 +18,17 @@
  *      $env:LOMS_DB = "learning_outcomes"; mongosh --file database_import.js
  *
  *  SCRIPT LÀM GÌ:
- *   1. Tạo 29 collection kèm quy tắc kiểm tra cấu trúc ($jsonSchema) và index.
- *   2. Nạp dữ liệu khởi tạo lấy từ tài liệu: 7 PLO, 17 PI, ma trận I/R/M của học phần
- *      OOPR230279 (trang 46) và khung quy tắc đo lường bản nháp.
- *   Ngân hàng câu hỏi (question_banks, question_categories, questions) được tạo rỗng:
- *   danh mục và câu hỏi chỉ nhập khi có đề đã thi và ánh xạ CLO–PI đã duyệt.
- *
- *  AN TOÀN:
- *   - Chạy lại nhiều lần được: collection đã có thì chỉ cập nhật validator; dữ liệu khởi tạo
- *     chỉ chèn khi chưa tồn tại (không ghi đè nội dung đã được chỉnh sửa).
- *   - Script KHÔNG xóa bất kỳ dữ liệu nào.
- *   - Nội dung PLO/PI trong script là bản DIỄN GIẢI NGẮN lấy từ tài liệu hướng dẫn, chưa phải
- *     nguyên văn bản CTĐT; được đánh dấu NEEDS_CLARIFICATION cho tới khi đối chiếu bản gốc.
+ *   1. Tạo 25 collection kèm quy tắc kiểm tra cấu trúc ($jsonSchema) và index.
+ *   2. Nạp dữ liệu khởi tạo: 7 PLO, 17 PI (kèm trọng số đóng góp và ngưỡng đạt mẫu) và ma trận I/R/M
+ *      của học phần OOPR230279.
+ *   Lưu ý:
+ *   - Đã loại bỏ 3 collection ngân hàng câu hỏi (question_banks, question_categories, questions)
+ *     và 1 collection quy tắc rời rạc (measurement_rules) -> còn 25 collections.
+ *   - Ngưỡng đạt (passThreshold) và trọng số đóng góp được lưu bắt buộc trực tiếp trên plos, pis,
+ *     clos, clo_pi_links và assessments.cloWeights.
+ *   - Bảng điểm (scores) lưu trực tiếp rawScore >= 0 theo từng cặp (itemId, cloId) (vắng thi / bỏ trống = 0.0,
+ *     bỏ các trạng thái điểm rỗng SCORE_STATUS_VALUES).
+ *   - Kết quả đo lường lưu xuyên suốt 4 cấp độ: RESULT_LEVELS = ['ASSESSMENT_CLO', 'CLO', 'PI', 'PLO'].
  * ============================================================================
  */
 
@@ -43,22 +42,26 @@ print('>>> Cơ sở dữ liệu: ' + DB_NAME + (LOAD_ILLUSTRATIVE_SAMPLE ? '  (c
 // ----------------------------------------------------------------------------
 // 1. Kiểu dữ liệu dùng chung cho validator
 // ----------------------------------------------------------------------------
-const OID    = { bsonType: 'objectId' };
-const OID_N  = { bsonType: ['objectId', 'null'] };
-const STR    = { bsonType: 'string' };
-const STR_N  = { bsonType: ['string', 'null'] };
-const BOOL   = { bsonType: 'bool' };
-const DATE   = { bsonType: 'date' };
-const DATE_N = { bsonType: ['date', 'null'] };
-const NUM    = { bsonType: ['double', 'int', 'long', 'decimal'] };
-const NUM_N  = { bsonType: ['double', 'int', 'long', 'decimal', 'null'] };
-const INT    = { bsonType: ['int', 'long', 'double'] };
-const INT_N  = { bsonType: ['int', 'long', 'double', 'null'] };
-const OBJ    = { bsonType: 'object' };
-const OBJ_N  = { bsonType: ['object', 'null'] };
-const arr    = (items) => ({ bsonType: 'array', items });
-const en     = (...v) => ({ enum: v });
-const bloom  = { bsonType: ['int', 'long', 'double', 'null'], minimum: 1, maximum: 6 };
+const OID      = { bsonType: 'objectId' };
+const OID_N    = { bsonType: ['objectId', 'null'] };
+const STR      = { bsonType: 'string' };
+const STR_N    = { bsonType: ['string', 'null'] };
+const BOOL     = { bsonType: 'bool' };
+const DATE     = { bsonType: 'date' };
+const DATE_N   = { bsonType: ['date', 'null'] };
+const NUM      = { bsonType: ['double', 'int', 'long', 'decimal'] };
+const NUM_N    = { bsonType: ['double', 'int', 'long', 'decimal', 'null'] };
+const INT      = { bsonType: ['int', 'long', 'double'] };
+const INT_N    = { bsonType: ['int', 'long', 'double', 'null'] };
+const OBJ      = { bsonType: 'object' };
+const OBJ_N    = { bsonType: ['object', 'null'] };
+const arr      = (items) => ({ bsonType: 'array', items });
+const en       = (...v) => ({ enum: v });
+const bloom    = { bsonType: ['int', 'long', 'double', 'null'], minimum: 1, maximum: 6 };
+// Trọng số và ngưỡng đạt bắt buộc thuộc khoảng (0, 1] (không được để trống)
+const weight01 = { bsonType: ['double', 'int', 'long', 'decimal'], minimum: 0, exclusiveMinimum: true, maximum: 1 };
+const rate01   = { bsonType: ['double', 'int', 'long', 'decimal', 'null'], minimum: 0, maximum: 1 };
+const level16  = { bsonType: ['int', 'long', 'double', 'null'], minimum: 1, maximum: 6 };
 
 const VERIFICATION = {
   bsonType: 'object',
@@ -72,26 +75,24 @@ const schema = (required, properties) => ({
 // ----------------------------------------------------------------------------
 // 2. Khai báo collection: validator + index
 // ----------------------------------------------------------------------------
-// CLO mà một câu hỏi/tiêu chí đo, kèm phần điểm của câu được chia cho CLO đó (tổng của một câu = 1).
-// ADR 0011 (Q10): câu hỏi chỉ gán CLO; PI suy ra từ kết quả CLO qua clo_pi_links. Cách chia điểm khi một câu đo nhiều CLO chờ Q15
+// Mỗi câu hỏi ánh xạ tới 1 hoặc nhiều CLO; giảng viên khai báo trực tiếp điểm tối đa (maxScore > 0)
 const OUTCOME_MAPPING = {
-  bsonType: 'object', required: ['cloId', 'weight'],
-  properties: { cloId: OID, weight: { bsonType: ['double', 'int', 'long', 'decimal'], minimum: 0, exclusiveMinimum: true, maximum: 1 } }
+  bsonType: 'object', required: ['cloId', 'maxScore'],
+  properties: { cloId: OID, maxScore: { bsonType: ['double', 'int', 'long', 'decimal'], minimum: 0, exclusiveMinimum: true } }
 };
-// Biểu thức: tổng các trọng số trong mảng bằng 1 (sai số 0,0001)
-// Biểu thức: trong một câu hỏi, mỗi CLO chỉ khai báo một lần (tránh tính trùng điểm)
+// Tỷ lệ đóng góp W_{p,j} thuộc (0, 1] của bài kiểm tra cho từng CLO có mặt trong bài
+const ASSESSMENT_CLO_WEIGHT = {
+  bsonType: 'object', required: ['cloId', 'weight'],
+  properties: { cloId: OID, weight: weight01 }
+};
+// Biểu thức: trong một danh sách, mỗi cloId chỉ xuất hiện một lần
 const noDuplicateClos = (mappingsPath) => ({ $eq: [ { $size: mappingsPath },
   { $size: { $setUnion: [ { $map: { input: mappingsPath, as: 'm', in: '$$m.cloId' } }, [] ] } } ] });
-const sumsToOne = (weightsPath) => ({ $lte: [{ $abs: { $subtract: [{ $sum: weightsPath }, 1] } }, 0.0001] });
 
-const SCORE_STATUS_VALUES = ['SCORED', 'BLANK', 'ABSENT', 'NOT_GRADED', 'EXEMPT', 'MISSING'];
-const RESULT_LEVELS = ['CLO', 'COURSE', 'PI', 'PLO'];
-// Bài đánh giá đã được Trưởng bộ môn duyệt (hoặc sau đó) thì khóa cấu trúc items[]
-const ASSESSMENT_LOCKED_STATUSES = ['APPROVED', 'SCORE_ENTERED', 'LOCKED'];
-const ASSESSMENT_NEED_ITEMS_STATUSES = ['SUBMITTED', 'APPROVED', 'SCORE_ENTERED', 'LOCKED'];
-const rate01 = { bsonType: ['double', 'int', 'long', 'decimal', 'null'], minimum: 0, maximum: 1 };
-// Mức năng lực/Bloom nguyên văn trong tài liệu: số nguyên 1–6
-const level16 = { bsonType: ['int', 'long', 'double', 'null'], minimum: 1, maximum: 6 };
+// 4 cấp độ kết quả chuẩn đầu ra (bỏ COURSE, thêm ASSESSMENT_CLO cho Cấp độ 1)
+const RESULT_LEVELS = ['ASSESSMENT_CLO', 'CLO', 'PI', 'PLO'];
+const ASSESSMENT_LOCKED_STATUSES = ['LOCKED', 'SCORE_ENTERED'];
+const ASSESSMENT_NEED_ITEMS_STATUSES = ['LOCKED', 'SCORE_ENTERED'];
 
 const COLLECTIONS = {
 
@@ -104,7 +105,7 @@ const COLLECTIONS = {
         bsonType: 'object', required: ['role'],
         properties: {
           role: en('ADMIN', 'PROGRAM_MANAGER', 'DEPARTMENT_HEAD', 'QA_OFFICER', 'LECTURER', 'STUDENT', 'VIEWER'),
-          scope: {                           // { programIds, courseIds, sectionIds }
+          scope: {
             bsonType: ['object', 'null'],
             properties: { programIds: arr(OID), courseIds: arr(OID), sectionIds: arr(OID) }
           }
@@ -123,8 +124,8 @@ const COLLECTIONS = {
   program_versions: {
     validator: schema(['programId', 'version', 'status'], {
       programId: OID, version: STR, applicableCohorts: arr(STR),
-      totalCredits: INT_N,                   // tổng số tín chỉ tốt nghiệp theo quy định
-      durationYears: NUM_N,                  // thời gian đào tạo (năm)
+      totalCredits: INT_N,
+      durationYears: NUM_N,
       status: en('DRAFT', 'ACTIVE', 'ARCHIVED'),
       verification: VERIFICATION, extra: OBJ_N
     }),
@@ -132,28 +133,30 @@ const COLLECTIONS = {
   },
 
   plos: {
-    validator: schema(['programVersionId', 'code', 'displayOrder', 'verification'], {
+    validator: schema(['programVersionId', 'code', 'displayOrder', 'passThreshold', 'verification'], {
       programVersionId: OID,
       code: { bsonType: 'string', pattern: '^PLO[1-9][0-9]*$' },
       displayOrder: INT,
-      category: { enum: ['GENERAL', 'SPECIALIZED', 'UNSPECIFIED', null] },  // chuẩn chung / chuẩn chuyên biệt
-      contentOriginal: STR_N,            // nguyên văn trong CTĐT (null cho đến khi đối chiếu bản gốc)
-      contentSummary: STR_N,             // diễn giải ngắn
-      capabilityLevelRaw: level16,       // đúng số trong cột "Trình độ năng lực" (1–6), không tính từ PI
+      category: { enum: ['GENERAL', 'SPECIALIZED', 'UNSPECIFIED', null] },
+      contentOriginal: STR_N,
+      contentSummary: STR_N,
+      capabilityLevelRaw: level16,
+      passThreshold: weight01,           // Ngưỡng đạt bắt buộc của PLO thuộc (0, 1]
       verification: VERIFICATION, reviewNote: STR_N
     }),
     indexes: [[{ programVersionId: 1, code: 1 }, { unique: true }]]
   },
 
   pis: {
-    validator: schema(['programVersionId', 'ploId', 'code', 'displayOrder', 'verification'], {
+    validator: schema(['programVersionId', 'ploId', 'code', 'displayOrder', 'weight', 'passThreshold', 'verification'], {
       programVersionId: OID, ploId: OID,
       code: { bsonType: 'string', pattern: '^PI[1-9][0-9]*\\.[1-9][0-9]*$' },
       displayOrder: INT,
       nameOriginalTerm: STR_N,
       contentOriginal: STR_N, contentShort: STR_N,
       capabilityLevelRaw: level16,
-      targetPassRate: rate01,
+      weight: weight01,                  // Trọng số đóng góp W_{PI -> PLO} thuộc (0, 1] (tổng các PI trong cùng PLO = 1.0)
+      passThreshold: weight01,           // Ngưỡng đạt bắt buộc của PI thuộc (0, 1]
       verification: VERIFICATION, reviewNote: STR_N
     }),
     indexes: [[{ programVersionId: 1, code: 1 }, { unique: true }], [{ ploId: 1 }]]
@@ -199,13 +202,13 @@ const COLLECTIONS = {
   },
 
   clos: {
-    validator: schema(['syllabusId', 'courseId', 'code', 'contentOriginal'], {
+    validator: schema(['syllabusId', 'courseId', 'code', 'contentOriginal', 'measurement'], {
       syllabusId: OID, courseId: OID,
       code: { bsonType: 'string', pattern: '^CLO[0-9]+$' },
       contentOriginal: STR, bloomLevel: bloom, bloomNote: STR_N,
-      measurement: {                     // để trống (null) cho đến khi Khoa xác nhận
-        bsonType: ['object', 'null'],
-        properties: { defaultWeight: rate01, defaultPassThreshold: rate01 }
+      measurement: {
+        bsonType: 'object', required: ['defaultPassThreshold'],
+        properties: { defaultPassThreshold: weight01 } // Ngưỡng đạt bắt buộc của CLO thuộc (0, 1] (đã bỏ defaultWeight)
       },
       verification: VERIFICATION, extra: OBJ_N
     }),
@@ -213,111 +216,31 @@ const COLLECTIONS = {
   },
 
   clo_pi_links: {
-    validator: schema(['programVersionId', 'syllabusId', 'cloId', 'piId'], {
+    validator: schema(['programVersionId', 'syllabusId', 'cloId', 'piId', 'weight'], {
       programVersionId: OID, syllabusId: OID, cloId: OID, piId: OID,
-      // tỷ trọng CLO → PI khi tổng hợp gián tiếp (pi.method = FROM_CLOS); 0 < x ≤ 1, null cho đến khi quy tắc được xác nhận
-      weight: { bsonType: ['double', 'int', 'long', 'decimal', 'null'], minimum: 0, exclusiveMinimum: true, maximum: 1 },
+      // Trọng số đóng góp W_{CLO -> PI} thuộc (0, 1] (bắt buộc không để trống; không ép tổng qua các học phần = 1.0)
+      weight: weight01,
       verification: VERIFICATION
     }),
     indexes: [[{ cloId: 1, piId: 1 }, { unique: true }], [{ piId: 1 }], [{ programVersionId: 1 }]]
   },
 
-  // ----- Ngân hàng câu hỏi (danh mục câu hỏi của đề ĐÃ THI; không sinh đề, không duyệt đề) -----
-  question_banks: {
-    validator: schema(['code', 'name', 'courseId', 'syllabusId', 'sourceSystem', 'status'], {
-      code: STR, name: STR, description: STR_N,
-      courseId: OID, syllabusId: OID,            // ngân hàng gắn với phiên bản đề cương vì CLO chỉ có nghĩa trong một đề cương
-      sourceSystem: en('INTERNAL', 'MOODLE', 'EXCEL_IMPORT'),
-      externalBankId: STR_N,
-      status: en('ACTIVE', 'ARCHIVED'),
-      extra: OBJ_N
-    }),
-    indexes: [[{ code: 1 }, { unique: true }], [{ courseId: 1, syllabusId: 1 }]]
-  },
-
-  // Cây danh mục nội dung của một ngân hàng: Chương/Phần (cấp 1) → Chủ đề (cấp 2) → Nhóm nhỏ (cấp 3)
-  question_categories: {
-    validator: {
-      $and: [
-        schema(['bankId', 'code', 'name', 'parentId', 'ancestorIds', 'level', 'status'], {
-          bankId: OID, code: STR, name: STR, description: STR_N,
-          parentId: OID_N, ancestorIds: arr(OID),
-          level: { bsonType: ['int', 'long', 'double'], minimum: 1, maximum: 3 },
-          order: INT_N, status: en('ACTIVE', 'ARCHIVED')
-        }),
-        // cấp 1 ⇔ không có cha; số tổ tiên = cấp − 1
-        { $expr: { $eq: [{ $eq: ['$level', 1] }, { $eq: [{ $type: '$parentId' }, 'null'] }] } },
-        { $expr: { $eq: [{ $size: '$ancestorIds' }, { $subtract: ['$level', 1] }] } }
-      ]
-    },
-    indexes: [
-      [{ bankId: 1, code: 1 }, { unique: true }],
-      [{ bankId: 1, parentId: 1, order: 1 }],
-      [{ ancestorIds: 1 }]
-    ]
-  },
-
-  questions: {
-    validator: {
-      $and: [
-        schema(['bankId', 'code', 'version', 'questionType', 'categoryId', 'bloomLevel', 'outcomeMappings', 'status'], {
-          bankId: OID, code: STR, version: INT,
-          questionType: en('MCQ', 'SHORT_ANSWER', 'ESSAY', 'PRACTICAL', 'PROJECT_TASK'),
-          content: STR_N,                        // nội dung câu hỏi (có thể để trống nếu đề còn bảo mật)
-          categoryId: OID,                       // mỗi câu thuộc đúng MỘT danh mục lá hoặc nhánh của cây
-          bloomLevel: { bsonType: ['int', 'long', 'double'], minimum: 1, maximum: 6 },
-          difficulty: { enum: ['EASY', 'MEDIUM', 'HARD', null] },
-          defaultMaxScore: NUM_N,
-          outcomeMappings: arr(OUTCOME_MAPPING), // một câu có thể đo nhiều CLO
-          source: OBJ_N,                         // { system: INTERNAL|MOODLE|EXCEL_IMPORT, externalQuestionId, note }
-          status: en('DRAFT', 'ACTIVE', 'RETIRED'),
-          verification: VERIFICATION, extra: OBJ_N
-        }),
-        // Câu ở trạng thái ACTIVE phải có ít nhất một CLO và tổng phần điểm = 1
-        { $expr: { $or: [ { $ne: ['$status', 'ACTIVE'] },
-            { $and: [ { $gte: [{ $size: '$outcomeMappings' }, 1] }, sumsToOne('$outcomeMappings.weight') ] } ] } },
-        // mỗi CLO chỉ xuất hiện một lần trong một câu
-        { $expr: noDuplicateClos('$outcomeMappings') }
-      ]
-    },
-    indexes: [
-      [{ bankId: 1, code: 1 }, { unique: true }],
-      [{ categoryId: 1 }],
-      [{ bankId: 1, status: 1, bloomLevel: 1 }],
-      [{ 'outcomeMappings.cloId': 1 }],
-      // chống nhập trùng một câu từ hệ thống ngoài (Moodle...)
-      [{ bankId: 1, 'source.system': 1, 'source.externalQuestionId': 1 },
-       { unique: true, partialFilterExpression: { 'source.externalQuestionId': { $type: 'string' } }, name: 'uniq_external_question' }]
-    ]
-  },
-
+  // ----- Bài đánh giá & Ma trận Câu hỏi – CLO -----
   assessments: {
     validator: {
       $and: [
-        schema(['syllabusId', 'code', 'name', 'scope', 'dataGranularity', 'status', 'isLocked'], {
+        schema(['syllabusId', 'code', 'name', 'scope', 'status', 'isLocked'], {
           syllabusId: OID, code: STR, name: STR,
           scope: en('SYLLABUS_TEMPLATE', 'SECTION'),
           sectionId: OID_N, templateId: OID_N,
           type: { enum: ['QUIZ', 'PRACTICAL', 'PROJECT', 'MIDTERM', 'FINAL', 'OTHER', null] },
           phase: { enum: ['FORMATIVE', 'MIDTERM', 'SUMMATIVE', null] },
           scheduledAt: DATE_N,
-          totalPoints: { bsonType: ['double', 'int', 'long', 'decimal', 'null'], minimum: 0 },  // backend so khớp với tổng items.maxScore (dung sai 0,001)
-          weightInCourse: rate01,
-          dataGranularity: en('ITEM', 'TOTAL_ONLY'),
-          // Quy trình Trưởng bộ môn duyệt ma trận đề thi (đề thi → điểm); xem GiaiThich §4.15
-          status: en('DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED', 'SCORE_ENTERED', 'LOCKED'),
-          isLocked: BOOL,                    // true khi status ∈ APPROVED, SCORE_ENTERED, LOCKED: cấm sửa items[]
-          approval: {
-            bsonType: ['object', 'null'],
-            properties: {
-              submittedBy: OID_N, submittedAt: DATE_N, reviewedBy: OID_N, reviewedAt: DATE_N, reviewNote: STR_N,
-              history: arr({
-                bsonType: 'object', required: ['action', 'actorId', 'at'],
-                properties: { action: en('SUBMIT', 'APPROVE', 'REJECT', 'UNLOCK'), actorId: OID, at: DATE, note: STR_N }
-              })
-            }
-          },
-          coverageSummary: {                 // thống kê độ phủ phục vụ màn hình duyệt nhanh
+          status: en('DRAFT', 'LOCKED', 'SCORE_ENTERED'),
+          isLocked: BOOL,
+          // Tỷ lệ đóng góp W_{p,j} thuộc (0, 1] của bài kiểm tra cho từng CLO có mặt trong bài
+          cloWeights: arr(ASSESSMENT_CLO_WEIGHT),
+          coverageSummary: {
             bsonType: ['object', 'null'],
             properties: {
               totalItemsSum: NUM_N,
@@ -326,43 +249,29 @@ const COLLECTIONS = {
                              properties: { bloomLevel: bloom, questionCount: INT_N, points: NUM_N, percentage: NUM_N } })
             }
           },
-          exportedFiles: arr({
-            bsonType: 'object',
-            properties: { fileRef: STR_N, templateCode: STR_N, includeOutcomeLabels: BOOL, exportedBy: OID_N, exportedAt: DATE_N }
-          }),
           items: arr({
-            bsonType: 'object', required: ['_id', 'code', 'kind', 'maxScore', 'outcomeMappings'],
+            bsonType: 'object', required: ['_id', 'code', 'outcomeMappings'],
             properties: {
-              _id: OID, code: STR, orderIndex: INT_N, title: STR_N,
-              kind: en('QUESTION', 'CRITERION'),
-              maxScore: { bsonType: ['double', 'int', 'long', 'decimal'], minimum: 0, exclusiveMinimum: true },
-              bloomLevel: bloom, topic: STR_N,
-              // Bản SNAPSHOT tại thời điểm thi: CLO và phần điểm của câu được chia cho CLO đó
-              outcomeMappings: { bsonType: 'array', minItems: 1, items: OUTCOME_MAPPING },
-              questionId: OID_N, questionVersion: INT_N,   // câu hỏi lấy từ ngân hàng (null với tiêu chí rubric hoặc đề ngoài ngân hàng)
-              externalRef: STR_N,                          // mã câu hỏi trên Moodle/LMS để khớp cột điểm
-              rubric: OBJ_N                                // { levels: [{ level, description, score }] }
+              _id: OID, code: STR, orderIndex: INT_N,
+              bloomLevel: bloom,
+              outcomeMappings: { bsonType: 'array', minItems: 1, items: OUTCOME_MAPPING }
             }
           }),
           source: OBJ_N, verification: VERIFICATION, extra: OBJ_N
         }),
-        // Bản đánh giá theo lớp (scope=SECTION) bắt buộc có sectionId
         { $expr: { $or: [ { $ne: ['$scope', 'SECTION'] }, { $eq: [{ $type: '$sectionId' }, 'objectId'] } ] } },
-        // isLocked khớp với trạng thái duyệt
         { $expr: { $eq: ['$isLocked', { $in: ['$status', ASSESSMENT_LOCKED_STATUSES] }] } },
-        // Đã gửi duyệt trở đi thì phải có ít nhất một câu hỏi/tiêu chí
         { $expr: { $or: [ { $not: [{ $in: ['$status', ASSESSMENT_NEED_ITEMS_STATUSES] }] },
                           { $gte: [{ $size: { $ifNull: ['$items', []] } }, 1] } ] } },
-        // Mỗi câu hỏi/tiêu chí: tổng phần điểm chia cho các CLO phải bằng 1, mỗi CLO một lần
         { $expr: { $allElementsTrue: [ { $map: { input: { $ifNull: ['$items', []] }, as: 'it',
-            in: { $and: [ sumsToOne('$$it.outcomeMappings.weight'), noDuplicateClos('$$it.outcomeMappings') ] } } } ] } }
+            in: noDuplicateClos('$$it.outcomeMappings') } } ] } },
+        { $expr: noDuplicateClos({ $ifNull: ['$cloWeights', []] }) }
       ]
     },
     indexes: [
       [{ syllabusId: 1, sectionId: 1, code: 1 }, { unique: true }],
       [{ sectionId: 1, status: 1 }],
-      [{ 'items.outcomeMappings.cloId': 1 }],
-      [{ 'items.questionId': 1 }]
+      [{ 'items.outcomeMappings.cloId': 1 }]
     ]
   },
 
@@ -386,9 +295,9 @@ const COLLECTIONS = {
   students: {
     validator: schema(['studentRef'], {
       studentRef: STR,
-      userId: OID_N,                         // users._id khi sinh viên được cấp tài khoản xem kết quả của chính mình
+      userId: OID_N,
       cohort: STR_N, majorCode: STR_N, programVersionId: OID_N,
-      fullName: STR_N, email: STR_N,         // tùy chọn, chỉ lưu khi được phép (Q09)
+      fullName: STR_N, email: STR_N,
       status: { enum: ['ACTIVE', 'SUSPENDED', 'GRADUATED', 'DROPPED_OUT', null] }
     }),
     indexes: [[{ studentRef: 1 }, { unique: true }], [{ programVersionId: 1, cohort: 1 }], [{ userId: 1 }]]
@@ -403,13 +312,9 @@ const COLLECTIONS = {
 
   // ----- Nhập điểm -----
   import_batches: {
-    validator: schema(['sectionId', 'assessmentId', 'sourceSystem', 'status'], {
+    validator: schema(['sectionId', 'assessmentId', 'status'], {
       sectionId: OID, assessmentId: OID,
-      fileName: STR_N, fileChecksum: STR_N, fileRef: STR_N,   // fileRef: đường dẫn lưu tệp gốc làm minh chứng
-      sourceSystem: en('EXCEL', 'CSV', 'MOODLE_EXPORT'),
-      columnMapping: OBJ_N,
-      emptyCellAs: { enum: ['BLANK', 'MISSING', null] },
-      reimportPolicy: { enum: ['REJECT_ON_CONFLICT', 'OVERWRITE', 'UPDATE_BLANK_ONLY', null] },
+      fileName: STR_N, fileChecksum: STR_N, fileRef: STR_N,
       status: en('UPLOADED', 'VALIDATED', 'HAS_ERRORS', 'CONFIRMED', 'ROLLED_BACK'),
       stats: OBJ_N, uploadedBy: OID_N, confirmedBy: OID_N, confirmedAt: DATE_N
     }),
@@ -428,102 +333,33 @@ const COLLECTIONS = {
   scores: {
     validator: {
       $and: [
-        {
-          $jsonSchema: {
-            bsonType: 'object',
-            required: ['sectionId', 'assessmentId', 'itemId', 'studentId', 'status', 'importBatchId'],
-            properties: {
-              sectionId: OID, assessmentId: OID, itemId: OID, studentId: OID,
-              status: { enum: SCORE_STATUS_VALUES },
-              rawScore: { bsonType: ['double', 'int', 'long', 'decimal', 'null'], minimum: 0 },
-              maxScore: { bsonType: ['double', 'int', 'long', 'decimal'], minimum: 0 },
-              rubricLevel: { bsonType: ['int', 'long', 'double', 'null'], minimum: 1, maximum: 4 },
-              importBatchId: OID, sourceRow: INT_N, revision: INT_N,
-              updatedBy: OID_N, updatedAt: DATE_N
-            },
-            // SCORED/BLANK phải có rawScore + maxScore; các trạng thái còn lại rawScore phải là null
-            oneOf: [
-              { properties: { status: en('SCORED', 'BLANK'), rawScore: { bsonType: ['double', 'int', 'long', 'decimal'] } },
-                required: ['rawScore', 'maxScore'] },
-              { properties: { status: en('ABSENT', 'NOT_GRADED', 'EXEMPT', 'MISSING'), rawScore: { bsonType: 'null' } } }
-            ]
-          }
-        },
-        // rawScore <= maxScore (khi có điểm); BLANK (bỏ trống) phải bằng 0
-        { $expr: { $or: [
-            { $in: [{ $type: '$rawScore' }, ['null', 'missing']] },
-            { $lte: ['$rawScore', '$maxScore'] } ] } },
-        { $expr: { $or: [ { $ne: ['$status', 'BLANK'] }, { $eq: ['$rawScore', 0] } ] } }
+        schema(['sectionId', 'assessmentId', 'itemId', 'cloId', 'studentId', 'rawScore', 'maxScore'], {
+          sectionId: OID, assessmentId: OID, itemId: OID, cloId: OID, studentId: OID,
+          // Vắng thi hoặc bỏ trống câu hỏi lưu trực tiếp rawScore = 0.0 (đã bỏ status và rubricLevel)
+          rawScore: { bsonType: ['double', 'int', 'long', 'decimal'], minimum: 0 },
+          maxScore: { bsonType: ['double', 'int', 'long', 'decimal'], minimum: 0, exclusiveMinimum: true },
+          importBatchId: OID_N, sourceRow: INT_N,
+          updatedBy: OID_N, updatedAt: DATE_N
+        }),
+        { $expr: { $lte: ['$rawScore', '$maxScore'] } }
       ]
     },
     indexes: [
-      [{ sectionId: 1, assessmentId: 1, itemId: 1, studentId: 1 }, { unique: true }],
+      [{ sectionId: 1, assessmentId: 1, itemId: 1, cloId: 1, studentId: 1 }, { unique: true }],
       [{ studentId: 1 }],
       [{ importBatchId: 1 }]
     ]
   },
 
-  // ----- Đo lường -----
-  measurement_rules: {
-    validator: {
-      $and: [
-        schema(['code', 'version', 'status'], {
-          code: STR, version: STR,
-          status: en('DRAFT', 'CONFIRMED', 'RETIRED'),
-          confirmedBy: OID_N, confirmedAt: DATE_N,
-          scope: OBJ_N,
-          // Các ngưỡng/phương pháp để null trong bản DRAFT cho đến khi Khoa xác nhận (Q04, Q12, Q13)
-          clo: {
-            bsonType: ['object', 'null'],
-            properties: {
-              method: { enum: ['WEIGHTED_ITEMS', 'POINTS_RATIO', null] },
-              defaultPassThreshold: rate01, minCoverage: rate01
-            }
-          },
-          course: {
-            bsonType: ['object', 'null'],
-            properties: { requireAllCloPass: { bsonType: ['bool', 'null'] }, defaultTargetPassRate: rate01 }
-          },
-          pi: {
-            bsonType: ['object', 'null'],
-            properties: {
-              // ADR 0011: PI luôn suy ra từ kết quả CLO theo clo_pi_links.weight
-              method: { enum: ['FROM_CLOS', null] },
-              aggregationMethod: { enum: ['WEIGHTED_AVERAGE', 'MAX', 'LATEST', 'ACCUMULATED_EVIDENCE', null] },
-              // ADR 0012: không quy đổi I/R/M thành hệ số; không có trường useIrmAsWeight/irmWeights
-              defaultPassThreshold: rate01
-            }
-          },
-          plo: {
-            bsonType: ['object', 'null'],
-            properties: {
-              method: { enum: ['ALL_PIS_PASSED', 'WEIGHTED_PIS', 'AVERAGE_PIS', null] },
-              defaultPassThreshold: rate01, cohortTargetPassRate: rate01
-            }
-          },
-          missingDataPolicy: {
-            bsonType: ['object', 'null'],
-            properties: {
-              blankScoreValue: { enum: [0] },   // BLANK luôn tính 0 (có ghi nhận)
-              excludeAbsentFromDenominator: { bsonType: ['bool', 'null'] },
-              excludeMissingFromDenominator: { bsonType: ['bool', 'null'] }
-            }
-          },
-          notes: STR_N
-        })
-      ]
-    },
-    indexes: [[{ code: 1, version: 1 }, { unique: true }]]
-  },
-
+  // ----- Đo lường 4 cấp độ (ASSESSMENT_CLO -> CLO -> PI -> PLO) -----
   calculation_runs: {
-    validator: schema(['scope', 'ruleId', 'status', 'lockKey'], {
-      scope: en('SECTION', 'COURSE', 'COHORT', 'PROGRAM'),
-      scopeRef: {                            // đối tượng cụ thể của phạm vi (bổ sung để biết lượt tính áp dụng cho lớp/khóa nào)
+    validator: schema(['scope', 'status', 'lockKey'], {
+      scope: en('SECTION', 'COHORT', 'PROGRAM'),
+      scopeRef: {
         bsonType: ['object', 'null'],
         properties: { sectionIds: arr(OID), courseIds: arr(OID), cohorts: arr(STR), termId: OID_N }
       },
-      lockKey: STR, programVersionId: OID_N, syllabusIds: arr(OID), ruleId: OID,
+      lockKey: STR, programVersionId: OID_N, syllabusIds: arr(OID),
       isOfficial: BOOL,
       dataSnapshot: {
         bsonType: ['object', 'null'],
@@ -534,9 +370,8 @@ const COLLECTIONS = {
       errorMessage: STR_N, triggeredBy: OID_N, startedAt: DATE_N, finishedAt: DATE_N
     }),
     indexes: [
-      [{ scope: 1, ruleId: 1, startedAt: -1 }],
+      [{ scope: 1, startedAt: -1 }],
       [{ 'scopeRef.sectionIds': 1, startedAt: -1 }],
-      // hai lượt tính cùng phạm vi + cùng quy tắc không được chạy đồng thời (khóa chỉ giữ khi đang chờ/đang xử lý)
       [{ lockKey: 1 }, { unique: true, partialFilterExpression: { status: { $in: ['PENDING', 'PROCESSING'] } }, name: 'uniq_running_lockKey' }]
     ]
   },
@@ -544,23 +379,22 @@ const COLLECTIONS = {
   student_results: {
     validator: schema(['runId', 'level', 'subjectId', 'studentId', 'status'], {
       runId: OID, level: { enum: RESULT_LEVELS }, subjectId: OID,
-      sectionId: OID_N, studentId: OID, termId: OID_N,
+      // assessmentId khác null khi level = 'ASSESSMENT_CLO'; bằng null khi level thuộc 'CLO' | 'PI' | 'PLO'
+      sectionId: OID_N, assessmentId: OID_N, studentId: OID, termId: OID_N,
       status: en('COMPUTED', 'INSUFFICIENT_DATA', 'NOT_APPLICABLE'),
-      value: rate01, passed: { bsonType: ['bool', 'null'] },
-      evidenceCount: INT_N,
+      value: rate01, passThreshold: rate01, passed: { bsonType: ['bool', 'null'] },
       completeness: {
         bsonType: ['object', 'null'],
         properties: { requiredCount: INT_N, availableCount: INT_N, ratio: rate01 }
       },
-      // Truy vết một cấp liền kề: CLO → scores; PI → scores hoặc student_results (CLO); PLO → student_results (PI)
       inputs: arr({
         bsonType: 'object', required: ['sourceType', 'refId'],
         properties: { sourceType: en('SCORE', 'STUDENT_RESULT'), refId: OID, normalizedValue: NUM_N, weight: NUM_N }
       }),
-      ruleId: OID_N, programVersionId: OID_N, syllabusId: OID_N
+      programVersionId: OID_N, syllabusId: OID_N
     }),
     indexes: [
-      [{ runId: 1, level: 1, subjectId: 1, sectionId: 1, studentId: 1 }, { unique: true }],
+      [{ runId: 1, level: 1, subjectId: 1, sectionId: 1, assessmentId: 1, studentId: 1 }, { unique: true }],
       [{ studentId: 1, level: 1, subjectId: 1, termId: 1 }]
     ]
   },
@@ -568,20 +402,21 @@ const COLLECTIONS = {
   aggregate_results: {
     validator: schema(['runId', 'level', 'subjectId', 'scope', 'counts'], {
       runId: OID, level: { enum: RESULT_LEVELS }, subjectId: OID,
-      scope: {                               // refId = lớp / học phần / CTĐT tùy type; cohort, termId bổ sung cho phạm vi khóa/học kỳ
+      sectionId: OID_N, assessmentId: OID_N,
+      scope: {
         bsonType: 'object', required: ['type', 'refId'],
-        properties: { type: en('SECTION', 'COURSE', 'COHORT', 'PROGRAM'), refId: OID, cohort: STR_N, termId: OID_N }
+        properties: { type: en('ASSESSMENT', 'SECTION', 'COHORT', 'PROGRAM'), refId: OID, cohort: STR_N, termId: OID_N }
       },
       counts: {
-        bsonType: 'object', required: ['enrolled', 'evaluable', 'passed', 'failed', 'insufficientData'],
-        properties: { enrolled: INT, evaluable: INT, passed: INT, failed: INT, insufficientData: INT }
+        bsonType: 'object', required: ['enrolled', 'passed', 'failed'],
+        properties: { enrolled: INT, passed: INT, failed: INT }
       },
-      passRate: rate01, passRateOfEnrolled: rate01, targetPassRate: rate01,
-      targetMet: { bsonType: ['bool', 'null'] }, dataCompleteness: rate01,
-      ruleId: OID_N, programVersionId: OID_N
+      mean: rate01, passRate: rate01, passThreshold: rate01,
+      dataCompleteness: rate01,
+      programVersionId: OID_N
     }),
     indexes: [
-      [{ runId: 1, level: 1, subjectId: 1, 'scope.type': 1, 'scope.refId': 1, 'scope.cohort': 1, 'scope.termId': 1 },
+      [{ runId: 1, level: 1, subjectId: 1, sectionId: 1, assessmentId: 1, 'scope.type': 1, 'scope.refId': 1, 'scope.cohort': 1, 'scope.termId': 1 },
        { unique: true, name: 'uniq_aggregate_scope' }],
       [{ level: 1, subjectId: 1, 'scope.termId': 1 }]
     ]
@@ -591,7 +426,7 @@ const COLLECTIONS = {
   reports: {
     validator: schema(['type', 'runId'], {
       type: en('SECTION_CLO', 'COURSE_PI', 'PROGRAM_PLO', 'DATA_COMPLETENESS'),
-      title: STR_N, params: OBJ_N, runId: OID, ruleId: OID_N, programVersionId: OID_N,
+      title: STR_N, params: OBJ_N, runId: OID, programVersionId: OID_N,
       summary: OBJ_N, limitations: STR_N,
       exports: arr({
         bsonType: 'object',
@@ -617,7 +452,6 @@ const COLLECTIONS = {
       ownerId: OID, targetTermId: OID_N, dueDate: DATE_N,
       priority: { enum: ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL', null] },
       status: en('OPEN', 'IN_PROGRESS', 'DONE', 'VERIFIED', 'CANCELLED'),
-      // Đánh giá hiệu quả ở chu kỳ đo lường kế tiếp (đóng vòng cải tiến)
       evaluation: {
         bsonType: ['object', 'null'],
         properties: {
@@ -636,8 +470,8 @@ const COLLECTIONS = {
   audit_logs: {
     validator: schema(['at', 'action', 'entity'], {
       at: DATE, userId: OID_N,
-      action: en('SCORE_UPDATE', 'IMPORT_CONFIRM', 'ASSESSMENT_APPROVE', 'ASSESSMENT_REJECT',
-                 'RUN_CALCULATION', 'RULE_CONFIRM', 'LOGIN'),
+      action: en('SCORE_UPDATE', 'IMPORT_CONFIRM', 'ASSESSMENT_LOCK', 'ASSESSMENT_UNLOCK',
+                 'RUN_CALCULATION', 'LOGIN'),
       entity: OBJ, before: OBJ_N, after: OBJ_N, reason: STR_N, ip: STR_N
     }),
     indexes: [[{ 'entity.collection': 1, 'entity.id': 1, at: -1 }], [{ userId: 1, at: -1 }]]
@@ -648,6 +482,13 @@ const COLLECTIONS = {
 // 3. Tạo collection + validator + index (chạy lại được)
 // ----------------------------------------------------------------------------
 const existing = new Set(d.getCollectionNames());
+// Dọn dẹp 4 collection đã loại bỏ nếu tồn tại rỗng từ phiên bản trước
+['question_banks', 'question_categories', 'questions', 'measurement_rules'].forEach(function (obs) {
+  if (existing.has(obs) && d.getCollection(obs).countDocuments({}) === 0) {
+    d.getCollection(obs).drop();
+    existing.delete(obs);
+  }
+});
 let created = 0, updated = 0, indexCount = 0;
 
 Object.keys(COLLECTIONS).forEach(function (name) {
@@ -675,7 +516,7 @@ function seed(collName, filter, doc) {
   return d.getCollection(collName).findOne(filter)._id;
 }
 
-// 4.2 CTĐT và phiên bản
+// 4.1 CTĐT và phiên bản
 const programId = seed('programs', { code: 'CNTT' }, {
   name: 'Công nghệ thông tin', level: null, degree: null,
   extra: { note: 'Mã nội bộ của dự án; trình độ/văn bằng sẽ điền sau khi đọc thông tin chung của bản CTĐT.' }
@@ -686,92 +527,76 @@ const pvId = seed('program_versions', { programId: programId, version: 'BM7A-2.7
                   note: 'Q01: áp dụng cho các khóa K23, K24, K25, K26, K27 (nhóm SV xác nhận 2026-11-06).' }
 });
 
-// 4.3 Bảy PLO và 17 PI (Misa.md, mục 2–3; mục 7.3 trang 7–8 của bản CTĐT)
-// displayOrder theo thứ tự trình bày trong tài liệu: PLO1, PLO6, PLO7, PLO4, PLO5, PLO2, PLO3
-const PLO_NOTE = 'Nội dung là diễn giải ngắn theo tài liệu hướng dẫn; cần đối chiếu nguyên văn bản CTĐT ở bước trích xuất (ngày 3).';
+// 4.2 Bảy PLO và 17 PI (kèm ngưỡng đạt 0.60 và trọng số PI -> PLO tổng = 1.0 cho mỗi PLO)
+const PLO_NOTE = 'Nội dung là diễn giải ngắn theo tài liệu hướng dẫn; cập nhật qua Import CSV CTĐT.';
 const PLOS = [
-  // [mã, thứ tự trình bày, mức năng lực ghi trong tài liệu, diễn giải ngắn]
-  ['PLO1', 1, 3, 'Vận dụng toán học, thuật toán và khoa học để xác định giải pháp CNTT'],
-  ['PLO2', 6, 4, 'Nhận biết trách nhiệm nghề nghiệp; xem xét giải pháp trên cơ sở pháp lý và đạo đức'],
-  ['PLO3', 7, 3, 'Tiếp thu, vận dụng kiến thức mới và sử dụng chiến lược học tập phù hợp'],
-  ['PLO4', 4, 3, 'Làm việc nhóm hiệu quả, tổ chức công việc và đóng góp vào mục tiêu chung'],
-  ['PLO5', 5, 4, 'Giao tiếp với nhiều đối tượng và sử dụng tiếng Anh'],
-  ['PLO6', 2, 6, 'Thiết kế, cài đặt và đánh giá giải pháp đáp ứng yêu cầu CNTT'],
-  ['PLO7', 3, 6, 'Sử dụng công nghệ phù hợp để tạo ra giải pháp CNTT']
+  // [mã, thứ tự trình bày, mức năng lực, ngưỡng đạt passThreshold, diễn giải ngắn]
+  ['PLO1', 1, 3, 0.60, 'Vận dụng toán học, thuật toán và khoa học để xác định giải pháp CNTT'],
+  ['PLO2', 6, 4, 0.60, 'Nhận biết trách nhiệm nghề nghiệp; xem xét giải pháp trên cơ sở pháp lý và đạo đức'],
+  ['PLO3', 7, 3, 0.60, 'Tiếp thu, vận dụng kiến thức mới và sử dụng chiến lược học tập phù hợp'],
+  ['PLO4', 4, 3, 0.60, 'Làm việc nhóm hiệu quả, tổ chức công việc và đóng góp vào mục tiêu chung'],
+  ['PLO5', 5, 4, 0.60, 'Giao tiếp với nhiều đối tượng và sử dụng tiếng Anh'],
+  ['PLO6', 2, 6, 0.60, 'Thiết kế, cài đặt và đánh giá giải pháp đáp ứng yêu cầu CNTT'],
+  ['PLO7', 3, 6, 0.60, 'Sử dụng công nghệ phù hợp để tạo ra giải pháp CNTT']
 ];
 const ploId = {};
 PLOS.forEach(function (p) {
   ploId[p[0]] = seed('plos', { programVersionId: pvId, code: p[0] }, {
-    displayOrder: p[1], category: 'UNSPECIFIED', contentOriginal: null, contentSummary: p[3], capabilityLevelRaw: p[2],
-    verification: { status: 'NEEDS_CLARIFICATION', verifiedBy: null, verifiedAt: null, note: PLO_NOTE },
+    displayOrder: p[1], category: 'UNSPECIFIED', contentOriginal: null, contentSummary: p[4],
+    capabilityLevelRaw: p[2], passThreshold: p[3],
+    verification: { status: 'UNVERIFIED', verifiedBy: null, verifiedAt: null, note: PLO_NOTE },
     reviewNote: null
   });
 });
 
 const PIS = [
-  // [mã PLO, mã PI, thứ tự, mức năng lực ghi trong tài liệu, nội dung rút gọn, ghi chú cần làm rõ]
-  ['PLO1', 'PI1.1', 1, 2, 'Xác định vấn đề tính toán trong CNTT', null],
-  ['PLO1', 'PI1.2', 2, 3, 'Áp dụng toán học, thuật toán và khoa học để xác định giải pháp', null],
-  ['PLO2', 'PI2.1', 3, 2, 'Nhận thức trách nhiệm nghề nghiệp và đạo đức', null],
-  ['PLO2', 'PI2.2', 4, 4, 'Đánh giá tác động của giải pháp kỹ thuật đến cộng đồng, xã hội',
-    'PI2.2 dùng động từ "Đánh giá" nhưng ghi mức 4; cần hướng dẫn thang đo (Q03).'],
-  ['PLO3', 'PI3.1', 5, 3, 'Áp dụng kiến thức mới để giải quyết vấn đề CNTT', null],
-  ['PLO3', 'PI3.2', 6, 3, 'Áp dụng chiến lược học tập hiệu quả', null],
-  ['PLO4', 'PI4.1', 7, 3, 'Thiết lập môi trường làm việc nhóm hiệu quả', null],
-  ['PLO4', 'PI4.2', 8, 3, 'Vận dụng phương pháp làm việc nhóm', null],
-  ['PLO4', 'PI4.3', 9, 3, 'Thể hiện trách nhiệm và đóng góp vào thành công của nhóm', null],
-  ['PLO5', 'PI5.1', 10, 3, 'Truyền đạt nội dung công việc bằng văn bản', null],
-  ['PLO5', 'PI5.2', 11, 4, 'Truyền đạt hiểu biết bằng lời nói', null],
-  ['PLO5', 'PI5.3', 12, 4, 'Đọc, hiểu, viết bằng tiếng Anh trong CNTT', null],
-  ['PLO6', 'PI6.1', 13, 4, 'Thiết lập yêu cầu, xác định chức năng', null],
-  ['PLO6', 'PI6.2', 14, 6, 'Phân tích, thiết kế và cài đặt bài toán', null],
-  ['PLO6', 'PI6.3', 15, 5, 'Đánh giá giải pháp theo yêu cầu bài toán', null],
-  ['PLO7', 'PI7.1', 16, 6, 'Áp dụng công nghệ phần mềm, HTTT, AI để tạo giải pháp',
-    'PI7.1 mở đầu bằng "Áp dụng" nhưng ghi mức 6; cần hướng dẫn thang đo (Q03).'],
-  ['PLO7', 'PI7.2', 17, 6, 'Áp dụng công nghệ mạng máy tính để tạo giải pháp',
-    'PI7.2 mở đầu bằng "Áp dụng" nhưng ghi mức 6; cần hướng dẫn thang đo (Q03).']
+  // [mã PLO, mã PI, thứ tự, mức năng lực, trọng số W_{PI -> PLO}, ngưỡng đạt passThreshold, nội dung rút gọn, ghi chú]
+  ['PLO1', 'PI1.1', 1, 2, 0.40, 0.60, 'Xác định vấn đề tính toán trong CNTT', null],
+  ['PLO1', 'PI1.2', 2, 3, 0.60, 0.60, 'Áp dụng toán học, thuật toán và khoa học để xác định giải pháp', null],
+  ['PLO2', 'PI2.1', 3, 2, 0.50, 0.60, 'Nhận thức trách nhiệm nghề nghiệp và đạo đức', null],
+  ['PLO2', 'PI2.2', 4, 4, 0.50, 0.60, 'Đánh giá tác động của giải pháp kỹ thuật đến cộng đồng, xã hội', null],
+  ['PLO3', 'PI3.1', 5, 3, 0.50, 0.60, 'Áp dụng kiến thức mới để giải quyết vấn đề CNTT', null],
+  ['PLO3', 'PI3.2', 6, 3, 0.50, 0.60, 'Áp dụng chiến lược học tập hiệu quả', null],
+  ['PLO4', 'PI4.1', 7, 3, 0.30, 0.60, 'Thiết lập môi trường làm việc nhóm hiệu quả', null],
+  ['PLO4', 'PI4.2', 8, 3, 0.30, 0.60, 'Vận dụng phương pháp làm việc nhóm', null],
+  ['PLO4', 'PI4.3', 9, 3, 0.40, 0.60, 'Thể hiện trách nhiệm và đóng góp vào thành công của nhóm', null],
+  ['PLO5', 'PI5.1', 10, 3, 0.30, 0.60, 'Truyền đạt nội dung công việc bằng văn bản', null],
+  ['PLO5', 'PI5.2', 11, 4, 0.30, 0.60, 'Truyền đạt hiểu biết bằng lời nói', null],
+  ['PLO5', 'PI5.3', 12, 4, 0.40, 0.60, 'Đọc, hiểu, viết bằng tiếng Anh trong CNTT', null],
+  ['PLO6', 'PI6.1', 13, 4, 0.30, 0.60, 'Thiết lập yêu cầu, xác định chức năng', null],
+  ['PLO6', 'PI6.2', 14, 6, 0.40, 0.60, 'Phân tích, thiết kế và cài đặt bài toán', null],
+  ['PLO6', 'PI6.3', 15, 5, 0.30, 0.60, 'Đánh giá giải pháp theo yêu cầu bài toán', null],
+  ['PLO7', 'PI7.1', 16, 6, 0.50, 0.60, 'Áp dụng công nghệ phần mềm, HTTT, AI để tạo giải pháp', null],
+  ['PLO7', 'PI7.2', 17, 6, 0.50, 0.60, 'Áp dụng công nghệ mạng máy tính để tạo giải pháp', null]
 ];
 const piId = {};
 PIS.forEach(function (p) {
   piId[p[1]] = seed('pis', { programVersionId: pvId, code: p[1] }, {
     ploId: ploId[p[0]], displayOrder: p[2], nameOriginalTerm: 'Performance index',
-    contentOriginal: null, contentShort: p[4], capabilityLevelRaw: p[3], targetPassRate: null,
-    verification: { status: 'NEEDS_CLARIFICATION', verifiedBy: null, verifiedAt: null,
-                    note: p[5] ? (p[5] + ' ' + PLO_NOTE) : PLO_NOTE },
-    reviewNote: p[5]
+    contentOriginal: null, contentShort: p[6], capabilityLevelRaw: p[3],
+    weight: p[4], passThreshold: p[5],
+    verification: { status: 'UNVERIFIED', verifiedBy: null, verifiedAt: null,
+                    note: p[7] ? (p[7] + ' ' + PLO_NOTE) : PLO_NOTE },
+    reviewNote: p[7]
   });
 });
 
-// 4.4 Học phần OOP và dòng ma trận ở trang 46 (Phụ lục II)
+// 4.3 Học phần OOP và dòng ma trận ở trang 46 (Phụ lục II)
 const oopId = seed('courses', { code: 'OOPR230279' }, { name: 'Lập trình hướng đối tượng', credits: null });
 [['PI1.2', 'R'], ['PI6.1', 'R'], ['PI6.2', 'I'], ['PI7.1', 'R']].forEach(function (r) {
   seed('course_pi_contributions', { programVersionId: pvId, courseId: oopId, piId: piId[r[0]] }, {
     contribution: r[1],
-    verification: { status: 'NEEDS_CLARIFICATION', verifiedBy: null, verifiedAt: null,
-                    note: 'Chép theo ví dụ trong tài liệu hướng dẫn; cần đối chiếu lại trang 46 của bản CTĐT.' }
+    verification: { status: 'UNVERIFIED', verifiedBy: null, verifiedAt: null,
+                    note: 'Chép theo ví dụ trong tài liệu hướng dẫn; đối chiếu bản CTĐT.' }
   });
 });
 
-// 4.5 Quy tắc đo lường: khung bản nháp, chưa có công thức/ngưỡng chính thức
-seed('measurement_rules', { code: 'QT-PDBCL-DLCDR', version: '0.1-DRAFT' }, {
-  status: 'DRAFT', confirmedBy: null, confirmedAt: null,
-  scope: { programVersionId: pvId, courseIds: null },
-  clo: { method: null, defaultPassThreshold: null, minCoverage: null },
-  course: { requireAllCloPass: null, defaultTargetPassRate: null },
-  // BLANK luôn tính 0 (có ghi nhận); cách xử lý ABSENT/MISSING trong mẫu số chờ Khoa (Q13)
-  missingDataPolicy: { blankScoreValue: 0, excludeAbsentFromDenominator: null, excludeMissingFromDenominator: null },
-  // ADR 0011 (Q10): PI suy ra từ CLO; trọng số CLO → PI (clo_pi_links.weight) chờ Q22. ADR 0012 (Q18): không quy đổi I/R/M
-  pi: { method: 'FROM_CLOS', aggregationMethod: null, defaultPassThreshold: null },
-  plo: { method: null, defaultPassThreshold: null, cohortTargetPassRate: null },
-  notes: 'BẢN NHÁP: các ngưỡng, trọng số, mẫu số để trống chờ Khoa xác nhận (Q04, Q12, Q13). Không dùng để kết luận chính thức.'
-});
-
-// 4.7 (Tùy chọn) Dữ liệu MINH HỌA: CLO ví dụ của học phần OOP (Misa.md, mục 4)
+// 4.4 (Tùy chọn) Dữ liệu MINH HỌA: CLO ví dụ của học phần OOP
 if (LOAD_ILLUSTRATIVE_SAMPLE) {
   const syl = seed('syllabi', { courseId: oopId, version: 'ILLUSTRATIVE-DRAFT' }, {
     effectiveFromTermId: null, effectiveToTermId: null, status: 'DRAFT',
     verification: { status: 'UNVERIFIED', verifiedBy: null, verifiedAt: null,
-                    note: 'ĐỀ CƯƠNG MINH HỌA, không phải đề cương chính thức. Thay bằng đề cương thật khi Khoa cung cấp (Q02).' }
+                    note: 'ĐỀ CƯƠNG MINH HỌA, không phải đề cương chính thức.' }
   });
   [
     ['CLO1', 'Giải thích đóng gói, kế thừa và đa hình bằng ví dụ lập trình', 2],
@@ -781,12 +606,12 @@ if (LOAD_ILLUSTRATIVE_SAMPLE) {
   ].forEach(function (c) {
     seed('clos', { syllabusId: syl, code: c[0] }, {
       courseId: oopId, contentOriginal: c[1], bloomLevel: c[2], bloomNote: 'Mức Bloom do người soạn đề xuất (minh họa).',
-      measurement: null,
+      measurement: { defaultPassThreshold: 0.60 },
       verification: { status: 'UNVERIFIED', verifiedBy: null, verifiedAt: null,
                       note: 'CLO MINH HỌA do người hướng dẫn đề xuất, không phải CLO chính thức.' }
     });
   });
-  print('>>> Đã nạp dữ liệu MINH HỌA (đề cương + 4 CLO của OOP');
+  print('>>> Đã nạp dữ liệu MINH HỌA (đề cương + 4 CLO của OOP)');
 }
 
 // ----------------------------------------------------------------------------
@@ -794,7 +619,7 @@ if (LOAD_ILLUSTRATIVE_SAMPLE) {
 // ----------------------------------------------------------------------------
 print('>>> Số document khởi tạo:');
 ['programs', 'program_versions', 'plos', 'pis', 'courses',
- 'course_pi_contributions', 'measurement_rules', 'syllabi', 'clos', 'question_banks', 'questions'].forEach(function (n) {
+ 'course_pi_contributions', 'syllabi', 'clos'].forEach(function (n) {
   print('      ' + n + ': ' + d.getCollection(n).countDocuments({}));
 });
 print('>>> HOÀN TẤT. Tổng số collection: ' + d.getCollectionNames().length);

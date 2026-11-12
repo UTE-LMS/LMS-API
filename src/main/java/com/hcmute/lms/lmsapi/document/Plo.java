@@ -48,6 +48,9 @@ public class Plo {
   @Field("capabilityLevelRaw")
   private Integer capabilityLevelRaw;
 
+  @Field("passThreshold")
+  private Double passThreshold;
+
   @Field("verification")
   private Verification verification;
 

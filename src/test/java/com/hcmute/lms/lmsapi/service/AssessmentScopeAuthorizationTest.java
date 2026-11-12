@@ -35,7 +35,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("canAccessAssessment/canReviewAssessment (F04, NEW-01)")
+@DisplayName("canAccessAssessment (F04)")
 class AssessmentScopeAuthorizationTest {
 
   private static final String COURSE_ID = "671dcba5f123456789abc101";
@@ -158,47 +158,5 @@ class AssessmentScopeAuthorizationTest {
         .isFalse();
     assertThat(service.canAccessAssessment(principal(Role.ADMIN), " ", AccessType.READ)).isFalse();
     assertThat(service.canAccessAssessment(principal(Role.ADMIN), null, AccessType.READ)).isFalse();
-  }
-
-  @Test
-  @DisplayName(
-      "canReviewAssessment: chỉ DEPARTMENT_HEAD có học phần của đề cương trong scope.courseIds")
-  void onlyDepartmentHeadInScopeMayReview() {
-    assertThat(
-            service.canReviewAssessment(
-                principal(Role.DEPARTMENT_HEAD, COURSE_ID), SECTION_ASSESSMENT_ID))
-        .isTrue();
-    assertThat(
-            service.canReviewAssessment(
-                principal(Role.DEPARTMENT_HEAD, "671dcba5f123456789abc999"), SECTION_ASSESSMENT_ID))
-        .isFalse();
-    for (Role role :
-        List.of(
-            Role.ADMIN,
-            Role.LECTURER,
-            Role.PROGRAM_MANAGER,
-            Role.QA_OFFICER,
-            Role.VIEWER,
-            Role.STUDENT)) {
-      assertThat(service.canReviewAssessment(principal(role, COURSE_ID), SECTION_ASSESSMENT_ID))
-          .as("role %s", role)
-          .isFalse();
-    }
-  }
-
-  @Test
-  @DisplayName(
-      "canReviewAssessment: khung không được duyệt; thiếu tham số hoặc không tồn tại -> false")
-  void reviewFailClosed() {
-    UserPrincipal head = principal(Role.DEPARTMENT_HEAD, COURSE_ID);
-    assertThat(service.canReviewAssessment(head, TEMPLATE_ID)).isFalse();
-    assertThat(service.canReviewAssessment(null, SECTION_ASSESSMENT_ID)).isFalse();
-    assertThat(service.canReviewAssessment(head, null)).isFalse();
-    assertThat(service.canReviewAssessment(head, " ")).isFalse();
-    assertThat(
-            service.canReviewAssessment(
-                UserPrincipal.builder().id(USER_ID).roleAssignments(null).build(),
-                SECTION_ASSESSMENT_ID))
-        .isFalse();
   }
 }

@@ -3,9 +3,7 @@ package com.hcmute.lms.lmsapi.service.impl;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.hcmute.lms.lmsapi.document.ImportColumnMapping;
-import com.hcmute.lms.lmsapi.enums.EmptyCellAs;
 import com.hcmute.lms.lmsapi.enums.ImportErrorType;
-import com.hcmute.lms.lmsapi.enums.ScoreStatus;
 import com.hcmute.lms.lmsapi.util.ScoreCsvParser;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
@@ -16,15 +14,14 @@ import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/**
- * Giá trị kỳ vọng được tính tay từ nội dung CSV nhỏ trong từng test. Dữ liệu là "DỮ LIỆU THỬ
- * NGHIỆM": Q1 tối đa 4 điểm, Q2 tối đa 6 điểm (ví dụ minh họa, không phải cấu hình thật).
- */
-@DisplayName("F05b: ScoreRowValidator kiểm tra từng dòng điểm (US-22, US-23)")
+/** Giá trị kỳ vọng được tính tay từ nội dung CSV nhỏ trong từng test (ADR 0014, v0.7). */
+@DisplayName("F05b: ScoreRowValidator kiểm tra từng dòng điểm")
 class ScoreRowValidatorTest {
 
   private static final String ITEM_Q1 = "aaaaaaaaaaaaaaaaaaaaaaa1";
   private static final String ITEM_Q2 = "aaaaaaaaaaaaaaaaaaaaaaa2";
+  private static final String CLO_1 = "ccccccccccccccccccccccc1";
+  private static final String CLO_2 = "ccccccccccccccccccccccc2";
 
   private final ScoreRowValidator validator = new ScoreRowValidator();
   private final Map<String, String> enrolled = new HashMap<>();
@@ -34,8 +31,8 @@ class ScoreRowValidatorTest {
       ImportColumnMapping.builder().studentColumn("studentRef").build();
   private final List<ScoreRowValidator.Column> columns =
       List.of(
-          new ScoreRowValidator.Column(1, "Q1", ITEM_Q1, 4.0),
-          new ScoreRowValidator.Column(2, "Q2", ITEM_Q2, 6.0));
+          new ScoreRowValidator.Column(1, "Q1", ITEM_Q1, CLO_1, 4.0),
+          new ScoreRowValidator.Column(2, "Q2", ITEM_Q2, CLO_2, 6.0));
 
   ScoreRowValidatorTest() {
     enrolled.put("S1", "id-s1");
@@ -43,24 +40,18 @@ class ScoreRowValidatorTest {
     enrolled.put("S3", "id-s3");
   }
 
-  private ScoreRowValidator.Result run(String csv, EmptyCellAs emptyCellAs) {
+  private ScoreRowValidator.Result run(String csv) {
     return validator.validate(
         ScoreCsvParser.parse(csv.getBytes(StandardCharsets.UTF_8)),
         0,
         mapping,
         columns,
         enrolled,
-        existing,
-        emptyCellAs);
-  }
-
-  private ScoreRowValidator.Result run(String csv) {
-    return run(csv, EmptyCellAs.MISSING);
+        existing);
   }
 
   @Test
-  @DisplayName(
-      "US-22: điểm đúng bằng maxScore là hợp lệ; 0 gõ rõ ràng là SCORED 0, không phải BLANK")
+  @DisplayName("US-22: điểm đúng bằng maxScore là hợp lệ; 0 gõ rõ ràng là 0.0")
   void scoresAtBoundaryAreValid() {
     ScoreRowValidator.Result result = run("studentRef,Q1,Q2\nS1,4,6\nS2,0,5.5\n");
 
@@ -69,10 +60,10 @@ class ScoreRowValidatorTest {
     assertThat(result.errorRows()).isZero();
     assertThat(result.drafts())
         .containsExactly(
-            new ScoreRowValidator.Draft(2, "id-s1", ITEM_Q1, ScoreStatus.SCORED, 4.0, 4.0),
-            new ScoreRowValidator.Draft(2, "id-s1", ITEM_Q2, ScoreStatus.SCORED, 6.0, 6.0),
-            new ScoreRowValidator.Draft(3, "id-s2", ITEM_Q1, ScoreStatus.SCORED, 0.0, 4.0),
-            new ScoreRowValidator.Draft(3, "id-s2", ITEM_Q2, ScoreStatus.SCORED, 5.5, 6.0));
+            new ScoreRowValidator.Draft(2, "id-s1", ITEM_Q1, CLO_1, 4.0, 4.0),
+            new ScoreRowValidator.Draft(2, "id-s1", ITEM_Q2, CLO_2, 6.0, 6.0),
+            new ScoreRowValidator.Draft(3, "id-s2", ITEM_Q1, CLO_1, 0.0, 4.0),
+            new ScoreRowValidator.Draft(3, "id-s2", ITEM_Q2, CLO_2, 5.5, 6.0));
   }
 
   @Test
@@ -86,7 +77,6 @@ class ScoreRowValidatorTest {
             new ScoreRowValidator.RowError(
                 2, "Q1", ImportErrorType.SCORE_OUT_OF_RANGE, "4.01", "Điểm vượt điểm tối đa 4"));
     assertThat(result.errorRows()).isEqualTo(1);
-    // Dòng lỗi không sinh điểm nào (kể cả ô Q2 hợp lệ); dòng 3 đúng không bị báo nhầm.
     assertThat(result.drafts()).extracting(ScoreRowValidator.Draft::sourceRow).containsOnly(3);
   }
 
@@ -109,7 +99,6 @@ class ScoreRowValidatorTest {
     ScoreRowValidator.Result comma = run("studentRef;Q1;Q2\nS1;3,5;6\n");
     assertThat(comma.errors()).isEmpty();
     assertThat(comma.drafts().get(0).rawScore()).isEqualTo(3.5);
-    // 4,01 > 4 (dấu phẩy là dấu thập phân khi tệp dùng chấm phẩy làm phân cách)
     assertThat(run("studentRef;Q1;Q2\nS1;4,01;6\n").errors())
         .singleElement()
         .extracting("errorType")
@@ -117,22 +106,14 @@ class ScoreRowValidatorTest {
   }
 
   @Test
-  @DisplayName(
-      "US-23/AC-1: ô trống + BLANK -> BLANK điểm 0; ô trống + MISSING -> MISSING điểm null; hai trạng thái khác nhau")
+  @DisplayName("US-23/AC-1: ô trống tự động gán rawScore = 0.0 theo chuẩn v0.7")
   void emptyCellFollowsChosenPolicy() {
     String csv = "studentRef,Q1,Q2\nS1,,6\n";
 
-    ScoreRowValidator.Draft asBlank = run(csv, EmptyCellAs.BLANK).drafts().get(0);
-    ScoreRowValidator.Draft asMissing = run(csv, EmptyCellAs.MISSING).drafts().get(0);
-
-    assertThat(asBlank.status()).isEqualTo(ScoreStatus.BLANK);
+    ScoreRowValidator.Draft asBlank = run(csv).drafts().get(0);
     assertThat(asBlank.rawScore()).isEqualTo(0.0);
-    assertThat(asMissing.status()).isEqualTo(ScoreStatus.MISSING);
-    assertThat(asMissing.rawScore()).isNull();
-    assertThat(asMissing.maxScore()).isEqualTo(4.0);
-    // Ô có điểm không bị ảnh hưởng bởi chính sách ô trống.
-    assertThat(run(csv, EmptyCellAs.MISSING).drafts().get(1).status())
-        .isEqualTo(ScoreStatus.SCORED);
+    assertThat(asBlank.maxScore()).isEqualTo(4.0);
+    assertThat(run(csv).drafts().get(1).rawScore()).isEqualTo(6.0);
   }
 
   @Test
@@ -163,7 +144,7 @@ class ScoreRowValidatorTest {
 
   @Test
   @DisplayName(
-      "US-22/AC-2: mã sinh viên trống, lạ/không ghi danh, trùng trong tệp -> đúng loại lỗi, dòng đầu của cặp trùng vẫn hợp lệ")
+      "US-22/AC-2: mã sinh viên trống, lạ/không ghi danh, trùng trong tệp -> đúng loại lỗi")
   void studentCodeErrors() {
     ScoreRowValidator.Result result = run("studentRef,Q1,Q2\n,4,6\nS9,4,6\nS1,4,6\nS1,3,5\n");
 
@@ -185,10 +166,9 @@ class ScoreRowValidatorTest {
   }
 
   @Test
-  @DisplayName(
-      "US-23/AC-2: (sinh viên, câu) đã có điểm -> DUPLICATE_RECORD ở đúng cột, cả dòng bị loại, điểm cũ không bị đụng")
+  @DisplayName("US-23/AC-2: (sinh viên, câu, CLO) đã có điểm -> DUPLICATE_RECORD")
   void existingScoreIsRejectedByPolicy() {
-    existing.add(ScoreRowValidator.key("id-s1", ITEM_Q2));
+    existing.add(ScoreRowValidator.key("id-s1", ITEM_Q2, CLO_2));
 
     ScoreRowValidator.Result result = run("studentRef,Q1,Q2\nS1,4,6\nS2,1,2\n");
 
@@ -200,7 +180,6 @@ class ScoreRowValidatorTest {
               assertThat(error.column()).isEqualTo("Q2");
               assertThat(error.errorType()).isEqualTo(ImportErrorType.DUPLICATE_RECORD);
               assertThat(error.rawValue()).isEqualTo("6");
-              assertThat(error.message()).contains("REJECT_ON_CONFLICT");
             });
     assertThat(result.drafts())
         .extracting(ScoreRowValidator.Draft::studentId)
@@ -224,14 +203,13 @@ class ScoreRowValidatorTest {
 
   @Test
   @DisplayName(
-      "US-22/AC-3 (biên): 1 lỗi trong 1.000 dòng -> đúng 1 lỗi ở dòng 501, 999 dòng hợp lệ không bị báo nhầm")
+      "US-22/AC-3 (biên): 1 lỗi trong 1.000 dòng -> đúng 1 lỗi ở dòng 501, 999 dòng hợp lệ")
   void oneErrorInAThousandRows() {
     List<ScoreRowValidator.Column> single = List.of(columns.get(0));
     StringBuilder csv = new StringBuilder("studentRef,Q1\n");
     Map<String, String> many = new HashMap<>();
     for (int i = 1; i <= 1000; i++) {
       many.put("R" + i, "id-r" + i);
-      // Dòng dữ liệu thứ 500 nằm ở dòng 501 của tệp (dòng 1 là tiêu đề); điểm 4,01 > 4.
       csv.append("R").append(i).append(',').append(i == 500 ? "4.01" : "3").append('\n');
     }
 
@@ -242,8 +220,7 @@ class ScoreRowValidatorTest {
             mapping,
             single,
             many,
-            existing,
-            EmptyCellAs.MISSING);
+            existing);
 
     assertThat(result.totalRows()).isEqualTo(1000);
     assertThat(result.errorRows()).isEqualTo(1);
@@ -253,7 +230,7 @@ class ScoreRowValidatorTest {
 
   @Test
   @DisplayName(
-      "US-24 (ví dụ minh họa): lớp 45 ghi danh, tệp chỉ có 40 dòng -> 40 điểm, 5 sinh viên không có điểm và không bị báo lỗi")
+      "US-24: lớp 45 ghi danh, tệp chỉ có 40 dòng -> 40 điểm, 5 sinh viên không có điểm và không bị báo lỗi")
   void enrolledStudentsAbsentFromTheFileGetNoScores() {
     List<ScoreRowValidator.Column> single = List.of(columns.get(0));
     Map<String, String> classOf45 = new HashMap<>();
@@ -272,8 +249,7 @@ class ScoreRowValidatorTest {
             mapping,
             single,
             classOf45,
-            existing,
-            EmptyCellAs.BLANK);
+            existing);
 
     assertThat(result.errors()).isEmpty();
     assertThat(result.drafts()).hasSize(40);

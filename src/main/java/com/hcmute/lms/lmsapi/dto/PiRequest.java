@@ -51,6 +51,16 @@ public class PiRequest {
   @DecimalMax(value = "1.0", message = "Tỷ lệ đạt mục tiêu phải từ 0 đến 1")
   private Double targetPassRate;
 
+  @NotNull(message = "Trọng số (weight) không được để trống")
+  @DecimalMin(value = "0.0", inclusive = false, message = "Trọng số phải lớn hơn 0")
+  @DecimalMax(value = "1.0", message = "Trọng số không được vượt quá 1")
+  private Double weight;
+
+  @NotNull(message = "Ngưỡng đạt (passThreshold) không được để trống")
+  @DecimalMin(value = "0.0", inclusive = false, message = "Ngưỡng đạt phải lớn hơn 0")
+  @DecimalMax(value = "1.0", message = "Ngưỡng đạt không được vượt quá 1")
+  private Double passThreshold;
+
   @Size(max = 2000, message = "Ghi chú rà soát tối đa 2000 ký tự")
   private String reviewNote;
 }

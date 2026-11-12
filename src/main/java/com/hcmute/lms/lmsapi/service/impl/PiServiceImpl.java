@@ -72,6 +72,8 @@ public class PiServiceImpl implements PiService {
             .contentShort(request.getContentShort())
             .capabilityLevelRaw(request.getCapabilityLevelRaw())
             .targetPassRate(request.getTargetPassRate())
+            .weight(request.getWeight())
+            .passThreshold(request.getPassThreshold())
             .verification(
                 Verification.builder().status(VerificationStatus.NEEDS_CLARIFICATION).build())
             .reviewNote(request.getReviewNote())
@@ -106,6 +108,8 @@ public class PiServiceImpl implements PiService {
     pi.setContentShort(request.getContentShort());
     pi.setCapabilityLevelRaw(request.getCapabilityLevelRaw());
     pi.setTargetPassRate(request.getTargetPassRate());
+    pi.setWeight(request.getWeight());
+    pi.setPassThreshold(request.getPassThreshold());
     pi.setReviewNote(request.getReviewNote());
 
     try {

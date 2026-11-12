@@ -1,7 +1,6 @@
 # ADR 0011 — PI suy ra từ kết quả CLO; câu hỏi/tiêu chí chỉ gán CLO (Q10)
 
-- **Trạng thái:** ĐÃ CHẤP NHẬN (ACCEPTED) theo **quyết định của nhóm sinh viên** ngày 2026-11-06.
-  **Chưa có xác nhận của GVHD/Khoa**; nếu GVHD/Khoa yêu cầu khác thì viết ADR mới thay thế.
+- **Trạng thái:** ĐÃ CHẤP NHẬN (ACCEPTED) ngày 2026-11-06; **cập nhật bởi [ADR 0013](file:///D:/Code/Project/LMS-API/doc/adr/0013-import-ctdt-de-cuong-va-nhap-diem-clo-truc-tiep.md) ngày 2026-11-10** (`outcomeMappings[]` đổi từ `{ cloId, weight }` sang `{ cloId, maxScore }`, bỏ 3 collections ngân hàng câu hỏi).
 - **Ngày:** 2026-11-06
 - **Người soạn:** Antigravity theo yêu cầu của sinh viên Minh (`minhat5`); sinh viên rà soát và chốt: [ĐIỀN]
 - **Thay thế:** câu trả lời tạm cũ của Q10 (`pi.method = DIRECT_FROM_ITEMS`, PI gán trực tiếp cho từng câu hỏi)

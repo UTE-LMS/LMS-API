@@ -10,7 +10,6 @@ import com.hcmute.lms.lmsapi.document.Assessment;
 import com.hcmute.lms.lmsapi.document.CourseSection;
 import com.hcmute.lms.lmsapi.document.UserScope;
 import com.hcmute.lms.lmsapi.enums.AssessmentStatus;
-import com.hcmute.lms.lmsapi.enums.DataGranularity;
 import com.hcmute.lms.lmsapi.enums.Role;
 import com.hcmute.lms.lmsapi.enums.SectionStatus;
 import com.hcmute.lms.lmsapi.enums.TermStatus;
@@ -60,7 +59,6 @@ class ImportBatchUploadIntegrationTest extends ScoreImportIntegrationBase {
             .andExpect(jsonPath("$.fileName").value("scores.csv"))
             .andExpect(jsonPath("$.fileChecksum").value(sha256(csv)))
             .andExpect(jsonPath("$.sourceSystem").value("CSV"))
-            .andExpect(jsonPath("$.emptyCellAs").value("MISSING"))
             .andExpect(jsonPath("$.reimportPolicy").value("REJECT_ON_CONFLICT"))
             .andExpect(jsonPath("$.uploadedBy").value(lecturer.getId()))
             .andExpect(jsonPath("$.stats").doesNotExist())
@@ -164,7 +162,7 @@ class ImportBatchUploadIntegrationTest extends ScoreImportIntegrationBase {
     String csv = goodCsv();
     String id = uploadAndValidate(csv, "MISSING");
     mockMvc.perform(postAction(lecturerToken, id, "confirm")).andExpect(status().isOk());
-    Assessment second = fixtures.sectionAssessment(section, AssessmentStatus.APPROVED, 4, 6);
+    Assessment second = fixtures.sectionAssessment(section, AssessmentStatus.LOCKED, 4, 6);
     String mapping =
         "{\"items\":[{\"column\":\"Q1\",\"item\":\""
             + second.getItems().get(0).getId()
@@ -177,13 +175,10 @@ class ImportBatchUploadIntegrationTest extends ScoreImportIntegrationBase {
         .andExpect(status().isCreated());
   }
 
-  @ParameterizedTest
-  @EnumSource(
-      value = AssessmentStatus.class,
-      names = {"DRAFT", "SUBMITTED", "REJECTED", "LOCKED"})
-  @DisplayName("US-21/AC-4: bài chưa APPROVED/SCORE_ENTERED (hoặc đã LOCKED) -> 422, không tạo lô")
-  void us21_ac4_assessmentNotOpenForScores(AssessmentStatus status) throws Exception {
-    Assessment closed = fixtures.sectionAssessment(section, status, 4, 6);
+  @Test
+  @DisplayName("US-21/AC-4: bài DRAFT chưa LOCKED -> 422, không tạo lô")
+  void us21_ac4_assessmentNotOpenForScores() throws Exception {
+    Assessment closed = fixtures.sectionAssessment(section, AssessmentStatus.DRAFT, 4, 6);
     String mapping =
         "{\"items\":[{\"column\":\"Q1\",\"item\":\"" + closed.getItems().get(0).getId() + "\"}]}";
 
@@ -192,15 +187,14 @@ class ImportBatchUploadIntegrationTest extends ScoreImportIntegrationBase {
             uploadTo(lecturerToken, section.getId(), closed.getId(), goodCsv(), "MISSING", mapping))
         .andExpect(status().isUnprocessableEntity())
         .andExpect(jsonPath("$.code").value("BUSINESS_RULE_VIOLATION"))
-        .andExpect(jsonPath("$.message").value(containsString(status.name())));
+        .andExpect(jsonPath("$.message").value(containsString("DRAFT")));
 
     assertThat(countBatches()).isZero();
   }
 
   @Test
-  @DisplayName(
-      "US-21/AC-4: bài SCORE_ENTERED vẫn nhận lô mới (nhập thêm), bài TOTAL_ONLY thì không")
-  void us21_ac4_scoreEnteredAllowedTotalOnlyRejected() throws Exception {
+  @DisplayName("US-21/AC-4: bài SCORE_ENTERED vẫn nhận lô mới (nhập thêm)")
+  void us21_ac4_scoreEnteredAllowed() throws Exception {
     Assessment entered = fixtures.sectionAssessment(section, AssessmentStatus.SCORE_ENTERED, 4, 6);
     String mapping =
         "{\"items\":[{\"column\":\"Q1\",\"item\":\"" + entered.getItems().get(0).getId() + "\"}]}";
@@ -209,13 +203,6 @@ class ImportBatchUploadIntegrationTest extends ScoreImportIntegrationBase {
             uploadTo(
                 lecturerToken, section.getId(), entered.getId(), goodCsv(), "MISSING", mapping))
         .andExpect(status().isCreated());
-
-    assessment.setDataGranularity(DataGranularity.TOTAL_ONLY);
-    mongo().save(assessment);
-    mockMvc
-        .perform(upload(lecturerToken, goodCsv(), "MISSING", defaultMapping()))
-        .andExpect(status().isUnprocessableEntity())
-        .andExpect(jsonPath("$.message").value(containsString("TOTAL_ONLY")));
   }
 
   @ParameterizedTest
@@ -257,7 +244,7 @@ class ImportBatchUploadIntegrationTest extends ScoreImportIntegrationBase {
   @DisplayName("US-21: bài của lớp khác hoặc không tồn tại -> 404; id sai định dạng -> 400")
   void us21_assessmentMustBelongToSection() throws Exception {
     CourseSection otherSection = fixtures.section(section.getCourseId(), List.of(lecturer.getId()));
-    Assessment foreign = fixtures.sectionAssessment(otherSection, AssessmentStatus.APPROVED, 4);
+    Assessment foreign = fixtures.sectionAssessment(otherSection, AssessmentStatus.LOCKED, 4);
 
     mockMvc
         .perform(
@@ -292,22 +279,14 @@ class ImportBatchUploadIntegrationTest extends ScoreImportIntegrationBase {
   }
 
   @Test
-  @DisplayName(
-      "US-23/AC-1: thiếu emptyCellAs hoặc giá trị lạ -> 400 (hệ thống không đoán ô trống); thiếu reimportPolicy -> 400")
-  void us23_ac1_emptyCellPolicyIsMandatory() throws Exception {
-    mockMvc
-        .perform(upload(lecturerToken, goodCsv(), null, defaultMapping()))
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
-    mockMvc
-        .perform(upload(lecturerToken, goodCsv(), "ZERO", defaultMapping()))
-        .andExpect(status().isBadRequest());
+  @DisplayName("US-23/AC-2: thiếu reimportPolicy -> 400")
+  void us23_ac2_reimportPolicyIsMandatory() throws Exception {
     mockMvc
         .perform(
             rawUpload(lecturerToken, section.getId(), assessment.getId(), goodCsv())
-                .param("emptyCellAs", "BLANK")
                 .param("columnMapping", defaultMapping()))
-        .andExpect(status().isBadRequest());
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
 
     assertThat(countBatches()).isZero();
   }
@@ -390,7 +369,7 @@ class ImportBatchUploadIntegrationTest extends ScoreImportIntegrationBase {
                 + "{\"column\":\"Q2\",\"item\":\""
                 + itemId(0)
                 + "\"}]}"),
-        400,
+        422,
         "nhiều cột");
     assertRejected(
         upload(
@@ -423,19 +402,19 @@ class ImportBatchUploadIntegrationTest extends ScoreImportIntegrationBase {
   }
 
   @Test
-  @DisplayName(
-      "US-21: ánh xạ hai cột cùng khớp một externalRef trùng (nhập nhằng) -> 422 yêu cầu dùng _id")
-  void us21_ambiguousExternalRef() throws Exception {
-    assessment.getItems().get(1).setExternalRef(externalRef(0));
-    mongo().save(assessment);
-
+  @DisplayName("US-21: ánh xạ hai cột cùng khớp một câu hỏi -> 422")
+  void us21_duplicateItemMapping() throws Exception {
     mockMvc
         .perform(
             upload(
                 lecturerToken,
                 goodCsv(),
                 "BLANK",
-                "{\"items\":[{\"column\":\"Q1\",\"item\":\"" + externalRef(0) + "\"}]}"))
+                "{\"items\":[{\"column\":\"Q1\",\"item\":\""
+                    + itemId(0)
+                    + "\"},{\"column\":\"Q2\",\"item\":\""
+                    + itemId(0)
+                    + "\"}]}"))
         .andExpect(status().isUnprocessableEntity())
         .andExpect(jsonPath("$.message").value(containsString("nhiều")));
   }

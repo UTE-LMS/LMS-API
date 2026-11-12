@@ -444,7 +444,8 @@ class DemoDataSeederTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.verification.status").value("VERIFIED"));
 
-    PloRequest newPlo = PloRequest.builder().code("PLO3").displayOrder(3).build();
+    PloRequest newPlo =
+        PloRequest.builder().code("PLO3").displayOrder(3).passThreshold(0.5).build();
     mockMvc
         .perform(
             post("/api/v1/program-versions/{v}/plos", version.getId())

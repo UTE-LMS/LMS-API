@@ -29,6 +29,7 @@ public class PloMapperImpl implements PloMapper {
         .contentOriginal(plo.getContentOriginal())
         .contentSummary(plo.getContentSummary())
         .capabilityLevelRaw(plo.getCapabilityLevelRaw())
+        .passThreshold(plo.getPassThreshold())
         .verification(verificationMapper.toResponse(plo.getVerification()))
         .reviewNote(plo.getReviewNote())
         .build();

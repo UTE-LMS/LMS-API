@@ -57,12 +57,6 @@ public interface ScopeAuthorizationService {
    */
   boolean canAccessImportBatch(UserPrincipal principal, String batchId, AccessType accessType);
 
-  /**
-   * Quyền duyệt/từ chối ma trận bài đánh giá bản lớp (NEW-01): chỉ DEPARTMENT_HEAD có học phần của
-   * đề cương trong {@code scope.courseIds}. ADMIN không có quyền này.
-   */
-  boolean canReviewAssessment(UserPrincipal principal, String assessmentId);
-
   boolean canAccessProgram(UserPrincipal principal, String programId, AccessType accessType);
 
   boolean canAccessProgramVersion(

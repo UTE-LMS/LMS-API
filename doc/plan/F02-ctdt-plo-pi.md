@@ -43,12 +43,12 @@ Quản lý khung chuẩn đầu ra cấp chương trình: chương trình, phiê
 6. **I/R/M ≠ trọng số.** `course_pi_contributions` chỉ là thiết kế sư phạm; cấm ánh xạ I=1, R=2, M=3. Ô trống của ma trận = **không có bản ghi**.
 7. `targetPassRate` là mục tiêu cấp lớp/khóa của PI, để `null` cho tới khi Khoa xác nhận; không đặt mặc định.
 8. `program_versions.applicableCohorts` để trống tới khi trả lời Q01.
-9. **Người xác nhận nội dung là `QA_OFFICER`** **[ĐỀ XUẤT, chờ Q08; xem ADR 0004]**: chỉ `QA_OFFICER` được đổi
+9. **Người xác nhận nội dung là `QA_OFFICER`** **[ADR 0004]**: chỉ `QA_OFFICER` được đổi
    `verification.status` của `program_versions`, `plos`, `pis`. `PROGRAM_MANAGER` soạn nội dung nhưng không tự xác nhận
    (tách người soạn khỏi người xác nhận). `ADMIN` không có quyền này.
-10. **Quyền khởi tạo danh mục CTĐT thuộc `ADMIN`** **[ĐỀ XUẤT; xem ADR 0005]**: `POST/PUT /api/v1/programs` do `ADMIN`
-    thực hiện. `PROGRAM_MANAGER` quản lý các phiên bản `program_versions`, `plos`, `pis`, `course_pi_contributions`
-    trong phạm vi `scope.programIds` được giao (kiểm tra `canAccessProgram` / `canAccessProgramVersion`, fail-closed).
+10. **Quyền khởi tạo danh mục CTĐT và Import CTĐT (Phương án R1 — ADR 0013):** `POST/PUT /api/v1/programs` do `ADMIN`
+    thực hiện (ADR 0005). `PROGRAM_MANAGER` quản lý các phiên bản `program_versions`, `plos`, `pis`, `course_pi_contributions`
+    trong phạm vi `scope.programIds` được giao và có thể thực hiện **Import Bản mô tả CTĐT** (`POST /api/v1/program-versions/{pvId}/import-specification`) để khởi tạo đồng bộ PLO, PI, học phần (`courses`), vị trí học phần (`program_courses`) và ma trận đóng góp `course_pi_contributions` ($I/R/M$).
 
 ## 5. Stories và acceptance criteria (nháp)
 

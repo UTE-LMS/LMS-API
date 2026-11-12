@@ -75,10 +75,10 @@ Cách chạy cục bộ (theo `README.md`): bật MongoDB replica set bằng ima
   test đo lường đặt tên fixture "ví dụ minh họa", giá trị kỳ vọng tính tay độc lập và ghi cách tính.
 - Dữ liệu khởi tạo của `database_import.js` (7 PLO, 17 PI, quy tắc đo lường nháp) là dữ liệu nạp mặc định; test API không
   được phụ thuộc vào việc nó đã có (plan F02 §9).
-- Ca âm và ca biên bắt buộc cho miền này (rule 04): điểm > điểm tối đa; `BLANK` ≠ `MISSING`/`ABSENT`; trùng
-  `(sectionId, assessmentId, itemId, studentId)`; tổng `weight` ≠ 1; cặp CLO–PI ngoài `clo_pi_links`; tệp trống/sai
+- Ca âm và ca biên bắt buộc cho miền này (rule 04, cập nhật theo ADR 0013): điểm > `maxScore` của `(itemId, cloId)`; `BLANK` ≠ `MISSING`/`ABSENT`; trùng
+  `(sectionId, assessmentId, itemId, cloId, studentId)`; trùng `cloId` trong cùng một câu hỏi; `maxScore <= 0`; tệp trống/sai
   cột/trùng checksum; quy tắc `DRAFT` không chạy chính thức; lớp 45 ghi danh/40 đủ dữ liệu; người dùng ngoài phạm vi lớp
-  bị từ chối; sửa điểm đồng thời báo xung đột. Phần nhập điểm (F05b US-21…24) đã có test, xem §8.5c; **sửa điểm đồng thời (US-25) và đo lường (F06) chưa có mã để kiểm** — liệt kê để không bị quên.
+  bị từ chối; sửa điểm đồng thời báo xung đột; mở khóa ma trận (`unlock`) khi đã có điểm bị chặn 422. Phần nhập điểm (F05b US-21…24) đã có test và sẽ refactor theo ADR 0014.
 
 ## 6. Tiêu chí vào / ra
 
@@ -246,18 +246,10 @@ vế "từ chối nhập/sửa điểm" của US-18/AC-2 **chưa có test** vì 
 | US-15/AC-2 (Σ weight ≠ 1, CLO trùng, CLO khác đề cương/không tồn tại → 422) | `AIT#us15_ac2_outcomeMappingRules`; `AVT#weightsSummingToOneAreAccepted`, `#weightsNotSummingToOneAreRejected`, `#toleranceIsAccepted`, `#duplicateCloIsRejected`, `#cloMustExistAndBelongToTheSyllabus`, `#duplicateCodeOrIdIsRejected` | Có |
 | US-15/AC-3 (bản lớp thiếu `sectionId` → 400) | Không áp dụng: `sectionId` lấy từ đường dẫn (plan F04 §11 D12) | Không phát sinh |
 | US-15/AC-4 (giảng viên lớp khác → 403) | `AIT#us15_ac4_onlyTheSectionLecturerCreates`, `#templateAuthorizationFollowsAdr0010`; `ASA#sectionAssessmentFollowsSectionAccess`, `#templateFollowsSyllabusAccess`, `#accessFailClosed` | Có |
-| US-15/AC-5 (isLocked → thêm/sửa/xóa phần tử bị từ chối, vẫn đọc được) | `AIT#us15_ac5_lockedAssessmentRejectsStructureChanges`, `#new01_ac1_submit` (đang chờ duyệt cũng khóa sửa) | Có |
-| (ngoài AC) `maxScore ≤ 0`, thiếu `kind`/`outcomeMappings`, Bloom ngoài 1–6, `weight` ngoài (0,1] → 400; trùng mã → 409; `TOTAL_ONLY` | `AIT#us15_validationErrors`, `#us15_duplicateCode`, `#totalOnlyIsFlaggedAsNotMeasurable` | Có test, thiếu AC |
-| US-16/AC-1 (rubric mức 1–4; mức ngoài 1–4 → 400; điểm mức > `maxScore` → 422) | `AIT#us16_ac1_rubricLevels`; `AVT#rubricRules` | Có |
-| US-16/AC-2 (Bloom và mức rubric độc lập) | `AIT#us16_ac2_bloomAndRubricLevelAreIndependent` | Có |
-| NEW-01/AC-1 (gửi duyệt → SUBMITTED, ghi người/giờ gửi, history SUBMIT) | `AIT#new01_ac1_submit`; `AAT#submit_recordsApproval` | Có |
-| NEW-01/AC-2 (0 phần tử hoặc tổng điểm lệch ≥ 0,001 → 422; biên 0,0009 và 0,0011) | `AIT#new01_ac2_submitPreconditions`; `AAT#submit_totalPointsToleranceBoundary`, `#submit_requiresItemsAndTotal` | Có |
-| NEW-01/AC-3 (duyệt → APPROVED, isLocked, reviewedBy/At, history, audit ASSESSMENT_APPROVE) | `AIT#new01_ac3_approve`; `AAT#approve_locksAndAudits` | Có |
-| NEW-01/AC-4 (từ chối kèm ghi chú; thiếu ghi chú → 400; sửa lại → DRAFT rồi gửi lại) | `AIT#new01_ac4_rejectAndResubmit`; `AAT#reject_recordsNote` | Có |
-| NEW-01/AC-5 (vai trò khác, TBM ngoài phạm vi, người gửi tự duyệt → 403) | `AIT#new01_ac5_onlyDepartmentHeadInScopeReviews`, `#new01_ac5_submitterCannotSelfApprove`; `AAT#submitterCannotReviewOwnAssessment`; `ASA#onlyDepartmentHeadInScopeMayReview`, `#reviewFailClosed` | Có |
-| NEW-01/AC-6 (`byClo`, `byBloom` khớp tính tay, ví dụ minh họa 20 điểm) | `AIT#new01_ac6_coverageMatchesHandComputation`; `ACT#handComputedExample`, `#cloPointsSumToTotal`, `#emptyItems` | Có |
-| NEW-01/AC-7 (chuyển trạng thái sai thứ tự → 422) | `AIT#new01_ac7_invalidTransitions`; `AAT#invalidTransitions`, `#templateAndMissing`, `#lockedStatuses` | Có |
-| (plan §8) hai người cùng duyệt một bài, chỉ một người thắng | `AIT#new01_concurrentApprovalHasASingleWinner` (người thua nhận 409 hoặc 422); `WCT#writeConflictIsAConflict` | Có |
+| US-15/AC-5 (isLocked → thêm/sửa/xóa phần tử bị từ chối, vẫn đọc được) | `AIT#us15_ac5_lockedAssessmentRejectsStructureChanges` | Có |
+| (cập nhật theo ADR 0013) `outcomeMappings[].maxScore ≤ 0`, thiếu `outcomeMappings`, trùng `cloId` trong cùng câu hỏi, Bloom ngoài 1–6 → 400; trùng mã → 409 | Cập nhật trong `AssessmentIntegrationTest` và `AssessmentItemValidatorTest` (bỏ US-16 rubric và `totalPoints`/`weight`) | Đang refactor theo ADR 0013 |
+| NEW-01/AC-1..AC-4 (Giảng viên phụ trách lớp tự khóa ma trận `DRAFT -> LOCKED`, `isLocked = true`, ghi `ASSESSMENT_LOCK`; khóa khi `items[]` rỗng → 422; mở khóa `LOCKED -> DRAFT` khi chưa có điểm, ghi `ASSESSMENT_UNLOCK`; người ngoài `lecturerIds` → 403) | Refactor `AssessmentIntegrationTest` & unit test (xóa `AssessmentApprovalServiceImplTest` cũ) | Đang refactor theo ADR 0013 |
+| NEW-01/AC-5 (`byClo`, `byBloom` tính từ `outcomeMappings[].maxScore` khớp tính tay) | `AIT#new01_ac5_coverageMatchesHandComputation`; `ACT#handComputedExample` | Đang refactor theo ADR 0013 |
 
 Chưa có test: sửa CLO sau khi sao chép rồi kiểm snapshot (chỉ kiểm sửa khung, chưa kiểm đổi chính CLO; F03 hiện chặn đổi CLO khi đề cương
 đã `CONFIRMED`); mở khóa (`UNLOCK`) vì chưa có API.

@@ -106,18 +106,18 @@ Backlog: **44 story = 33 Must + 9 Should + 2 Could** (40 story gốc + 4 story m
 
 ---
 
-## 3. Mô hình dữ liệu (MongoDB, 29 collection chính, đã bỏ ml_experiments)
+## 3. Mô hình dữ liệu (MongoDB, 26 collection chính — cập nhật v0.6 theo ADR 0013)
 
-Thiết kế CSDL **v0.5** (cập nhật 2026-10-23 theo `PLO_DB_UPDATE.md`) trong `GiaiThich_CoSoDuLieu.md` là **nguồn ưu tiên** khi các tài liệu lệch nhau. Tóm tắt thay đổi so với v0.4: `GiaiThich_CoSoDuLieu.md` §0.
+Thiết kế CSDL **v0.6** (cập nhật 2026-11-10 theo `ADR 0013` và `dac-ta-thay-doi-nghiep-vu-va-phuong-an-tinh-clo.md`) trong `GiaiThich_CoSoDuLieu.md` là **nguồn ưu tiên** khi các tài liệu lệch nhau. Tóm tắt thay đổi: `GiaiThich_CoSoDuLieu.md` §0.
 
 | Nhóm | Collection | Vai trò |
 |---|---|---|
-| A. Người dùng | `users` | Tài khoản (mật khẩu chỉ lưu băm), `roleAssignments[]` = vai trò (7 giá trị, gồm `DEPARTMENT_HEAD`, `STUDENT`) + phạm vi `{programIds, courseIds, sectionIds}` |
-| B. CTĐT | `programs`, `program_versions`, `plos`, `pis`, `courses`, `program_courses`, `course_pi_contributions` | CTĐT + phiên bản, 7 PLO, 17 PI, học phần, vị trí học phần trong CTĐT, ma trận I/R/M |
-| C. Học phần & CLO | `syllabi`, `clos`, `clo_pi_links` | Đề cương theo phiên bản, CLO (duy nhất trong một đề cương), liên kết CLO–PI |
-| D. Câu hỏi & bài đánh giá | `question_banks`, `question_categories`, `questions`, `assessments` | Danh mục câu hỏi đã thi; bài đánh giá khung (`SYLLABUS_TEMPLATE`) và bản lớp (`SECTION`, chứa `items[]`); bản lớp có trạng thái duyệt `DRAFT/SUBMITTED/APPROVED/REJECTED/SCORE_ENTERED/LOCKED` và `isLocked` (khóa `items` từ `APPROVED`) |
+| A. Người dùng | `users` | Tài khoản (mật khẩu chỉ lưu băm), `roleAssignments[]` = vai trò (7 giá trị) + phạm vi `{programIds, courseIds, sectionIds}` |
+| B. CTĐT | `programs`, `program_versions`, `plos`, `pis`, `courses`, `program_courses`, `course_pi_contributions` | CTĐT + phiên bản, 7 PLO, 17 PI, học phần, vị trí học phần trong CTĐT, ma trận I/R/M (hỗ trợ Import CTĐT theo Phương án R1) |
+| C. Học phần & CLO | `syllabi`, `clos`, `clo_pi_links` | Đề cương theo phiên bản, CLO (duy nhất trong một đề cương), liên kết CLO–PI (hỗ trợ Import Đề cương theo Phương án R1) |
+| D. Bài đánh giá & Ma trận CLO | `assessments` | Đã xóa `question_banks`, `question_categories`, `questions` để bảo mật đề thi. Bài đánh giá khung (`SYLLABUS_TEMPLATE`) và bản lớp (`SECTION`, chứa `items[]` với `outcomeMappings: [{cloId, maxScore}]`); giảng viên tự khóa ma trận (`DRAFT -> LOCKED -> SCORE_ENTERED`) |
 | E. Học kỳ, lớp, sinh viên | `terms`, `course_sections`, `students`, `enrollments` | Học kỳ (OPEN/SCORE_LOCKED/CLOSED), lớp, sinh viên (`studentRef`), ghi danh = **mẫu số** |
-| F. Nhập điểm | `import_batches`, `import_row_errors`, `scores` | Lô nhập, lỗi từng dòng, điểm theo (sinh viên × câu hỏi/tiêu chí) |
+| F. Nhập điểm CLO | `import_batches`, `import_row_errors`, `scores` | Lô nhập, lỗi từng dòng, điểm đạt được trực tiếp theo từng cặp `(sinh viên × bài đánh giá × câu hỏi × CLO)` |
 | G. Đo lường | `measurement_rules`, `calculation_runs`, `student_results`, `aggregate_results` | Quy tắc có phiên bản, lượt tính, kết quả cá nhân (CLO/COURSE/PI/PLO), kết quả tổng hợp |
 | H. Báo cáo, cải tiến | `reports`, `improvement_actions`, `audit_logs` | Báo cáo kèm `limitations`, hành động cải tiến, nhật ký thao tác |
 

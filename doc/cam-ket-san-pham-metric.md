@@ -72,24 +72,24 @@ không tính vào cam kết), **K** = không làm. Cột "Đề xuất" là gợ
 | US-10 | Quản lý đề cương theo phiên bản | C | [ĐIỀN] |
 | US-11 | Quản lý CLO thuộc một đề cương | C | [ĐIỀN] |
 | US-12 | Liên kết CLO–PI và xác nhận | C | [ĐIỀN] |
-| US-13 | Ngân hàng câu hỏi và cây danh mục 3 cấp | MR | [ĐIỀN] |
-| US-14 | Câu hỏi kèm ánh xạ nhiều cặp (CLO, PI, weight) | C | [ĐIỀN] |
-| US-15 | Bài đánh giá theo đề cương và theo lớp (`items[]`) | C | [ĐIỀN] |
-| US-16 | Tiêu chí rubric và mức rubric 1–4 | C | [ĐIỀN] |
-| US-17 | Nhập câu hỏi từ Excel/Moodle | K | [ĐIỀN] |
-| NEW-01 | Duyệt ma trận đề thi: giảng viên gửi duyệt, Trưởng bộ môn duyệt/từ chối, khóa `items` sau khi duyệt (CSDL v0.5). **Chạm phạm vi "không duyệt đề" nên cần GVHD đồng ý (Q11)** | C | [ĐIỀN] |
+| US-13 | Ngân hàng câu hỏi và cây danh mục 3 cấp (Đã hủy bỏ theo ADR 0013 để bảo mật đề thi) | K | K |
+| US-14 | Câu hỏi trong ngân hàng (Đã hủy bỏ theo ADR 0013) | K | K |
+| US-15 | Bài đánh giá theo đề cương và theo lớp (`items[]` kèm `outcomeMappings: [{cloId, maxScore}]`) | C | [ĐIỀN] |
+| US-16 | Tiêu chí rubric (Đã hủy bỏ theo ADR 0013 — nhập điểm trực tiếp từng CLO của từng câu hỏi) | K | K |
+| US-17 | Nhập câu hỏi từ Excel/Moodle | K | K |
+| NEW-01 | Giảng viên tự khóa ma trận bài đánh giá (`DRAFT → LOCKED`), khóa `items[]` trước khi nhập điểm, kèm `cloWeights` và `coverageSummary` (CSDL v0.7, ADR 0014) | C | [ĐIỀN] |
 | US-18 | Học kỳ và khóa sổ điểm | C | [ĐIỀN] |
 | US-19 | Lớp học phần và giảng viên phụ trách | C | [ĐIỀN] |
 | US-20 | Nhập danh sách lớp → sinh viên và ghi danh | C | [ĐIỀN] |
-| US-21 | Tải tệp điểm và ánh xạ cột | C | [ĐIỀN] |
-| US-22 | Kiểm tra tệp, báo lỗi theo dòng/cột | C | [ĐIỀN] |
-| US-23 | Chọn cách hiểu ô trống (BLANK/MISSING) và chính sách nhập lại | C | [ĐIỀN] |
-| US-24 | Xác nhận nhập (transaction) hoặc rollback lô | C | [ĐIỀN] |
+| US-21 | Xuất CSV mẫu từ ma trận đã khóa và Nhập điểm trực tiếp từng CLO của từng câu hỏi | C | [ĐIỀN] |
+| US-22 | Kiểm tra tệp CSV, báo lỗi theo dòng/cột | C | [ĐIỀN] |
+| US-23 | Xem trước trên giao diện, xử lý vắng thi / bỏ trống = 0.0 điểm | C | [ĐIỀN] |
+| US-24 | Xác nhận nhập điểm trực tiếp vào `scores` | C | [ĐIỀN] |
 | US-25 | Sửa điểm đơn lẻ có lý do | MR | [ĐIỀN] |
-| US-26 | Quy tắc đo lường có phiên bản (DRAFT/CONFIRMED/RETIRED) | C | [ĐIỀN] |
-| US-27 | Tính CLO của từng sinh viên theo lớp | C | [ĐIỀN] |
-| US-28 | Tính PI và PLO từ kết quả cấp dưới | C | [ĐIỀN] |
-| US-29 | Tổng hợp cấp lớp/khóa/CTĐT kèm mẫu số | C | [ĐIỀN] |
+| US-26 | Import CSV CTĐT & Đề cương kèm sẵn Ngưỡng đạt và Trọng số (`UNVERIFIED -> VERIFIED`) | C | [ĐIỀN] |
+| US-27 | Tính mức đạt `ASSESSMENT_CLO` (Cấp 1) và `CLO` toàn học phần (Cấp 2) theo tỷ lệ đóng góp $W_{p,j}$ | C | [ĐIỀN] |
+| US-28 | Tính `PI` (chuẩn hóa mẫu số trên tập CLO đã học) và `PLO` từ các PI | C | [ĐIỀN] |
+| US-29 | Tổng hợp cấp bài đánh giá / lớp học phần ($N_{\text{section}}$) và cấp khóa / CTĐT ($N_{\text{cohort}}$) | C | [ĐIỀN] |
 | US-30 | Chống chạy trùng, đánh dấu kết quả cũ | MR | [ĐIỀN] |
 | US-31 | Báo cáo CLO theo lớp học phần | C | [ĐIỀN] |
 | US-32 | Báo cáo PI theo học phần/khóa, PLO theo CTĐT | C | [ĐIỀN] |

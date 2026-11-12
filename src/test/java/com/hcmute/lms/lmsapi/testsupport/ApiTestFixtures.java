@@ -2,8 +2,10 @@ package com.hcmute.lms.lmsapi.testsupport;
 
 import com.hcmute.lms.lmsapi.config.JwtConfig;
 import com.hcmute.lms.lmsapi.document.Assessment;
+import com.hcmute.lms.lmsapi.document.AssessmentCloWeight;
 import com.hcmute.lms.lmsapi.document.AssessmentItem;
 import com.hcmute.lms.lmsapi.document.Clo;
+import com.hcmute.lms.lmsapi.document.CloMeasurement;
 import com.hcmute.lms.lmsapi.document.Course;
 import com.hcmute.lms.lmsapi.document.CoursePiContribution;
 import com.hcmute.lms.lmsapi.document.CourseSection;
@@ -26,7 +28,6 @@ import com.hcmute.lms.lmsapi.enums.AssessmentStatus;
 import com.hcmute.lms.lmsapi.enums.CourseCategory;
 import com.hcmute.lms.lmsapi.enums.CourseType;
 import com.hcmute.lms.lmsapi.enums.EnrollmentStatus;
-import com.hcmute.lms.lmsapi.enums.ItemKind;
 import com.hcmute.lms.lmsapi.enums.PiContributionType;
 import com.hcmute.lms.lmsapi.enums.ProgramVersionStatus;
 import com.hcmute.lms.lmsapi.enums.Role;
@@ -192,6 +193,7 @@ public final class ApiTestFixtures {
             .code(code)
             .displayOrder(displayOrder)
             .contentSummary(LABEL + " PLO giả " + code)
+            .passThreshold(0.5)
             .verification(unverified())
             .build());
   }
@@ -205,6 +207,8 @@ public final class ApiTestFixtures {
             .code(code)
             .displayOrder(displayOrder)
             .contentShort(LABEL + " PI giả " + code)
+            .weight(0.5)
+            .passThreshold(0.5)
             .verification(unverified())
             .build());
   }
@@ -259,6 +263,7 @@ public final class ApiTestFixtures {
             .courseId(syllabus.getCourseId())
             .code(code)
             .contentOriginal(LABEL + " CLO giả " + code)
+            .measurement(CloMeasurement.builder().defaultPassThreshold(0.5).build())
             .verification(unverified())
             .build());
   }
@@ -297,24 +302,20 @@ public final class ApiTestFixtures {
   public Assessment sectionAssessment(
       CourseSection section, AssessmentStatus status, double... maxScores) {
     List<AssessmentItem> items = new ArrayList<>();
-    double total = 0;
+    String dummyCloId = new ObjectId().toHexString();
     for (int i = 0; i < maxScores.length; i++) {
-      total += maxScores[i];
       items.add(
           AssessmentItem.builder()
               .id(new ObjectId().toHexString())
               .code("Q" + (i + 1))
               .orderIndex(i + 1)
-              .title(LABEL + " Câu " + (i + 1))
-              .kind(ItemKind.QUESTION)
-              .maxScore(maxScores[i])
-              .externalRef("EXT-" + runId + "-Q" + (i + 1))
+              .bloomLevel(2)
               .outcomeMappings(
                   new ArrayList<>(
                       List.of(
                           OutcomeMapping.builder()
-                              .cloId(new ObjectId().toHexString())
-                              .weight(1.0)
+                              .cloId(dummyCloId)
+                              .maxScore(maxScores[i])
                               .build())))
               .build());
     }
@@ -325,9 +326,10 @@ public final class ApiTestFixtures {
             .code(code("AS"))
             .name(LABEL + " Bài đánh giá giả")
             .scope(AssessmentScope.SECTION)
-            .totalPoints(total)
             .status(status)
             .locked(status.locksStructure())
+            .cloWeights(
+                List.of(AssessmentCloWeight.builder().cloId(dummyCloId).weight(1.0).build()))
             .items(items)
             .build());
   }

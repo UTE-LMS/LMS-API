@@ -4,13 +4,13 @@ Hệ thống quản lý, đo lường và phân tích chuẩn đầu ra chương
 Phiên bản kế hoạch: **v0.3** (dự thảo, 2026-10-27, **đang ở tuần 5–6**; v0.2 ngày 2026-10-20). Người soạn: Claude Code theo
 yêu cầu của sinh viên; **cần hai sinh viên và giảng viên hướng dẫn (GVHD) rà soát, chỉnh và chốt**.
 
-**Thay đổi v0.2 → v0.3:** đồng bộ với thiết kế CSDL **v0.5** (`GiaiThich_CoSoDuLieu.md` §0, cập nhật theo
-`PLO_DB_UPDATE.md`): thêm vai trò `DEPARTMENT_HEAD`, `STUDENT`; thêm quy trình Trưởng bộ môn duyệt ma trận đề thi (story
-mới NEW-01); thêm 3 story mới NEW-02…04; sửa phạm vi "duyệt đề" thành "duyệt *nội dung* đề"; cập nhật module, số
-collection (30, dùng 29), rủi ro R11, câu hỏi Q17–Q19, hiện trạng (đã có image MongoDB Docker). Danh sách tính năng
-đề xuất chốt nằm ở `chot-feature-do-an.md`.
+**Thay đổi v0.3 → v0.4 (2026-11-10 theo ADR 0013):** đồng bộ với thiết kế CSDL **v0.6** (`GiaiThich_CoSoDuLieu.md` §0) và đặc tả `dac-ta-thay-doi-nghiep-vu-va-phuong-an-tinh-clo.md`:
+1. **Phương án R1:** Một vai trò Quản lý học thuật (`PROGRAM_MANAGER` / `ADMIN`) thực hiện Import đồng bộ Bản mô tả CTĐT và Đề cương chi tiết học phần.
+2. **Bảo mật đề thi (29 $\to$ 26 collections):** Xóa hoàn toàn 3 collections ngân hàng câu hỏi (`question_banks`, `question_categories`, `questions`) và các story US-13, US-14, US-16, US-17.
+3. **Giảng viên tự khóa ma trận (NEW-01):** Giảng viên lớp học phần thiết lập ma trận câu hỏi – CLO và tự khóa ma trận (`DRAFT -> LOCKED`), bỏ bước Trưởng bộ môn duyệt ma trận đề thi.
+4. **Nhập điểm trực tiếp từng CLO của từng câu hỏi & Phương án B1 (`POINTS_RATIO`):** Mỗi câu hỏi ánh xạ tới các CLO kèm `maxScore` trực tiếp (`outcomeMappings: [{cloId, maxScore}]`, không dùng `weight`); giảng viên nhập điểm đạt được trực tiếp cho từng cặp `(itemId, cloId)`; hệ thống chỉ đo lường chuẩn đầu ra (CLO từng bài đánh giá, CLO toàn học phần, PI, PLO), không đo kết quả bài kiểm tra tổng và không xét điểm qua môn học phần (bỏ cấp `COURSE`).
 
-**Bản chia theo từng feature (để giao cho LLM hỗ trợ code): `doc/plan/README.md`.** File này là bản tổng.
+**Bản chia theo từng feature (để giao cho LLM hỗ trợ code): `doc/plan/README.md`.** Kế hoạch sửa đổi mã nguồn ngay lập tức: [`doc/ke-hoach-sua-doi-theo-nghiep-vu-moi.md`](file:///D:/Code/Project/LMS-API/doc/ke-hoach-sua-doi-theo-nghiep-vu-moi.md).
 
 Nguồn: `Rubric_Do_An_Mon_Hoc_CNPM_V2-1.docx.md`, `BS.md`, `Misa.md`, `GiaiThich_CoSoDuLieu.md` (v0.5),
 `database_import.js`. Rule cho agent: `CLAUDE.md`, `.claude/rules/`.
@@ -84,17 +84,15 @@ Angular (LMS-UI) ──HTTPS/JSON──> Spring Boot API ──> MongoDB (replic
 | `auth` | `users` | F01 |
 | `program` | `programs`, `program_versions`, `plos`, `pis`, `program_courses`, `course_pi_contributions` | F02 |
 | `course` | `courses`, `syllabi`, `clos`, `clo_pi_links` | F03 |
-| `assessment` | `question_banks`, `question_categories`, `questions`, `assessments` | F04, gồm quy trình duyệt ma trận đề thi (NEW-01) |
+| `assessment` | `assessments` | F04: bài đánh giá và ma trận câu hỏi – CLO, giảng viên tự khóa ma trận (NEW-01) |
 | `academic` | `terms`, `course_sections`, `students`, `enrollments` | hỗ trợ F05 |
-| `scoreimport` | `import_batches`, `import_row_errors`, `scores` | F05 |
-| `measurement` | `measurement_rules`, `calculation_runs`, `student_results`, `aggregate_results` | F06 |
+| `scoreimport` | `import_batches`, `import_row_errors`, `scores` | F05b: nhập điểm trực tiếp từng CLO của từng câu hỏi |
+| `measurement` | `measurement_rules`, `calculation_runs`, `student_results`, `aggregate_results` | F06: đo lường CLO (từng bài & toàn môn, Phương án B1 `POINTS_RATIO`), PI, PLO |
 | `report` | `reports` | F07 |
 | `improvement` | `improvement_actions` | F08 |
 | `audit` | `audit_logs` | xuyên suốt |
 
-CSDL v0.5 gồm **29 collection chính** (đã loại bỏ collection `ml_experiments` khỏi `database_import.js` do ML ngoài phạm vi đồ án, xem TD-06). Một số trường v0.5 có trong
-CSDL nhưng chưa có tính năng: `assessments.exportedFiles`; riêng `courses.departmentId` và collection `departments` đã chốt loại bỏ (Q17, ADR 0010),
-`pi.useIrmAsWeight`/`irmWeights` đã loại bỏ hoàn toàn khỏi CSDL theo ADR 0012 (Q18).
+CSDL v0.6 gồm **26 collection chính** (đã loại bỏ `ml_experiments` theo TD-06 và loại bỏ 3 collection `question_banks`, `question_categories`, `questions` theo ADR 0013).
 
 **Quyết định kiến trúc cần ghi ADR** (`doc/adr/`): cơ chế xác thực (JWT hay session); cách đọc tệp điểm
 (Apache POI cho Excel, thư viện CSV); cách lưu tệp gốc; cách thực hiện transaction; chiến lược migrate/seed
@@ -135,39 +133,36 @@ tâm của AC.
 | US-11 | Quản lý CLO thuộc một đề cương | M | IBS | `code` duy nhất **trong đề cương**; Bloom 1–6 |
 | US-12 | Khai báo và xác nhận liên kết CLO–PI (nhiều–nhiều) | M | IBS | Hiển thị ma trận; chỉ liên kết đã VERIFIED được dùng cho tính chính thức; `weight` của liên kết (0 < x ≤ 1) để trống tới khi quy tắc xác nhận |
 
-### E04 — Ngân hàng câu hỏi và bài đánh giá (F04)
+### E04 — Bài đánh giá và Ma trận Câu hỏi – CLO (F04, cập nhật theo ADR 0013)
 | ID | Story | Ưu tiên | Chủ trì | Trọng tâm AC |
 |---|---|---|---|---|
-| US-13 | Quản lý ngân hàng và cây danh mục nội dung 3 cấp | S | IBS, IT | Cấp 1 không có cha; không vượt cấp 3; trùng mã bị từ chối |
-| US-14 | Khai báo câu hỏi kèm ánh xạ nhiều cặp (CLO, PI, weight) | M | IBS | Tổng weight = 1 với câu ACTIVE; PI phải thuộc `clo_pi_links` của chính CLO; không trùng cặp |
-| US-15 | Lập bài đánh giá theo đề cương (khung) và theo lớp (bản SECTION có `items[]`) | M | IBS, IT | Copy ánh xạ tại thời điểm thi; `totalPoints` khớp tổng `items.maxScore` (dung sai 0,001); bản `isLocked` (APPROVED trở đi) bị khóa `items` |
-| US-16 | Khai báo tiêu chí rubric và mức rubric 1–4 | M | IBS | Mức rubric tách khỏi Bloom |
-| US-17 | Nhập câu hỏi từ Excel/Moodle, chống nhập trùng | C | IT | Trùng `(bank, system, externalQuestionId)` bị từ chối **[CHỜ XÁC NHẬN Q16]** |
-| NEW-01 | **Duyệt ma trận đề thi:** giảng viên gửi duyệt (`SUBMITTED`), Trưởng bộ môn duyệt/từ chối (`APPROVED`/`REJECTED`), khóa `items`, ghi `approval.history[]` và `audit_logs`; bảng độ phủ theo CLO và Bloom (`coverageSummary`) | M | IBS (quy trình), IT | Chỉ nhập điểm khi `APPROVED`/`SCORE_ENTERED`; gửi duyệt cần ≥ 1 item và `totalPoints` khớp; vai trò khác `DEPARTMENT_HEAD` không duyệt được; `PUT items` bị từ chối khi `isLocked` **[CHỜ GVHD, Q11]** |
+| US-13, US-14, US-16, US-17 | *(Đã loại bỏ theo ADR 0013)* | K | — | Không lưu ngân hàng câu hỏi, không lưu nội dung câu hỏi/rubric để bảo mật đề thi |
+| US-15 | Lập bài đánh giá theo đề cương (khung) và theo lớp (bản SECTION có `items[]`) | M | IBS, IT | Mỗi câu hỏi (`item`) khai báo danh sách `outcomeMappings: [{cloId, maxScore}]` ($maxScore > 0$, không trùng `cloId`, không dùng `weight`); bản `isLocked = true` (`LOCKED`/`SCORE_ENTERED`) bị cấm sửa `items[]` |
+| NEW-01 | **Giảng viên tự khóa ma trận bài đánh giá:** giảng viên phụ trách lớp tự khóa ma trận (`DRAFT → LOCKED`), mở khóa (`UNLOCK` khi chưa có điểm), ghi `audit_logs` (`ASSESSMENT_LOCK`, `ASSESSMENT_UNLOCK`); bảng độ phủ theo CLO và Bloom (`coverageSummary`) | M | IBS, IT | Chỉ nhập điểm khi `LOCKED`/`SCORE_ENTERED`; khóa ma trận cần ≥ 1 câu hỏi hợp lệ; chỉ giảng viên phụ trách lớp (`lecturerIds`) được khóa/mở khóa |
 
 ### E05 — Học kỳ, lớp học phần, sinh viên
 | ID | Story | Ưu tiên | Chủ trì | Trọng tâm AC |
 |---|---|---|---|---|
 | US-18 | Quản lý học kỳ và khóa sổ điểm | M | IT | OPEN/SCORE_LOCKED/CLOSED; khóa thì không nhập/sửa điểm |
 | US-19 | Quản lý lớp học phần, giảng viên phụ trách | M | IBS, IT | Gắn đề cương và học kỳ |
-| US-20 | Nhập danh sách lớp (CSV/Excel) → sinh viên và ghi danh | M | IT | Dùng `studentRef`; ghi danh là mẫu số **[CHỜ XÁC NHẬN Q09]** |
+| US-20 | Nhập danh sách lớp (CSV/Excel) → sinh viên và ghi danh | M | IT | Dùng `studentRef`; ghi danh là mẫu số |
 
-### E06 — Nhập điểm (F05)
+### E06 — Nhập điểm CLO từng câu hỏi (F05b, cập nhật theo ADR 0013)
 | ID | Story | Ưu tiên | Chủ trì | Trọng tâm AC |
 |---|---|---|---|---|
-| US-21 | Tải tệp điểm và ánh xạ cột → câu hỏi/tiêu chí (lưu để dùng lại) | M | IT | Tính checksum, phát hiện nhập trùng |
-| US-22 | Kiểm tra tệp, báo lỗi theo dòng và cột | M | IT | Mã sinh viên không hợp lệ, điểm vượt thang, trùng bản ghi, thiếu trường; lưu `import_row_errors` |
-| US-23 | Chọn cách hiểu ô trống (BLANK hay MISSING) và chính sách nhập lại cho từng lô | M | IBS, IT | Hệ thống không tự đoán **[CHỜ XÁC NHẬN Q13]**. Chính sách nhập lại: `REJECT_ON_CONFLICT` / `OVERWRITE` / `UPDATE_BLANK_ONLY` **[CHỜ XÁC NHẬN Q19]** |
-| US-24 | Xác nhận nhập (một transaction) hoặc rollback lô | M | IT | Lỗi giữa chừng không để lại điểm nửa vời; chỉ nhập khi bài đánh giá `APPROVED`/`SCORE_ENTERED`; ghi `audit_logs` cùng transaction |
+| US-21 | Nhập điểm trực tiếp từng CLO của từng câu hỏi (trên lưới hoặc tải tệp điểm) | M | IT | Mỗi ô điểm ứng với 1 cặp `(itemId, cloId)`; tính checksum tệp |
+| US-22 | Kiểm tra tệp, báo lỗi theo dòng và cột | M | IT | Mã sinh viên không hợp lệ, điểm vượt `maxScore` của `(itemId, cloId)`, trùng bản ghi, thiếu trường; lưu `import_row_errors` |
+| US-23 | Chọn cách hiểu ô trống (BLANK hay MISSING) và chính sách nhập lại cho từng lô | M | IBS, IT | Hệ thống không tự đoán. Chính sách nhập lại: `REJECT_ON_CONFLICT` / `OVERWRITE` / `UPDATE_BLANK_ONLY` |
+| US-24 | Xác nhận nhập (một transaction) hoặc rollback lô | M | IT | Lỗi giữa chừng không để lại điểm nửa vời; chỉ nhập khi bài đánh giá `LOCKED`/`SCORE_ENTERED`; ghi `audit_logs` cùng transaction |
 | US-25 | Sửa điểm đơn lẻ có lý do | S | IT | Ghi audit trước/sau; khóa lạc quan `revision`; học kỳ đã khóa thì từ chối |
 
-### E07 — Đo lường (F06)
+### E07 — Đo lường chuẩn đầu ra (F06, cập nhật theo ADR 0013)
 | ID | Story | Ưu tiên | Chủ trì | Trọng tâm AC |
 |---|---|---|---|---|
-| US-26 | Quản lý quy tắc đo lường có phiên bản (DRAFT/CONFIRMED/RETIRED) | M | IBS (đặc tả), IT | Ngưỡng/trọng số để trống tới khi xác nhận; chỉ CONFIRMED cho kết quả chính thức; quy tắc tách theo cấp `clo`/`course`/`pi`/`plo`/`missingDataPolicy` **[CHỜ XÁC NHẬN Q04, Q12]** |
-| US-27 | Tính CLO của từng sinh viên theo lớp | M | IT, IBS (kiểm chứng) | Kết quả tính tay độc lập khớp; trạng thái COMPUTED/INSUFFICIENT_DATA; thiếu dữ liệu ≠ 0; `Value(CLO)` = Σ điểm phần của CLO / Σ điểm tối đa phần của CLO (CSDL §4.1, xem `PLO_DB_UPDATE.md` §4.1) |
-| US-28 | Tính PI và PLO từ kết quả cấp dưới | M | IT, IBS | Không suy mức PLO bằng trung bình mức PI; `inputs[]` ghi đủ đầu vào (một cấp liền kề, `sourceType` STUDENT_RESULT). PI theo `FROM_CLOS` (ADR 0011, câu hỏi chỉ gán CLO); `aggregationMethod`/PLO method còn lại: xem NEW-04 **[CHỜ XÁC NHẬN Q19, Q21, Q22]** |
-| US-29 | Tổng hợp cấp lớp/khóa/CTĐT kèm mẫu số | M | IT | `counts` đủ 5 số; luôn có `passRateOfEnrolled` |
+| US-26 | Quản lý quy tắc đo lường có phiên bản (DRAFT/CONFIRMED/RETIRED) | M | IBS (đặc tả), IT | Ngưỡng/trọng số để trống tới khi xác nhận; chỉ CONFIRMED cho kết quả chính thức; quy tắc tách theo cấp `clo`/`pi`/`plo`/`missingDataPolicy` (đã bỏ khối `course`) |
+| US-27 | Tính CLO của từng sinh viên (cả từng bài đánh giá và tích lũy toàn học phần) | M | IT, IBS (kiểm chứng) | **Phương án B1 (`POINTS_RATIO`, ADR 0013):** tỷ lệ tổng điểm thực tế đạt được của CLO trên tổng điểm tối đa của CLO; thiếu dữ liệu ≠ 0; lưu `student_results` với `assessmentId != null` (từng bài) và `assessmentId = null` (toàn môn) |
+| US-28 | Tính PI và PLO từ kết quả cấp dưới | M | IT, IBS | Không suy mức PLO bằng trung bình mức PI; `inputs[]` ghi đủ đầu vào (một cấp liền kề, `sourceType` STUDENT_RESULT). PI theo `FROM_CLOS` (ADR 0011) |
+| US-29 | Tổng hợp cấp bài đánh giá / lớp / học phần / khóa / CTĐT kèm mẫu số | M | IT | `counts` đủ 5 số; luôn có `passRateOfEnrolled` |
 | US-30 | Chống chạy trùng và đánh dấu kết quả cũ | S | IT | `lockKey` (chỉ mục duy nhất khi `PENDING`/`PROCESSING`); `isStale` khi điểm đổi sau lần tính |
 
 ### E08 — Báo cáo và truy vết (F07)

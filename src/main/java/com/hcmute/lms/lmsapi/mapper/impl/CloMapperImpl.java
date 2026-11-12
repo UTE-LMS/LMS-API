@@ -21,13 +21,15 @@ public class CloMapperImpl implements CloMapper {
     if (request == null) {
       return null;
     }
-    CloMeasurement measurement = null;
+    CloMeasurement measurement;
     if (request.getMeasurement() != null) {
+      Double threshold = request.getMeasurement().getDefaultPassThreshold();
       measurement =
           CloMeasurement.builder()
-              .defaultWeight(request.getMeasurement().getDefaultWeight())
-              .defaultPassThreshold(request.getMeasurement().getDefaultPassThreshold())
+              .defaultPassThreshold(threshold != null ? threshold : 0.5)
               .build();
+    } else {
+      measurement = CloMeasurement.builder().defaultPassThreshold(0.5).build();
     }
 
     return Clo.builder()
@@ -53,7 +55,6 @@ public class CloMapperImpl implements CloMapper {
     if (clo.getMeasurement() != null) {
       measurementDto =
           CloMeasurementDto.builder()
-              .defaultWeight(clo.getMeasurement().getDefaultWeight())
               .defaultPassThreshold(clo.getMeasurement().getDefaultPassThreshold())
               .build();
     }

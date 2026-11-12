@@ -1,6 +1,15 @@
 # TÀI LIỆU ĐẶC TẢ KỸ THUẬT CƠ SỞ DỮ LIỆU MONGODB (DATABASE SPECIFICATION)
 **Hệ thống Quản lý, Đo lường và Đánh giá Chuẩn đầu ra (OBE Analytics & Measurement Engine)**  
-*Phiên bản đặc tả: v0.5 | Chuẩn công nghệ: MongoDB 7.0+ (Replica Set) – Spring Boot 3.x – Angular 17+*
+*Phiên bản đặc tả gốc: v0.5 (đã được cập nhật lên **v0.7 — 25 collections** theo **[ADR 0014](file:///D:/Code/Project/LMS-API/doc/adr/0014-import-ctdt-de-cuong-va-do-luong-4-cap-clo-pi-plo.md)** và **[`doc/dac-ta-thay-doi-nghiep-vu-va-phuong-an-tinh-clo.md`](file:///D:/Code/Project/LMS-API/doc/dac-ta-thay-doi-nghiep-vu-va-phuong-an-tinh-clo.md)**)*
+
+> [!IMPORTANT]
+> **Ghi chú đồng bộ phiên bản v0.7 (2026-11-11):**
+> Trong phiên bản chính thức **v0.7** ([`doc/GiaiThich_CoSoDuLieu.md`](file:///D:/Code/Project/LMS-API/doc/GiaiThich_CoSoDuLieu.md) và [`doc/database_import.js`](file:///D:/Code/Project/LMS-API/doc/database_import.js)), hệ thống đã áp dụng các thay đổi bắt buộc theo [ADR 0014](file:///D:/Code/Project/LMS-API/doc/adr/0014-import-ctdt-de-cuong-va-do-luong-4-cap-clo-pi-plo.md):
+> 1. **Giảm từ 29 xuống 25 collections:** Xóa hoàn toàn 3 collections ngân hàng câu hỏi (`question_banks`, `question_categories`, `questions`) để bảo mật đề thi tuyệt đối và xóa collection `measurement_rules` (ngưỡng đạt và trọng số lưu bắt buộc trên PLO, PI, CLO, liên kết và bài kiểm tra).
+> 2. **Cập nhật Cấp độ kết quả (`RESULT_LEVELS = ['ASSESSMENT_CLO', 'CLO', 'PI', 'PLO']`):** Bỏ `'COURSE'`, thêm `'ASSESSMENT_CLO'`.
+> 3. **Import CSV CTĐT & Đề cương (`UNVERIFIED -> VERIFIED`):** Khởi tạo `passThreshold` bắt buộc trên PLO/PI/CLO, trọng số $W_{PI \to PLO}$ ($\sum = 1.0$) và $W_{CLO \to PI} \in (0, 1]$ (không ép tổng $= 1.0$).
+> 4. **Bài đánh giá & Nhập điểm CLO trực tiếp:** Giảng viên tự khóa ma trận đề (`DRAFT -> LOCKED -> SCORE_ENTERED`), khai báo `cloWeights` ($W_{p,j}$). Điểm nhập trực tiếp theo từng cặp `(itemId, cloId)` qua CSV mẫu; sinh viên vắng thi / bỏ trống câu hỏi lưu trực tiếp `rawScore = 0.0` (xóa `scores.status`).
+> 5. **Công thức đo lường chuẩn đầu ra 4 cấp độ:** Đo lường CLO cho cả **từng bài đánh giá** (`assessmentId != null`) và **toàn học phần** (`assessmentId = null`). PI tính theo trung bình có trọng số chuẩn hóa trên tập CLO đã học (học lại lấy lần học gần nhất `LATEST`); PLO tổng hợp từ các PI. Mẫu số tách $N_{\text{section}}$ (`ENROLLED`) và $N_{\text{cohort}}$.
 
 ---
 

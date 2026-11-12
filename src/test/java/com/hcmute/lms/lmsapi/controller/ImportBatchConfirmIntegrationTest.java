@@ -56,7 +56,7 @@ class ImportBatchConfirmIntegrationTest extends ScoreImportIntegrationBase {
       "US-24/AC-1: xác nhận lô VALIDATED -> CONFIRMED; 6 điểm (3 SV x 2 câu) + trạng thái lô + bài SCORE_ENTERED + audit IMPORT_CONFIRM cùng được ghi")
   void us24_ac1_confirmWritesEverythingTogether() throws Exception {
     String id = uploadAndValidate(threeStudentsCsv(), "BLANK");
-    assertThat(assessmentStatus()).isEqualTo("APPROVED");
+    assertThat(assessmentStatus()).isEqualTo("LOCKED");
     assertThat(scoresOfSection()).isEmpty();
 
     mockMvc
@@ -71,10 +71,9 @@ class ImportBatchConfirmIntegrationTest extends ScoreImportIntegrationBase {
     List<Document> scores = scoresOfSection();
     assertThat(scores).hasSize(6);
     Document s1q1 = scoreOf(s1, 0);
-    assertThat(s1q1.getString("status")).isEqualTo("SCORED");
     assertThat(number(s1q1, "rawScore")).isEqualTo(3.0);
     assertThat(number(s1q1, "maxScore")).isEqualTo(4.0);
-    assertThat(s1q1.getInteger("revision")).isEqualTo(1);
+    assertThat(s1q1.getObjectId("cloId")).isNotNull();
     assertThat(s1q1.getInteger("sourceRow")).isEqualTo(2);
     assertThat(s1q1.getObjectId("importBatchId")).isEqualTo(new ObjectId(id));
     assertThat(s1q1.getObjectId("sectionId")).isEqualTo(new ObjectId(section.getId()));
@@ -83,8 +82,7 @@ class ImportBatchConfirmIntegrationTest extends ScoreImportIntegrationBase {
     assertThat(s1q1.getDate("updatedAt")).isBeforeOrEqualTo(new Date());
     assertThat(number(scoreOf(s1, 1), "rawScore")).isEqualTo(6.0);
     assertThat(number(scoreOf(s1, 1), "maxScore")).isEqualTo(6.0);
-    // s2: Q2 gõ "0" -> SCORED 0 (không phải BLANK), sourceRow = 3
-    assertThat(scoreOf(s2, 1).getString("status")).isEqualTo("SCORED");
+    // s2: Q2 gõ "0" -> rawScore 0 (không phải BLANK), sourceRow = 3
     assertThat(number(scoreOf(s2, 1), "rawScore")).isEqualTo(0.0);
     assertThat(scoreOf(s2, 1).getInteger("sourceRow")).isEqualTo(3);
     // s3: Q2 = 2.5 ở dòng 4
@@ -168,7 +166,7 @@ class ImportBatchConfirmIntegrationTest extends ScoreImportIntegrationBase {
         .andExpect(jsonPath("$.message").value(containsString("ROLLED_BACK")));
 
     assertThat(scoresOfSection()).isEmpty();
-    assertThat(assessmentStatus()).isEqualTo("APPROVED");
+    assertThat(assessmentStatus()).isEqualTo("LOCKED");
 
     String ok = uploadAndValidate(csv(s3.getStudentRef() + ",3,6"), "BLANK");
     mockMvc.perform(postAction(lecturerToken, ok, "confirm")).andExpect(status().isOk());
@@ -198,7 +196,7 @@ class ImportBatchConfirmIntegrationTest extends ScoreImportIntegrationBase {
 
     assertThat(batchDocument(id).getString("status")).isEqualTo("VALIDATED");
     assertThat(scoresOfSection()).isEmpty();
-    assertThat(assessmentStatus()).isEqualTo("APPROVED");
+    assertThat(assessmentStatus()).isEqualTo("LOCKED");
     assertThat(importConfirmAudits(id)).isZero();
   }
 
@@ -234,7 +232,7 @@ class ImportBatchConfirmIntegrationTest extends ScoreImportIntegrationBase {
         .andExpect(jsonPath("$.message").value(containsString("SCORE_LOCKED")));
 
     assertThat(scoresOfSection()).isEmpty();
-    assertThat(assessmentStatus()).isEqualTo("APPROVED");
+    assertThat(assessmentStatus()).isEqualTo("LOCKED");
   }
 
   @Test

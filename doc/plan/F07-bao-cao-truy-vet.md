@@ -39,7 +39,7 @@ ngược từ một kết quả về dòng điểm trong tệp gốc trong ≤ 3
 
 | ID | AC |
 |---|---|
-| US-31/AC-1 | Báo cáo CLO của một lớp liệt kê từng CLO với `counts`, `passRate`, `passRateOfEnrolled`, mục tiêu/`targetMet`, và khối phạm vi + quy tắc + `programVersionId` + `runId` |
+| US-31/AC-1 | Báo cáo CLO của một lớp học phần (gồm kết quả CLO theo từng bài đánh giá `scope.type = ASSESSMENT` và kết quả CLO tích lũy toàn học phần `scope.type = SECTION` theo ADR 0013) liệt kê từng CLO với `counts`, `passRate`, `passRateOfEnrolled`, mục tiêu/`targetMet`, và khối phạm vi + quy tắc + `programVersionId` + `runId` |
 | US-31/AC-2 | Quy tắc `DRAFT`/chưa chính thức ⇒ `limitations` nêu "không chính thức"; lần chạy `isStale` ⇒ nêu "dữ liệu đã thay đổi sau lần tính" |
 | US-31/AC-3 | Báo cáo của lớp khác (ngoài phạm vi giảng viên) ⇒ 403 |
 | US-32/AC-1 | Báo cáo PI theo học phần/khóa và PLO theo CTĐT sắp theo `displayOrder`, nhận diện bằng mã; chỉ dựa trên kết quả đã tính |

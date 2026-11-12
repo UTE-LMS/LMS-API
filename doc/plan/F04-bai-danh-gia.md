@@ -1,24 +1,20 @@
-# F04 — Bài đánh giá, rubric, duyệt ma trận đề thi, ngân hàng câu hỏi
+# F04 — Bài đánh giá và Ma trận Câu hỏi – CLO (Giảng viên tự khóa ma trận)
 
-Story: **US-15** bài đánh giá khung và bản lớp (C), **US-16** tiêu chí rubric + mức 1–4 (C), **NEW-01** duyệt ma trận đề
-thi (C, **GVHD đã xác nhận Q11**, ADR 0001 phương án A), **US-13** ngân hàng + cây danh mục 3 cấp (MR), **US-14** câu hỏi nhiều cặp trong ngân hàng
-(đề xuất MR; kế hoạch v0.3 xếp M), **US-17** nhập câu hỏi từ Excel/Moodle (K). Giai đoạn P3. Chủ trì đề xuất: IBS + IT.
+Story: **US-15** bài đánh giá khung và bản lớp (C), **NEW-01** giảng viên tự khóa/mở khóa ma trận bài đánh giá kèm độ phủ `coverageSummary` (C, **cập nhật theo [ADR 0013](../adr/0013-import-ctdt-de-cuong-va-nhap-diem-clo-truc-tiep.md) thay thế ADR 0001**). Các story **US-13, US-14, US-16, US-17** đã được **loại bỏ hoàn toàn (K)** theo ADR 0013 để bảo mật đề thi và nhập điểm trực tiếp từng CLO của từng câu hỏi. Giai đoạn P3. Chủ trì đề xuất: IBS + IT.
 Package: `assessment`. Phụ thuộc: `00`, `F01`, `F02`, `F03` (cần `clos`, `clo_pi_links`); `F05a` cho bản lớp (`course_sections`).
 
 ## 1. Mục tiêu
 
-Khai báo **cấu trúc bài đã thi**: có những câu hỏi/tiêu chí nào, điểm tối đa, mức Bloom, đo CLO nào với phần điểm bao
-nhiêu (ADR 0011: câu hỏi chỉ gán CLO, PI suy ra từ kết quả CLO qua `clo_pi_links`). Đây là "bản đồ" để quy điểm lên chuẩn đầu ra. Bản lớp phải được **duyệt ma trận** rồi mới mở cổng nhập điểm, và bị
-**khóa `items[]`** sau đó. Không sinh đề, không duyệt *nội dung* câu hỏi.
+Khai báo **ma trận câu hỏi – CLO của bài đánh giá**: bài đánh giá có những câu hỏi nào (`Câu 1`, `Câu 2`...), mỗi câu hỏi đánh giá những CLO nào và **điểm tối đa (`maxScore`) dành cho từng CLO tại câu hỏi đó là bao nhiêu** (do giảng viên nhập trực tiếp, không dùng trọng số `weight`). Bản lớp (`scope = SECTION`) do **Giảng viên phụ trách lớp tự khóa ma trận** (`DRAFT → LOCKED`) trước khi mở cổng nhập điểm CLO, và bị **khóa cứng `items[]`** sau đó. Hệ thống tuyệt đối không lưu nội dung câu hỏi/đáp án/ngân hàng đề và không đo điểm tổng bài kiểm tra (`totalPoints`).
 
 ## 2. Đọc trước
 
-- `GiaiThich_CoSoDuLieu.md` §0, §1 (phạm vi), nguyên tắc 8 và 12, §4.12–4.15, §6, Q11.
-- `database_import.js`: khối `question_banks`, `question_categories`, `questions`, `assessments` (có 4 điều kiện `$expr`).
-- `PLO_DB_UPDATE.md` §3.15 và §5 (chỉ dẫn khóa cấu trúc đề).
-- `adr/0001-duyet-ma-tran-de-thi.md` (phương án A/B/C cho NEW-01).
+- `dac-ta-thay-doi-nghiep-vu-va-phuong-an-tinh-clo.md` §3.2, §3.3, §6.2.
+- `GiaiThich_CoSoDuLieu.md` (v0.6) §0, §1, nguyên tắc 8, 12, 13, §4.12.
+- `database_import.js` (v0.6): khối `OUTCOME_MAPPING`, `assessments`.
+- `adr/0013-import-ctdt-de-cuong-va-nhap-diem-clo-truc-tiep.md`.
 
-## 3. Collection `assessments` (lõi của feature)
+## 3. Collection `assessments` (lõi của feature — CSDL v0.6)
 
 | Trường | Ghi chú |
 |---|---|
@@ -27,72 +23,62 @@ nhiêu (ADR 0011: câu hỏi chỉ gán CLO, PI suy ra từ kết quả CLO qua 
 | `sectionId`, `templateId` | `templateId` trỏ khung mẫu (nếu bản lớp sao chép từ khung) |
 | `type` | `QUIZ`, `PRACTICAL`, `PROJECT`, `MIDTERM`, `FINAL`, `OTHER` |
 | `phase` | `FORMATIVE`, `MIDTERM`, `SUMMATIVE` |
-| `totalPoints`, `weightInCourse` (0–1) | `totalPoints` phải khớp Σ `items.maxScore` (dung sai 0,001) |
-| `dataGranularity` | `ITEM` (mặc định) hoặc `TOTAL_ONLY` — `TOTAL_ONLY` **không đo được CLO/PI** |
-| `status` | `DRAFT`, `SUBMITTED`, `APPROVED`, `REJECTED`, `SCORE_ENTERED`, `LOCKED` |
-| `isLocked` | `true` khi `status ∈ {APPROVED, SCORE_ENTERED, LOCKED}` (validator bắt buộc khớp) |
-| `approval` | `{ submittedBy, submittedAt, reviewedBy, reviewedAt, reviewNote, history[] }`; `history[].action ∈ SUBMIT, APPROVE, REJECT, UNLOCK` |
-| `coverageSummary` | `{ totalItemsSum, byClo[{cloId, points, percentage}], byBloom[{bloomLevel, questionCount, points, percentage}] }` |
-| `exportedFiles` | **không có tính năng** (xuất phôi in là khâu tổ chức thi) |
-| `items[]` | `_id`, `code`, `orderIndex`, `title`, `kind` (`QUESTION`/`CRITERION`), `maxScore` (> 0), `bloomLevel`, `topic`, `questionId`/`questionVersion` (null được), `externalRef` (chuỗi, mã câu trên Moodle để khớp cột điểm), `outcomeMappings[]` (≥ 1), `rubric` |
-| `outcomeMappings[]` | `{ cloId, weight }`, `weight` ∈ (0, 1], **Σ weight = 1** trong một item, không trùng CLO (ADR 0011) |
+| `scheduledAt` | Thời điểm kiểm tra (tùy chọn) |
+| `status` | `DRAFT` (đang thiết lập ma trận) → `LOCKED` (giảng viên đã khóa ma trận, mở cổng nhập điểm) → `SCORE_ENTERED` (đã có điểm nhập vào) |
+| `isLocked` | `true` khi `status ∈ {LOCKED, SCORE_ENTERED}` (validator bắt buộc khớp) |
+| `coverageSummary` | `{ totalItemsSum, byClo[{cloId, points, percentage}], byBloom[{bloomLevel, questionCount, points, percentage}] }` (trong đó `points` là tổng `outcomeMappings[].maxScore`) |
+| `items[]` | `_id`, `code` (ví dụ `"Câu 1"`), `orderIndex`, `bloomLevel` (1–6, tùy chọn), `outcomeMappings[]` (≥ 1) |
+| `outcomeMappings[]` | `{ cloId, maxScore }`, `maxScore > 0` (do giảng viên nhập trực tiếp điểm tối đa của từng CLO trong câu hỏi đó; không trùng `cloId` trong cùng 1 câu hỏi) |
 
-Chỉ mục: duy nhất `(syllabusId, sectionId, code)`; `(sectionId, status)`; `items.outcomeMappings.cloId`; `items.questionId`.
-Validator ở MongoDB đã ép: bản `SECTION` có `sectionId`; `isLocked` khớp `status`; từ `SUBMITTED` trở đi có ≥ 1 item; Σ weight = 1 và
-không trùng CLO. **Service vẫn phải kiểm tra trước** để trả lỗi rõ ràng (không để lộ lỗi 121 của MongoDB).
+> **Các trường đã loại bỏ hoàn toàn theo ADR 0013:** `totalPoints`, `weightInCourse`, `dataGranularity`, `approval`, `exportedFiles`; trong `items[]` đã bỏ `title`, `kind`, `maxScore` (cấp item), `topic`, `questionId`, `questionVersion`, `externalRef`, `rubric`; trong `outcomeMappings[]` đã thay `weight` bằng `maxScore`.
 
-## 4. Quy tắc nghiệp vụ
+Chỉ mục: duy nhất `(syllabusId, sectionId, code)`; `(sectionId, status)`; `items.outcomeMappings.cloId`.
 
-1. **Bản lớp là SNAPSHOT:** `items[].outcomeMappings` sao chép tại thời điểm thi; đổi `clos` sau đó không làm đổi bài đã thi.
+## 4. Quy tắc nghiệp vụ (cập nhật theo ADR 0013)
+
+1. **Bản lớp là SNAPSHOT:** `items[].outcomeMappings` sao chép tại thời điểm thiết lập; đổi `clos` sau đó không làm đổi bài đã thi.
 2. Mỗi `cloId` trong `outcomeMappings` phải **thuộc `syllabusId` của bài**. Chạy tính chính thức (F06) yêu cầu `clo_pi_links` của các CLO đó đã `VERIFIED`.
-3. `Σ weight` của một item = 1 (sai số 0,0001). Không gán nguyên điểm một câu cho mọi chuẩn. Cách chia giữa các CLO chờ Khoa (Q15): giữ ở dạng dữ liệu, không rải logic cứng.
-4. `rubric.levels[].level` ∈ 1–4 là **mức rubric**, tách khỏi `bloomLevel` (1–6). Không quy đổi lẫn nhau.
-5. **Luồng trạng thái (NEW-01), GVHD đã xác nhận (Q11):**
-   `DRAFT → SUBMITTED` (giảng viên gửi; cần ≥ 1 item và `|totalPoints − Σ maxScore| < 0,001`);
-   `SUBMITTED → APPROVED | REJECTED` (Trưởng bộ môn; `REJECTED` kèm `reviewNote`); `REJECTED → DRAFT` (sửa lại);
-   `APPROVED → SCORE_ENTERED` (tự động khi lô điểm đầu tiên được xác nhận, F05b); `SCORE_ENTERED → LOCKED` (khóa sổ);
-   `UNLOCK` (mở khóa) chỉ khi chưa có điểm và có lý do **[ĐỀ XUẤT]**. Mỗi chuyển trạng thái ghi `approval.history[]` và `audit_logs`
-   (`ASSESSMENT_APPROVE`/`ASSESSMENT_REJECT`). Chuyển trạng thái sai thứ tự → 422.
-6. **Khóa cấu trúc:** khi `isLocked = true` mọi API đổi `items[]` (thêm/sửa/xóa/đổi `maxScore`/`outcomeMappings`) bị từ chối (409/422).
-   Phải đổi `isLocked` và `status` **cùng một lần ghi** (validator bắt buộc khớp).
-7. **Chỉ nhập điểm khi `APPROVED` hoặc `SCORE_ENTERED`** (F05b kiểm tra; F04 cung cấp trạng thái).
-8. `coverageSummary` do service tính từ `items` (độ phủ theo CLO và Bloom), lưu lại để màn hình duyệt nhanh đọc; không để người dùng nhập tay.
-9. Chỉ `DEPARTMENT_HEAD` (đúng phạm vi) duyệt/từ chối; người gửi duyệt **không tự duyệt** bài của mình.
-10. Nếu GVHD không đồng ý bước Trưởng bộ môn (phương án B của ADR 0001): giảng viên tự xác nhận `DRAFT → APPROVED`, giữ khóa `items`.
-11. `dataGranularity = TOTAL_ONLY`: cho lưu nhưng báo rõ không đo được CLO/PI; nếu dữ liệu thật chỉ có điểm tổng phải đổi phạm vi bằng ADR trước K1 (R2).
+3. **Điểm tối đa trực tiếp cho từng CLO trong mỗi câu hỏi:** Mỗi phần tử trong `outcomeMappings` khai báo `{ cloId, maxScore }` với `maxScore > 0`. Nếu một câu hỏi kiểm tra nhiều CLO, từng CLO trong câu hỏi đó có `maxScore` riêng biệt; mỗi `cloId` chỉ xuất hiện tối đa 1 lần trong cùng một câu hỏi (`noDuplicateClos`).
+4. **Hệ thống không đo kết quả bài kiểm tra:** Không có trường `totalPoints` và không kiểm tra tổng điểm bài thi; hệ thống chỉ tổng hợp điểm theo từng CLO để đo lường chuẩn đầu ra.
+5. **Luồng trạng thái Giảng viên tự khóa ma trận (NEW-01 — ADR 0013):**
+   - `DRAFT → LOCKED`: Giảng viên phụ trách lớp (`LECTURER` trong `course_sections.lecturerIds`) gọi `POST /api/v1/assessments/{id}/lock`. Điều kiện: `scope = SECTION`, `status = DRAFT`, `size(items) >= 1`. Đặt `status = LOCKED`, `isLocked = true`, ghi `audit_logs` (`ASSESSMENT_LOCK`).
+   - `LOCKED → DRAFT` (Mở khóa — `unlock`): Giảng viên phụ trách lớp gọi `POST /api/v1/assessments/{id}/unlock`. Chỉ cho phép khi `status = LOCKED` và **chưa có bản ghi điểm nào trong `scores` thuộc `assessmentId` đó** (nếu đã có điểm hoặc `status = SCORE_ENTERED` $\to$ từ chối `422`). Đặt `status = DRAFT`, `isLocked = false`, ghi `audit_logs` (`ASSESSMENT_UNLOCK`).
+   - `LOCKED → SCORE_ENTERED`: Tự động chuyển khi lô điểm đầu tiên được xác nhận ở F05b.
+   - Xóa bài đánh giá (`DELETE /api/v1/assessments/{id}`): Chỉ cho phép khi `status = DRAFT` và chưa có điểm.
+6. **Khóa cấu trúc:** khi `isLocked = true` mọi API sửa bài hoặc đổi `items[]` bị từ chối (`422`). Phải đổi `isLocked` và `status` **cùng một lần ghi**.
+7. **Chỉ nhập điểm khi `LOCKED` hoặc `SCORE_ENTERED`** (F05b kiểm tra).
+8. `coverageSummary` do service tính tự động từ `items`:
+   - Điểm của câu hỏi $k$ trên ma trận chuẩn đầu ra là $\sum_{m \in \text{outcomeMappings}_k} maxScore_m$.
+   - `totalItemsSum` = tổng `maxScore` của mọi `outcomeMappings` trong toàn bộ `items[]`.
+   - `byClo`: tổng `maxScore` và tỷ lệ % của từng `cloId` trên `totalItemsSum`.
+   - `byBloom`: số câu hỏi, tổng `maxScore` các CLO trong câu hỏi có `bloomLevel` đó, và tỷ lệ % trên `totalItemsSum`.
 
-## 5. Stories và acceptance criteria (nháp)
+## 5. Stories và acceptance criteria (cập nhật theo ADR 0013)
 
 | ID | AC |
 |---|---|
 | US-15/AC-1 | Giảng viên tạo bài `SECTION` cho lớp mình, sao chép từ khung (`templateId`) hoặc tự khai báo `items` → thành công, `status = DRAFT`, `isLocked = false` |
-| US-15/AC-2 | `outcomeMappings` có Σ `weight` ≠ 1 → 422; có CLO trùng → 422; CLO không thuộc `syllabusId` của bài → 422 (ADR 0011) |
+| US-15/AC-2 | `outcomeMappings` có `maxScore <= 0` → 400; có `cloId` trùng trong cùng một câu hỏi → 422; `cloId` không thuộc `syllabusId` của bài → 422 |
 | US-15/AC-3 | `scope = SECTION` thiếu `sectionId` → 400 |
-| US-15/AC-4 | Giảng viên sửa bài của lớp không thuộc phạm vi → 403 |
-| US-15/AC-5 | Khi `isLocked = true`, thêm/sửa/xóa item → bị từ chối; bài vẫn đọc được |
-| US-16/AC-1 | Item `kind = CRITERION` có `rubric.levels` với `level` 1–4, mỗi mức có `score` ≤ `maxScore`; `level` ngoài 1–4 → 400 |
-| US-16/AC-2 | `bloomLevel` và mức rubric là hai trường độc lập (không API nào đổi cái này từ cái kia) |
-| NEW-01/AC-1 | Giảng viên gửi duyệt bài hợp lệ → `SUBMITTED`, ghi `approval.submittedBy/At`, `history` có `SUBMIT` |
-| NEW-01/AC-2 | Gửi duyệt khi 0 item, hoặc `totalPoints` lệch Σ `maxScore` quá 0,001 → 422 |
-| NEW-01/AC-3 | `DEPARTMENT_HEAD` duyệt → `APPROVED`, `isLocked = true`, ghi `reviewedBy/At`, `history`, và `audit_logs` (`ASSESSMENT_APPROVE`) |
-| NEW-01/AC-4 | Từ chối kèm `reviewNote` → `REJECTED`, `isLocked = false`; thiếu `reviewNote` → 400 |
-| NEW-01/AC-5 | Vai trò khác `DEPARTMENT_HEAD` (kể cả người gửi) gọi duyệt → 403 |
-| NEW-01/AC-6 | Màn hình duyệt đọc `coverageSummary`: `byClo` và `byBloom` khớp với tính tay từ `items` (ví dụ kiểm chứng độc lập) |
-| NEW-01/AC-7 | Chuyển trạng thái sai thứ tự (ví dụ `DRAFT → APPROVED`, `LOCKED → DRAFT`) → 422 |
-| US-13/AC-1 (MR) | Cây danh mục: cấp 1 không có cha; cấp 2–3 có `ancestorIds` đúng; cấp 4 → 422; trùng `(bankId, code)` → 409 |
-| US-14/AC-1 (MR) | Câu hỏi `ACTIVE` phải có ≥ 1 CLO, Σ `weight` = 1; câu và danh mục cùng ngân hàng; CLO thuộc đề cương (ADR 0011) |
+| US-15/AC-4 | Giảng viên tạo/sửa/xóa/khóa bài của lớp không thuộc `lecturerIds` → 403 |
+| US-15/AC-5 | Khi `isLocked = true` (`LOCKED` / `SCORE_ENTERED`), sửa thông tin bài, xóa bài hoặc `PUT /items` → bị từ chối (422); bài vẫn đọc được |
+| NEW-01/AC-1 | Giảng viên phụ trách lớp gọi `POST /api/v1/assessments/{id}/lock` khi bài `SECTION` đang `DRAFT` và có ≥ 1 câu hỏi hợp lệ → `status = LOCKED`, `isLocked = true`, ghi `audit_logs` (`ASSESSMENT_LOCK`) |
+| NEW-01/AC-2 | Gọi `lock` khi `items[]` rỗng, hoặc bài là `SYLLABUS_TEMPLATE`, hoặc `status != DRAFT` → 422 |
+| NEW-01/AC-3 | Giảng viên phụ trách lớp gọi `POST /api/v1/assessments/{id}/unlock` khi bài đang `LOCKED` và chưa có điểm trong `scores` → `status = DRAFT`, `isLocked = false`, ghi `audit_logs` (`ASSESSMENT_UNLOCK`). Nếu đã có điểm hoặc `status = SCORE_ENTERED` → 422 |
+| NEW-01/AC-4 | Người dùng không phải Giảng viên phụ trách lớp (`lecturerIds`) gọi `lock` / `unlock` → 403 |
+| NEW-01/AC-5 | API `GET /api/v1/assessments/{id}/coverage` và `coverageSummary` tính đúng `totalItemsSum`, `byClo`, `byBloom` từ `outcomeMappings[].maxScore` khớp tính tay độc lập |
 
-## 6. API đề xuất **[ĐỀ XUẤT]**
+## 6. API chuẩn (tiền tố `/api/v1` — ADR 0013)
 
 | Phương thức | Đường dẫn | Quyền |
 |---|---|---|
-| GET/POST/PUT | `/api/syllabi/{id}/assessment-templates` | PROGRAM_MANAGER, LECTURER |
-| GET/POST/PUT | `/api/sections/{sectionId}/assessments`, `/api/assessments/{id}` | LECTURER (lớp mình) |
-| PUT | `/api/assessments/{id}/items` | LECTURER; **từ chối nếu `isLocked`** |
-| POST | `/api/assessments/{id}/submit` | LECTURER |
-| POST | `/api/assessments/{id}/approve`, `/reject` | DEPARTMENT_HEAD |
-| GET | `/api/assessments/{id}/coverage` | các vai trò được xem |
-| (MR) | `/api/question-banks`, `/api/question-banks/{id}/categories`, `/api/questions` | PROGRAM_MANAGER, LECTURER |
+| GET/POST | `/api/v1/syllabi/{id}/assessment-templates` | đọc: `canAccessSyllabus` READ; tạo: `PROGRAM_MANAGER`, `LECTURER` hoặc `DEPARTMENT_HEAD` có học phần trong scope |
+| GET/POST | `/api/v1/sections/{sectionId}/assessments` | đọc: `canAccessSection` READ; tạo: `LECTURER` của lớp |
+| GET/PUT/DELETE | `/api/v1/assessments/{id}` | đọc theo lớp/đề cương; sửa/xóa (chỉ khi `DRAFT`): như tạo |
+| PUT | `/api/v1/assessments/{id}/items` | `LECTURER` của lớp (hoặc người tạo khung); **từ chối 422 nếu `isLocked = true`** |
+| POST | `/api/v1/assessments/{id}/lock` | `LECTURER` của lớp (`DRAFT -> LOCKED`, ghi `ASSESSMENT_LOCK`) |
+| POST | `/api/v1/assessments/{id}/unlock` | `LECTURER` của lớp (`LOCKED -> DRAFT` khi chưa có điểm, ghi `ASSESSMENT_UNLOCK`) |
+| GET | `/api/v1/assessments/{id}/coverage` | như đọc; trả `byClo` kèm mã CLO và `byBloom` |
 
 ## 7. Kiểm tra tham chiếu ở service
 

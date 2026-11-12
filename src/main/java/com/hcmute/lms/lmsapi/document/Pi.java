@@ -54,6 +54,12 @@ public class Pi {
   @Field("targetPassRate")
   private Double targetPassRate;
 
+  @Field("weight")
+  private Double weight;
+
+  @Field("passThreshold")
+  private Double passThreshold;
+
   @Field("verification")
   private Verification verification;
 

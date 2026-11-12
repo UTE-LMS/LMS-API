@@ -244,6 +244,7 @@ public final class DemoDataSeeder implements ApplicationRunner {
                         .displayOrder(order)
                         .category(PloCategory.UNSPECIFIED)
                         .contentSummary(LABEL + " Nội dung giả của " + code + FAKE_NOTE)
+                        .passThreshold(0.5)
                         .verification(unverified("PLO mẫu, nội dung giả"))
                         .build()),
             () ->
@@ -287,6 +288,8 @@ public final class DemoDataSeeder implements ApplicationRunner {
                         .code(code)
                         .displayOrder(order)
                         .contentShort(LABEL + " Nội dung giả của " + code + FAKE_NOTE)
+                        .weight(0.5)
+                        .passThreshold(0.5)
                         .verification(unverified("PI mẫu, nội dung giả"))
                         .build()),
             () ->

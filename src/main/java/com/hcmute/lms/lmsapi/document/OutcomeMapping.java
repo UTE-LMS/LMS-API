@@ -7,10 +7,7 @@ import lombok.NoArgsConstructor;
 import org.springframework.data.mongodb.core.mapping.Field;
 import org.springframework.data.mongodb.core.mapping.FieldType;
 
-/**
- * CLO mà một phần tử đo và phần điểm của phần tử được chia cho CLO đó. PI không nằm ở đây: PI được
- * suy ra từ kết quả CLO qua clo_pi_links (ADR 0011).
- */
+/** CLO mà câu hỏi đo lường và điểm tối đa của câu hỏi dành cho CLO đó (v0.7). */
 @Data
 @Builder
 @NoArgsConstructor
@@ -20,7 +17,7 @@ public class OutcomeMapping {
   @Field(name = "cloId", targetType = FieldType.OBJECT_ID)
   private String cloId;
 
-  /** Phần điểm chia cho CLO, trong (0, 1]; tổng của một phần tử bằng 1. */
-  @Field("weight")
-  private Double weight;
+  /** Điểm tối đa của câu hỏi đối với CLO này, lớn hơn 0. */
+  @Field("maxScore")
+  private Double maxScore;
 }

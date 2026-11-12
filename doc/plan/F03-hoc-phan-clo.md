@@ -21,7 +21,7 @@ sau này phải bám vào (câu hỏi chỉ được đo cặp (CLO, PI) có tro
 | `courses` | `code` (duy nhất), `name`, `credits` (int), `extra`. *(Q17 đã chốt: không tạo collection `departments`, bỏ `departmentId`)* |
 | `program_courses` | `programVersionId`, `courseId`, `semester`, `credits`, `type` (`COMPULSORY`/`ELECTIVE`), `category` (`FOUNDATION`, `MAJOR_FOUNDATION`, `SPECIALIZED`, `CAPSTONE_PROJECT`, `THESIS`), `prerequisiteCourseIds[]`, `previousCourseIds[]` |
 | `syllabi` | `courseId`, `version`, `effectiveFromTermId`, `effectiveToTermId` (null được), `status` (`DRAFT`/`CONFIRMED`/`ARCHIVED`), `verification`. Duy nhất `(courseId, version)` |
-| `clos` | `syllabusId`, `courseId`, `code` (`^CLO[0-9]+$`), `contentOriginal`, `bloomLevel` (1–6), `bloomNote`, `measurement` (`{ defaultWeight, defaultPassThreshold }`, null cho tới khi Khoa xác nhận), `verification`. Duy nhất `(syllabusId, code)` |
+| `clos` | `syllabusId`, `courseId`, `code` (`^CLO[0-9]+$`), `contentOriginal`, `bloomLevel` (1–6), `bloomNote`, `measurement` (`{ defaultPassThreshold }`, null cho tới khi Khoa xác nhận; đã bỏ `defaultWeight` theo ADR 0013), `verification`. Duy nhất `(syllabusId, code)` |
 | `clo_pi_links` | `cloId`, `piId`, `syllabusId`, `programVersionId`, `weight` (0 < x ≤ 1, null cho tới khi quy tắc xác nhận), `verification`. Duy nhất `(cloId, piId)` |
 
 ## 4. Quy tắc nghiệp vụ
@@ -29,20 +29,16 @@ sau này phải bám vào (câu hỏi chỉ được đo cặp (CLO, PI) có tro
 1. **Mã CLO chỉ có nghĩa trong một đề cương** (`CLO1` của OOP khác `CLO1` của Cơ sở dữ liệu). Nhận diện CLO bằng `_id`; `code` chỉ duy nhất trong một `syllabusId`.
 2. `clos.courseId` phải bằng `syllabi.courseId` của `syllabusId` đó.
 3. `bloomLevel` ∈ 1–6 và **không phải điểm số** — không có trường quy đổi.
-4. `clos.measurement.defaultWeight` và `defaultPassThreshold` **để `null`** tới khi Khoa xác nhận (Q12). Nếu có giá trị, nằm trong [0, 1].
-   Không đặt mặc định (không dùng 20/40/40, 60%…).
+4. `clos.measurement.defaultPassThreshold` **để `null`** tới khi Khoa xác nhận (Q12). Nếu có giá trị, nằm trong [0, 1]. Đã loại bỏ `defaultWeight` theo ADR 0013 vì mức đạt CLO tính theo tỷ lệ điểm thực tế (`POINTS_RATIO`) và hệ thống không xét điểm tổng kết học phần.
 5. **Liên kết CLO–PI:** `clo_pi_links.syllabusId` và `programVersionId` phải khớp CLO và PI. Chỉ liên kết `verification.status = VERIFIED`
-   mới được dùng cho tính chính thức (F06). `weight` dùng cho phương pháp `FROM_CLOS` (NEW-04), được phép `null`.
+   mới được dùng cho tính chính thức (F06). `weight` dùng cho phương pháp `FROM_CLOS`, được phép `null`.
 6. Không xóa/sửa CLO, liên kết đã được `outcomeMappings` hoặc `student_results` tham chiếu; thay vào đó đổi trạng thái hoặc sinh đề cương mới.
 7. Đề cương khác `DRAFT` (`CONFIRMED` và `ARCHIVED`) không cho sửa nội dung CLO và không sửa liên kết CLO–PI (TD-27); sửa = tạo `syllabi.version` mới (nguyên tắc phiên bản hóa).
 8. Học phần thử nghiệm: Đã tiếp nhận 2 đề cương chi tiết chính thức từ CTĐT Fintech (`APCM220307`, `ABDA433708`) bên cạnh học phần mẫu `OOPR230279` của CNTT.
 9. `contentOriginal` của CLO trích xuất trực tiếp từ đề cương chính thức đã duyệt; không điền từ trí nhớ.
-10. **Phân quyền theo ADR 0010 (thay thế ADR 0009):**
-    - `courses` (kho tổng cấp trường): Chỉ `ADMIN` tạo / sửa / xóa môn học (kế thừa từ danh mục chính thức của Phòng Đào tạo). Thu hồi quyền tạo/sửa `courses` của `PROGRAM_MANAGER`.
-    - `scope.courseIds`: Admin gán môn phụ trách cho Trưởng bộ môn (`DEPARTMENT_HEAD`); Trưởng bộ môn phân công môn cho Giảng viên (`LECTURER`) trong bộ môn biên soạn đề cương.
-    - Soạn đề cương & CLO: `LECTURER` có `courseId` trong scope (khi đề cương ở trạng thái `DRAFT`).
-    - Phê duyệt đề cương: `DEPARTMENT_HEAD` có `courseId` trong scope thẩm định và duyệt chuyển trạng thái sang `CONFIRMED` (khóa đóng băng nội dung).
-    - Trưởng ngành (`PROGRAM_MANAGER`): Quản lý CTĐT, đưa môn học vào CTĐT (`program_courses`) và tạo liên kết $CLO \to PI$ (`clo_pi_links`) cho ngành mình.
+10. **Phân quyền và Import Đề cương (ADR 0010 & Phương án R1 — ADR 0013):**
+    - Hỗ trợ **Import Đề cương chi tiết học phần** (`POST /api/v1/courses/{courseId}/syllabi/import`) bởi `PROGRAM_MANAGER` / `ADMIN` (Phương án R1, ADR 0013) để khởi tạo đồng bộ `syllabi`, `clos`, `clo_pi_links` và khung `assessments` (`SYLLABUS_TEMPLATE`).
+    - Ngoài luồng Import đồng bộ, hệ thống vẫn hỗ trợ quản lý chi tiết theo ADR 0010 (`ADMIN` quản lý `courses`; `LECTURER` / `DEPARTMENT_HEAD` biên soạn/duyệt đề cương theo `scope.courseIds`; `PROGRAM_MANAGER` quản lý `program_courses` và `clo_pi_links` theo `scope.programIds`).
 
 ## 5. Stories và acceptance criteria (nháp)
 

@@ -1,9 +1,7 @@
 # Kế hoạch theo feature (bản cho người và LLM đọc)
 
-> **Trạng thái: DỰ THẢO, chưa ký.** Tách từ `doc/ke-hoach-xay-dung.md` (v0.3) và `doc/chot-feature-do-an.md`, đối chiếu
-> với thiết kế CSDL v0.5. Mục **[ĐỀ XUẤT]** là ý của người soạn; **[CHỜ GVHD]** / **[CHỜ KHOA]** là chưa được duyệt.
-> Acceptance criteria (AC) trong các file này là **bản nháp để IBS/IT chỉnh trước khi code**, chưa phải SRS chính thức.
-> Ngày soạn: 2026-10-27.
+> **Trạng thái: CẬP NHẬT THEO [ADR 0014](../adr/0014-import-ctdt-de-cuong-va-do-luong-4-cap-clo-pi-plo.md) (2026-11-11).** Tách từ `doc/ke-hoach-xay-dung.md` (v0.4), `doc/chot-feature-do-an.md` và đặc tả [`doc/dac-ta-thay-doi-nghiep-vu-va-phuong-an-tinh-clo.md`](../dac-ta-thay-doi-nghiep-vu-va-phuong-an-tinh-clo.md), đối chiếu
+> với thiết kế CSDL v0.7 (25 collections). Kế hoạch sửa đổi mã nguồn ngay lập tức: [`doc/ke-hoach-sua-doi-theo-nghiep-vu-moi.md`](../ke-hoach-sua-doi-theo-nghiep-vu-moi.md).
 
 Mỗi file là **một feature, tự đủ để giao cho một LLM** (kèm file này làm ngữ cảnh chung). Đừng bắt LLM đọc cả
 `ke-hoach-xay-dung.md` (35 KB) khi chỉ làm một feature.
@@ -14,12 +12,12 @@ Mỗi file là **một feature, tự đủ để giao cho một LLM** (kèm file
 |---|---|---|---|---|
 | [00-nen-tang-chung.md](00-nen-tang-chung.md) | Nền tảng dùng chung (lỗi, audit, transaction, kiểm thử, health) | US-39, US-40 | `common`, `audit` | P0 |
 | [F01-nguoi-dung-phan-quyen.md](F01-nguoi-dung-phan-quyen.md) | Người dùng và phân quyền | US-01…04, NEW-03 | `auth` | P2 |
-| [F02-ctdt-plo-pi.md](F02-ctdt-plo-pi.md) | CTĐT, PLO, PI, ma trận I/R/M | US-05…08 | `program` | P2 |
-| [F03-hoc-phan-clo.md](F03-hoc-phan-clo.md) | Học phần, đề cương, CLO, liên kết CLO–PI | US-09…12 | `course` | P2 |
-| [F04-bai-danh-gia.md](F04-bai-danh-gia.md) | Bài đánh giá, rubric, duyệt ma trận, ngân hàng câu hỏi | US-13…17, NEW-01 | `assessment` | P3 |
+| [F02-ctdt-plo-pi.md](F02-ctdt-plo-pi.md) | CTĐT, PLO, PI, ma trận I/R/M (+ Import CTĐT `UNVERIFIED -> VERIFIED`) | US-05…08 | `program` | P2 |
+| [F03-hoc-phan-clo.md](F03-hoc-phan-clo.md) | Học phần, đề cương, CLO, liên kết CLO–PI (+ Import Đề cương `UNVERIFIED -> VERIFIED`) | US-09…12 | `course` | P2 |
+| [F04-bai-danh-gia.md](F04-bai-danh-gia.md) | Bài đánh giá & Ma trận câu hỏi – CLO, `cloWeights`, giảng viên tự khóa ma trận | US-15, NEW-01 | `assessment` | P3 |
 | [F05a-hoc-ky-lop-sinh-vien.md](F05a-hoc-ky-lop-sinh-vien.md) | Học kỳ, lớp học phần, sinh viên, ghi danh | US-18…20 | `academic` | P3 |
-| [F05b-nhap-diem.md](F05b-nhap-diem.md) | Nhập điểm từ tệp | US-21…25 | `scoreimport` | P3 |
-| [F06-do-luong.md](F06-do-luong.md) | Quy tắc và engine đo lường CLO → PI → PLO | US-26…30, NEW-04 | `measurement` | P4 |
+| [F05b-nhap-diem.md](F05b-nhap-diem.md) | Xuất CSV mẫu từ ma trận đã khóa & Nhập điểm trực tiếp từng CLO của từng câu hỏi (Vắng = 0đ) | US-21…25 | `scoreimport` | P3 |
+| [F06-do-luong.md](F06-do-luong.md) | Engine đo lường chuẩn đầu ra 4 cấp độ (`ASSESSMENT_CLO -> CLO -> PI -> PLO`) | US-26…30, NEW-04 | `measurement` | P4 |
 | [F07-bao-cao-truy-vet.md](F07-bao-cao-truy-vet.md) | Báo cáo, truy vết, xuất tệp, dashboard | US-31…36 | `report` | P5 |
 | [F08-cai-tien.md](F08-cai-tien.md) | Hành động cải tiến (đóng vòng) | US-37, 38, NEW-02 | `improvement` | P5 |
 
@@ -33,33 +31,30 @@ Thứ tự phụ thuộc (mũi tên = phải xong trước):
 
 F06 cần dữ liệu F02–F05b; F07 chỉ **đọc** kết quả F06; F08 gắn vào kết quả/báo cáo của F06–F07.
 
-## 2. Ưu tiên và phạm vi cam kết (đề xuất, chưa ký)
+## 2. Ưu tiên và phạm vi cam kết (theo ADR 0014)
 
-Ký hiệu: **C** = cam kết, **MR** = mục tiêu mở rộng, **K** = không làm (theo `chot-feature-do-an.md`). Cột "Kế hoạch v0.3"
-là mức Must/Should/Could của `ke-hoach-xay-dung.md`; hai nguồn lệch ở US-04, 13, 14 (nguồn nào chốt do hai bạn và GVHD).
+Ký hiệu: **C** = cam kết, **MR** = mục tiêu mở rộng, **K** = không làm (theo `chot-feature-do-an.md`).
 
-| Story | Kế hoạch v0.3 | Đề xuất chốt | Story | Kế hoạch v0.3 | Đề xuất chốt |
+| Story | Kế hoạch v0.4 | Đề xuất chốt | Story | Kế hoạch v0.4 | Đề xuất chốt |
 |---|---|---|---|---|---|
 | US-01…03 | M | C | US-23 | M | C |
 | US-04 | S | MR (ghi audit vẫn C) | US-24 | M | C |
 | US-05…07 | M | C | US-25 | S | MR |
 | US-08 | S | MR | US-26…29 | M | C |
 | US-09…12 | M | C | US-30 | S | MR |
-| US-13 | S | MR | US-31…34 | M | C |
-| US-14 | M | MR | US-35, 36 | S | MR |
-| US-15, 16 | M | C | US-37, 38 | M | C |
-| US-17 | C | K | US-39, 40 | M | C |
-| NEW-01 | M | C **[CHỜ GVHD, Q11]** | NEW-02 | S | MR |
-| US-18…20 | M | C | NEW-03, 04 | S, C | MR |
-| US-21, 22 | M | C | | | |
+| US-13, 14 | K | K (Đã bỏ theo ADR 0013/0014) | US-31…34 | M | C |
+| US-15 | M | C | US-35, 36 | S | MR |
+| US-16, 17 | K | K (Đã bỏ theo ADR 0013/0014) | US-37, 38 | M | C |
+| NEW-01 | M | C (Giảng viên tự khóa ma trận, ADR 0014) | US-39, 40 | M | C |
+| US-18…20 | M | C | NEW-02 | S | MR |
+| US-21, 22 | M | C | NEW-03, 04 | S, C | MR |
 
 ## 3. Nguồn sự thật và thứ tự ưu tiên khi tài liệu lệch nhau
 
-1. `doc/database_import.js`: validator `$jsonSchema`, enum, chỉ mục **thực tế** của 29 collection (đã bỏ `ml_experiments` do ML ngoài phạm vi đồ án). Đây là hợp đồng dữ liệu.
-2. `doc/GiaiThich_CoSoDuLieu.md` (v0.5): ý nghĩa nghiệp vụ, 14 nguyên tắc (§2), từng collection (§4), câu hỏi Q01–Q23 (§8).
+1. `doc/database_import.js`: validator `$jsonSchema`, enum, chỉ mục **thực tế** của **25 collection** (đã bỏ `ml_experiments`, 3 collection ngân hàng câu hỏi và collection `measurement_rules`). Đây là hợp đồng dữ liệu.
+2. `doc/dac-ta-thay-doi-nghiep-vu-va-phuong-an-tinh-clo.md` và `doc/GiaiThich_CoSoDuLieu.md` (v0.7): ý nghĩa nghiệp vụ, 14 nguyên tắc (§2), từng collection (§4), câu hỏi Q01–Q23 (§8).
 3. `doc/chot-feature-do-an.md` rồi `doc/ke-hoach-xay-dung.md`: phạm vi và ưu tiên.
-4. `doc/PLO_DB_UPDATE.md`: đặc tả nguồn của v0.5. **Chỉ lấy nội dung dữ liệu và công thức (§3, §4)**; dòng đầu của file ghi
-   "Spring Boot 3.x – Angular 17+" **không áp dụng**: dự án dùng **Spring Boot 4.1.0, Java 25, Angular 21**.
+4. `doc/PLO_DB_UPDATE.md`: đặc tả nguồn v0.5 (đã được cập nhật lên v0.7 bởi ADR 0014).
 5. `CLAUDE.md` và `.claude/rules/*.md`: quy tắc làm việc (không hardcode ngưỡng, ghi AI log, git…).
 
 Lệch nhau mà không tự giải quyết được thì **dừng và hỏi**, đừng chọn rồi viết như thể đã được duyệt.
@@ -86,14 +81,13 @@ Lệch nhau mà không tự giải quyết được thì **dừng và hỏi**, �
    `capabilityLevelRaw` lưu nguyên, không diễn giải.
 4. **Tỷ lệ đạt luôn kèm mẫu số**: `counts` = ghi danh, đủ dữ liệu, đạt, chưa đạt, chưa đủ dữ liệu; luôn có `passRateOfEnrolled`.
 5. **CLO nhận diện bằng `_id`** (mã `CLO1` chỉ duy nhất trong một đề cương). **PLO/PI nhận diện bằng mã**, không bằng thứ tự dòng.
-6. Một câu hỏi/tiêu chí đo nhiều cặp (CLO, PI): `weight` các cặp **tổng bằng 1**; cặp phải nằm trong `clo_pi_links` của chính CLO đó.
+6. **Điểm CLO của từng câu hỏi do Giảng viên nhập trực tiếp (ADR 0013):** Một câu hỏi có thể đo 1 hoặc nhiều CLO; mỗi CLO trong câu hỏi có `maxScore` riêng (`outcomeMappings: [{cloId, maxScore}]`) và được giảng viên nhập `rawScore` riêng trong `scores` (khóa duy nhất `{sectionId, assessmentId, itemId, cloId, studentId}`, không dùng trọng số `weight`).
 7. **MongoDB không có khóa ngoại:** service tự kiểm tra tham chiếu trước khi ghi.
 8. Mọi kết quả gắn `programVersionId`, `syllabusId`, `ruleId`; truy vết được về `scores` → `import_batches` + số dòng tệp gốc.
-9. Sửa điểm, xác nhận nhập, duyệt/từ chối bài đánh giá, chạy tính, xác nhận quy tắc, đăng nhập đều ghi `audit_logs`.
+9. Sửa điểm, xác nhận nhập, khóa/mở khóa ma trận bài đánh giá (`ASSESSMENT_LOCK`, `ASSESSMENT_UNLOCK`), chạy tính, xác nhận quy tắc, đăng nhập đều ghi `audit_logs`.
 10. `contentOriginal` của PLO/PI/CLO để trống tới khi đối chiếu bản gốc; **không điền nguyên văn từ trí nhớ**.
 11. Dùng `studentRef` (mã thay thế). Test/seed chỉ dùng dữ liệu giả có nhãn "DỮ LIỆU THỬ NGHIỆM". Không lưu bài làm của sinh viên.
-12. **Ngoài phạm vi:** tổ chức thi, sinh đề, duyệt *nội dung* đề, xuất phôi in, lưu bài làm, **mọi thứ ML**, quản lý "minh chứng"
-    như danh mục dữ liệu, quy đổi I/R/M thành hệ số.
+12. **Ngoài phạm vi:** tổ chức thi, sinh đề, lưu nội dung câu hỏi/ngân hàng đề (`question_banks`, `question_categories`, `questions` đã xóa), đo kết quả bài kiểm tra tổng (`totalPoints`) và xét điểm qua môn học phần (`COURSE`), xuất phôi in, lưu bài làm, **mọi thứ ML**, quản lý "minh chứng" như danh mục dữ liệu, quy đổi I/R/M thành hệ số.
 
 ## 6. Cách dùng với LLM hỗ trợ code
 

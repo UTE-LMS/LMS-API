@@ -59,11 +59,17 @@ class PloPiApiIntegrationTest extends IntegrationTestBase {
   }
 
   private static PloRequest ploRequest(String code, int displayOrder) {
-    return PloRequest.builder().code(code).displayOrder(displayOrder).build();
+    return PloRequest.builder().code(code).displayOrder(displayOrder).passThreshold(0.5).build();
   }
 
   private static PiRequest piRequest(String ploId, String code, int displayOrder) {
-    return PiRequest.builder().ploId(ploId).code(code).displayOrder(displayOrder).build();
+    return PiRequest.builder()
+        .ploId(ploId)
+        .code(code)
+        .displayOrder(displayOrder)
+        .weight(0.5)
+        .passThreshold(0.5)
+        .build();
   }
 
   // ------------------------------------------------------------------ US-06/AC-1: mẫu mã
@@ -272,7 +278,7 @@ class PloPiApiIntegrationTest extends IntegrationTestBase {
       "US-06/AC-5: body cố tình gửi verification = VERIFIED bị bỏ qua (chỉ QA_OFFICER được xác nhận)")
   void create_forgedVerificationIsIgnored() throws Exception {
     String body =
-        "{\"code\":\"PLO1\",\"displayOrder\":1,"
+        "{\"code\":\"PLO1\",\"displayOrder\":1,\"passThreshold\":0.5,"
             + "\"verification\":{\"status\":\"VERIFIED\",\"verifiedBy\":\"x\"}}";
     mockMvc
         .perform(postAs(manager, PLOS, body, version.getId()))
@@ -381,7 +387,7 @@ class PloPiApiIntegrationTest extends IntegrationTestBase {
             .append("syllabusId", new ObjectId())
             .append("cloId", new ObjectId())
             .append("piId", piOid)
-            .append("weight", null)
+            .append("weight", 0.5)
             .append("verification", new Document("status", "NEEDS_CLARIFICATION"));
     mongo().insert(link, "clo_pi_links");
     try {

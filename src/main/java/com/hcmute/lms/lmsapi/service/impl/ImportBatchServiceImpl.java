@@ -9,8 +9,8 @@ import com.hcmute.lms.lmsapi.document.ImportBatch;
 import com.hcmute.lms.lmsapi.document.ImportColumnMapping;
 import com.hcmute.lms.lmsapi.document.ImportRowError;
 import com.hcmute.lms.lmsapi.document.ImportStats;
+import com.hcmute.lms.lmsapi.document.OutcomeMapping;
 import com.hcmute.lms.lmsapi.document.Score;
-import com.hcmute.lms.lmsapi.document.Student;
 import com.hcmute.lms.lmsapi.document.Term;
 import com.hcmute.lms.lmsapi.dto.ImportBatchCreateRequest;
 import com.hcmute.lms.lmsapi.dto.ImportBatchResponse;
@@ -21,7 +21,6 @@ import com.hcmute.lms.lmsapi.dto.UserPrincipal;
 import com.hcmute.lms.lmsapi.enums.AssessmentScope;
 import com.hcmute.lms.lmsapi.enums.AssessmentStatus;
 import com.hcmute.lms.lmsapi.enums.AuditAction;
-import com.hcmute.lms.lmsapi.enums.DataGranularity;
 import com.hcmute.lms.lmsapi.enums.EnrollmentStatus;
 import com.hcmute.lms.lmsapi.enums.ImportBatchStatus;
 import com.hcmute.lms.lmsapi.enums.ImportSourceSystem;
@@ -49,6 +48,7 @@ import com.hcmute.lms.lmsapi.util.ObjectIdUtils;
 import com.hcmute.lms.lmsapi.util.ScoreCsvParser;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -65,35 +65,26 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Nhập điểm từ tệp CSV (F05b). Luồng: {@link #createBatch} (US-21) -> {@link #validateBatch}
- * (US-22, US-23) -> {@link #confirmBatch} (US-24). Điều kiện nhập (bài APPROVED/SCORE_ENTERED, lớp
- * và học kỳ chưa khóa điểm) được kiểm lại ở cả ba bước vì trạng thái có thể đổi giữa các bước.
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class ImportBatchServiceImpl implements ImportBatchService {
 
-  private static final String DEFAULT_STUDENT_COLUMN = "studentRef";
-  private static final String DEFAULT_FILE_NAME = "upload.csv";
-  private static final int MAX_FILE_NAME_LENGTH = 255;
+  public static final String DEFAULT_STUDENT_COLUMN = "studentRef";
   private static final String BATCH_COLLECTION = "import_batches";
 
+  private final CourseSectionRepository sectionRepository;
+  private final AssessmentRepository assessmentRepository;
+  private final TermRepository termRepository;
+  private final EnrollmentRepository enrollmentRepository;
+  private final StudentRepository studentRepository;
   private final ImportBatchRepository batchRepository;
   private final ImportRowErrorRepository rowErrorRepository;
   private final ScoreRepository scoreRepository;
-  private final CourseSectionRepository sectionRepository;
-  private final TermRepository termRepository;
-  private final AssessmentRepository assessmentRepository;
-  private final EnrollmentRepository enrollmentRepository;
-  private final StudentRepository studentRepository;
   private final ImportFileStorage fileStorage;
   private final ScoreRowValidator rowValidator;
-  private final AuditService auditService;
   private final ImportBatchMapper batchMapper;
-
-  // ------------------------------------------------------------------ US-21: tải tệp
+  private final AuditService auditService;
 
   @Override
   public ImportBatchResponse createBatch(
@@ -107,10 +98,10 @@ public class ImportBatchServiceImpl implements ImportBatchService {
     Assessment assessment = requireSectionAssessment(section, assessmentId);
     requireScoreEntryAllowed(section, assessment);
     ImportSourceSystem source = resolveSource(request);
-    requireSupportedPolicy(request.getReimportPolicy());
-    if (request.getEmptyCellAs() == null) {
-      throw invalid("Phải chọn emptyCellAs (BLANK hoặc MISSING); hệ thống không tự đoán ô trống");
+    if (source == ImportSourceSystem.EXCEL) {
+      throw new BusinessRuleViolationException("Định dạng Excel chưa được hỗ trợ (chờ ADR)");
     }
+    ReimportPolicy policy = resolveReimportPolicy(request);
 
     String checksum = ChecksumUtils.sha256Hex(content);
     if (batchRepository.existsBySectionIdAndAssessmentIdAndFileChecksumAndStatus(
@@ -121,7 +112,11 @@ public class ImportBatchServiceImpl implements ImportBatchService {
     }
     ScoreCsvParser.Table table = ScoreCsvParser.parse(content);
     ImportColumnMapping mapping =
-        resolveMapping(request.getColumnMapping(), section.getId(), assessment, table);
+        resolveMapping(
+            request == null ? null : request.getColumnMapping(),
+            section.getId(),
+            assessment,
+            table);
 
     String batchId = new ObjectId().toHexString();
     String fileRef = fileStorage.save(batchId, content);
@@ -135,8 +130,7 @@ public class ImportBatchServiceImpl implements ImportBatchService {
             .fileRef(fileRef)
             .sourceSystem(source)
             .columnMapping(mapping)
-            .emptyCellAs(request.getEmptyCellAs())
-            .reimportPolicy(request.getReimportPolicy())
+            .reimportPolicy(policy)
             .status(ImportBatchStatus.UPLOADED)
             .uploadedBy(actor.getId())
             .createdAt(Instant.now())
@@ -145,7 +139,6 @@ public class ImportBatchServiceImpl implements ImportBatchService {
     try {
       saved = batchRepository.save(batch);
     } catch (RuntimeException ex) {
-      // Tệp nằm ngoài transaction MongoDB nên phải dọn tay khi ghi lô thất bại (ADR 0013).
       fileStorage.delete(fileRef);
       throw ex;
     }
@@ -159,42 +152,35 @@ public class ImportBatchServiceImpl implements ImportBatchService {
   }
 
   private ImportSourceSystem resolveSource(ImportBatchCreateRequest request) {
-    ImportSourceSystem source =
-        request.getSourceSystem() != null ? request.getSourceSystem() : ImportSourceSystem.CSV;
-    if (source == ImportSourceSystem.EXCEL) {
-      throw new BusinessRuleViolationException(
-          "Chưa hỗ trợ tệp Excel (ADR 0013, TD-32): hãy xuất sang CSV rồi tải lên");
-    }
-    return source;
-  }
-
-  private void requireSupportedPolicy(ReimportPolicy policy) {
-    if (policy == null) {
-      throw invalid("Phải chọn reimportPolicy; hiện chỉ hỗ trợ REJECT_ON_CONFLICT");
-    }
-    if (policy != ReimportPolicy.REJECT_ON_CONFLICT) {
-      throw new BusinessRuleViolationException(
-          "Chính sách nhập lại " + policy + " chưa được hỗ trợ (chờ Q19); dùng REJECT_ON_CONFLICT");
-    }
+    return request != null && request.getSourceSystem() != null
+        ? request.getSourceSystem()
+        : ImportSourceSystem.CSV;
   }
 
   private String cleanFileName(String fileName) {
     if (fileName == null || fileName.isBlank()) {
-      return DEFAULT_FILE_NAME;
+      return "scores.csv";
     }
-    String name =
-        fileName.substring(Math.max(fileName.lastIndexOf('/'), fileName.lastIndexOf('\\')) + 1);
-    name = name.trim();
-    if (name.isEmpty()) {
-      return DEFAULT_FILE_NAME;
+    String name = fileName.replace('\\', '/');
+    int lastSlash = name.lastIndexOf('/');
+    if (lastSlash >= 0) {
+      name = name.substring(lastSlash + 1);
     }
-    return name.length() > MAX_FILE_NAME_LENGTH ? name.substring(0, MAX_FILE_NAME_LENGTH) : name;
+    return name.isBlank() ? "scores.csv" : name;
   }
 
-  /**
-   * Ánh xạ từ yêu cầu, hoặc dùng lại ánh xạ của lô gần nhất của bài (US-21/AC-2); sau đó kiểm tra
-   * các cột có trong tiêu đề của tệp.
-   */
+  private ReimportPolicy resolveReimportPolicy(ImportBatchCreateRequest request) {
+    ReimportPolicy policy = request == null ? null : request.getReimportPolicy();
+    if (policy == null) {
+      throw invalid("Thiếu chính sách nhập lại reimportPolicy");
+    }
+    if (policy != ReimportPolicy.REJECT_ON_CONFLICT) {
+      throw new BusinessRuleViolationException(
+          "Chính sách nhập lại [" + policy + "] chưa được hỗ trợ (chờ câu hỏi Q19)");
+    }
+    return policy;
+  }
+
   private ImportColumnMapping resolveMapping(
       ImportColumnMappingDto requested,
       String sectionId,
@@ -237,57 +223,61 @@ public class ImportBatchServiceImpl implements ImportBatchService {
             : requested.getStudentColumn().trim();
     Set<String> columns = new HashSet<>();
     columns.add(studentColumn.toLowerCase(Locale.ROOT));
-    Set<String> itemIds = new HashSet<>();
+    Set<String> itemKeys = new HashSet<>();
     List<ImportColumnMapping.Entry> entries = new ArrayList<>();
-    for (ImportColumnMappingDto.Item dto : requested.getItems()) {
+    for (ImportColumnMappingDto.Entry dto : requested.getItems()) {
       if (dto == null
           || dto.getColumn() == null
           || dto.getColumn().isBlank()
-          || dto.getItem() == null
-          || dto.getItem().isBlank()) {
+          || dto.getItemId() == null
+          || dto.getItemId().isBlank()) {
         throw invalid("Mỗi mục ánh xạ phải có column và item");
       }
       String column = dto.getColumn().trim();
       if (!columns.add(column.toLowerCase(Locale.ROOT))) {
         throw invalid("Cột [" + column + "] bị ánh xạ nhiều lần hoặc trùng cột mã sinh viên");
       }
-      AssessmentItem item = findItem(assessment, dto.getItem().trim());
-      if (!itemIds.add(item.getId())) {
-        throw invalid("Câu hỏi/tiêu chí [" + item.getCode() + "] bị ánh xạ từ nhiều cột");
+      AssessmentItem item = findItem(assessment, dto.getItemId().trim());
+      String cloId = dto.getCloId();
+      if (cloId == null || cloId.isBlank()) {
+        if (!item.getOutcomeMappings().isEmpty()) {
+          cloId = item.getOutcomeMappings().get(0).getCloId();
+        }
       }
-      entries.add(ImportColumnMapping.Entry.builder().column(column).itemId(item.getId()).build());
+      String key = item.getId() + ":" + (cloId == null ? "" : cloId);
+      if (!itemKeys.add(key)) {
+        throw new BusinessRuleViolationException(
+            "Câu hỏi [" + item.getCode() + "] bị ánh xạ từ nhiều cột");
+      }
+      entries.add(
+          ImportColumnMapping.Entry.builder()
+              .column(column)
+              .itemId(item.getId())
+              .cloId(cloId)
+              .build());
     }
     return ImportColumnMapping.builder().studentColumn(studentColumn).items(entries).build();
   }
 
-  /** Tìm theo {@code _id}, nếu không có thì theo {@code externalRef} (phải duy nhất). */
   private AssessmentItem findItem(Assessment assessment, String ref) {
     for (AssessmentItem item : assessment.getItems()) {
-      if (ref.equals(item.getId())) {
+      if (ref.equals(item.getId()) || ref.equalsIgnoreCase(item.getCode())) {
         return item;
       }
     }
-    List<AssessmentItem> byExternalRef =
-        assessment.getItems().stream().filter(item -> ref.equals(item.getExternalRef())).toList();
-    if (byExternalRef.size() == 1) {
-      return byExternalRef.get(0);
-    }
     throw new BusinessRuleViolationException(
-        byExternalRef.isEmpty()
-            ? "Không có câu hỏi/tiêu chí nào của bài khớp _id hoặc externalRef [" + ref + "]"
-            : "externalRef [" + ref + "] khớp nhiều câu hỏi/tiêu chí, hãy dùng _id");
+        "Không tìm thấy câu hỏi nào khớp với ID hoặc mã [" + ref + "]");
   }
-
-  // ------------------------------------------------------------------ US-22, US-23: kiểm tra
 
   @Override
   @Transactional
   public ImportBatchResponse validateBatch(String batchId, UserPrincipal actor) {
     ImportBatch batch = requireBatch(batchId);
-    if (batch.getStatus() == ImportBatchStatus.CONFIRMED
-        || batch.getStatus() == ImportBatchStatus.ROLLED_BACK) {
+    if (batch.getStatus() != ImportBatchStatus.UPLOADED
+        && batch.getStatus() != ImportBatchStatus.VALIDATED
+        && batch.getStatus() != ImportBatchStatus.HAS_ERRORS) {
       throw new BusinessRuleViolationException(
-          "Lô đang ở trạng thái " + batch.getStatus() + ", không kiểm tra lại được");
+          "Không thể kiểm tra lô ở trạng thái " + batch.getStatus());
     }
     Assessment assessment = loadAssessment(batch);
     requireScoreEntryAllowed(requireSection(batch.getSectionId()), assessment);
@@ -295,8 +285,20 @@ public class ImportBatchServiceImpl implements ImportBatchService {
     ScoreRowValidator.Result result = runValidation(batch, assessment);
     rowErrorRepository.deleteByBatchId(batch.getId());
     if (!result.errors().isEmpty()) {
-      rowErrorRepository.saveAll(
-          result.errors().stream().map(error -> toRowError(batch.getId(), error)).toList());
+      List<ImportRowError> errorDocs =
+          result.errors().stream()
+              .map(
+                  err ->
+                      ImportRowError.builder()
+                          .batchId(batch.getId())
+                          .rowNumber(err.rowNumber())
+                          .column(err.column())
+                          .errorType(err.errorType())
+                          .rawValue(err.rawValue())
+                          .message(err.message())
+                          .build())
+              .toList();
+      rowErrorRepository.insert(errorDocs);
     }
     batch.setStats(toStats(result));
     batch.setStatus(
@@ -312,7 +314,6 @@ public class ImportBatchServiceImpl implements ImportBatchService {
     return batchMapper.toResponse(saved);
   }
 
-  /** Đọc lại tệp đã lưu (kiểm checksum) và kiểm tra các dòng với dữ liệu hiện tại. */
   private ScoreRowValidator.Result runValidation(ImportBatch batch, Assessment assessment) {
     byte[] content = fileStorage.load(batch.getFileRef());
     if (!ChecksumUtils.sha256Hex(content).equals(batch.getFileChecksum())) {
@@ -326,72 +327,81 @@ public class ImportBatchServiceImpl implements ImportBatchService {
     List<ScoreRowValidator.Column> columns =
         mapping.getItems().stream()
             .map(
-                entry ->
-                    new ScoreRowValidator.Column(
-                        table.indexOf(entry.getColumn()),
-                        entry.getColumn(),
-                        entry.getItemId(),
-                        maxScoreOf(assessment, entry.getItemId())))
+                entry -> {
+                  String cloId = entry.getCloId();
+                  if (cloId == null) {
+                    AssessmentItem item = findItem(assessment, entry.getItemId());
+                    if (!item.getOutcomeMappings().isEmpty()) {
+                      cloId = item.getOutcomeMappings().get(0).getCloId();
+                    }
+                  }
+                  return new ScoreRowValidator.Column(
+                      table.indexOf(entry.getColumn()),
+                      entry.getColumn(),
+                      entry.getItemId(),
+                      cloId,
+                      maxScoreOf(assessment, entry.getItemId(), cloId));
+                })
             .toList();
+
     Set<String> existingKeys =
         scoreRepository
             .findBySectionIdAndAssessmentId(batch.getSectionId(), batch.getAssessmentId())
             .stream()
-            .map(score -> ScoreRowValidator.key(score.getStudentId(), score.getItemId()))
+            .map(
+                score ->
+                    ScoreRowValidator.key(
+                        score.getStudentId(), score.getItemId(), score.getCloId()))
             .collect(Collectors.toSet());
+
     return rowValidator.validate(
         table,
         table.indexOf(mapping.getStudentColumn()),
         mapping,
         columns,
         enrolledStudentIdByRef(batch.getSectionId()),
-        existingKeys,
-        batch.getEmptyCellAs());
+        existingKeys);
   }
 
-  private double maxScoreOf(Assessment assessment, String itemId) {
-    return assessment.getItems().stream()
-        .filter(item -> itemId.equals(item.getId()))
+  private double maxScoreOf(Assessment assessment, String itemId, String cloId) {
+    AssessmentItem item =
+        assessment.getItems().stream()
+            .filter(it -> itemId.equals(it.getId()))
+            .findFirst()
+            .orElseThrow(
+                () ->
+                    new BusinessRuleViolationException(
+                        "Câu hỏi " + itemId + " không còn trong bài đánh giá"));
+    return item.getOutcomeMappings().stream()
+        .filter(m -> cloId == null || cloId.equals(m.getCloId()))
         .findFirst()
-        .map(AssessmentItem::getMaxScore)
+        .map(OutcomeMapping::getMaxScore)
         .orElseThrow(
             () ->
                 new BusinessRuleViolationException(
-                    "Câu hỏi/tiêu chí " + itemId + " không còn trong bài đánh giá"));
+                    "CLO " + cloId + " không còn trong câu hỏi " + item.getCode()));
   }
 
-  /** Mã sinh viên -> studentId của những sinh viên đang ENROLLED trong lớp. */
   private Map<String, String> enrolledStudentIdByRef(String sectionId) {
-    List<String> studentIds =
-        enrollmentRepository.findBySectionIdAndStatus(sectionId, EnrollmentStatus.ENROLLED).stream()
-            .map(Enrollment::getStudentId)
-            .toList();
-    return studentRepository.findAllById(studentIds).stream()
-        .collect(
-            Collectors.toMap(Student::getStudentRef, Student::getId, (first, second) -> first));
-  }
-
-  private ImportRowError toRowError(String batchId, ScoreRowValidator.RowError error) {
-    return ImportRowError.builder()
-        .batchId(batchId)
-        .rowNumber(error.rowNumber())
-        .column(error.column())
-        .errorType(error.errorType())
-        .rawValue(error.rawValue())
-        .message(error.message())
-        .build();
+    List<Enrollment> enrolled =
+        enrollmentRepository.findBySectionIdAndStatus(sectionId, EnrollmentStatus.ENROLLED);
+    Set<String> studentIds =
+        enrolled.stream().map(Enrollment::getStudentId).collect(Collectors.toSet());
+    Map<String, String> refToId = new HashMap<>();
+    studentRepository
+        .findAllById(studentIds)
+        .forEach(student -> refToId.put(student.getStudentRef(), student.getId()));
+    return refToId;
   }
 
   private ImportStats toStats(ScoreRowValidator.Result result) {
     return ImportStats.builder()
         .totalRows(result.totalRows())
-        .validRows(result.totalRows() - result.errorRows())
         .errorRows(result.errorRows())
+        .validRows(result.totalRows() - result.errorRows())
         .scoreCount(result.drafts().size())
         .build();
   }
-
-  // ------------------------------------------------------------------ US-24: xác nhận
 
   @Override
   @Transactional
@@ -403,7 +413,6 @@ public class ImportBatchServiceImpl implements ImportBatchService {
     Assessment assessment = loadAssessment(batch);
     requireScoreEntryAllowed(requireSection(batch.getSectionId()), assessment);
 
-    // Kiểm tra lại với dữ liệu hiện tại: ghi danh hoặc điểm có thể đã đổi từ lúc validate.
     ScoreRowValidator.Result result = runValidation(batch, assessment);
     if (!result.errors().isEmpty()) {
       throw new BusinessRuleViolationException(
@@ -418,7 +427,6 @@ public class ImportBatchServiceImpl implements ImportBatchService {
     batch.setConfirmedBy(actor.getId());
     batch.setConfirmedAt(now);
     batch.setStats(toStats(result));
-    // Ghi lô trước: hai người xác nhận cùng lúc thì người sau thất bại (409) trước khi ghi điểm.
     ImportBatch saved = batchRepository.save(batch);
 
     scoreRepository.insert(
@@ -426,9 +434,9 @@ public class ImportBatchServiceImpl implements ImportBatchService {
             .map(draft -> toScore(draft, saved, assessment, actor, now))
             .toList());
 
-    if (assessmentBefore == AssessmentStatus.APPROVED) {
+    if (assessmentBefore == AssessmentStatus.LOCKED) {
       assessment.setStatus(AssessmentStatus.SCORE_ENTERED);
-      assessment.setLocked(AssessmentStatus.SCORE_ENTERED.locksStructure());
+      assessment.setLocked(true);
       assessmentRepository.save(assessment);
     }
 
@@ -460,13 +468,12 @@ public class ImportBatchServiceImpl implements ImportBatchService {
         .sectionId(batch.getSectionId())
         .assessmentId(assessment.getId())
         .itemId(draft.itemId())
+        .cloId(draft.cloId())
         .studentId(draft.studentId())
-        .status(draft.status())
         .rawScore(draft.rawScore())
         .maxScore(draft.maxScore())
         .importBatchId(batch.getId())
         .sourceRow(draft.sourceRow())
-        .revision(1)
         .updatedBy(actor.getId())
         .updatedAt(now)
         .build();
@@ -491,18 +498,13 @@ public class ImportBatchServiceImpl implements ImportBatchService {
     };
   }
 
-  // ------------------------------------------------------------------ hủy lô
-
   @Override
   @Transactional
   public ImportBatchResponse rollbackBatch(String batchId, UserPrincipal actor) {
     ImportBatch batch = requireBatch(batchId);
     if (batch.getStatus() == ImportBatchStatus.CONFIRMED) {
-      throw new BusinessRuleViolationException(
-          "Chưa hỗ trợ gỡ điểm của lô đã CONFIRMED (cần quyết định về audit action và kiểm tra"
-              + " calculation_runs, xem TD-36)");
-    }
-    if (batch.getStatus() == ImportBatchStatus.ROLLED_BACK) {
+      throw new BusinessRuleViolationException("Không thể hủy lô đã xác nhận (CONFIRMED)");
+    } else if (batch.getStatus() == ImportBatchStatus.ROLLED_BACK) {
       throw new BusinessRuleViolationException("Lô đã bị hủy trước đó");
     }
     batch.setStatus(ImportBatchStatus.ROLLED_BACK);
@@ -510,8 +512,6 @@ public class ImportBatchServiceImpl implements ImportBatchService {
     log.info("Hủy lô nhập điểm id=[{}] bởi user=[{}]", saved.getId(), actor.getUsername());
     return batchMapper.toResponse(saved);
   }
-
-  // ------------------------------------------------------------------ đọc
 
   @Override
   public ImportBatchResponse getBatch(String batchId) {
@@ -538,12 +538,6 @@ public class ImportBatchServiceImpl implements ImportBatchService {
             .map(batchMapper::toResponse));
   }
 
-  // ------------------------------------------------------------------ dùng chung
-
-  /**
-   * Điều kiện nhập điểm (plan F05b §4 quy tắc 2): bài APPROVED hoặc SCORE_ENTERED và theo ITEM, lớp
-   * chưa LOCKED, học kỳ còn OPEN (SCORE_LOCKED/CLOSED khóa nhập điểm, plan F05a quy tắc 2).
-   */
   private void requireScoreEntryAllowed(CourseSection section, Assessment assessment) {
     if (section.getStatus() == SectionStatus.LOCKED) {
       throw new BusinessRuleViolationException(
@@ -560,17 +554,11 @@ public class ImportBatchServiceImpl implements ImportBatchService {
       throw new BusinessRuleViolationException(
           "Học kỳ [" + term.getCode() + "] đang " + term.getStatus() + ", không nhập điểm");
     }
-    if (assessment.getStatus() != AssessmentStatus.APPROVED
+    if (assessment.getStatus() != AssessmentStatus.LOCKED
         && assessment.getStatus() != AssessmentStatus.SCORE_ENTERED) {
       throw new BusinessRuleViolationException(
-          "Chỉ nhập điểm khi bài đánh giá APPROVED hoặc SCORE_ENTERED, hiện là "
+          "Chỉ nhập điểm khi bài đánh giá LOCKED hoặc SCORE_ENTERED, hiện là "
               + assessment.getStatus());
-    }
-    if (assessment.getDataGranularity() != DataGranularity.ITEM) {
-      throw new BusinessRuleViolationException(
-          "Bài đánh giá không theo ITEM ("
-              + assessment.getDataGranularity()
-              + "), chưa hỗ trợ nhập");
     }
   }
 

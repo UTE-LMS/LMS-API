@@ -13,6 +13,8 @@ public interface AssessmentRepository extends MongoRepository<Assessment, String
 
   List<Assessment> findBySectionIdOrderByCodeAsc(String sectionId);
 
+  List<Assessment> findBySectionId(String sectionId);
+
   boolean existsBySyllabusIdAndScopeAndCode(String syllabusId, AssessmentScope scope, String code);
 
   boolean existsBySyllabusIdAndSectionIdAndCode(String syllabusId, String sectionId, String code);

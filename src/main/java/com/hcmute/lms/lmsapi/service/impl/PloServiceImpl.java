@@ -67,6 +67,7 @@ public class PloServiceImpl implements PloService {
             .contentOriginal(request.getContentOriginal())
             .contentSummary(request.getContentSummary())
             .capabilityLevelRaw(request.getCapabilityLevelRaw())
+            .passThreshold(request.getPassThreshold())
             .verification(
                 Verification.builder().status(VerificationStatus.NEEDS_CLARIFICATION).build())
             .reviewNote(request.getReviewNote())
@@ -99,6 +100,7 @@ public class PloServiceImpl implements PloService {
     plo.setContentOriginal(request.getContentOriginal());
     plo.setContentSummary(request.getContentSummary());
     plo.setCapabilityLevelRaw(request.getCapabilityLevelRaw());
+    plo.setPassThreshold(request.getPassThreshold());
     plo.setReviewNote(request.getReviewNote());
 
     try {

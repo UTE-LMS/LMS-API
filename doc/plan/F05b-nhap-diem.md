@@ -1,23 +1,24 @@
-# F05b — Nhập điểm từ tệp
+# F05b — Nhập điểm trực tiếp từng CLO của từng câu hỏi
 
-Story: **US-21** tải tệp + ánh xạ cột (C), **US-22** kiểm tra, báo lỗi theo dòng/cột (C), **US-23** chọn BLANK/MISSING + chính
+Story: **US-21** nhập điểm / tải tệp + ánh xạ cột `(itemId, cloId)` (C), **US-22** kiểm tra, báo lỗi theo dòng/cột (C), **US-23** chọn BLANK/MISSING + chính
 sách nhập lại (C; chỉ `REJECT_ON_CONFLICT` cam kết), **US-24** xác nhận trong một transaction hoặc rollback (C), **US-25** sửa
 điểm đơn lẻ có lý do (MR). Giai đoạn P3. Chủ trì đề xuất: IT (IBS cho cách hiểu ô trống). Package: `scoreimport`.
-Phụ thuộc: `00` (transaction, audit), `F01`, `F04` (bài `APPROVED`), `F05a` (lớp, sinh viên, ghi danh).
-**Trạng thái hiện thực (2026-11-10): US-21, 22, 23, 24 đã có mã và test trên nhánh `feat/f05b-score-import` (xem §11); US-25 chưa làm (mở rộng).** Mã nằm ở các package theo tầng của repo (`controller`, `service`, `service.impl`, `document`, ...), không có package `scoreimport` riêng.
+Phụ thuộc: `00` (transaction, audit), `F01`, `F04` (bài `LOCKED` / `SCORE_ENTERED`), `F05a` (lớp, sinh viên, ghi danh).
+**Trạng thái hiện thực (2026-11-10): US-21..24 đã merge qua PR #83 (theo schema cũ) và sẽ được refactor theo ADR 0014 (nhập điểm theo cặp `(itemId, cloId)`, vắng thi/bỏ trống = 0.0).** Mã nằm ở các package theo tầng của repo (`controller`, `service`, `service.impl`, `document`, ...).
 **Đây là mô-đun lõi** (coverage ≥ 70%, cả hai sinh viên phải giải thích được).
 
 ## 1. Mục tiêu
 
-Tiếp nhận điểm **có sẵn sau khi thi** từ tệp CSV/Excel (xuất từ Moodle hoặc bảng tính), kiểm tra, báo lỗi chính xác theo dòng/cột,
+Tiếp nhận điểm **của từng CLO trong từng câu hỏi** do giảng viên nhập trực tiếp hoặc tải lên từ tệp CSV/Excel (sau khi ma trận bài đánh giá đã được giảng viên khóa `LOCKED`), kiểm tra đối chiếu với `maxScore` của từng cặp `(itemId, cloId)`, báo lỗi chính xác theo dòng/cột,
 cho người dùng xác nhận, rồi ghi `scores` **trong một transaction** hoặc không ghi gì. Mọi điểm truy vết được về lô nhập và dòng
 tệp gốc.
 
 ## 2. Đọc trước
 
-- `GiaiThich_CoSoDuLieu.md` nguyên tắc 7, 10, §4.20–4.22, §6, Q05, Q13, Q19.
-- `database_import.js`: khối `import_batches`, `import_row_errors`, `scores` (validator `oneOf` theo `status`).
-- `PLO_DB_UPDATE.md` §5 mục 1–2 (ranh giới transaction; chỉ nhập điểm khi bài `APPROVED`/`SCORE_ENTERED`).
+- `dac-ta-thay-doi-nghiep-vu-va-phuong-an-tinh-clo.md` §3.3, §3.4, §6.2.
+- `GiaiThich_CoSoDuLieu.md` (v0.6) nguyên tắc 7, 8, 10, §4.20–4.22, §6, Q05, Q13, Q15, Q19.
+- `database_import.js` (v0.6): khối `import_batches`, `import_row_errors`, `scores` (khóa duy nhất `{sectionId, assessmentId, itemId, cloId, studentId}`).
+- `adr/0013-import-ctdt-de-cuong-va-nhap-diem-clo-truc-tiep.md`.
 
 ## 3. Collection và trường chính
 
@@ -25,27 +26,27 @@ tệp gốc.
 |---|---|
 | `import_batches` | `sectionId`, `assessmentId`, `fileName`, `fileChecksum` (SHA-256), `fileRef` (chuỗi, nơi lưu tệp gốc), `sourceSystem` (`EXCEL`/`CSV`/`MOODLE_EXPORT`), `columnMapping`, `emptyCellAs` (`BLANK`/`MISSING`), `reimportPolicy` (`REJECT_ON_CONFLICT`/`OVERWRITE`/`UPDATE_BLANK_ONLY`), `status` (`UPLOADED`/`VALIDATED`/`HAS_ERRORS`/`CONFIRMED`/`ROLLED_BACK`), `stats` (`totalRows`, `validRows`, `errorRows`), `uploadedBy`, `confirmedBy`, `confirmedAt` |
 | `import_row_errors` | `batchId`, `rowNumber`, `column`, `errorType` (`INVALID_STUDENT_CODE`, `SCORE_OUT_OF_RANGE`, `DUPLICATE_RECORD`, `MISSING_FIELD`), `rawValue`, `message` |
-| `scores` | `sectionId`, `assessmentId`, `itemId`, `studentId`, `status`, `rawScore`, `maxScore` (snapshot), `rubricLevel` (1–4, cho CRITERION), `importBatchId`, `sourceRow`, `revision`, `updatedBy`, `updatedAt`. Duy nhất `(sectionId, assessmentId, itemId, studentId)` |
+| `scores` | `sectionId`, `assessmentId`, `itemId`, **`cloId`**, `studentId`, `status`, `rawScore`, `maxScore` (snapshot từ `outcomeMappings[].maxScore`), `importBatchId`, `sourceRow`, `revision`, `updatedBy`, `updatedAt`. Duy nhất `(sectionId, assessmentId, itemId, cloId, studentId)` (đã bỏ `rubricLevel` theo ADR 0013) |
 
 `scores.status ∈ SCORED, BLANK, ABSENT, NOT_GRADED, EXEMPT, MISSING`. Validator: `SCORED`/`BLANK` bắt buộc `rawScore` + `maxScore`; bốn trạng
 thái còn lại `rawScore = null`; `BLANK ⇒ rawScore = 0`; `rawScore ≤ maxScore`.
 
-## 4. Quy tắc nghiệp vụ
+## 4. Quy tắc nghiệp vụ (cập nhật theo ADR 0013)
 
 1. **Thiếu dữ liệu ≠ 0.** Ô trống khi nhập là `BLANK` (đã dự thi, bỏ trống = 0 có ghi nhận) hoặc `MISSING` (thiếu dữ liệu, `null`) **do người nhập
-   chọn cho từng lô** (`emptyCellAs`); hệ thống không tự đoán. `ABSENT`, `NOT_GRADED`, `EXEMPT` đến từ cột trạng thái trong tệp hoặc quy ước ánh xạ **[CHỜ Q13]**; không suy từ ô trống.
-2. **Điều kiện nhập:** bài đánh giá phải `APPROVED` hoặc `SCORE_ENTERED`; học kỳ/lớp chưa khóa (F05a); `dataGranularity = ITEM`. Vi phạm → từ chối cả lô.
+   chọn cho từng lô** (`emptyCellAs`); hệ thống không tự đoán.
+2. **Điều kiện nhập:** bài đánh giá phải ở trạng thái `LOCKED` hoặc `SCORE_ENTERED` (`isLocked = true`); học kỳ/lớp chưa khóa (F05a). Vi phạm → từ chối cả lô (422).
 3. **Người dùng ngoài phạm vi lớp bị từ chối** (403); giảng viên chỉ nhập cho lớp mình.
-4. **Ánh xạ cột:** cột tệp ↔ `items._id` hoặc `items.externalRef`; lưu `columnMapping` trong lô để dùng lại. Cột sinh viên ↔ `studentRef` (chỉ sinh viên **đang ghi danh** lớp đó).
-5. **Kiểm tra từng dòng** (4 loại lỗi trong enum): mã sinh viên không có/không ghi danh (`INVALID_STUDENT_CODE`), điểm âm hoặc > `maxScore`
-   (`SCORE_OUT_OF_RANGE`), trùng `(sectionId, assessmentId, itemId, studentId)` trong tệp hoặc với dữ liệu đã có (`DUPLICATE_RECORD`), thiếu trường bắt buộc
-   (`MISSING_FIELD`). Lỗi cấp tệp (rỗng, sai định dạng, thiếu cột bắt buộc) chưa nằm trong enum: trả 400 và không tạo lô, hoặc tạo lô `HAS_ERRORS` với 1 dòng lỗi `rowNumber = 0` **[ĐỀ XUẤT, chọn một và ghi lại]**.
-6. **Checksum SHA-256** của tệp: cùng `(sectionId, assessmentId, fileChecksum)` đã `CONFIRMED` ⇒ cảnh báo nhập trùng (từ chối hoặc hỏi lại).
-7. **Chính sách nhập lại** khi `(item, student)` đã có điểm: cam kết `REJECT_ON_CONFLICT` (từ chối cả lô hoặc dòng đó, ghi `DUPLICATE_RECORD`). `OVERWRITE`, `UPDATE_BLANK_ONLY` là MR **[CHỜ Q19]**.
+4. **Điểm nhập trực tiếp theo từng cặp `(itemId, cloId)`:** Mỗi cột điểm trong tệp (hoặc trên lưới nhập điểm) ánh xạ tới đúng một cặp `(itemId, cloId)` đã khai báo trong `assessment.items[].outcomeMappings`. Nếu một câu hỏi có 2 CLO (ví dụ `Câu 2 - CLO1 (max 2.0)` và `Câu 2 - CLO2 (max 3.0)`), giảng viên nhập điểm riêng cho từng cột; hệ thống **không** tự chia điểm bằng trọng số.
+5. **Kiểm tra từng dòng** (4 loại lỗi trong enum): mã sinh viên không có/không ghi danh (`INVALID_STUDENT_CODE`), điểm âm hoặc > `maxScore` của cặp `(itemId, cloId)` đó
+   (`SCORE_OUT_OF_RANGE`), trùng `(sectionId, assessmentId, itemId, cloId, studentId)` trong tệp hoặc với dữ liệu đã có (`DUPLICATE_RECORD`), thiếu trường bắt buộc
+   (`MISSING_FIELD`).
+6. **Checksum SHA-256** của tệp: cùng `(sectionId, assessmentId, fileChecksum)` đã `CONFIRMED` ⇒ cảnh báo/từ chối nhập trùng.
+7. **Chính sách nhập lại** khi `(itemId, cloId, studentId)` đã có điểm: cam kết `REJECT_ON_CONFLICT`.
 8. **Xác nhận (US-24) là một transaction** nhiều document: cập nhật `import_batches.status = CONFIRMED` (+ `confirmedBy/At`), ghi hàng loạt `scores`, chuyển
-   `assessments.status → SCORE_ENTERED` nếu đây là lô đầu, ghi `audit_logs` (`IMPORT_CONFIRM`). Lỗi giữa chừng ⇒ **không để lại điểm nửa vời**. Cần MongoDB replica set.
-9. Lô có lỗi (`HAS_ERRORS`) **không xác nhận được**. **[ĐỀ XUẤT]** hoặc sửa tệp rồi tải lại (lô mới), hoặc xác nhận phần hợp lệ khi người dùng chọn rõ — mặc định: không cho xác nhận.
-10. `scores.maxScore` = `items.maxScore` **tại thời điểm nhập** (snapshot). `sourceRow` = số dòng trong tệp gốc. `revision` bắt đầu từ 1.
+   `assessments.status → SCORE_ENTERED` nếu đang ở `LOCKED`, ghi `audit_logs` (`IMPORT_CONFIRM`). Lỗi giữa chừng ⇒ **không để lại điểm nửa vời**. Cần MongoDB replica set.
+9. Lô có lỗi (`HAS_ERRORS`) **không xác nhận được**.
+10. `scores.maxScore` = `outcomeMappings[].maxScore` của cặp `(itemId, cloId)` **tại thời điểm nhập** (snapshot). `sourceRow` = số dòng trong tệp gốc. `revision` bắt đầu từ 1.
 11. **Sửa điểm đơn lẻ (US-25, MR):** dùng khóa lạc quan `revision` (lệch ⇒ 409), **bắt buộc có lý do**, ghi `audit_logs` (`SCORE_UPDATE`) có `before`/`after`, từ chối khi học kỳ/lớp đã khóa. Sau khi sửa, đánh dấu các `calculation_runs` liên quan `isStale = true` (F06).
 12. Lưu tệp gốc: `fileRef` chỉ là tham chiếu (đường dẫn/khóa); **nơi lưu là quyết định riêng** (ADR). Không lưu bài làm của sinh viên.
 

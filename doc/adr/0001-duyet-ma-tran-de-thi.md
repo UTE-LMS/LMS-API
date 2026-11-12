@@ -1,6 +1,6 @@
 # ADR 0001 — Duyệt ma trận đề thi trước khi nhập điểm
 
-- **Trạng thái:** ĐÃ CHẤP NHẬN phương án A. GVHD đã xác nhận (Q11) theo báo cáo của sinh viên ngày 2026-11-08; **ngày ký và người ký: [ĐIỀN]**.
+- **Trạng thái:** **ĐÃ BỊ THAY THẾ (SUPERSEDED) bởi [ADR 0013](file:///D:/Code/Project/LMS-API/doc/adr/0013-import-ctdt-de-cuong-va-nhap-diem-clo-truc-tiep.md) ngày 2026-11-10** (Giảng viên lớp học phần tự khóa ma trận `DRAFT -> LOCKED`, bỏ bước Trưởng bộ môn duyệt ma trận). *(Lịch sử cũ: ĐÃ CHẤP NHẬN phương án A ngày 2026-11-08).*
 - **Ngày:** 2026-10-27
 - **Người soạn:** Claude Code theo yêu cầu của sinh viên; sinh viên rà soát và ghi tên người chốt: [ĐIỀN]
 

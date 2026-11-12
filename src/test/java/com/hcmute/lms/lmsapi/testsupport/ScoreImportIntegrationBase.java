@@ -62,7 +62,7 @@ public abstract class ScoreImportIntegrationBase extends IntegrationTestBase {
     section.setSyllabusId(syllabus.getId());
     section.setTermId(term.getId());
     section = mongo().save(section);
-    assessment = fixtures.sectionAssessment(section, AssessmentStatus.APPROVED, 4, 6);
+    assessment = fixtures.sectionAssessment(section, AssessmentStatus.LOCKED, 4, 6);
 
     s1 = enroll(EnrollmentStatus.ENROLLED);
     s2 = enroll(EnrollmentStatus.ENROLLED);
@@ -85,7 +85,7 @@ public abstract class ScoreImportIntegrationBase extends IntegrationTestBase {
   }
 
   protected String externalRef(int index) {
-    return assessment.getItems().get(index).getExternalRef();
+    return assessment.getItems().get(index).getCode();
   }
 
   /** Ánh xạ mặc định: cột Q1 theo externalRef của câu 1, cột Q2 theo _id của câu 2. */
