@@ -75,8 +75,7 @@ class CloValidationTest {
         CloRequest.builder()
             .code("CLO1")
             .bloomLevel(3)
-            .measurement(
-                CloMeasurementDto.builder().defaultPassThreshold(0.6).build())
+            .measurement(CloMeasurementDto.builder().defaultPassThreshold(0.6).build())
             .build();
     assertThat(validator.validate(reqValid)).isEmpty();
 
@@ -85,8 +84,7 @@ class CloValidationTest {
         CloRequest.builder()
             .code("CLO1")
             .bloomLevel(3)
-            .measurement(
-                CloMeasurementDto.builder().defaultPassThreshold(1.5).build())
+            .measurement(CloMeasurementDto.builder().defaultPassThreshold(1.5).build())
             .build();
     Set<ConstraintViolation<CloRequest>> violations = validator.validate(reqInvalid);
     assertThat(violations).hasSize(1);

@@ -20,8 +20,8 @@ import org.springframework.data.mongodb.core.mapping.Field;
 import org.springframework.data.mongodb.core.mapping.FieldType;
 
 /**
- * Bài đánh giá trong collection assessments (ADR 0014, Schema v0.7).
- * Vòng đời: DRAFT -> LOCKED -> SCORE_ENTERED.
+ * Bài đánh giá trong collection assessments (ADR 0014, Schema v0.7). Vòng đời: DRAFT -> LOCKED ->
+ * SCORE_ENTERED.
  */
 @Data
 @Builder
@@ -89,9 +89,7 @@ public class Assessment {
   @Field("items")
   private List<AssessmentItem> items = new ArrayList<>();
 
-  /**
-   * Khóa lạc quan.
-   */
+  /** Khóa lạc quan. */
   @Version
   @Field("revision")
   private Long revision;

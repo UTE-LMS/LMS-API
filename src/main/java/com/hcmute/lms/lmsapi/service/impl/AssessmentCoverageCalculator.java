@@ -12,9 +12,7 @@ import java.util.Map;
 import java.util.TreeMap;
 import org.springframework.stereotype.Component;
 
-/**
- * Tính độ phủ của bài đánh giá theo CLO và theo mức Bloom từ items[] (ADR 0014, Schema v0.7).
- */
+/** Tính độ phủ của bài đánh giá theo CLO và theo mức Bloom từ items[] (ADR 0014, Schema v0.7). */
 @Component
 public class AssessmentCoverageCalculator {
 

@@ -7,9 +7,7 @@ import lombok.NoArgsConstructor;
 import org.springframework.data.mongodb.core.mapping.Field;
 import org.springframework.data.mongodb.core.mapping.FieldType;
 
-/**
- * CLO mà câu hỏi đo lường và điểm tối đa của câu hỏi dành cho CLO đó (v0.7).
- */
+/** CLO mà câu hỏi đo lường và điểm tối đa của câu hỏi dành cho CLO đó (v0.7). */
 @Data
 @Builder
 @NoArgsConstructor

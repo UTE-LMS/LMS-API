@@ -278,8 +278,7 @@ class CloIntegrationTest extends IntegrationTestBase {
             .code("CLO1")
             .contentOriginal("Hiểu các khái niệm cơ bản về lập trình hướng đối tượng")
             .bloomLevel(2)
-            .measurement(
-                CloMeasurementDto.builder().defaultPassThreshold(0.5).build())
+            .measurement(CloMeasurementDto.builder().defaultPassThreshold(0.5).build())
             .build();
 
     mockMvc

@@ -10,9 +10,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * DTO tỷ lệ % đóng góp W_{p,j} của bài kiểm tra cho CLO.
- */
+/** DTO tỷ lệ % đóng góp W_{p,j} của bài kiểm tra cho CLO. */
 @Data
 @Builder
 @NoArgsConstructor

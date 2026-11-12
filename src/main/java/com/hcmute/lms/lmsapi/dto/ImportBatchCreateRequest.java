@@ -7,9 +7,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * Tham số tạo lô nhập (ADR 0014, v0.7).
- */
+/** Tham số tạo lô nhập (ADR 0014, v0.7). */
 @Data
 @Builder
 @NoArgsConstructor

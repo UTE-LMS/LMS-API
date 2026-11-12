@@ -14,9 +14,7 @@ import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/**
- * Giá trị kỳ vọng được tính tay từ nội dung CSV nhỏ trong từng test (ADR 0014, v0.7).
- */
+/** Giá trị kỳ vọng được tính tay từ nội dung CSV nhỏ trong từng test (ADR 0014, v0.7). */
 @DisplayName("F05b: ScoreRowValidator kiểm tra từng dòng điểm")
 class ScoreRowValidatorTest {
 
@@ -69,7 +67,8 @@ class ScoreRowValidatorTest {
   }
 
   @Test
-  @DisplayName("US-22/AC-1: maxScore + 0,01 là SCORE_OUT_OF_RANGE đúng dòng 2, cột Q1, kèm giá trị gốc")
+  @DisplayName(
+      "US-22/AC-1: maxScore + 0,01 là SCORE_OUT_OF_RANGE đúng dòng 2, cột Q1, kèm giá trị gốc")
   void scoreJustAboveMaxIsReported() {
     ScoreRowValidator.Result result = run("studentRef,Q1,Q2\nS1,4.01,6\nS2,4,6\n");
 
@@ -82,7 +81,8 @@ class ScoreRowValidatorTest {
   }
 
   @Test
-  @DisplayName("US-22/AC-1: điểm âm, chữ, NaN, ký hiệu khoa học, nhiều dấu thập phân đều lỗi; dấu phẩy thập phân hợp lệ")
+  @DisplayName(
+      "US-22/AC-1: điểm âm, chữ, NaN, ký hiệu khoa học, nhiều dấu thập phân đều lỗi; dấu phẩy thập phân hợp lệ")
   void invalidNumbersAreRejected() {
     for (String bad : new String[] {"-0.5", "abc", "NaN", "Infinity", "1e1", "1.2.3", "1 2"}) {
       ScoreRowValidator.Result result = run("studentRef,Q1,Q2\nS1," + bad + ",6\n");
@@ -117,7 +117,8 @@ class ScoreRowValidatorTest {
   }
 
   @Test
-  @DisplayName("US-22/AC-2: dòng ngắn hơn tiêu đề là MISSING_FIELD (khác ô trống); dòng thừa ô là lỗi cả dòng")
+  @DisplayName(
+      "US-22/AC-2: dòng ngắn hơn tiêu đề là MISSING_FIELD (khác ô trống); dòng thừa ô là lỗi cả dòng")
   void shortAndLongRowsAreMissingField() {
     ScoreRowValidator.Result shortRow = run("studentRef,Q1,Q2\nS1,4\n");
     assertThat(shortRow.errors())
@@ -142,7 +143,8 @@ class ScoreRowValidatorTest {
   }
 
   @Test
-  @DisplayName("US-22/AC-2: mã sinh viên trống, lạ/không ghi danh, trùng trong tệp -> đúng loại lỗi")
+  @DisplayName(
+      "US-22/AC-2: mã sinh viên trống, lạ/không ghi danh, trùng trong tệp -> đúng loại lỗi")
   void studentCodeErrors() {
     ScoreRowValidator.Result result = run("studentRef,Q1,Q2\n,4,6\nS9,4,6\nS1,4,6\nS1,3,5\n");
 
@@ -200,7 +202,8 @@ class ScoreRowValidatorTest {
   }
 
   @Test
-  @DisplayName("US-22/AC-3 (biên): 1 lỗi trong 1.000 dòng -> đúng 1 lỗi ở dòng 501, 999 dòng hợp lệ")
+  @DisplayName(
+      "US-22/AC-3 (biên): 1 lỗi trong 1.000 dòng -> đúng 1 lỗi ở dòng 501, 999 dòng hợp lệ")
   void oneErrorInAThousandRows() {
     List<ScoreRowValidator.Column> single = List.of(columns.get(0));
     StringBuilder csv = new StringBuilder("studentRef,Q1\n");
@@ -226,7 +229,8 @@ class ScoreRowValidatorTest {
   }
 
   @Test
-  @DisplayName("US-24: lớp 45 ghi danh, tệp chỉ có 40 dòng -> 40 điểm, 5 sinh viên không có điểm và không bị báo lỗi")
+  @DisplayName(
+      "US-24: lớp 45 ghi danh, tệp chỉ có 40 dòng -> 40 điểm, 5 sinh viên không có điểm và không bị báo lỗi")
   void enrolledStudentsAbsentFromTheFileGetNoScores() {
     List<ScoreRowValidator.Column> single = List.of(columns.get(0));
     Map<String, String> classOf45 = new HashMap<>();

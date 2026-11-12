@@ -9,9 +9,7 @@ import lombok.NoArgsConstructor;
 import org.springframework.data.mongodb.core.mapping.Field;
 import org.springframework.data.mongodb.core.mapping.FieldType;
 
-/**
- * Ánh xạ cột tệp điểm: cột sinh viên và danh sách (cột điểm, itemId, cloId).
- */
+/** Ánh xạ cột tệp điểm: cột sinh viên và danh sách (cột điểm, itemId, cloId). */
 @Data
 @Builder
 @NoArgsConstructor

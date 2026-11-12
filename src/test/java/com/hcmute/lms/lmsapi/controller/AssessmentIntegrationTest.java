@@ -96,8 +96,7 @@ class AssessmentIntegrationTest extends IntegrationTestBase {
     return OutcomeMappingDto.builder().cloId(clo.getId()).maxScore(maxScore).build();
   }
 
-  private AssessmentItemDto question(
-      String code, Integer bloom, OutcomeMappingDto... mappings) {
+  private AssessmentItemDto question(String code, Integer bloom, OutcomeMappingDto... mappings) {
     return AssessmentItemDto.builder()
         .code(code)
         .bloomLevel(bloom)
@@ -304,16 +303,12 @@ class AssessmentIntegrationTest extends IntegrationTestBase {
     AssessmentRequest badCloWeight =
         sectionRequest()
             .cloWeights(
-                List.of(
-                    AssessmentCloWeightDto.builder().cloId(clo1.getId()).weight(1.5).build()))
+                List.of(AssessmentCloWeightDto.builder().cloId(clo1.getId()).weight(1.5).build()))
             .build();
     mockMvc
         .perform(
             postAs(
-                lecturerToken,
-                "/api/v1/sections/{id}/assessments",
-                badCloWeight,
-                section.getId()))
+                lecturerToken, "/api/v1/sections/{id}/assessments", badCloWeight, section.getId()))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
   }
@@ -608,7 +603,8 @@ class AssessmentIntegrationTest extends IntegrationTestBase {
         .perform(
             postAs(lecturerToken, "/api/v1/sections/{id}/assessments", reqOver, section.getId()))
         .andExpect(status().isUnprocessableEntity())
-        .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("vượt quá 100%")));
+        .andExpect(
+            jsonPath("$.message").value(org.hamcrest.Matchers.containsString("vượt quá 100%")));
 
     // Bài 2: CLO1 = 0.3 (tổng CLO1 = 0.7 + 0.3 = 1.0 <= 1.0, CLO2 = 0.3 + 0.1 = 0.4 <= 1.0) -> 201
     AssessmentRequest reqValid =

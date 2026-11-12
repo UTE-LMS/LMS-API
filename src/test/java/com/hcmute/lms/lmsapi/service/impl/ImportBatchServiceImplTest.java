@@ -96,11 +96,7 @@ class ImportBatchServiceImplTest {
     termId = new ObjectId().toHexString();
     itemId = new ObjectId().toHexString();
     cloId = new ObjectId().toHexString();
-    actor =
-        UserPrincipal.builder()
-            .id(new ObjectId().toHexString())
-            .username("giangvien")
-            .build();
+    actor = UserPrincipal.builder().id(new ObjectId().toHexString()).username("giangvien").build();
   }
 
   private void stubOpenSectionAndAssessment() {
@@ -179,9 +175,7 @@ class ImportBatchServiceImplTest {
     when(batchRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
     for (String raw :
-        new String[] {
-          "C:\\Users\\gv\\diem.csv", "../../etc/diem.csv", null, "  ", "dir/"
-        }) {
+        new String[] {"C:\\Users\\gv\\diem.csv", "../../etc/diem.csv", null, "  ", "dir/"}) {
       service.createBatch(sectionId, assessmentId, raw, CSV, request(), actor);
     }
 

@@ -14,8 +14,7 @@ import java.util.regex.Pattern;
 import org.springframework.stereotype.Component;
 
 /**
- * Kiểm tra từng dòng của tệp điểm (ADR 0014, v0.7).
- * Ô trống hoặc vắng thi mặc định rawScore = 0.0.
+ * Kiểm tra từng dòng của tệp điểm (ADR 0014, v0.7). Ô trống hoặc vắng thi mặc định rawScore = 0.0.
  */
 @Component
 public class ScoreRowValidator {

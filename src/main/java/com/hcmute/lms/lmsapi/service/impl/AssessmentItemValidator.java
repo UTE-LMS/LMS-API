@@ -76,11 +76,9 @@ public class AssessmentItemValidator {
   }
 
   /**
-   * Kiểm tra tính hợp lệ của cloWeights:
-   * 1. Không trùng cloId
-   * 2. Trọng số mỗi CLO trong (0, 1]
-   * 3. Mọi cloId trong items[] phải có trong cloWeights và ngược lại
-   * 4. Tổng trọng số tích lũy của từng CLO qua các bài đã LOCKED / SCORE_ENTERED trong cùng sectionId không vượt quá 1.0 (100%)
+   * Kiểm tra tính hợp lệ của cloWeights: 1. Không trùng cloId 2. Trọng số mỗi CLO trong (0, 1] 3.
+   * Mọi cloId trong items[] phải có trong cloWeights và ngược lại 4. Tổng trọng số tích lũy của
+   * từng CLO qua các bài đã LOCKED / SCORE_ENTERED trong cùng sectionId không vượt quá 1.0 (100%)
    */
   public void validateCloWeights(
       String syllabusId,
@@ -114,7 +112,8 @@ public class AssessmentItemValidator {
         }
       }
       if (!declaredCloIds.equals(itemCloIds)) {
-        throw rule("Danh sách CLO trong cloWeights phải khớp chính xác với các CLO xuất hiện trong câu hỏi (items)");
+        throw rule(
+            "Danh sách CLO trong cloWeights phải khớp chính xác với các CLO xuất hiện trong câu hỏi (items)");
       }
     }
 

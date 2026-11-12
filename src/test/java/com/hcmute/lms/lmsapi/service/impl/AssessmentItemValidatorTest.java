@@ -69,10 +69,7 @@ class AssessmentItemValidatorTest {
   }
 
   private AssessmentItemDto item(String code, OutcomeMappingDto... mappings) {
-    return AssessmentItemDto.builder()
-        .code(code)
-        .outcomeMappings(List.of(mappings))
-        .build();
+    return AssessmentItemDto.builder().code(code).outcomeMappings(List.of(mappings)).build();
   }
 
   private void assertRejected(AssessmentItemDto item, String messagePart) {

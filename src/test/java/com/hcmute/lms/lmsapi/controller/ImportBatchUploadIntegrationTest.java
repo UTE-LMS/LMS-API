@@ -402,8 +402,7 @@ class ImportBatchUploadIntegrationTest extends ScoreImportIntegrationBase {
   }
 
   @Test
-  @DisplayName(
-      "US-21: ánh xạ hai cột cùng khớp một câu hỏi -> 422")
+  @DisplayName("US-21: ánh xạ hai cột cùng khớp một câu hỏi -> 422")
   void us21_duplicateItemMapping() throws Exception {
     mockMvc
         .perform(

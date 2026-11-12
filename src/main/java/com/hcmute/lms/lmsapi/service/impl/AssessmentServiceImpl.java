@@ -73,12 +73,7 @@ public class AssessmentServiceImpl implements AssessmentService {
 
     Assessment assessment =
         newAssessment(
-            AssessmentScope.SYLLABUS_TEMPLATE,
-            syllabusId,
-            null,
-            request,
-            null,
-            request.getItems());
+            AssessmentScope.SYLLABUS_TEMPLATE, syllabusId, null, request, null, request.getItems());
     return save(assessment, code);
   }
 
@@ -210,7 +205,11 @@ public class AssessmentServiceImpl implements AssessmentService {
     assessment.setStatus(AssessmentStatus.LOCKED);
     assessment.setLocked(true);
     Assessment saved = assessmentRepository.save(assessment);
-    log.info("Khóa bài đánh giá id=[{}] mã [{}] bởi actor=[{}]", saved.getId(), saved.getCode(), actorId);
+    log.info(
+        "Khóa bài đánh giá id=[{}] mã [{}] bởi actor=[{}]",
+        saved.getId(),
+        saved.getCode(),
+        actorId);
 
     auditService.record(
         AuditAction.ASSESSMENT_LOCK,
@@ -241,7 +240,11 @@ public class AssessmentServiceImpl implements AssessmentService {
     assessment.setStatus(AssessmentStatus.DRAFT);
     assessment.setLocked(false);
     Assessment saved = assessmentRepository.save(assessment);
-    log.info("Mở khóa bài đánh giá id=[{}] mã [{}] bởi actor=[{}]", saved.getId(), saved.getCode(), actorId);
+    log.info(
+        "Mở khóa bài đánh giá id=[{}] mã [{}] bởi actor=[{}]",
+        saved.getId(),
+        saved.getCode(),
+        actorId);
 
     auditService.record(
         AuditAction.ASSESSMENT_UNLOCK,
@@ -264,12 +267,14 @@ public class AssessmentServiceImpl implements AssessmentService {
     }
     if (scoreRepository.existsByAssessmentId(id)) {
       throw new AppException(
-          ErrorCode.CONFLICT,
-          HttpStatus.CONFLICT,
-          "Không thể xóa bài đánh giá đã có điểm");
+          ErrorCode.CONFLICT, HttpStatus.CONFLICT, "Không thể xóa bài đánh giá đã có điểm");
     }
     assessmentRepository.delete(assessment);
-    log.info("Xóa bài đánh giá id=[{}] mã [{}] bởi actor=[{}]", assessment.getId(), assessment.getCode(), actorId);
+    log.info(
+        "Xóa bài đánh giá id=[{}] mã [{}] bởi actor=[{}]",
+        assessment.getId(),
+        assessment.getCode(),
+        actorId);
   }
 
   private Assessment newAssessment(

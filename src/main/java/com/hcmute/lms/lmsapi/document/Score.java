@@ -12,8 +12,8 @@ import org.springframework.data.mongodb.core.mapping.Field;
 import org.springframework.data.mongodb.core.mapping.FieldType;
 
 /**
- * Điểm của một sinh viên ở một câu hỏi gắn với CLO (ADR 0014, DB Schema v0.7).
- * Vắng thi hoặc bỏ trống câu hỏi lưu trực tiếp rawScore = 0.0 (đã loại bỏ status và rubricLevel).
+ * Điểm của một sinh viên ở một câu hỏi gắn với CLO (ADR 0014, DB Schema v0.7). Vắng thi hoặc bỏ
+ * trống câu hỏi lưu trực tiếp rawScore = 0.0 (đã loại bỏ status và rubricLevel).
  */
 @Data
 @Builder
@@ -46,7 +46,10 @@ public class Score {
   @Field("rawScore")
   private Double rawScore;
 
-  /** Điểm tối đa của câu đối với CLO này tại thời điểm nhập (snapshot từ outcomeMappings[].maxScore). */
+  /**
+   * Điểm tối đa của câu đối với CLO này tại thời điểm nhập (snapshot từ
+   * outcomeMappings[].maxScore).
+   */
   @Field("maxScore")
   private Double maxScore;
 

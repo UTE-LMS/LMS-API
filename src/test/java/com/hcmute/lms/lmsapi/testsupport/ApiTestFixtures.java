@@ -329,11 +329,7 @@ public final class ApiTestFixtures {
             .status(status)
             .locked(status.locksStructure())
             .cloWeights(
-                List.of(
-                    AssessmentCloWeight.builder()
-                        .cloId(dummyCloId)
-                        .weight(1.0)
-                        .build()))
+                List.of(AssessmentCloWeight.builder().cloId(dummyCloId).weight(1.0).build()))
             .items(items)
             .build());
   }

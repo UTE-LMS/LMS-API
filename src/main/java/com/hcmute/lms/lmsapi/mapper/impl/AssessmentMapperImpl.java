@@ -85,12 +85,7 @@ public class AssessmentMapperImpl implements AssessmentMapper {
       return new ArrayList<>();
     }
     return dtos.stream()
-        .map(
-            d ->
-                AssessmentCloWeight.builder()
-                    .cloId(d.getCloId())
-                    .weight(d.getWeight())
-                    .build())
+        .map(d -> AssessmentCloWeight.builder().cloId(d.getCloId()).weight(d.getWeight()).build())
         .toList();
   }
 
@@ -101,11 +96,7 @@ public class AssessmentMapperImpl implements AssessmentMapper {
     }
     return weights.stream()
         .map(
-            w ->
-                AssessmentCloWeightDto.builder()
-                    .cloId(w.getCloId())
-                    .weight(w.getWeight())
-                    .build())
+            w -> AssessmentCloWeightDto.builder().cloId(w.getCloId()).weight(w.getWeight()).build())
         .toList();
   }
 

@@ -13,9 +13,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * Yêu cầu tạo bài đánh giá (ADR 0014, v0.7).
- */
+/** Yêu cầu tạo bài đánh giá (ADR 0014, v0.7). */
 @Data
 @Builder
 @NoArgsConstructor

@@ -12,9 +12,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * Một câu hỏi của bài đánh giá (v0.7).
- */
+/** Một câu hỏi của bài đánh giá (v0.7). */
 @Data
 @Builder
 @NoArgsConstructor
@@ -27,7 +25,8 @@ public class AssessmentItemDto {
   @NotBlank(message = "Mã phần tử không được để trống")
   @Pattern(
       regexp = "^[A-Za-z0-9._ -]{1,40}$",
-      message = "Mã phần tử chỉ gồm chữ cái, số, dấu chấm, gạch ngang, gạch dưới, khoảng trắng (1-40 ký tự)")
+      message =
+          "Mã phần tử chỉ gồm chữ cái, số, dấu chấm, gạch ngang, gạch dưới, khoảng trắng (1-40 ký tự)")
   private String code;
 
   @Min(value = 1, message = "Thứ tự phải từ 1 trở lên")

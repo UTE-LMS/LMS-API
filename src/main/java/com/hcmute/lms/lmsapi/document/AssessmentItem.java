@@ -10,8 +10,8 @@ import org.springframework.data.mongodb.core.mapping.Field;
 import org.springframework.data.mongodb.core.mapping.FieldType;
 
 /**
- * Một câu hỏi trong ma trận đề thi (assessments.items[]).
- * Điểm tối đa được lưu trực tiếp trong outcomeMappings[].maxScore (v0.7).
+ * Một câu hỏi trong ma trận đề thi (assessments.items[]). Điểm tối đa được lưu trực tiếp trong
+ * outcomeMappings[].maxScore (v0.7).
  */
 @Data
 @Builder

@@ -11,7 +11,6 @@ import com.hcmute.lms.lmsapi.document.ImportRowError;
 import com.hcmute.lms.lmsapi.document.ImportStats;
 import com.hcmute.lms.lmsapi.document.OutcomeMapping;
 import com.hcmute.lms.lmsapi.document.Score;
-import com.hcmute.lms.lmsapi.document.Student;
 import com.hcmute.lms.lmsapi.document.Term;
 import com.hcmute.lms.lmsapi.dto.ImportBatchCreateRequest;
 import com.hcmute.lms.lmsapi.dto.ImportBatchResponse;
@@ -42,8 +41,8 @@ import com.hcmute.lms.lmsapi.repository.ScoreRepository;
 import com.hcmute.lms.lmsapi.repository.StudentRepository;
 import com.hcmute.lms.lmsapi.repository.TermRepository;
 import com.hcmute.lms.lmsapi.service.AuditService;
-import com.hcmute.lms.lmsapi.service.ImportFileStorage;
 import com.hcmute.lms.lmsapi.service.ImportBatchService;
+import com.hcmute.lms.lmsapi.service.ImportFileStorage;
 import com.hcmute.lms.lmsapi.util.ChecksumUtils;
 import com.hcmute.lms.lmsapi.util.ObjectIdUtils;
 import com.hcmute.lms.lmsapi.util.ScoreCsvParser;
@@ -114,7 +113,10 @@ public class ImportBatchServiceImpl implements ImportBatchService {
     ScoreCsvParser.Table table = ScoreCsvParser.parse(content);
     ImportColumnMapping mapping =
         resolveMapping(
-            request == null ? null : request.getColumnMapping(), section.getId(), assessment, table);
+            request == null ? null : request.getColumnMapping(),
+            section.getId(),
+            assessment,
+            table);
 
     String batchId = new ObjectId().toHexString();
     String fileRef = fileStorage.save(batchId, content);
@@ -263,7 +265,8 @@ public class ImportBatchServiceImpl implements ImportBatchService {
         return item;
       }
     }
-    throw new BusinessRuleViolationException("Không tìm thấy câu hỏi nào khớp với ID hoặc mã [" + ref + "]");
+    throw new BusinessRuleViolationException(
+        "Không tìm thấy câu hỏi nào khớp với ID hoặc mã [" + ref + "]");
   }
 
   @Override
@@ -345,7 +348,10 @@ public class ImportBatchServiceImpl implements ImportBatchService {
         scoreRepository
             .findBySectionIdAndAssessmentId(batch.getSectionId(), batch.getAssessmentId())
             .stream()
-            .map(score -> ScoreRowValidator.key(score.getStudentId(), score.getItemId(), score.getCloId()))
+            .map(
+                score ->
+                    ScoreRowValidator.key(
+                        score.getStudentId(), score.getItemId(), score.getCloId()))
             .collect(Collectors.toSet());
 
     return rowValidator.validate(

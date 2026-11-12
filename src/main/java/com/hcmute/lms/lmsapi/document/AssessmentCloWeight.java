@@ -7,9 +7,7 @@ import lombok.NoArgsConstructor;
 import org.springframework.data.mongodb.core.mapping.Field;
 import org.springframework.data.mongodb.core.mapping.FieldType;
 
-/**
- * Tỷ lệ % đóng góp W_{p,j} của bài kiểm tra p cho chuẩn đầu ra cloId (trong khoảng (0, 1]).
- */
+/** Tỷ lệ % đóng góp W_{p,j} của bài kiểm tra p cho chuẩn đầu ra cloId (trong khoảng (0, 1]). */
 @Data
 @Builder
 @NoArgsConstructor

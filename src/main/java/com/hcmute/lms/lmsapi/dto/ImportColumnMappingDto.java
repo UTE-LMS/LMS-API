@@ -17,8 +17,7 @@ public class ImportColumnMappingDto {
 
   private String studentColumn;
 
-  @Builder.Default
-  private List<Entry> items = new ArrayList<>();
+  @Builder.Default private List<Entry> items = new ArrayList<>();
 
   @Data
   @Builder
