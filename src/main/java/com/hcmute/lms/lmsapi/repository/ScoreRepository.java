@@ -10,5 +10,9 @@ public interface ScoreRepository extends MongoRepository<Score, String> {
 
   List<Score> findBySectionIdAndAssessmentId(String sectionId, String assessmentId);
 
+  boolean existsByAssessmentId(String assessmentId);
+
   long countByImportBatchId(String importBatchId);
+
+  void deleteByImportBatchId(String importBatchId);
 }

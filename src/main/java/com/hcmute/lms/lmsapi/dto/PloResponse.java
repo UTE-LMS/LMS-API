@@ -20,6 +20,7 @@ public class PloResponse {
   private String contentOriginal;
   private String contentSummary;
   private Integer capabilityLevelRaw;
+  private Double passThreshold;
   private VerificationResponse verification;
   private String reviewNote;
 }

@@ -21,6 +21,8 @@ public class PiResponse {
   private String contentShort;
   private Integer capabilityLevelRaw;
   private Double targetPassRate;
+  private Double weight;
+  private Double passThreshold;
   private VerificationResponse verification;
   private String reviewNote;
 }

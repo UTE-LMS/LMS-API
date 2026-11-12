@@ -1,6 +1,8 @@
 package com.hcmute.lms.lmsapi.dto;
 
 import com.hcmute.lms.lmsapi.enums.PloCategory;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -38,6 +40,11 @@ public class PloRequest {
   @Min(value = 1, message = "Mức năng lực phải từ 1 đến 6")
   @Max(value = 6, message = "Mức năng lực phải từ 1 đến 6")
   private Integer capabilityLevelRaw;
+
+  @NotNull(message = "Ngưỡng đạt (passThreshold) không được để trống")
+  @DecimalMin(value = "0.0", inclusive = false, message = "Ngưỡng đạt phải lớn hơn 0")
+  @DecimalMax(value = "1.0", message = "Ngưỡng đạt không được vượt quá 1")
+  private Double passThreshold;
 
   @Size(max = 2000, message = "Ghi chú rà soát tối đa 2000 ký tự")
   private String reviewNote;

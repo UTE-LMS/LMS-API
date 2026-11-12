@@ -28,7 +28,6 @@ public class ImportBatchMapperImpl implements ImportBatchMapper {
         .fileRef(batch.getFileRef())
         .sourceSystem(batch.getSourceSystem())
         .columnMapping(toDto(batch.getColumnMapping()))
-        .emptyCellAs(batch.getEmptyCellAs())
         .reimportPolicy(batch.getReimportPolicy())
         .status(batch.getStatus())
         .stats(toStats(batch.getStats()))
@@ -58,13 +57,14 @@ public class ImportBatchMapperImpl implements ImportBatchMapper {
     if (mapping == null) {
       return null;
     }
-    List<ImportColumnMappingDto.Item> items =
+    List<ImportColumnMappingDto.Entry> items =
         mapping.getItems().stream()
             .map(
                 entry ->
-                    ImportColumnMappingDto.Item.builder()
+                    ImportColumnMappingDto.Entry.builder()
                         .column(entry.getColumn())
-                        .item(entry.getItemId())
+                        .itemId(entry.getItemId())
+                        .cloId(entry.getCloId())
                         .build())
             .toList();
     return ImportColumnMappingDto.builder()

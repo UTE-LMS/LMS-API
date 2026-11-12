@@ -1,6 +1,5 @@
 package com.hcmute.lms.lmsapi.document;
 
-import com.hcmute.lms.lmsapi.enums.EmptyCellAs;
 import com.hcmute.lms.lmsapi.enums.ImportBatchStatus;
 import com.hcmute.lms.lmsapi.enums.ImportSourceSystem;
 import com.hcmute.lms.lmsapi.enums.ReimportPolicy;
@@ -56,9 +55,6 @@ public class ImportBatch {
 
   @Field("columnMapping")
   private ImportColumnMapping columnMapping;
-
-  @Field("emptyCellAs")
-  private EmptyCellAs emptyCellAs;
 
   @Field("reimportPolicy")
   private ReimportPolicy reimportPolicy;

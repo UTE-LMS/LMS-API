@@ -13,13 +13,7 @@ import java.util.TreeMap;
 import org.springframework.stereotype.Component;
 
 /**
- * Tính độ phủ của bài đánh giá theo CLO và theo mức Bloom từ items[] (NEW-01/AC-6). Lớp thuần: chỉ
- * đọc danh sách đầu vào, không truy cập CSDL.
- *
- * <p>Cách tính: tổng điểm {@code total = Σ maxScore}. Điểm của một CLO là {@code Σ (maxScore ×
- * weight)} trên các phần tử có đo CLO đó; vì Σ weight của mỗi phần tử bằng 1 nên tổng điểm các CLO
- * bằng {@code total}. Điểm của một mức Bloom là {@code Σ maxScore} các phần tử ở mức đó (phần tử
- * không khai báo Bloom không được tính vào {@code byBloom}). Phần trăm = điểm / total × 100.
+ * Tính độ phủ của bài đánh giá theo CLO và theo mức Bloom từ items[] (ADR 0014, Schema v0.7).
  */
 @Component
 public class AssessmentCoverageCalculator {
@@ -27,20 +21,31 @@ public class AssessmentCoverageCalculator {
   private static final double PERCENT = 100.0;
 
   public CoverageSummary compute(List<AssessmentItem> items) {
+    if (items == null || items.isEmpty()) {
+      return CoverageSummary.builder()
+          .totalItemsSum(0.0)
+          .byClo(new ArrayList<>())
+          .byBloom(new ArrayList<>())
+          .build();
+    }
     double total = 0;
     Map<String, Double> pointsByClo = new LinkedHashMap<>();
     Map<Integer, double[]> byBloom = new TreeMap<>(); // [0] = số phần tử, [1] = điểm
 
     for (AssessmentItem item : items) {
-      double maxScore = item.getMaxScore();
-      total += maxScore;
-      for (OutcomeMapping mapping : item.getOutcomeMappings()) {
-        pointsByClo.merge(mapping.getCloId(), maxScore * mapping.getWeight(), Double::sum);
+      double itemMaxScore = 0.0;
+      if (item.getOutcomeMappings() != null) {
+        for (OutcomeMapping mapping : item.getOutcomeMappings()) {
+          double score = mapping.getMaxScore() != null ? mapping.getMaxScore() : 0.0;
+          itemMaxScore += score;
+          pointsByClo.merge(mapping.getCloId(), score, Double::sum);
+        }
       }
+      total += itemMaxScore;
       if (item.getBloomLevel() != null) {
         double[] bucket = byBloom.computeIfAbsent(item.getBloomLevel(), level -> new double[2]);
         bucket[0] += 1;
-        bucket[1] += maxScore;
+        bucket[1] += itemMaxScore;
       }
     }
 

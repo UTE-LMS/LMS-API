@@ -180,6 +180,7 @@ class ApiContractIntegrationTest extends IntegrationTestBase {
             "contentOriginal",
             "contentSummary",
             "capabilityLevelRaw",
+            "passThreshold",
             "verification",
             "reviewNote");
     assertThat(topKeys(mockMvc.perform(getAs(bearer, piUrl, pv, pi.getId()))))
@@ -194,6 +195,8 @@ class ApiContractIntegrationTest extends IntegrationTestBase {
             "contentShort",
             "capabilityLevelRaw",
             "targetPassRate",
+            "weight",
+            "passThreshold",
             "verification",
             "reviewNote");
 

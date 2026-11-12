@@ -108,13 +108,13 @@ public class CloServiceImpl implements CloService {
     clo.setBloomNote(request.getBloomNote() != null ? request.getBloomNote().trim() : null);
 
     if (request.getMeasurement() != null) {
+      Double threshold = request.getMeasurement().getDefaultPassThreshold();
       clo.setMeasurement(
           CloMeasurement.builder()
-              .defaultWeight(request.getMeasurement().getDefaultWeight())
-              .defaultPassThreshold(request.getMeasurement().getDefaultPassThreshold())
+              .defaultPassThreshold(threshold != null ? threshold : 0.5)
               .build());
-    } else {
-      clo.setMeasurement(null);
+    } else if (clo.getMeasurement() == null) {
+      clo.setMeasurement(CloMeasurement.builder().defaultPassThreshold(0.5).build());
     }
     clo.setExtra(request.getExtra());
 

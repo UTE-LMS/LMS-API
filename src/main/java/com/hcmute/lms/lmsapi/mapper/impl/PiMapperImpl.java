@@ -31,6 +31,8 @@ public class PiMapperImpl implements PiMapper {
         .contentShort(pi.getContentShort())
         .capabilityLevelRaw(pi.getCapabilityLevelRaw())
         .targetPassRate(pi.getTargetPassRate())
+        .weight(pi.getWeight())
+        .passThreshold(pi.getPassThreshold())
         .verification(verificationMapper.toResponse(pi.getVerification()))
         .reviewNote(pi.getReviewNote())
         .build();

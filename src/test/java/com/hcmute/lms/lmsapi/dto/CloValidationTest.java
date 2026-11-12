@@ -76,7 +76,7 @@ class CloValidationTest {
             .code("CLO1")
             .bloomLevel(3)
             .measurement(
-                CloMeasurementDto.builder().defaultWeight(0.4).defaultPassThreshold(0.6).build())
+                CloMeasurementDto.builder().defaultPassThreshold(0.6).build())
             .build();
     assertThat(validator.validate(reqValid)).isEmpty();
 
@@ -86,18 +86,18 @@ class CloValidationTest {
             .code("CLO1")
             .bloomLevel(3)
             .measurement(
-                CloMeasurementDto.builder().defaultWeight(1.5).defaultPassThreshold(-0.1).build())
+                CloMeasurementDto.builder().defaultPassThreshold(1.5).build())
             .build();
     Set<ConstraintViolation<CloRequest>> violations = validator.validate(reqInvalid);
-    assertThat(violations).hasSize(2);
+    assertThat(violations).hasSize(1);
   }
 
   @Test
-  @DisplayName("US-12/AC-5: weight ngoài (0, 1] bị chặn; null hoặc trong (0, 1] hợp lệ")
+  @DisplayName("US-12/AC-5: weight bắt buộc trong (0, 1]")
   void cloPiLinkWeightValidation() {
     String validId = new ObjectId().toHexString();
 
-    // null weight hợp lệ (Q22)
+    // null weight bị chặn
     CloPiLinkRequest reqNullWeight =
         CloPiLinkRequest.builder()
             .programVersionId(validId)
@@ -105,7 +105,8 @@ class CloValidationTest {
             .piId(validId)
             .weight(null)
             .build();
-    assertThat(validator.validate(reqNullWeight)).isEmpty();
+    assertThat(validator.validate(reqNullWeight))
+        .anyMatch(v -> v.getPropertyPath().toString().equals("weight"));
 
     // weight = 0.5 hợp lệ
     CloPiLinkRequest reqValidWeight =

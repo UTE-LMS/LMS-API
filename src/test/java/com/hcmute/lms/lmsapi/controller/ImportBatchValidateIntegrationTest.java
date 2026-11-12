@@ -216,55 +216,29 @@ class ImportBatchValidateIntegrationTest extends ScoreImportIntegrationBase {
   }
 
   @Test
-  @DisplayName(
-      "US-23/AC-1: emptyCellAs=BLANK -> ô trống thành BLANK điểm 0 sau khi xác nhận; không sinh ABSENT/NOT_GRADED/EXEMPT")
-  void us23_ac1_blank() throws Exception {
+  @DisplayName("US-23/AC-1: ô trống tự động thành điểm 0.0 sau khi xác nhận")
+  void us23_ac1_emptyCellAssignedZero() throws Exception {
     String id =
         uploadAndValidate(csv(s1.getStudentRef() + ",,6", s2.getStudentRef() + ",4,"), "BLANK");
     mockMvc.perform(postAction(lecturerToken, id, "confirm")).andExpect(status().isOk());
 
     Document s1q1 = scoreOf(s1, 0);
-    assertThat(s1q1.getString("status")).isEqualTo("BLANK");
     assertThat(((Number) s1q1.get("rawScore")).doubleValue()).isEqualTo(0.0);
     assertThat(((Number) s1q1.get("maxScore")).doubleValue()).isEqualTo(4.0);
     Document s2q2 = scoreOf(s2, 1);
-    assertThat(s2q2.getString("status")).isEqualTo("BLANK");
     assertThat(((Number) s2q2.get("rawScore")).doubleValue()).isEqualTo(0.0);
-    // Ô có điểm vẫn là SCORED
-    assertThat(scoreOf(s1, 1).getString("status")).isEqualTo("SCORED");
-    assertThat(scoresOfSection())
-        .extracting(d -> d.getString("status"))
-        .containsOnly("BLANK", "SCORED")
-        .doesNotContain("ABSENT", "NOT_GRADED", "EXEMPT", "MISSING");
+    // Ô có điểm lưu đúng điểm
+    assertThat(((Number) scoreOf(s1, 1).get("rawScore")).doubleValue()).isEqualTo(6.0);
   }
 
   @Test
-  @DisplayName(
-      "US-23/AC-1: emptyCellAs=MISSING -> ô trống thành MISSING, rawScore null (không phải 0)")
-  void us23_ac1_missing() throws Exception {
-    String id =
-        uploadAndValidate(csv(s1.getStudentRef() + ",,6", s2.getStudentRef() + ",4,"), "MISSING");
-    mockMvc.perform(postAction(lecturerToken, id, "confirm")).andExpect(status().isOk());
-
-    for (Document missing : List.of(scoreOf(s1, 0), scoreOf(s2, 1))) {
-      assertThat(missing.getString("status")).isEqualTo("MISSING");
-      assertThat(missing.get("rawScore")).isNull();
-      assertThat(((Number) missing.get("maxScore")).doubleValue()).isPositive();
-    }
-    assertThat(scoresOfSection())
-        .extracting(d -> d.getString("status"))
-        .containsOnly("MISSING", "SCORED")
-        .doesNotContain("BLANK", "ABSENT");
-  }
-
-  @Test
-  @DisplayName("US-23/AC-1: điểm 0 gõ rõ ràng là SCORED 0, khác BLANK dù cùng rawScore = 0")
-  void us23_ac1_explicitZeroIsScoredNotBlank() throws Exception {
+  @DisplayName("US-23/AC-1: điểm 0 gõ rõ ràng hay ô trống đều lưu rawScore = 0.0 hợp lệ")
+  void us23_ac1_explicitZeroAndBlankBothZero() throws Exception {
     String id = uploadAndValidate(csv(s1.getStudentRef() + ",0,"), "BLANK");
     mockMvc.perform(postAction(lecturerToken, id, "confirm")).andExpect(status().isOk());
 
-    assertThat(scoreOf(s1, 0).getString("status")).isEqualTo("SCORED");
-    assertThat(scoreOf(s1, 1).getString("status")).isEqualTo("BLANK");
+    assertThat(((Number) scoreOf(s1, 0).get("rawScore")).doubleValue()).isEqualTo(0.0);
+    assertThat(((Number) scoreOf(s1, 1).get("rawScore")).doubleValue()).isEqualTo(0.0);
   }
 
   @Test

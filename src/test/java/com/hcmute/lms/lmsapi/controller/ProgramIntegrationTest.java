@@ -310,6 +310,7 @@ class ProgramIntegrationTest {
             .code("PLO1")
             .displayOrder(1)
             .contentSummary("Nội dung PLO")
+            .passThreshold(0.5)
             .capabilityLevelRaw(3)
             .build();
 
@@ -334,7 +335,13 @@ class ProgramIntegrationTest {
         .andExpect(status().isConflict());
 
     PiRequest wrongPlo =
-        PiRequest.builder().ploId("671dcba5f123456789abc778").code("PI1.1").displayOrder(1).build();
+        PiRequest.builder()
+            .ploId("671dcba5f123456789abc778")
+            .code("PI1.1")
+            .displayOrder(1)
+            .weight(0.5)
+            .passThreshold(0.5)
+            .build();
     ApiTestSupport.performJson(
             mockMvc,
             objectMapper,
@@ -348,6 +355,8 @@ class ProgramIntegrationTest {
             .ploId(ploId)
             .code("PI1.1")
             .displayOrder(1)
+            .weight(0.5)
+            .passThreshold(0.5)
             .capabilityLevelRaw(3)
             .targetPassRate(0.8)
             .build();
@@ -448,6 +457,8 @@ class ProgramIntegrationTest {
                 .programVersionId(draftVersion.getId())
                 .code("PLO2")
                 .displayOrder(2)
+                .contentSummary("Nội dung PLO2")
+                .passThreshold(0.5)
                 .verification(
                     Verification.builder().status(VerificationStatus.NEEDS_CLARIFICATION).build())
                 .build());
@@ -472,6 +483,9 @@ class ProgramIntegrationTest {
                 .ploId(plo.getId())
                 .code("PI2.1")
                 .displayOrder(3)
+                .contentShort("Nội dung PI2.1")
+                .weight(0.5)
+                .passThreshold(0.5)
                 .verification(
                     Verification.builder().status(VerificationStatus.NEEDS_CLARIFICATION).build())
                 .build());

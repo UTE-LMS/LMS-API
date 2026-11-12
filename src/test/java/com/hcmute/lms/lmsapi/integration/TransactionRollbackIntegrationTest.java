@@ -143,7 +143,7 @@ public class TransactionRollbackIntegrationTest {
         .hasSize(1);
 
     AuditLog logEntry = auditLogs.get(0);
-    assertThat(logEntry.getAction()).isEqualTo(AuditAction.RULE_CONFIRM);
+    assertThat(logEntry.getAction()).isEqualTo(AuditAction.IMPORT_CONFIRM);
     assertThat(logEntry.getEntity().getCollection()).isEqualTo(TEST_COLLECTION);
     assertThat(logEntry.getEntity().getId()).isEqualTo(testTermCode);
     assertThat(logEntry.getReason()).isEqualTo(auditReason);
@@ -176,7 +176,7 @@ public class TransactionRollbackIntegrationTest {
 
       // Bước 2: Ghi nhật ký kiểm toán vào audit_logs (cùng transaction)
       auditService.record(
-          AuditAction.RULE_CONFIRM,
+          AuditAction.IMPORT_CONFIRM,
           AuditEntity.builder().collection(TEST_COLLECTION).id(termCode).build(),
           null,
           Map.of("academicYear", academicYear, "status", "OPEN"),
@@ -200,7 +200,7 @@ public class TransactionRollbackIntegrationTest {
 
       // Bước 2: Ghi nhật ký kiểm toán vào audit_logs (cùng transaction)
       auditService.record(
-          AuditAction.RULE_CONFIRM,
+          AuditAction.IMPORT_CONFIRM,
           AuditEntity.builder().collection(TEST_COLLECTION).id(termCode).build(),
           null,
           Map.of("academicYear", academicYear, "status", "OPEN"),

@@ -41,18 +41,17 @@ public class AuditServiceUnitTest {
   }
 
   @Test
-  @DisplayName("AuditAction enum contains exactly the 7 defined actions matching schema")
+  @DisplayName("AuditAction enum contains exactly the 6 defined actions matching schema v0.7")
   void testAuditActionEnumValues() {
     AuditAction[] actions = AuditAction.values();
-    assertThat(actions).hasSize(7);
+    assertThat(actions).hasSize(6);
     assertThat(actions)
         .containsExactlyInAnyOrder(
             AuditAction.SCORE_UPDATE,
             AuditAction.IMPORT_CONFIRM,
-            AuditAction.ASSESSMENT_APPROVE,
-            AuditAction.ASSESSMENT_REJECT,
+            AuditAction.ASSESSMENT_LOCK,
+            AuditAction.ASSESSMENT_UNLOCK,
             AuditAction.RUN_CALCULATION,
-            AuditAction.RULE_CONFIRM,
             AuditAction.LOGIN);
   }
 

@@ -1,6 +1,5 @@
 package com.hcmute.lms.lmsapi.dto;
 
-import com.hcmute.lms.lmsapi.enums.EmptyCellAs;
 import com.hcmute.lms.lmsapi.enums.ImportBatchStatus;
 import com.hcmute.lms.lmsapi.enums.ImportSourceSystem;
 import com.hcmute.lms.lmsapi.enums.ReimportPolicy;
@@ -10,7 +9,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/** Lô nhập điểm trả về cho UI (F05b). */
+/** Lô nhập điểm trả về cho UI (F05b, v0.7). */
 @Data
 @Builder
 @NoArgsConstructor
@@ -25,7 +24,6 @@ public class ImportBatchResponse {
   private String fileRef;
   private ImportSourceSystem sourceSystem;
   private ImportColumnMappingDto columnMapping;
-  private EmptyCellAs emptyCellAs;
   private ReimportPolicy reimportPolicy;
   private ImportBatchStatus status;
   private Stats stats;

@@ -6,7 +6,6 @@ import com.hcmute.lms.lmsapi.dto.ImportColumnMappingDto;
 import com.hcmute.lms.lmsapi.dto.ImportRowErrorResponse;
 import com.hcmute.lms.lmsapi.dto.PageResponse;
 import com.hcmute.lms.lmsapi.dto.UserPrincipal;
-import com.hcmute.lms.lmsapi.enums.EmptyCellAs;
 import com.hcmute.lms.lmsapi.enums.ImportSourceSystem;
 import com.hcmute.lms.lmsapi.enums.ReimportPolicy;
 import com.hcmute.lms.lmsapi.exception.AppException;
@@ -66,8 +65,7 @@ public class ImportBatchController {
           @Pattern(regexp = ID_PATTERN, message = "ID bài đánh giá phải là ObjectId 24 ký tự hex")
           String assessmentId,
       @RequestPart("file") MultipartFile file,
-      @RequestParam("emptyCellAs") EmptyCellAs emptyCellAs,
-      @RequestParam("reimportPolicy") ReimportPolicy reimportPolicy,
+      @RequestParam(name = "reimportPolicy", required = false) ReimportPolicy reimportPolicy,
       @RequestParam(name = "sourceSystem", required = false) ImportSourceSystem sourceSystem,
       @RequestParam(name = "columnMapping", required = false) String columnMapping,
       @AuthenticationPrincipal UserPrincipal principal)
@@ -81,7 +79,6 @@ public class ImportBatchController {
     ImportBatchCreateRequest request =
         ImportBatchCreateRequest.builder()
             .sourceSystem(sourceSystem)
-            .emptyCellAs(emptyCellAs)
             .reimportPolicy(reimportPolicy)
             .columnMapping(parseMapping(columnMapping))
             .build();
