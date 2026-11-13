@@ -414,8 +414,10 @@ public class ScopeAuthorizationServiceImpl implements ScopeAuthorizationService 
       case LECTURER -> matchesCourseScope(scope, courseId);
       case PROGRAM_MANAGER ->
           accessType == AccessType.READ
-              ? (matchesCourseScope(scope, courseId) || isStrictEmptyScope(scope))
-              : matchesCourseScope(scope, courseId);
+              ? (matchesCourseScope(scope, courseId)
+                  || isCourseInProgramScope(scope, courseId)
+                  || isStrictEmptyScope(scope))
+              : (matchesCourseScope(scope, courseId) || isCourseInProgramScope(scope, courseId));
       case QA ->
           accessType == AccessType.READ
               && (isStrictEmptyScope(scope) || matchesCourseScope(scope, courseId));
@@ -426,6 +428,19 @@ public class ScopeAuthorizationServiceImpl implements ScopeAuthorizationService 
     return scope != null
         && scope.getCourseIds() != null
         && scope.getCourseIds().contains(courseId.trim());
+  }
+
+  private boolean isCourseInProgramScope(UserScope scope, String courseId) {
+    if (scope == null || scope.getProgramIds() == null || scope.getProgramIds().isEmpty()) {
+      return false;
+    }
+    return programCourseRepository.findByCourseId(courseId.trim()).stream()
+        .anyMatch(
+            pc ->
+                programVersionRepository
+                    .findById(pc.getProgramVersionId())
+                    .map(pv -> scope.getProgramIds().contains(pv.getProgramId()))
+                    .orElse(false));
   }
 
   private boolean checkProgramAssignment(

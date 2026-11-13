@@ -14,7 +14,11 @@ public interface CloPiLinkRepository extends MongoRepository<CloPiLink, String> 
 
   List<CloPiLink> findBySyllabusIdAndProgramVersionId(String syllabusId, String programVersionId);
 
+  List<CloPiLink> findByProgramVersionId(String programVersionId);
+
   boolean existsByCloId(String cloId);
 
   boolean existsByPiId(String piId);
+
+  void deleteBySyllabusId(String syllabusId);
 }

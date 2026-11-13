@@ -9,7 +9,6 @@ import com.hcmute.lms.lmsapi.document.Program;
 import com.hcmute.lms.lmsapi.document.ProgramVersion;
 import com.hcmute.lms.lmsapi.document.User;
 import com.hcmute.lms.lmsapi.dto.LoginRequest;
-import com.hcmute.lms.lmsapi.enums.PiContributionType;
 import com.hcmute.lms.lmsapi.enums.ProgramVersionStatus;
 import com.hcmute.lms.lmsapi.enums.Role;
 import com.hcmute.lms.lmsapi.testsupport.IntegrationTestBase;
@@ -152,7 +151,6 @@ class ApiContractIntegrationTest extends IntegrationTestBase {
     ProgramVersion version = fixtures.programVersion(program, ProgramVersionStatus.DRAFT);
     Plo plo = fixtures.plo(version, "PLO1", 1);
     Pi pi = fixtures.pi(version, plo, "PI1.1", 1);
-    var contribution = fixtures.contribution(version, fixtures.course(), pi, PiContributionType.I);
     String pv = version.getId();
 
     String programUrl = "/api/v1/programs/{id}";
@@ -199,37 +197,6 @@ class ApiContractIntegrationTest extends IntegrationTestBase {
             "passThreshold",
             "verification",
             "reviewNote");
-
-    String matrixJson =
-        body(mockMvc.perform(getAs(bearer, "/api/v1/program-versions/{v}/pi-contributions", pv)));
-    assertThat(topLevelKeys(matrixJson))
-        .containsExactlyInAnyOrder(
-            "id", "programVersionId", "courseId", "piId", "contribution", "verification");
-    assertThat(keysOf(matrixJson)).contains("status", "verifiedBy", "verifiedAt", "note");
-    assertThat(matrixJson).contains(contribution.getId());
-  }
-
-  @Test
-  @DisplayName(
-      "US-07/AC-4: không API nào trả trọng số suy từ I/R/M (khóa weight/score/coefficient/ratio)")
-  void matrixNeverExposesWeights() throws Exception {
-    String bearer = fixtures.bearerFor(Role.QA, null);
-    ProgramVersion version =
-        fixtures.programVersion(fixtures.program(), ProgramVersionStatus.DRAFT);
-    Pi pi = fixtures.pi(version, fixtures.plo(version, "PLO1", 1), "PI1.1", 1);
-    for (PiContributionType type : PiContributionType.values()) {
-      fixtures.contribution(version, fixtures.course(), pi, type);
-    }
-
-    String json =
-        body(
-            mockMvc.perform(
-                getAs(bearer, "/api/v1/program-versions/{v}/pi-contributions", version.getId())));
-
-    assertThat(keysOf(json)).noneMatch(key -> WEIGHT_LIKE.matcher(key).find());
-    // Giá trị của contribution phải còn là chữ cái I/R/M, không phải số.
-    assertThat(json)
-        .contains("\"contribution\":\"I\"", "\"contribution\":\"R\"", "\"contribution\":\"M\"");
   }
 
   // ------------------------------------------------------------------ tiện ích

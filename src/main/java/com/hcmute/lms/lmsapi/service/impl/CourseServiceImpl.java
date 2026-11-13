@@ -12,7 +12,6 @@ import com.hcmute.lms.lmsapi.exception.BusinessRuleViolationException;
 import com.hcmute.lms.lmsapi.exception.ErrorCode;
 import com.hcmute.lms.lmsapi.exception.ResourceNotFoundException;
 import com.hcmute.lms.lmsapi.mapper.CourseMapper;
-import com.hcmute.lms.lmsapi.repository.CoursePiContributionRepository;
 import com.hcmute.lms.lmsapi.repository.CourseRepository;
 import com.hcmute.lms.lmsapi.repository.ProgramCourseRepository;
 import com.hcmute.lms.lmsapi.service.CourseService;
@@ -43,7 +42,6 @@ public class CourseServiceImpl implements CourseService {
 
   private final CourseRepository courseRepository;
   private final ProgramCourseRepository programCourseRepository;
-  private final CoursePiContributionRepository coursePiContributionRepository;
   private final CourseMapper courseMapper;
 
   @Override
@@ -129,12 +127,6 @@ public class CourseServiceImpl implements CourseService {
     if (programCourseRepository.existsByCourseId(id)) {
       throw new BusinessRuleViolationException(
           "COURSE_IN_USE", "Không thể xóa học phần đang được gán vào chương trình đào tạo: " + id);
-    }
-
-    if (coursePiContributionRepository.existsByCourseId(id)) {
-      throw new BusinessRuleViolationException(
-          "COURSE_IN_USE",
-          "Không thể xóa học phần đang được tham chiếu trong ma trận đóng góp PI: " + id);
     }
 
     courseRepository.deleteById(id);

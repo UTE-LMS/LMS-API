@@ -4,16 +4,12 @@ import com.hcmute.lms.lmsapi.document.Clo;
 import com.hcmute.lms.lmsapi.document.CloPiLink;
 import com.hcmute.lms.lmsapi.document.Pi;
 import com.hcmute.lms.lmsapi.document.Syllabus;
-import com.hcmute.lms.lmsapi.document.Verification;
 import com.hcmute.lms.lmsapi.dto.CloPiLinkCellDto;
 import com.hcmute.lms.lmsapi.dto.CloPiLinkRequest;
 import com.hcmute.lms.lmsapi.dto.CloPiLinkResponse;
 import com.hcmute.lms.lmsapi.dto.CloPiMatrixResponse;
 import com.hcmute.lms.lmsapi.dto.CloResponse;
 import com.hcmute.lms.lmsapi.dto.PiResponse;
-import com.hcmute.lms.lmsapi.dto.UserPrincipal;
-import com.hcmute.lms.lmsapi.dto.VerificationRequest;
-import com.hcmute.lms.lmsapi.enums.AccessType;
 import com.hcmute.lms.lmsapi.exception.AppException;
 import com.hcmute.lms.lmsapi.exception.BusinessRuleViolationException;
 import com.hcmute.lms.lmsapi.exception.ErrorCode;
@@ -28,9 +24,7 @@ import com.hcmute.lms.lmsapi.repository.ProgramCourseRepository;
 import com.hcmute.lms.lmsapi.repository.ProgramVersionRepository;
 import com.hcmute.lms.lmsapi.repository.SyllabusRepository;
 import com.hcmute.lms.lmsapi.service.CloPiLinkService;
-import com.hcmute.lms.lmsapi.service.ScopeAuthorizationService;
 import com.hcmute.lms.lmsapi.util.ObjectIdUtils;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -50,7 +44,6 @@ public class CloPiLinkServiceImpl implements CloPiLinkService {
   private final PiRepository piRepository;
   private final ProgramVersionRepository programVersionRepository;
   private final ProgramCourseRepository programCourseRepository;
-  private final ScopeAuthorizationService scopeAuthorizationService;
   private final CloPiLinkMapper cloPiLinkMapper;
   private final CloMapper cloMapper;
   private final PiMapper piMapper;
@@ -168,43 +161,6 @@ public class CloPiLinkServiceImpl implements CloPiLinkService {
         .pis(piResponses)
         .links(cellDtos)
         .build();
-  }
-
-  @Override
-  public CloPiLinkResponse verifyLink(
-      String id, VerificationRequest request, UserPrincipal principal) {
-    ObjectIdUtils.requireValid(id, "cloPiLinkId");
-    CloPiLink link =
-        cloPiLinkRepository
-            .findById(id)
-            .orElseThrow(
-                () -> new ResourceNotFoundException("Liên kết CLO-PI không tồn tại: " + id));
-
-    // Thẩm định quyền QA theo scope
-    if (!scopeAuthorizationService.canAccessProgramVersion(
-        principal, link.getProgramVersionId(), AccessType.WRITE)) {
-      throw new AppException(
-          ErrorCode.FORBIDDEN,
-          HttpStatus.FORBIDDEN,
-          "Chuyên viên QA không có quyền thẩm định trong phạm vi phiên bản CTĐT này");
-    }
-
-    Verification verification =
-        Verification.builder()
-            .status(request.getStatus())
-            .verifiedBy(principal != null ? principal.getId() : null)
-            .verifiedAt(Instant.now())
-            .note(request.getNote())
-            .build();
-
-    link.setVerification(verification);
-    CloPiLink saved = cloPiLinkRepository.save(link);
-    log.info(
-        "Xác nhận liên kết CLO-PI id=[{}] sang trạng thái [{}] bởi user=[{}]",
-        id,
-        request.getStatus(),
-        principal != null ? principal.getId() : "system");
-    return cloPiLinkMapper.toResponse(saved);
   }
 
   private Syllabus requireSyllabus(String syllabusId) {

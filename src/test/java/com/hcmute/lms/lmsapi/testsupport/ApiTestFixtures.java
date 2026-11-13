@@ -7,7 +7,6 @@ import com.hcmute.lms.lmsapi.document.AssessmentItem;
 import com.hcmute.lms.lmsapi.document.Clo;
 import com.hcmute.lms.lmsapi.document.CloMeasurement;
 import com.hcmute.lms.lmsapi.document.Course;
-import com.hcmute.lms.lmsapi.document.CoursePiContribution;
 import com.hcmute.lms.lmsapi.document.CourseSection;
 import com.hcmute.lms.lmsapi.document.Enrollment;
 import com.hcmute.lms.lmsapi.document.OutcomeMapping;
@@ -28,7 +27,6 @@ import com.hcmute.lms.lmsapi.enums.AssessmentStatus;
 import com.hcmute.lms.lmsapi.enums.CourseCategory;
 import com.hcmute.lms.lmsapi.enums.CourseType;
 import com.hcmute.lms.lmsapi.enums.EnrollmentStatus;
-import com.hcmute.lms.lmsapi.enums.PiContributionType;
 import com.hcmute.lms.lmsapi.enums.ProgramVersionStatus;
 import com.hcmute.lms.lmsapi.enums.Role;
 import com.hcmute.lms.lmsapi.enums.SectionStatus;
@@ -228,19 +226,6 @@ public final class ApiTestFixtures {
             .credits(3)
             .type(CourseType.COMPULSORY)
             .category(CourseCategory.MAJOR_FOUNDATION)
-            .build());
-  }
-
-  /** Thêm một dòng ma trận I/R/M giả. */
-  public CoursePiContribution contribution(
-      ProgramVersion version, Course course, Pi pi, PiContributionType type) {
-    return mongo.save(
-        CoursePiContribution.builder()
-            .programVersionId(version.getId())
-            .courseId(course.getId())
-            .piId(pi.getId())
-            .contribution(type)
-            .verification(unverified())
             .build());
   }
 

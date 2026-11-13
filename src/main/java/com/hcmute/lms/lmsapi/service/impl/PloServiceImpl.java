@@ -68,8 +68,7 @@ public class PloServiceImpl implements PloService {
             .contentSummary(request.getContentSummary())
             .capabilityLevelRaw(request.getCapabilityLevelRaw())
             .passThreshold(request.getPassThreshold())
-            .verification(
-                Verification.builder().status(VerificationStatus.NEEDS_CLARIFICATION).build())
+            .verification(Verification.builder().status(VerificationStatus.VERIFIED).build())
             .reviewNote(request.getReviewNote())
             .build();
 

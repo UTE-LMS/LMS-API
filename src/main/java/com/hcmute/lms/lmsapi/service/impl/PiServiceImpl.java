@@ -12,7 +12,6 @@ import com.hcmute.lms.lmsapi.exception.BusinessRuleViolationException;
 import com.hcmute.lms.lmsapi.exception.ErrorCode;
 import com.hcmute.lms.lmsapi.exception.ResourceNotFoundException;
 import com.hcmute.lms.lmsapi.mapper.PiMapper;
-import com.hcmute.lms.lmsapi.repository.CoursePiContributionRepository;
 import com.hcmute.lms.lmsapi.repository.PiRepository;
 import com.hcmute.lms.lmsapi.repository.PloRepository;
 import com.hcmute.lms.lmsapi.repository.ProgramReferenceRepository;
@@ -34,7 +33,6 @@ public class PiServiceImpl implements PiService {
   private final PiRepository piRepository;
   private final PloRepository ploRepository;
   private final ProgramVersionRepository programVersionRepository;
-  private final CoursePiContributionRepository coursePiContributionRepository;
   private final ProgramReferenceRepository programReferenceRepository;
   private final PiMapper piMapper;
 
@@ -74,8 +72,7 @@ public class PiServiceImpl implements PiService {
             .targetPassRate(request.getTargetPassRate())
             .weight(request.getWeight())
             .passThreshold(request.getPassThreshold())
-            .verification(
-                Verification.builder().status(VerificationStatus.NEEDS_CLARIFICATION).build())
+            .verification(Verification.builder().status(VerificationStatus.VERIFIED).build())
             .reviewNote(request.getReviewNote())
             .build();
 
@@ -126,8 +123,7 @@ public class PiServiceImpl implements PiService {
     requireDraftableVersion(programVersionId, true);
     Pi pi = requirePi(programVersionId, id);
 
-    if (coursePiContributionRepository.countByPiId(pi.getId()) > 0
-        || programReferenceRepository.existsPiReference(pi.getId())) {
+    if (programReferenceRepository.existsPiReference(pi.getId())) {
       throw new BusinessRuleViolationException(
           "PI_REFERENCED",
           "Không thể xóa PI khi vẫn còn học phần, CLO hoặc câu hỏi/đề đánh giá tham chiếu");

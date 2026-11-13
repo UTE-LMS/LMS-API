@@ -15,4 +15,6 @@ public interface CloRepository extends MongoRepository<Clo, String> {
   boolean existsBySyllabusId(String syllabusId);
 
   long countBySyllabusId(String syllabusId);
+
+  void deleteBySyllabusId(String syllabusId);
 }

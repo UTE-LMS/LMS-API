@@ -90,8 +90,7 @@ public class ProgramVersionServiceImpl implements ProgramVersionService {
                     ? new ArrayList<>(request.getApplicableCohorts())
                     : new ArrayList<>())
             .status(ProgramVersionStatus.DRAFT)
-            .verification(
-                Verification.builder().status(VerificationStatus.NEEDS_CLARIFICATION).build())
+            .verification(Verification.builder().status(VerificationStatus.VERIFIED).build())
             .build();
 
     try {

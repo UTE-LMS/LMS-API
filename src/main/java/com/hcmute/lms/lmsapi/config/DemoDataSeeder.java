@@ -1,7 +1,6 @@
 package com.hcmute.lms.lmsapi.config;
 
 import com.hcmute.lms.lmsapi.document.Course;
-import com.hcmute.lms.lmsapi.document.CoursePiContribution;
 import com.hcmute.lms.lmsapi.document.Pi;
 import com.hcmute.lms.lmsapi.document.Plo;
 import com.hcmute.lms.lmsapi.document.Program;
@@ -10,13 +9,11 @@ import com.hcmute.lms.lmsapi.document.RoleAssignment;
 import com.hcmute.lms.lmsapi.document.User;
 import com.hcmute.lms.lmsapi.document.UserScope;
 import com.hcmute.lms.lmsapi.document.Verification;
-import com.hcmute.lms.lmsapi.enums.PiContributionType;
 import com.hcmute.lms.lmsapi.enums.PloCategory;
 import com.hcmute.lms.lmsapi.enums.ProgramVersionStatus;
 import com.hcmute.lms.lmsapi.enums.Role;
 import com.hcmute.lms.lmsapi.enums.UserStatus;
 import com.hcmute.lms.lmsapi.enums.VerificationStatus;
-import com.hcmute.lms.lmsapi.repository.CoursePiContributionRepository;
 import com.hcmute.lms.lmsapi.repository.CourseRepository;
 import com.hcmute.lms.lmsapi.repository.PiRepository;
 import com.hcmute.lms.lmsapi.repository.PloRepository;
@@ -24,6 +21,7 @@ import com.hcmute.lms.lmsapi.repository.ProgramRepository;
 import com.hcmute.lms.lmsapi.repository.ProgramVersionRepository;
 import com.hcmute.lms.lmsapi.repository.UserRepository;
 import com.hcmute.lms.lmsapi.validator.PasswordPolicyValidator;
+import jakarta.annotation.PostConstruct;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -31,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Pattern;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
@@ -68,6 +67,7 @@ import org.springframework.stereotype.Component;
 @Component
 @Profile("demo")
 @Order(DemoDataSeeder.ORDER)
+@RequiredArgsConstructor
 public final class DemoDataSeeder implements ApplicationRunner {
 
   /** Chạy sau {@code InitialAdminSeeder} (Order 1) để không làm nó thấy users đã có dữ liệu. */
@@ -85,40 +85,27 @@ public final class DemoDataSeeder implements ApplicationRunner {
   private final PloRepository ploRepository;
   private final PiRepository piRepository;
   private final CourseRepository courseRepository;
-  private final CoursePiContributionRepository contributionRepository;
   private final UserRepository userRepository;
   private final PasswordEncoder passwordEncoder;
   private final PasswordPolicyValidator passwordPolicyValidator;
-  private final String password;
-  private final String key;
 
-  /** Tạo seeder; {@code password} và {@code key} lấy từ biến môi trường / cấu hình. */
-  public DemoDataSeeder(
-      ProgramRepository programRepository,
-      ProgramVersionRepository programVersionRepository,
-      PloRepository ploRepository,
-      PiRepository piRepository,
-      CourseRepository courseRepository,
-      CoursePiContributionRepository contributionRepository,
-      UserRepository userRepository,
-      PasswordEncoder passwordEncoder,
-      PasswordPolicyValidator passwordPolicyValidator,
-      @Value("${DEMO_USER_PASSWORD:}") String password,
-      @Value("${app.demo.key:demo}") String key) {
+  @Value("${DEMO_USER_PASSWORD:}")
+  private String password = "";
+
+  @Value("${app.demo.key:demo}")
+  private String key = "demo";
+
+  @PostConstruct
+  void validateKey() {
     if (key == null || !KEY_PATTERN.matcher(key).matches()) {
       throw new IllegalStateException("app.demo.key phải khớp [a-z0-9]{2,30}");
     }
-    this.programRepository = programRepository;
-    this.programVersionRepository = programVersionRepository;
-    this.ploRepository = ploRepository;
-    this.piRepository = piRepository;
-    this.courseRepository = courseRepository;
-    this.contributionRepository = contributionRepository;
-    this.userRepository = userRepository;
-    this.passwordEncoder = passwordEncoder;
-    this.passwordPolicyValidator = passwordPolicyValidator;
+  }
+
+  void configure(String password, String key) {
     this.password = password == null ? "" : password;
     this.key = key;
+    validateKey();
   }
 
   /** Kết quả một lần seed: số bản ghi mới tạo và số bản ghi đã có sẵn (giữ nguyên). */
@@ -160,9 +147,8 @@ public final class DemoDataSeeder implements ApplicationRunner {
     Program program = ensureProgram(counter);
     ProgramVersion version = ensureVersion(program, counter);
     Map<String, Plo> plos = ensurePlos(version, counter);
-    Map<String, Pi> pis = ensurePis(version, plos, counter);
+    ensurePis(version, plos, counter);
     Course course = ensureCourse(counter);
-    ensureContributions(version, course, pis, counter);
     boolean usersSeeded = ensureUsers(program, course, counter);
     return new SeedResult(counter.created, counter.existing, usersSeeded);
   }
@@ -313,36 +299,6 @@ public final class DemoDataSeeder implements ApplicationRunner {
             courseRepository.save(
                 Course.builder().code(courseCode()).name(LABEL + " Học phần mẫu").build()),
         () -> courseRepository.findOne(Example.of(Course.builder().code(courseCode()).build())));
-  }
-
-  private void ensureContributions(
-      ProgramVersion version, Course course, Map<String, Pi> pis, Counter counter) {
-    // Ma trận minh họa; I/R/M là vai trò sư phạm, không có hệ số (F02 mục 4.6).
-    ensureContribution(version, course, pis.get("PI1.1"), PiContributionType.I, counter);
-    ensureContribution(version, course, pis.get("PI1.2"), PiContributionType.R, counter);
-    ensureContribution(version, course, pis.get("PI2.1"), PiContributionType.M, counter);
-  }
-
-  private void ensureContribution(
-      ProgramVersion version, Course course, Pi pi, PiContributionType type, Counter counter) {
-    if (contributionRepository.existsByProgramVersionIdAndCourseIdAndPiId(
-        version.getId(), course.getId(), pi.getId())) {
-      counter.existing++;
-      return;
-    }
-    counter.created++;
-    try {
-      contributionRepository.save(
-          CoursePiContribution.builder()
-              .programVersionId(version.getId())
-              .courseId(course.getId())
-              .piId(pi.getId())
-              .contribution(type)
-              .verification(unverified("dòng ma trận mẫu"))
-              .build());
-    } catch (DuplicateKeyException ex) {
-      log.debug("Dòng ma trận demo đã được tạo song song, bỏ qua: {}", ex.getMessage());
-    }
   }
 
   // ---------------------------------------------------------------- người dùng

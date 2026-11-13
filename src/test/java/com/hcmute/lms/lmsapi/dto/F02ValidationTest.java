@@ -2,7 +2,6 @@ package com.hcmute.lms.lmsapi.dto;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.hcmute.lms.lmsapi.enums.PiContributionType;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import jakarta.validation.ValidatorFactory;
@@ -109,39 +108,6 @@ class F02ValidationTest {
   void targetPassRate_invalid(double rate) {
     PiRequest request = piRequest("PI1.1");
     request.setTargetPassRate(rate);
-    assertThat(validator.validate(request)).isNotEmpty();
-  }
-
-  @Test
-  @DisplayName("Mức đóng góp I/R/M bắt buộc")
-  void contribution_required() {
-    CoursePiContributionRequest request =
-        CoursePiContributionRequest.builder()
-            .courseId("671dcba5f123456789abc005")
-            .piId("671dcba5f123456789abc004")
-            .build();
-    assertThat(validator.validate(request)).isNotEmpty();
-
-    request.setContribution(PiContributionType.M);
-    assertThat(validator.validate(request)).isEmpty();
-  }
-
-  @Test
-  @DisplayName("ID tham chiếu phải là ObjectId 24 ký tự hex")
-  void objectIdPattern_invalid() {
-    CoursePiContributionRequest request =
-        CoursePiContributionRequest.builder()
-            .courseId("course-1")
-            .piId("pi-1")
-            .contribution(PiContributionType.I)
-            .build();
-    assertThat(validator.validate(request)).hasSize(2);
-  }
-
-  @Test
-  @DisplayName("Trạng thái xác nhận bắt buộc")
-  void verificationStatus_required() {
-    VerificationRequest request = VerificationRequest.builder().note("note").build();
     assertThat(validator.validate(request)).isNotEmpty();
   }
 }
