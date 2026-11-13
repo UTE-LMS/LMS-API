@@ -111,7 +111,7 @@ public class PloController {
   }
 
   @PutMapping("/{id}/verification")
-  @PreAuthorize("hasRole('QA_OFFICER')")
+  @PreAuthorize("hasRole('QA')")
   public ResponseEntity<PloResponse> verifyPlo(
       @PathVariable("programVersionId")
           @Pattern(

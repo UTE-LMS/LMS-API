@@ -86,26 +86,26 @@ class CourseScopeAuthorizationTest {
   }
 
   @Test
-  @DisplayName("DEPARTMENT_HEAD có môn học trong scope.courseIds -> được phép ghi (ADR 0010)")
-  void departmentHeadInScope_allowed() {
+  @DisplayName("PROGRAM_MANAGER có môn học trong scope.courseIds -> được phép ghi (ADR 0010, v0.7)")
+  void programManagerInScope_allowed() {
     when(courseRepository.existsById(COURSE_ID)).thenReturn(true);
 
     assertThat(
             service.canAccessCourse(
-                principalWithCourses(Role.DEPARTMENT_HEAD, List.of(COURSE_ID)),
+                principalWithCourses(Role.PROGRAM_MANAGER, List.of(COURSE_ID)),
                 COURSE_ID,
                 AccessType.WRITE))
         .isTrue();
   }
 
   @Test
-  @DisplayName("DEPARTMENT_HEAD không có môn học trong scope.courseIds -> bị từ chối")
-  void departmentHeadOutOfScope_denied() {
+  @DisplayName("PROGRAM_MANAGER không có môn học trong scope.courseIds -> bị từ chối")
+  void programManagerOutOfScope_denied() {
     when(courseRepository.existsById(COURSE_ID)).thenReturn(true);
 
     assertThat(
             service.canAccessCourse(
-                principalWithCourses(Role.DEPARTMENT_HEAD, List.of(OTHER_COURSE_ID)),
+                principalWithCourses(Role.PROGRAM_MANAGER, List.of(OTHER_COURSE_ID)),
                 COURSE_ID,
                 AccessType.WRITE))
         .isFalse();
@@ -157,7 +157,7 @@ class CourseScopeAuthorizationTest {
 
     assertThat(
             service.canAccessCourse(
-                principalWithCourses(Role.DEPARTMENT_HEAD, List.of(COURSE_ID)),
+                principalWithCourses(Role.PROGRAM_MANAGER, List.of(COURSE_ID)),
                 COURSE_ID,
                 AccessType.WRITE))
         .isFalse();
@@ -171,24 +171,24 @@ class CourseScopeAuthorizationTest {
   }
 
   @Test
-  @DisplayName("canAssignCourse: DEPARTMENT_HEAD có môn học trong scope -> được phép phân công")
-  void canAssignCourse_departmentHeadInScopeAllowed() {
+  @DisplayName("canAssignCourse: PROGRAM_MANAGER có môn học trong scope -> được phép phân công")
+  void canAssignCourse_programManagerInScopeAllowed() {
     when(courseRepository.existsById(COURSE_ID)).thenReturn(true);
 
     assertThat(
             service.canAssignCourse(
-                principalWithCourses(Role.DEPARTMENT_HEAD, List.of(COURSE_ID)), COURSE_ID))
+                principalWithCourses(Role.PROGRAM_MANAGER, List.of(COURSE_ID)), COURSE_ID))
         .isTrue();
   }
 
   @Test
-  @DisplayName("canAssignCourse: DEPARTMENT_HEAD ngoài scope môn -> bị từ chối")
-  void canAssignCourse_departmentHeadOutOfScopeDenied() {
+  @DisplayName("canAssignCourse: PROGRAM_MANAGER ngoài scope môn -> bị từ chối")
+  void canAssignCourse_programManagerOutOfScopeDenied() {
     when(courseRepository.existsById(COURSE_ID)).thenReturn(true);
 
     assertThat(
             service.canAssignCourse(
-                principalWithCourses(Role.DEPARTMENT_HEAD, List.of(OTHER_COURSE_ID)), COURSE_ID))
+                principalWithCourses(Role.PROGRAM_MANAGER, List.of(OTHER_COURSE_ID)), COURSE_ID))
         .isFalse();
   }
 

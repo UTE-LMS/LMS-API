@@ -111,7 +111,7 @@ public class PiController {
   }
 
   @PutMapping("/{id}/verification")
-  @PreAuthorize("hasRole('QA_OFFICER')")
+  @PreAuthorize("hasRole('QA')")
   public ResponseEntity<PiResponse> verifyPi(
       @PathVariable("programVersionId")
           @Pattern(

@@ -31,7 +31,7 @@ public class DepartmentController {
   @GetMapping("/lecturers")
   @PreAuthorize(
       "#courseId == null || #courseId.isBlank()"
-          + " ? hasRole('DEPARTMENT_HEAD')"
+          + " ? hasAnyRole('PROGRAM_MANAGER', 'ADMIN')"
           + " : @scopeAuthorizationService.canAssignCourse(authentication.principal, #courseId)")
   public ResponseEntity<List<UserResponse>> getDepartmentLecturers(
       @RequestParam(required = false) String courseId,

@@ -88,10 +88,10 @@ Lưu trữ tài khoản và ma trận phân quyền hệ thống.
   - `fullName`: `String`.
   - `status`: `String` Enum: `["ACTIVE", "LOCKED"]`.
   - `roleAssignments`: `Array<Object>`:
-    - `role`: `String` Enum: `["ADMIN", "PROGRAM_MANAGER", "DEPARTMENT_HEAD", "QA_OFFICER", "LECTURER", "STUDENT", "VIEWER"]`.
+    - `role`: `String` Enum: `["ADMIN", "PROGRAM_MANAGER", "LECTURER", "QA"]` (Chuẩn hóa 4 vai trò cốt lõi theo ADR 0014 & OBE Schema v0.7).
     - `scope`: `Object` `{ programIds: [ObjectId], courseIds: [ObjectId], sectionIds: [ObjectId] }`.
   - `createdAt`, `updatedAt`: `Date`.
-* **Business Rule:** Trưởng bộ môn (`DEPARTMENT_HEAD`) có thẩm quyền duyệt đề thi (`assessments`) và ma trận ánh xạ; Sinh viên (`STUDENT`) chỉ có quyền đọc `student_results` thuộc về mã sinh viên của chính mình.
+* **Business Rule:** Giảng viên phụ trách lớp (`LECTURER`) thiết lập ma trận câu hỏi – CLO và tự bấm khóa (`POST /lock`, `DRAFT -> LOCKED`) trước khi nhập điểm; Cán bộ `QA` phụ trách ĐBCL & Khảo thí, xem báo cáo đo lường chất lượng và thẩm định CTĐT.
 * **Indexes:** `{ username: 1 }` (unique), `{ email: 1 }` (unique).
 
 ---

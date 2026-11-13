@@ -53,14 +53,14 @@ Chọn phương án **A** (người dùng đã chốt hướng này).
    | `POST /syllabi/{syllabusId}/clo-pi-links` | `canAccessProgramVersion` (đã có) **thêm** `canAccessSyllabus` |
    | `DELETE /clo-pi-links/{id}` | `canAccessCloPiLink` |
 
-   Các `GET` giữ `isAuthenticated()`. `PUT /clo-pi-links/{id}/verification` giữ nguyên: chỉ `QA_OFFICER` đúng scope (ADR 0004).
+   Các `GET` giữ `isAuthenticated()`. `PUT /clo-pi-links/{id}/verification` giữ nguyên: chỉ cán bộ `QA` đúng scope (ADR 0004 & ADR 0014).
 4. Ngoài phạm vi ADR này (không đổi): quyền ghi `courses` và `terms`.
 
 ## 4. Hệ quả
 
 1. **Mã nguồn và kiểm thử:** thêm 4 phương thức vào `ScopeAuthorizationService` và `…Impl`; sửa `@PreAuthorize` ở `SyllabusController`,
    `CloController`, `CloPiLinkController`; thêm test cho từng phương thức và ca HTTP (PM ngoài scope → 403, trong scope → 2xx,
-   học phần chưa thuộc CTĐT nào → PM 403, `ADMIN` 2xx). Test: `CourseScopeAuthorizationTest` (unit) và `CloIntegrationTest` (US-10/AC-4, US-11/AC-5, US-12/AC-6); xem `doc/test-plan.md` mục 8.5. Quyền GHI chỉ tính phân công `PROGRAM_MANAGER` (và `ADMIN`): vai trò khác của cùng người dùng, ví dụ `QA_OFFICER` ở ngành khác, không cộng dồn thành quyền ghi.
+   học phần chưa thuộc CTĐT nào → PM 403, `ADMIN` 2xx). Test: `CourseScopeAuthorizationTest` (unit) và `CloIntegrationTest` (US-10/AC-4, US-11/AC-5, US-12/AC-6); xem `doc/test-plan.md` mục 8.5. Quyền GHI chỉ tính phân công `PROGRAM_MANAGER` (và `ADMIN`): vai trò khác của cùng người dùng, ví dụ `QA` ở ngành khác, không cộng dồn thành quyền ghi.
 2. **Quy trình nghiệp vụ:** `ADMIN` phải gán học phần vào CTĐT (`program_courses`) trước khi PM soạn đề cương. Nếu gỡ học phần khỏi
    `program_courses` cuối cùng trong scope của PM, PM mất quyền ghi đề cương học phần đó (dữ liệu đề cương vẫn giữ nguyên).
 3. **Chi phí:** mỗi lần kiểm tra của PM thêm truy vấn `program_courses` (và `program_versions`). Chưa đo. `program_courses` đã có chỉ mục `course_idx` trên `courseId` (`ProgramCourse`), nên truy vấn `findByCourseId` không quét toàn bộ.
@@ -80,7 +80,7 @@ Qua `program_courses`: học phần có mặt trong phiên bản CTĐT nào, phi
 
 **Hỏi 3. Học phần dùng chung cho hai ngành thì sao? PM ngành này có sửa được đề cương làm ảnh hưởng ngành kia không?**
 Có. Quy tắc là phép hợp: một CTĐT trong scope là đủ. Đây là đánh đổi có chủ đích; rủi ro được giảm nhờ đề cương `CONFIRMED` bị
-khóa (sửa = tạo phiên bản mới) và liên kết CLO–PI phải được `QA_OFFICER` đúng scope xác nhận. Nếu hội đồng muốn chặt hơn (cần đồng
+khóa (sửa = tạo phiên bản mới) và liên kết CLO–PI phải được cán bộ `QA` đúng scope xác nhận. Nếu hội đồng muốn chặt hơn (cần đồng
 thuận mọi ngành), phải xin thay quy tắc; hiện chưa làm.
 
 **Hỏi 4. Học phần mới tạo, chưa gán vào CTĐT, PM có soạn đề cương được không?**

@@ -72,7 +72,7 @@ Chỉ mục: duy nhất `(syllabusId, sectionId, code)`; `(sectionId, status)`; 
 
 | Phương thức | Đường dẫn | Quyền |
 |---|---|---|
-| GET/POST | `/api/v1/syllabi/{id}/assessment-templates` | đọc: `canAccessSyllabus` READ; tạo: `PROGRAM_MANAGER`, `LECTURER` hoặc `DEPARTMENT_HEAD` có học phần trong scope |
+| GET/POST | `/api/v1/syllabi/{id}/assessment-templates` | đọc: `canAccessSyllabus` READ; tạo: `PROGRAM_MANAGER` (hoặc `ADMIN`) có học phần trong scope |
 | GET/POST | `/api/v1/sections/{sectionId}/assessments` | đọc: `canAccessSection` READ; tạo: `LECTURER` của lớp |
 | GET/PUT/DELETE | `/api/v1/assessments/{id}` | đọc theo lớp/đề cương; sửa/xóa (chỉ khi `DRAFT`): như tạo |
 | PUT | `/api/v1/assessments/{id}/items` | `LECTURER` của lớp (hoặc người tạo khung); **từ chối 422 nếu `isLocked = true`** |
@@ -104,10 +104,10 @@ Vì sao lưu snapshot ánh xạ trong từng bài (đổi liên kết về sau k
 được chia, không được nhân đôi); vì sao khóa `items` sau duyệt (điểm đã nhập gắn vào đúng cấu trúc đó); vì sao duyệt *ma trận* khác
 duyệt *đề* (chỉ kiểm ánh xạ chuẩn đầu ra, không đụng nội dung câu hỏi); bỏ `isLocked` thì sửa `maxScore` sau khi có điểm làm sai CLO.
 
-## 11. Hiện thực (2026-11-08)
+## 11. Hiện thực (Lịch sử & Cập nhật v0.7 — ADR 0013 / ADR 0014)
 
-US-15, US-16 và NEW-01 đã có mã trên nhánh `feat/f04-assessments` (US-13, US-14 là mục tiêu mở rộng, US-17 loại khỏi phạm vi: **chưa làm**).
-Các quyết định dưới đây là lựa chọn của người hiện thực, **chờ hai sinh viên xác nhận**.
+> [!IMPORTANT]
+> **Cập nhật kiến trúc v0.7 (ADR 0014):** Bãi bỏ hoàn toàn vai trò `DEPARTMENT_HEAD` và luồng gửi duyệt đề thi (`submit`/`approve`/`reject`). Giảng viên lớp học phần (`LECTURER`) thiết lập ma trận câu hỏi – CLO và tự bấm khóa (`POST /assessments/{id}/lock`). Các ghi chú dưới đây từ ngày 2026-11-08 được lưu lại phục vụ theo dõi lịch sử và đã được thay thế hoàn toàn bởi các mục §1 đến §6 ở trên.
 
 **API thực tế** (tiền tố `/api/v1`):
 

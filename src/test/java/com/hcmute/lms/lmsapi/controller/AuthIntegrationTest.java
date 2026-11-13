@@ -108,7 +108,7 @@ class AuthIntegrationTest {
             .fullName("[DỮ LIỆU THỬ NGHIỆM] Tài khoản bị khóa")
             .status(UserStatus.LOCKED)
             .tokenVersion(0L)
-            .roleAssignments(List.of(RoleAssignment.builder().role(Role.STUDENT).build()))
+            .roleAssignments(List.of(RoleAssignment.builder().role(Role.QA).build()))
             .createdAt(Instant.now())
             .updatedAt(Instant.now())
             .build());

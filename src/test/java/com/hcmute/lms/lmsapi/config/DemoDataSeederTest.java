@@ -78,7 +78,7 @@ class DemoDataSeederTest {
   private static final String LABEL = "[DỮ LIỆU THỬ NGHIỆM]";
   private static final String CONTEXT_KEY = "itest" + UUID.randomUUID().toString().substring(0, 8);
   private static final String PASSWORD = "Demo-" + UUID.randomUUID();
-  private static final int EXPECTED_RECORDS = 17;
+  private static final int EXPECTED_RECORDS = 15;
 
   /** Key của mọi seeder dựng tay trong test, để dọn ở cuối. */
   private static final java.util.Set<String> KEYS_TO_PURGE = new java.util.HashSet<>();
@@ -319,10 +319,8 @@ class DemoDataSeederTest {
         Map.of(
             "admin", Role.ADMIN,
             "manager", Role.PROGRAM_MANAGER,
-            "head", Role.DEPARTMENT_HEAD,
-            "qa", Role.QA_OFFICER,
             "lecturer", Role.LECTURER,
-            "viewer", Role.VIEWER);
+            "qa", Role.QA);
     expected.forEach(
         (suffix, role) -> {
           User user = userRepository.findByUsername(seeder.username(suffix)).orElseThrow();
@@ -390,7 +388,7 @@ class DemoDataSeederTest {
     SeedResult result = seeder.seed();
 
     assertThat(result.usersSeeded()).isFalse();
-    assertThat(result.created()).isEqualTo(EXPECTED_RECORDS - 6);
+    assertThat(result.created()).isEqualTo(EXPECTED_RECORDS - 4);
     assertThat(
             mongo.count(
                 Query.query(Criteria.where("username").regex("^" + seeder.username(""))),
@@ -421,7 +419,7 @@ class DemoDataSeederTest {
 
   @Test
   @DisplayName(
-      "Issue #17: người dùng seed đăng nhập được; QA xác nhận được PLO demo; manager thêm được PLO; viewer không ghi được")
+      "Issue #17: người dùng seed đăng nhập được; QA xác nhận được PLO demo; manager thêm được PLO; QA không ghi được")
   void seededUsersWorkEndToEnd() throws Exception {
     DemoDataSeeder seeder = applicationContext.getBean(DemoDataSeeder.class);
     seeder.seed();
@@ -431,7 +429,6 @@ class DemoDataSeederTest {
 
     String qa = login(seeder.username("qa"));
     String manager = login(seeder.username("manager"));
-    String viewer = login(seeder.username("viewer"));
 
     VerificationRequest verify =
         VerificationRequest.builder().status(VerificationStatus.VERIFIED).build();
@@ -456,7 +453,7 @@ class DemoDataSeederTest {
     mockMvc
         .perform(
             post("/api/v1/program-versions/{v}/plos", version.getId())
-                .header(HttpHeaders.AUTHORIZATION, viewer)
+                .header(HttpHeaders.AUTHORIZATION, qa)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(newPlo)))
         .andExpect(status().isForbidden());

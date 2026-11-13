@@ -111,12 +111,11 @@ Tính năng F01 (Người dùng và phân quyền) đặt nền móng bảo mậ
 | Vai trò (`Role`) | Hành vi WRITE trên Lớp (`sectionId`) | Hành vi READ trên Lớp (`sectionId`) | Điều kiện áp dụng & Ràng buộc Scope |
 |---|---|---|---|
 | `ADMIN` | **CHO PHÉP** (Toàn bộ) | **CHO PHÉP** (Toàn bộ) | Toàn quyền hệ thống, không phụ thuộc vào `scope`. |
-| `LECTURER` | **CHO PHÉP** (Trong phạm vi) | **CHO PHÉP** (Trong phạm vi) | Thỏa mãn khi user còn role `LECTURER` VÀ: (1) `sectionId` ∈ `scope.sectionIds`, HOẶC (2) `courseId` ∈ `scope.courseIds`, HOẶC (3) `userId` ∈ `CourseSection.lecturerIds`. |
-| `PROGRAM_MANAGER` | **TỪ CHỐI (403)** | **CHO PHÉP** (Trong phạm vi) | READ: `sectionId` ∈ `scope.sectionIds` HOẶC `courseId` ∈ `scope.courseIds`. Không có quyền WRITE. Nếu chỉ có `programIds` thì từ chối 403 (hạn chế F01). |
-| `DEPARTMENT_HEAD` | **TỪ CHỐI (403)** | **CHO PHÉP** (Trong phạm vi) | READ: `sectionId` ∈ `scope.sectionIds` HOẶC `courseId` ∈ `scope.courseIds`. Không có quyền WRITE trên lớp (duyệt ma trận đề thi là endpoint duyệt riêng ở F04). |
-| `QA_OFFICER` | **TỪ CHỐI (403)** | **CHO PHÉP** (Trong phạm vi) | READ: `sectionId` ∈ `scope.sectionIds` HOẶC `courseId` ∈ `scope.courseIds`. Không có quyền WRITE. |
-| `VIEWER` | **TỪ CHỐI (403)** | **CHO PHÉP** (Tùy Scope) | Tuyệt đối không có quyền WRITE. Nếu scope rỗng (`scope == null` hoặc 3 mảng rỗng) → READ toàn hệ thống. Nếu scope có `sectionIds`/`courseIds` → chỉ READ trong phạm vi đó. Nếu chỉ có `programIds` → TỪ CHỐI 403. |
-| `STUDENT` | **TỪ CHỐI (403)** | **TỪ CHỐI (403)** | Từ chối 403 trên tài nguyên lớp học (chờ story NEW-03 sinh viên xem kết quả cá nhân qua `students.userId`). |
+| `LECTURER` | **CHO PHÉP** (Trong phạm vi) | **CHO PHÉP** (Trong phạm vi) | Thỏa mãn khi user có role `LECTURER` VÀ: (1) `sectionId` ∈ `scope.sectionIds`, HOẶC (2) `courseId` ∈ `scope.courseIds`, HOẶC (3) `userId` ∈ `CourseSection.lecturerIds`. |
+| `PROGRAM_MANAGER` | **TỪ CHỐI (403)** | **CHO PHÉP** (Trong phạm vi) | READ: `sectionId` ∈ `scope.sectionIds` HOẶC `courseId` ∈ `scope.courseIds`. Không có quyền WRITE trên lớp học phần (PM quản lý đề cương, bài mẫu và phân công học phần ở F02/F03/F04). |
+| `QA` | **TỪ CHỐI (403)** | **CHO PHÉP** (Tùy Scope) | Tuyệt đối không có quyền WRITE. Nếu scope rỗng (`scope == null` hoặc 3 mảng rỗng) → READ toàn hệ thống để khảo thí/đo lường chất lượng. Nếu scope có `sectionIds`/`courseIds` → chỉ READ trong phạm vi đó. (Thay thế hoàn toàn `VIEWER` và `QA_OFFICER`). |
+
+*(Lưu ý về tinh gọn 4 vai trò theo ADR 0014: `DEPARTMENT_HEAD` đã bị loại bỏ hoàn toàn do bãi bỏ quy trình duyệt ma trận đề; `STUDENT` là thực thể dữ liệu học vụ trong `students`/`enrollments` để tính mẫu số $N$, không có tài khoản đăng nhập; `VIEWER` và `QA_OFFICER` được hợp nhất thành `QA` phụ trách ĐBCL, khảo thí và xem báo cáo)*.
 
 3. **Bốn nguyên tắc vận hành cốt lõi:**
    - **Quy tắc `lecturerIds` độc lập:** Trường `lecturerIds` trong collection `course_sections` là nguồn ủy quyền trực tiếp từ bảng phân công giảng dạy. Giảng viên có `scope == null` hoặc scope rỗng nhưng có tên trong `CourseSection.lecturerIds` của lớp đó vẫn có toàn quyền READ và WRITE trên lớp đó (với điều kiện bắt buộc là người dùng vẫn đang sở hữu vai trò `LECTURER`).

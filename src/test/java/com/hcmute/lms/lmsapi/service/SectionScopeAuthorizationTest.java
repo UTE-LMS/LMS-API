@@ -128,11 +128,9 @@ class SectionScopeAuthorizationTest {
   }
 
   @Test
-  @DisplayName(
-      "Các vai trò khác (LECTURER, DEPARTMENT_HEAD, QA_OFFICER, VIEWER, STUDENT) bị từ chối")
+  @DisplayName("Các vai trò khác (LECTURER, QA) bị từ chối")
   void otherRoles_denied() {
-    for (Role role :
-        List.of(Role.LECTURER, Role.DEPARTMENT_HEAD, Role.QA_OFFICER, Role.VIEWER, Role.STUDENT)) {
+    for (Role role : List.of(Role.LECTURER, Role.QA)) {
       assertThat(
               service.canManageCourseSections(
                   principal(

@@ -65,7 +65,7 @@ class AssessmentIntegrationTest extends IntegrationTestBase {
     UserScope courseScope =
         UserScope.builder().courseIds(new ArrayList<>(List.of(course.getId()))).build();
     lecturer = fixtures.user(Role.LECTURER, courseScope);
-    departmentHead = fixtures.user(Role.DEPARTMENT_HEAD, courseScope);
+    departmentHead = fixtures.user(Role.PROGRAM_MANAGER, courseScope);
     User otherLecturer = fixtures.user(Role.LECTURER, UserScope.builder().build());
 
     section = fixtures.section(course.getId(), List.of(lecturer.getId()));
@@ -352,12 +352,12 @@ class AssessmentIntegrationTest extends IntegrationTestBase {
 
   @Test
   @DisplayName(
-      "Khung theo đề cương: giảng viên/TBM trong phạm vi được tạo; PM, ADMIN, giảng viên ngoài phạm vi -> 403 (ADR 0010)")
+      "Khung theo đề cương: ADMIN và PM trong phạm vi được tạo; LECTURER ngoài phạm vi -> 403")
   void templateAuthorizationFollowsAdr0010() throws Exception {
     AssessmentRequest request =
         AssessmentRequest.builder().code(fixtures.code("TPL")).name("Khung").build();
 
-    for (String token : List.of(pmToken, adminToken, otherLecturerToken)) {
+    for (String token : List.of(otherLecturerToken)) {
       mockMvc
           .perform(
               postAs(token, "/api/v1/syllabi/{id}/assessment-templates", request, syllabus.getId()))
@@ -365,11 +365,7 @@ class AssessmentIntegrationTest extends IntegrationTestBase {
     }
     mockMvc
         .perform(
-            postAs(
-                deptHeadToken,
-                "/api/v1/syllabi/{id}/assessment-templates",
-                request,
-                syllabus.getId()))
+            postAs(pmToken, "/api/v1/syllabi/{id}/assessment-templates", request, syllabus.getId()))
         .andExpect(status().isCreated());
 
     // ADMIN và PM đọc được khung

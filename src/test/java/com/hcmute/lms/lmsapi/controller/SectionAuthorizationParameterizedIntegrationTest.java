@@ -55,32 +55,19 @@ class SectionAuthorizationParameterizedIntegrationTest extends IntegrationTestBa
         row(Role.LECTURER, EMPTY_ARRAYS, false, false),
         row(Role.LECTURER, PROGRAM_MATCH, false, false),
         row(Role.LECTURER, OTHER_RESOURCES, false, false),
-        // PROGRAM_MANAGER, DEPARTMENT_HEAD, QA_OFFICER: chỉ READ trong sectionIds/courseIds.
+        // PROGRAM_MANAGER: chỉ READ trong sectionIds/courseIds.
         row(Role.PROGRAM_MANAGER, SECTION_MATCH, true, false),
         row(Role.PROGRAM_MANAGER, COURSE_MATCH, true, false),
         row(Role.PROGRAM_MANAGER, PROGRAM_MATCH, false, false),
         row(Role.PROGRAM_MANAGER, NULL_SCOPE, false, false),
         row(Role.PROGRAM_MANAGER, OTHER_RESOURCES, false, false),
-        row(Role.DEPARTMENT_HEAD, SECTION_MATCH, true, false),
-        row(Role.DEPARTMENT_HEAD, COURSE_MATCH, true, false),
-        row(Role.DEPARTMENT_HEAD, PROGRAM_MATCH, false, false),
-        row(Role.DEPARTMENT_HEAD, EMPTY_ARRAYS, false, false),
-        row(Role.DEPARTMENT_HEAD, OTHER_RESOURCES, false, false),
-        row(Role.QA_OFFICER, SECTION_MATCH, true, false),
-        row(Role.QA_OFFICER, COURSE_MATCH, true, false),
-        row(Role.QA_OFFICER, PROGRAM_MATCH, false, false),
-        row(Role.QA_OFFICER, NULL_SCOPE, false, false),
-        row(Role.QA_OFFICER, OTHER_RESOURCES, false, false),
-        // VIEWER: chỉ READ; scope rỗng đọc toàn hệ thống; chỉ programIds thì KHÔNG coi là rỗng.
-        row(Role.VIEWER, NULL_SCOPE, true, false),
-        row(Role.VIEWER, EMPTY_ARRAYS, true, false),
-        row(Role.VIEWER, SECTION_MATCH, true, false),
-        row(Role.VIEWER, COURSE_MATCH, true, false),
-        row(Role.VIEWER, PROGRAM_MATCH, false, false),
-        row(Role.VIEWER, OTHER_RESOURCES, false, false),
-        // STUDENT: từ chối cả hai (chờ NEW-03).
-        row(Role.STUDENT, NULL_SCOPE, false, false),
-        row(Role.STUDENT, SECTION_MATCH, false, false));
+        // QA: chỉ READ; scope rỗng đọc toàn hệ thống; chỉ programIds thì KHÔNG coi là rỗng.
+        row(Role.QA, NULL_SCOPE, true, false),
+        row(Role.QA, EMPTY_ARRAYS, true, false),
+        row(Role.QA, SECTION_MATCH, true, false),
+        row(Role.QA, COURSE_MATCH, true, false),
+        row(Role.QA, PROGRAM_MATCH, false, false),
+        row(Role.QA, OTHER_RESOURCES, false, false));
   }
 
   @ParameterizedTest(name = "{0}")

@@ -368,10 +368,8 @@ public final class DemoDataSeeder implements ApplicationRunner {
 
     ensureUser("admin", "Quản trị viên", Role.ADMIN, null, hash, counter);
     ensureUser("manager", "Quản lý CTĐT", Role.PROGRAM_MANAGER, programScope, hash, counter);
-    ensureUser("head", "Trưởng bộ môn", Role.DEPARTMENT_HEAD, courseScope, hash, counter);
-    ensureUser("qa", "Cán bộ đảm bảo chất lượng", Role.QA_OFFICER, programScope, hash, counter);
     ensureUser("lecturer", "Giảng viên", Role.LECTURER, courseScope, hash, counter);
-    ensureUser("viewer", "Người xem", Role.VIEWER, null, hash, counter);
+    ensureUser("qa", "Cán bộ đảm bảo chất lượng", Role.QA, programScope, hash, counter);
     return true;
   }
 

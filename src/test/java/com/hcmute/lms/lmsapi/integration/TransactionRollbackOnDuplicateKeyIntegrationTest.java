@@ -106,7 +106,7 @@ class TransactionRollbackOnDuplicateKeyIntegrationTest extends IntegrationTestBa
           .passwordHash("not-a-real-hash")
           .fullName("[DỮ LIỆU THỬ NGHIỆM] " + username)
           .status(UserStatus.ACTIVE)
-          .roleAssignments(List.of(RoleAssignment.builder().role(Role.VIEWER).build()))
+          .roleAssignments(List.of(RoleAssignment.builder().role(Role.QA).build()))
           .createdAt(now)
           .updatedAt(now)
           .build();

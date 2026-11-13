@@ -425,15 +425,14 @@ class ImportBatchUploadIntegrationTest extends ScoreImportIntegrationBase {
   void authorizationOnUpload() throws Exception {
     UserScope inSection =
         UserScope.builder().sectionIds(new java.util.ArrayList<>(List.of(section.getId()))).build();
-    String qa = fixtures.bearerFor(Role.QA_OFFICER, inSection);
+    String qa = fixtures.bearerFor(Role.QA, inSection);
     String pm = fixtures.bearerFor(Role.PROGRAM_MANAGER, inSection);
-    String head = fixtures.bearerFor(Role.DEPARTMENT_HEAD, inSection);
 
     mockMvc
         .perform(upload(otherLecturerToken, goodCsv(), "BLANK", defaultMapping()))
         .andExpect(status().isForbidden());
     // Plan F05b §6: chỉ LECTURER (lớp mình) nhập điểm; ADMIN và các vai trò đọc không có quyền này.
-    for (String token : new String[] {adminToken, qa, pm, head}) {
+    for (String token : new String[] {adminToken, qa, pm}) {
       mockMvc
           .perform(upload(token, goodCsv(), "BLANK", defaultMapping()))
           .andExpect(status().isForbidden());

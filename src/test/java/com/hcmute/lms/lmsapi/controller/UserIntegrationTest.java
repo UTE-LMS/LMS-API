@@ -181,7 +181,7 @@ class UserIntegrationTest {
               .email("new_test@hcmute.edu.vn")
               .password(RAW_PASSWORD)
               .fullName("New Test User")
-              .roleAssignments(List.of(RoleAssignment.builder().role(Role.STUDENT).build()))
+              .roleAssignments(List.of(RoleAssignment.builder().role(Role.QA).build()))
               .build();
 
       ApiTestSupport.performJson(
@@ -338,7 +338,7 @@ class UserIntegrationTest {
               .email("unique_email@hcmute.edu.vn")
               .password(RAW_PASSWORD)
               .fullName("Duplicate User")
-              .roleAssignments(List.of(RoleAssignment.builder().role(Role.STUDENT).build()))
+              .roleAssignments(List.of(RoleAssignment.builder().role(Role.QA).build()))
               .build();
 
       ApiTestSupport.expectConflict(
@@ -355,7 +355,7 @@ class UserIntegrationTest {
               .email("target_user@hcmute.edu.vn") // đã tồn tại
               .password(RAW_PASSWORD)
               .fullName("Duplicate Email User")
-              .roleAssignments(List.of(RoleAssignment.builder().role(Role.STUDENT).build()))
+              .roleAssignments(List.of(RoleAssignment.builder().role(Role.QA).build()))
               .build();
 
       ApiTestSupport.expectConflict(

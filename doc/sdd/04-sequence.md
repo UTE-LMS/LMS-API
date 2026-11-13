@@ -109,7 +109,7 @@ sequenceDiagram
 - Mỗi request đọc lại `users` từ CSDL (không tin vai trò trong token) nên đổi vai trò/khóa tài khoản có hiệu lực ngay, và
   `logout`/khóa tăng `tokenVersion` làm mọi token cũ bị 401.
 - Kiểm tra **phạm vi dữ liệu** (scope) không nằm ở bước này mà ở service khi cần (mục 4 là ví dụ duy nhất hiện có).
-- F03 (ADR 0010 thay thế ADR 0009): Admin quản lý Master Catalog `courses`; Trưởng bộ môn (`DEPARTMENT_HEAD`) nhận scope `courseIds` từ Admin và phân công cho Giảng viên (`LECTURER`) trong bộ môn biên soạn đề cương/CLO ở trạng thái `DRAFT`; Trưởng bộ môn thẩm định và duyệt `CONFIRMED`. Trưởng ngành (`PROGRAM_MANAGER`) quản lý đưa môn vào CTĐT (`program_courses`) và tạo liên kết $CLO \to PI$ (`clo_pi_links`) theo `scope.programIds`. Các kiểm tra scope đều thực hiện fail-closed qua `ScopeAuthorizationService`.
+- F03 (chuẩn hóa theo ADR 0014 & OBE Schema v0.7): `ADMIN` quản lý danh mục môn học (`courses`); Quản lý học thuật (`PROGRAM_MANAGER`) quản lý đề cương (`syllabi`), CLO (`clos`), ma trận liên kết $CLO \to PI$ (`clo_pi_links`) và bài đánh giá mẫu theo `scope.programIds`; Cán bộ ĐBCL (`QA`) thẩm định chất lượng (`verification`). Mọi kiểm tra scope đều thực hiện fail-closed qua `ScopeAuthorizationService`.
 
 ## 3. Tạo phiên bản CTĐT, PLO, PI (US-05, US-06)
 
@@ -183,7 +183,7 @@ sequenceDiagram
 - Mọi thay đổi PLO/PI chỉ được khi phiên bản ở `DRAFT`; `ProgramVersion` đã `ACTIVE` bị khóa nội dung.
 - Controller không chạm repository; service trả DTO qua mapper.
 
-## 4. Xác nhận nội dung bởi QA_OFFICER có kiểm tra phạm vi (US-08, ADR 0004)
+## 4. Xác nhận nội dung bởi cán bộ ĐBCL (QA) có kiểm tra phạm vi (US-08, ADR 0004 & ADR 0014)
 
 Căn cứ: `PloController.verifyPlo`, `ProgramVerificationServiceImpl.verifyPlo`, `ScopeAuthorizationServiceImpl.canAccessProgram`.
 Phiên bản CTĐT và PI đi theo cùng khuôn (`verifyProgramVersion`, `verifyPi`).
@@ -191,7 +191,7 @@ Phiên bản CTĐT và PI đi theo cùng khuôn (`verifyProgramVersion`, `verify
 ```mermaid
 sequenceDiagram
     autonumber
-    actor QA as QA_OFFICER
+    actor QA as QA (Cán bộ ĐBCL)
     participant CT as PloController
     participant VS as ProgramVerificationServiceImpl
     participant RV as ProgramVersionRepository
@@ -199,7 +199,7 @@ sequenceDiagram
     participant RL as PloRepository
     participant MP as PloMapper
 
-    Note over QA,CT: Đã qua mục 2. @PreAuthorize hasRole('QA_OFFICER') chặn ADMIN và PROGRAM_MANAGER ngay ở controller (403)
+    Note over QA,CT: Đã qua mục 2. @PreAuthorize hasRole('QA') chặn ADMIN và PROGRAM_MANAGER ngay ở controller (403)
     QA->>CT: PUT /program-versions/{pvId}/plos/{id}/verification {status, note}
     CT->>VS: verifyPlo(pvId, id, request, principal)
     VS->>RV: findById(pvId)
@@ -207,7 +207,7 @@ sequenceDiagram
         VS-->>QA: 404 NOT_FOUND
     end
     VS->>SA: canAccessProgram(principal, version.programId, WRITE)
-    Note over SA: Duyệt từng roleAssignment, hợp (UNION):<br/>ADMIN: true<br/>PROGRAM_MANAGER, QA_OFFICER: programIds chứa programId<br/>VIEWER: chỉ READ<br/>vai trò khác: false (fail-closed)
+    Note over SA: Duyệt từng roleAssignment, hợp (UNION):<br/>ADMIN: true<br/>PROGRAM_MANAGER, QA: programIds chứa programId<br/>vai trò khác: false (fail-closed)
     alt không có assignment nào cấp quyền
         VS-->>QA: AccessDeniedException, 403
     end
@@ -222,9 +222,8 @@ sequenceDiagram
 ```
 
 Điểm cần nhớ:
-- Hai lớp chặn: vai trò ở controller (`QA_OFFICER`), phạm vi chương trình ở service (`scope.programIds`). `ADMIN` được
-  `canAccessProgram` cho qua nhưng bị controller chặn trước, đúng ADR 0004 (tách người soạn khỏi người xác nhận).
-  Đề xuất này **chờ Q08**; chưa phải quyết định đã duyệt.
+- Hai lớp chặn: vai trò ở controller (`QA`), phạm vi chương trình ở service (`scope.programIds`). `ADMIN` được
+  `canAccessProgram` cho qua nhưng bị controller chặn trước, đúng ADR 0004 (tách người soạn khỏi người thẩm định ĐBCL).
 - Đây là nơi duy nhất trong mã production gọi `canAccessProgram`; `canAccessSection` (quyền trên lớp học phần) chưa có
   lớp production nào gọi, chỉ có test dùng qua controller thử nghiệm.
 
@@ -362,7 +361,26 @@ sequenceDiagram
     S-->>GV: 200 OK (ma trận đã khóa, sẵn sàng nhập điểm CLO)
 ```
 
-    alt bài chưa LOCKED/SCORE_ENTERED, TOTAL_ONLY, lớp LOCKED, học kỳ không OPEN, EXCEL, reimportPolicy khác REJECT_ON_CONFLICT
+## 8. Nhập điểm CLO từ tệp CSV (F05b, ADR 0013 & ADR 0014)
+
+Căn cứ: `ImportBatchController`, `ImportBatchServiceImpl`, `ScoreImportParser`, `ScoreImportValidator`.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor C as Giảng viên phụ trách lớp
+    participant CT as ImportBatchController
+    participant S as ImportBatchServiceImpl
+    participant P as ScoreImportParser
+    participant FS as FileStorage
+    participant V as ScoreImportValidator
+    participant A as AuditServiceImpl
+    participant DB as MongoDB replica set rs0
+
+    Note over C,DB: Bước 1 - US-21 tải tệp lên (không transactional)
+    C->>CT: POST /import-batches/upload (multipart CSV)
+    CT->>S: createBatch(...)
+    alt bài chưa LOCKED/SCORE_ENTERED, lớp LOCKED, học kỳ không OPEN
         S-->>C: 422 (không tạo lô)
     end
     S->>S: SHA-256 của tệp
@@ -381,7 +399,7 @@ sequenceDiagram
     C->>CT: POST /import-batches/{id}/validate
     S->>FS: load(fileRef), kiểm checksum
     S->>DB: đọc ghi danh ENROLLED, students, scores hiện có của (lớp, bài)
-    S->>V: validate(bảng, ánh xạ, emptyCellAs, ...)
+    S->>V: validate(bảng điểm theo cặp itemId-cloId, vắng/trống = 0.0)
     V-->>S: lỗi theo dòng/cột + các điểm sẽ ghi
     S->>DB: xóa lỗi cũ, ghi import_row_errors, cập nhật stats và status
     S-->>C: 200 VALIDATED hoặc HAS_ERRORS

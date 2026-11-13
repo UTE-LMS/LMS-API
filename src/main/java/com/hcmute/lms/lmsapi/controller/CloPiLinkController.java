@@ -96,7 +96,7 @@ public class CloPiLinkController {
   }
 
   @PutMapping("/clo-pi-links/{id}/verification")
-  @PreAuthorize("hasRole('QA_OFFICER')")
+  @PreAuthorize("hasRole('QA')")
   public ResponseEntity<CloPiLinkResponse> verifyLink(
       @PathVariable("id")
           @Pattern(

@@ -77,7 +77,7 @@ thái còn lại `rawScore = null`; `BLANK ⇒ rawScore = 0`; `rawScore ≤ maxS
 | Phương thức | Đường dẫn | Quyền |
 |---|---|---|
 | POST | `/api/sections/{sectionId}/assessments/{assessmentId}/import-batches` (tệp + cấu hình) | LECTURER (lớp mình) |
-| GET | `/api/import-batches/{id}`; `GET .../errors?page=` | LECTURER (lớp mình), QA_OFFICER |
+| GET | `/api/import-batches/{id}`; `GET .../errors?page=` | LECTURER (lớp mình), QA |
 | POST | `/api/import-batches/{id}/validate` (nếu tách bước) | LECTURER |
 | POST | `/api/import-batches/{id}/confirm`, `/rollback` | LECTURER |
 | PUT | `/api/scores/{id}` (MR, kèm `revision`, `reason`) | LECTURER (lớp mình) |
@@ -134,7 +134,7 @@ GVHD xác nhận**; mục nào đổi thì sửa mã kèm test tương ứng. Ba
 | D13 | Lô `HAS_ERRORS` không xác nhận được; **không** xác nhận phần hợp lệ. Muốn nhập tiếp thì sửa tệp rồi tải lô mới | Quy tắc 9, chọn mặc định an toàn |
 | D14 | Xác nhận = một `@Transactional`: ghi lô `CONFIRMED` (khóa lạc quan `revision`) → `insert` các `scores` (`revision = 1`, `maxScore` snapshot, `sourceRow`, `importBatchId`) → bài `APPROVED` → `SCORE_ENTERED` (chỉ lô đầu; `isLocked` giữ `true`) → `audit_logs` `IMPORT_CONFIRM`. Hai người xác nhận đồng thời: một thành công, người kia 409/422 | US-24; đã kiểm chứng rollback trên replica set (chèn lỗi giữa chừng) |
 | D15 | Hủy lô (`/rollback`) chỉ cho `UPLOADED`/`VALIDATED`/`HAS_ERRORS`. Lô `CONFIRMED` → 422 (**chưa làm** gỡ điểm đã xác nhận, TD-36) | Gỡ điểm cần quyết định `audit_logs.action` (enum đóng, TD-31) và kiểm tra `calculation_runs` chính thức (F06 chưa có) |
-| D16 | Phân quyền: ghi (tải, kiểm tra, xác nhận, hủy) = `hasRole('LECTURER')` **và** `canAccessSection(WRITE)`/`canAccessImportBatch(WRITE)`; ADMIN **không** được ghi (đúng plan §6, giống F04). Đọc = quyền đọc lớp (LECTURER của lớp, ADMIN, QA_OFFICER/DEPARTMENT_HEAD/PROGRAM_MANAGER trong scope, VIEWER) | Plan §6 "LECTURER (lớp mình)"; id lô lạ → 403 (fail-closed, như TD-22) |
+| D16 | Phân quyền: ghi (tải, kiểm tra, xác nhận, hủy) = `hasRole('LECTURER')` **và** `canAccessSection(WRITE)`/`canAccessImportBatch(WRITE)`; ADMIN **không** được ghi (đúng plan §6, giống F04). Đọc = quyền đọc lớp (LECTURER của lớp, ADMIN, PROGRAM_MANAGER trong scope, QA) | Plan §6 "LECTURER (lớp mình)"; id lô lạ → 403 (fail-closed, như TD-22) |
 | D17 | `audit_logs` `IMPORT_CONFIRM`: `entity = {import_batches, <id>}`, `before.status = VALIDATED`, `after = {status, scoreCount, assessmentId, assessmentStatus}`, không `reason`; `userId` là `ObjectId` của người xác nhận | `entity.id` lưu thành `entity._id` (TD-34) |
 
 ### 11.2 API thực tế (tiền tố `/api/v1`, JSON; lỗi theo `ErrorResponse` của US-40)

@@ -281,12 +281,12 @@ class ImportBatchValidateIntegrationTest extends ScoreImportIntegrationBase {
 
   @Test
   @DisplayName(
-      "Chung: người ngoài lớp không kiểm tra/xem lỗi lô; QA_OFFICER trong phạm vi lớp xem được nhưng không kiểm tra; id lạ -> 403/400")
+      "Chung: người ngoài lớp không kiểm tra/xem lỗi lô; QA trong phạm vi lớp xem được nhưng không kiểm tra; id lạ -> 403/400")
   void authorizationOnBatchEndpoints() throws Exception {
     String id = uploadAndValidateAllowErrors(csv("NOPE,1,1"));
     String qa =
         fixtures.bearerFor(
-            Role.QA_OFFICER,
+            Role.QA,
             UserScope.builder().sectionIds(new ArrayList<>(List.of(section.getId()))).build());
 
     mockMvc

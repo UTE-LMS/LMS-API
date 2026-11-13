@@ -37,7 +37,7 @@ Trong phân hệ F01, nhóm phát triển IT đã thiết kế và triển khai 
 
 3. **Phân quyền truy cập tài nguyên Lớp học phần theo Vai trò và Phạm vi (US-03):**
    - Xây dựng document và repository chỉ đọc `CourseSection` và `CourseSectionRepository` (collection `course_sections` §4.17).
-   - Hiện thực `ScopeAuthorizationService` và `ScopeAuthorizationServiceImpl` đóng gói toàn bộ ma trận phân quyền: 7 vai trò (`Role`) × 3 cấp độ phạm vi (`UserScope`) × 2 hành vi (`AccessType`: `READ`, `WRITE`).
+   - Hiện thực `ScopeAuthorizationService` và `ScopeAuthorizationServiceImpl` đóng gói toàn bộ ma trận phân quyền: 4 vai trò chuẩn hóa (`Role`: `ADMIN`, `PROGRAM_MANAGER`, `LECTURER`, `QA`) × 3 cấp độ phạm vi (`UserScope`) × 2 hành vi (`AccessType`: `READ`, `WRITE`).
    - Hiện thực quy tắc `lecturerIds` độc lập: Giảng viên có tên trong danh sách phân công giảng dạy của lớp học phần luôn có quyền READ và WRITE trên lớp đó, kể cả khi `scope` bị rỗng hoặc null (miễn là user vẫn giữ vai trò `LECTURER`).
    - Xử lý định nghĩa Strict Empty Scope: Scope chỉ rỗng khi `scope == null` HOẶC cả 3 mảng `programIds`, `courseIds`, `sectionIds` đều rỗng. Nếu chỉ có `programIds`, scope không rỗng nhưng do hạn chế F01 sẽ bị từ chối fail-closed (HTTP 403), không bị rơi vào nhánh đọc toàn hệ thống.
    - Hợp quyền đa vai trò (Multi-Role UNION): Người dùng sở hữu nhiều `roleAssignments` sẽ nhận được quyền hạn là phép hợp của tất cả các phân công.
@@ -53,7 +53,7 @@ Trong phân hệ F01, nhóm phát triển IBS tập trung vào việc chuẩn h�
 1. **Phân định rõ ràng Thẩm quyền và Trách nhiệm (Governance & Role-Based Segregation of Duties):**
    - Trong môi trường đại học, việc nhập điểm và đánh giá chuẩn đầu ra là nghiệp vụ pháp lý nhạy cảm. Hệ thống phân định rạch ròi giữa hành vi Ghi (`WRITE`: nhập điểm, chỉnh sửa điểm, tạo bài đánh giá) và hành vi Đọc (`READ`: tra cứu danh sách lớp, xem bảng điểm, thống kê chuẩn đầu ra).
    - Chỉ có Giảng viên được phân công giảng dạy (`LECTURER` nằm trong `lecturerIds` hoặc trong `scope`) và Quản trị viên kỹ thuật (`ADMIN`) mới được phép thực hiện hành vi WRITE.
-   - Các cấp quản lý chuyên môn như Trưởng chương trình (`PROGRAM_MANAGER`), Trưởng bộ môn (`DEPARTMENT_HEAD`), Chuyên viên bảo đảm chất lượng (`QA_OFFICER`) và Người quan sát (`VIEWER`) chỉ có quyền READ để phục vụ công tác thanh tra, giám sát, tuyệt đối không được tự ý can thiệp vào điểm số của lớp học phần nếu không có thẩm quyền giảng dạy.
+   - Các cấp quản lý chuyên môn như Quản lý chương trình (`PROGRAM_MANAGER`) và Cán bộ Đảm bảo chất lượng & Khảo thí (`QA`) chỉ có quyền READ để phục vụ công tác thanh tra, giám sát, thẩm định và đo lường báo cáo, tuyệt đối không được tự ý can thiệp vào điểm số của lớp học phần nếu không có thẩm quyền giảng dạy.
 
 2. **Tối ưu hóa quy trình phân công giảng dạy (Operational Agility via Independent `lecturerIds`):**
    - Trong thực tế quản lý đào tạo, các tình huống giảng viên dạy thay đột xuất, giảng viên thỉnh giảng hoặc nhiều giảng viên cùng phụ trách chung một lớp học phần diễn ra thường xuyên.
@@ -131,15 +131,13 @@ Mọi tham số, cấu hình và thư viện được lựa chọn trong F01 đ�
 
 ### Trả lời — Góc nhìn Sinh viên Kinh doanh số (IBS):
 
-1. **Danh mục 7 vai trò người dùng trong hệ thống:**
-   - Được trích xuất từ Quy chế tổ chức và hoạt động của Trường Đại học Sư phạm Kỹ thuật TP.HCM (HCMUTE) và mô hình quản trị đào tạo theo chuẩn OBE:
-     - `ADMIN`: Quản trị viên kỹ thuật hệ thống.
-     - `PROGRAM_MANAGER`: Trưởng / Chủ nhiệm chương trình đào tạo (phụ trách CTĐT, không đồng nhất với Trưởng khoa).
-     - `DEPARTMENT_HEAD`: Trưởng bộ môn (duyệt ma trận đề thi và phân công giảng dạy).
-     - `QA_OFFICER`: Chuyên viên phòng Đảm bảo chất lượng (giám sát, kiểm định chuẩn đầu ra).
-     - `LECTURER`: Giảng viên trực tiếp giảng dạy và đánh giá lớp học phần.
-     - `VIEWER`: Thanh tra đào tạo, chuyên gia đánh giá ngoài (AUN-QA/ABET) với quyền quan sát độc lập.
-     - `STUDENT`: Sinh viên theo học (người thụ hưởng kết quả đào tạo).
+1. **Danh mục 4 vai trò cốt lõi trong hệ thống (ADR 0014):**
+   - Được tinh gọn và chuẩn hóa theo ADR 0014 thành 4 vai trò cốt lõi:
+     - `ADMIN`: Quản trị viên kỹ thuật toàn hệ thống (phạm vi toàn cục `GLOBAL`).
+     - `PROGRAM_MANAGER`: Quản lý chương trình đào tạo, học thuật, phân công học phần, quản lý đề cương và bài đánh giá mẫu.
+     - `LECTURER`: Giảng viên trực tiếp phụ trách lớp học phần, soạn ma trận câu hỏi – CLO, tự bấm khóa và nhập điểm.
+     - `QA`: Cán bộ Đảm bảo chất lượng & Khảo thí, xem báo cáo đo lường, thẩm định CTĐT (hợp nhất hoàn toàn `VIEWER` và `QA_OFFICER`).
+     *(Lưu ý: Vai trò `DEPARTMENT_HEAD` bãi bỏ do không còn luồng duyệt ma trận; Sinh viên `STUDENT` là thực thể dữ liệu học vụ trong `students`/`enrollments` để tính mẫu số, không đăng nhập)*.
 
 2. **Cấu trúc trường dữ liệu lớp học phần (`CourseSection` §4.17):**
    - Dựa trên tài liệu khảo sát CSDL đào tạo `doc/GiaiThich_CoSoDuLieu.md` §4.17 và schema `doc/database_import.js`:
@@ -167,7 +165,7 @@ Mọi tham số, cấu hình và thư viện được lựa chọn trong F01 đ�
    - Nếu tài khoản của một giảng viên bị nghi ngờ xâm nhập, quản trị viên không có cách nào tước quyền ngay lập tức nếu không có cơ chế đối soát CSDL và kiểm tra `tokenVersion`.
 
 3. **Nếu bỏ quy tắc Strict Empty Scope:**
-   - Khi một chuyên gia kiểm định hoặc thanh tra được cấp tài khoản `VIEWER` phụ trách riêng một ngành đào tạo (`programIds = ["IT_PROGRAM"]`), hệ thống nếu kiểm tra rỗng sơ sài sẽ nhận định đây là scope rỗng và vô tình cấp quyền cho tài khoản này xem dữ liệu của toàn bộ trường đại học (bao gồm các ngành Cơ khí, Điện tử, May mặc...). Đây là sự cố vi phạm phân vùng dữ liệu nghiêm trọng.
+   - Khi một chuyên gia kiểm định hoặc cán bộ `QA` phụ trách riêng một ngành đào tạo (`programIds = ["IT_PROGRAM"]`), hệ thống nếu kiểm tra rỗng sơ sài sẽ nhận định đây là scope rỗng và vô tình cấp quyền cho tài khoản này xem dữ liệu của toàn bộ trường đại học (bao gồm các ngành Cơ khí, Điện tử, May mặc...). Đây là sự cố vi phạm phân vùng dữ liệu nghiêm trọng.
 
 4. **Nếu bỏ `PasswordPolicyValidator` đo bằng byte UTF-8:**
    - Hệ thống sẽ đối mặt với lỗ hổng **BCrypt Truncation Attack**: Giả sử mật khẩu là `MậtKhẩuCựcKỳBảoMậtTiếngViệtRấtDài123456789`, phần vượt quá 72 bytes sẽ bị BCrypt bỏ qua mà không báo lỗi. Kẻ tấn công chỉ cần nhập 72 bytes đầu tiên kèm bất kỳ ký tự rác nào phía sau vẫn có thể đăng nhập thành công.
@@ -180,7 +178,7 @@ Mọi tham số, cấu hình và thư viện được lựa chọn trong F01 đ�
 ### Trả lời — Góc nhìn Sinh viên Kinh doanh số (IBS):
 
 1. **Nếu bỏ phân định rạch ròi giữa READ và WRITE:**
-   - Xung đột thẩm quyền nghiêm trọng trong vận hành nhà trường: Các cán bộ kiểm định (`QA_OFFICER`) hoặc Trưởng chương trình đào tạo (`PROGRAM_MANAGER`) trong quá trình xem báo cáo có thể vô tình hoặc cố ý can thiệp vào bảng điểm của giảng viên. Điều này vi phạm nghiêm trọng Quy chế đào tạo của Bộ GD&ĐT về tính độc lập và trách nhiệm của giảng viên trực tiếp chấm thi.
+   - Xung đột thẩm quyền nghiêm trọng trong vận hành nhà trường: Các cán bộ ĐBCL (`QA`) hoặc Quản lý chương trình đào tạo (`PROGRAM_MANAGER`) trong quá trình xem báo cáo có thể vô tình hoặc cố ý can thiệp vào bảng điểm của giảng viên. Điều này vi phạm nghiêm trọng Quy chế đào tạo của Bộ GD&ĐT về tính độc lập và trách nhiệm của giảng viên trực tiếp chấm thi.
 
 2. **Nếu bỏ quy tắc `lecturerIds` độc lập:**
    - Quy trình phân công giảng viên dạy thay hoặc dạy phối hợp bị đình trệ: Phòng Đào tạo sẽ không thể phân công giảng viên một cách linh hoạt mà phải gửi văn bản yêu cầu Quản trị viên cập nhật lại cấu trúc phân quyền hệ thống cho từng giảng viên. Chi phí vận hành hành chính tăng vọt và làm chậm tiến độ công bố điểm cho sinh viên.
@@ -191,14 +189,11 @@ Mọi tham số, cấu hình và thư viện được lựa chọn trong F01 đ�
 
 ---
 
-## Bảng Tóm Tắt Ma Trận Phân Quyền canAccessSection [ĐỀ XUẤT, chờ Q08]
+## Bảng Tóm Tắt Ma Trận Phân Quyền canAccessSection (4 Vai trò chuẩn hóa — ADR 0014)
 
 | Vai trò (`Role`) | Hành vi Ghi (`WRITE`) trên Lớp | Hành vi Đọc (`READ`) trên Lớp | Điều kiện áp dụng & Ràng buộc Scope |
 |---|---|---|---|
 | `ADMIN` | **CHO PHÉP** (Toàn bộ) | **CHO PHÉP** (Toàn bộ) | Toàn quyền hệ thống, không phụ thuộc vào `scope`. |
-| `LECTURER` | **CHO PHÉP** (Trong phạm vi) | **CHO PHÉP** (Trong phạm vi) | Thỏa mãn khi user còn role `LECTURER` VÀ: (1) `sectionId` ∈ `scope.sectionIds`, HOẶC (2) `courseId` ∈ `scope.courseIds`, HOẶC (3) `userId` ∈ `CourseSection.lecturerIds`. |
-| `PROGRAM_MANAGER` | **TỪ CHỐI (403)** | **CHO PHÉP** (Trong phạm vi) | READ: `sectionId` ∈ `scope.sectionIds` HOẶC `courseId` ∈ `scope.courseIds`. Không có quyền WRITE. Nếu chỉ có `programIds` thì từ chối 403 (hạn chế F01). |
-| `DEPARTMENT_HEAD` | **TỪ CHỐI (403)** | **CHO PHÉP** (Trong phạm vi) | READ: `sectionId` ∈ `scope.sectionIds` HOẶC `courseId` ∈ `scope.courseIds`. Không có quyền WRITE trên lớp. |
-| `QA_OFFICER` | **TỪ CHỐI (403)** | **CHO PHÉP** (Trong phạm vi) | READ: `sectionId` ∈ `scope.sectionIds` HOẶC `courseId` ∈ `scope.courseIds`. Không có quyền WRITE. |
-| `VIEWER` | **TỪ CHỐI (403)** | **CHO PHÉP** (Tùy Scope) | Tuyệt đối không có quyền WRITE. Nếu scope rỗng (`scope == null` hoặc 3 mảng rỗng) → READ toàn hệ thống. Nếu scope có `sectionIds`/`courseIds` → chỉ READ trong phạm vi đó. Nếu chỉ có `programIds` → TỪ CHỐI 403. |
-| `STUDENT` | **TỪ CHỐI (403)** | **TỪ CHỐI (403)** | Từ chối 403 trên tài nguyên lớp học (chờ story NEW-03 sinh viên xem kết quả cá nhân). |
+| `LECTURER` | **CHO PHÉP** (Trong phạm vi) | **CHO PHÉP** (Trong phạm vi) | Thỏa mãn khi user có role `LECTURER` VÀ: (1) `sectionId` ∈ `scope.sectionIds`, HOẶC (2) `courseId` ∈ `scope.courseIds`, HOẶC (3) `userId` ∈ `CourseSection.lecturerIds`. |
+| `PROGRAM_MANAGER` | **TỪ CHỐI (403)** | **CHO PHÉP** (Trong phạm vi) | READ: `sectionId` ∈ `scope.sectionIds` HOẶC `courseId` ∈ `scope.courseIds`. Không có quyền WRITE trên lớp học phần (PM quản lý đề cương, bài mẫu ở F02/F03/F04). |
+| `QA` | **TỪ CHỐI (403)** | **CHO PHÉP** (Tùy Scope) | Tuyệt đối không có quyền WRITE. Nếu scope rỗng (`scope == null` hoặc 3 mảng rỗng) → READ toàn hệ thống để khảo thí/đo lường chất lượng. Nếu scope có `sectionIds`/`courseIds` → chỉ READ trong phạm vi đó. (Hợp nhất hoàn toàn `VIEWER` và `QA_OFFICER`). |

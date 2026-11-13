@@ -56,7 +56,7 @@ public class AssessmentController {
 
   @PostMapping("/syllabi/{syllabusId}/assessment-templates")
   @PreAuthorize(
-      "hasAnyRole('LECTURER', 'DEPARTMENT_HEAD') and"
+      "hasAnyRole('LECTURER', 'PROGRAM_MANAGER') and"
           + " @scopeAuthorizationService.canAccessSyllabus(authentication.principal, #syllabusId, "
           + WRITE
           + ")")
@@ -117,7 +117,7 @@ public class AssessmentController {
 
   @PutMapping("/assessments/{id}")
   @PreAuthorize(
-      "hasAnyRole('LECTURER', 'DEPARTMENT_HEAD') and"
+      "hasAnyRole('LECTURER', 'PROGRAM_MANAGER') and"
           + " @scopeAuthorizationService.canAccessAssessment(authentication.principal, #id, "
           + WRITE
           + ")")
@@ -132,7 +132,7 @@ public class AssessmentController {
 
   @PutMapping("/assessments/{id}/items")
   @PreAuthorize(
-      "hasAnyRole('LECTURER', 'DEPARTMENT_HEAD') and"
+      "hasAnyRole('LECTURER', 'PROGRAM_MANAGER') and"
           + " @scopeAuthorizationService.canAccessAssessment(authentication.principal, #id, "
           + WRITE
           + ")")

@@ -23,7 +23,7 @@ Người dùng đăng nhập nhận JWT token, có vai trò gắn với **phạm
 | `status` | `ACTIVE` / `LOCKED` |
 | `tokenVersion` | Số nguyên (`number` / `['int','long']`, mặc định 0), tăng nguyên tử qua `UserRepositoryCustom.incrementTokenVersion` khi logout hoặc khi tài khoản bị khóa (`LOCKED`). Kiểm tra để vô hiệu hóa vĩnh viễn các token cấp trước đó |
 | `roleAssignments[]` | Danh sách `{ role, scope }` (quyền người dùng là phép hợp UNION của các assignment, nạp từ DB mỗi request) |
-| `role` | `ADMIN`, `PROGRAM_MANAGER`, `DEPARTMENT_HEAD`, `QA_OFFICER`, `LECTURER`, `STUDENT`, `VIEWER` (đủ 7 enum) |
+| `role` | `ADMIN`, `PROGRAM_MANAGER`, `LECTURER`, `QA` (4 enum chuẩn hóa theo ADR 0014 & OBE Schema v0.7) |
 | `scope` | `{ programIds[], courseIds[], sectionIds[] }` hoặc `null` (ý nghĩa xem mục 4.2 & 4.3) |
 | `createdAt`, `updatedAt` | Thời gian hệ thống |
 
@@ -31,16 +31,16 @@ Chỉ mục: `username` duy nhất, `email` duy nhất.
 
 ## 4. Quy tắc nghiệp vụ
 
-### 4.1 Vai trò dùng trong cam kết
-`ADMIN`, `PROGRAM_MANAGER`, `DEPARTMENT_HEAD`, `QA_OFFICER`, `LECTURER`, `VIEWER`. `STUDENT` có trong enum CSDL và Java nhưng nghiệp vụ sinh viên xem kết quả làm ở NEW-03.
+### 4.1 Vai trò dùng trong hệ thống (4 vai trò chuẩn hóa)
+`ADMIN`, `PROGRAM_MANAGER`, `LECTURER`, `QA`. Cán bộ `QA` phụ trách ĐBCL & Khảo thí, xem báo cáo đo lường chất lượng, thẩm định CTĐT (hợp nhất `VIEWER` và `QA_OFFICER`). `DEPARTMENT_HEAD` bãi bỏ do không duyệt ma trận đề. Sinh viên (`STUDENT`) là thực thể dữ liệu học vụ trong `students`/`enrollments` để tính mẫu số $N_{\text{section}}$, không đăng nhập.
 
-### 4.2 Ma trận quyền trên tài nguyên Lớp học (`canAccessSection`) **[ĐỀ XUẤT, chờ Q08]**
+### 4.2 Ma trận quyền trên tài nguyên Lớp học (`canAccessSection`)
 
 | Hành vi trên lớp | Ai được phép |
 |---|---|
-| **WRITE** (nhập điểm, tạo bài đánh giá) | `ADMIN` (toàn bộ lớp), `LECTURER` (lớp trong `scope.sectionIds`, thuộc `scope.courseIds`, hoặc có trong `CourseSection.lecturerIds` **với điều kiện** user vẫn còn vai trò `LECTURER` trong `roleAssignments`) |
-| **READ** (xem lớp, bảng điểm, bài đánh giá) | `ADMIN` (toàn bộ), `PROGRAM_MANAGER` (lớp trong `sectionIds` hoặc `courseIds`), `DEPARTMENT_HEAD` (lớp trong `sectionIds` hoặc `courseIds`), `QA_OFFICER` (lớp trong `sectionIds` hoặc `courseIds`), `LECTURER` (lớp trong `sectionIds`, `courseIds` hoặc `lecturerIds`), `VIEWER` (scope rỗng = toàn bộ, scope có giá trị = trong scope) |
-| **Từ chối (403)** | `STUDENT` (chờ NEW-03), các vai trò khác ngoài phạm vi hoặc vai trò không có quyền WRITE; vai trò chỉ có `programIds` trong F01 (kể cả VIEWER và PROGRAM_MANAGER, hạn chế đã biết, chờ ánh xạ CTĐT → lớp ở feature sau) |
+| **WRITE** (nhập điểm, tạo bài đánh giá) | `ADMIN` (toàn bộ lớp), `LECTURER` (lớp trong `scope.sectionIds`, thuộc `scope.courseIds`, hoặc có trong `CourseSection.lecturerIds` **với điều kiện** user có vai trò `LECTURER` trong `roleAssignments`) |
+| **READ** (xem lớp, bảng điểm, bài đánh giá) | `ADMIN` (toàn bộ), `PROGRAM_MANAGER` (lớp trong `sectionIds` hoặc `courseIds`), `LECTURER` (lớp trong `sectionIds`, `courseIds` hoặc `lecturerIds`), `QA` (scope rỗng = toàn bộ để khảo thí/thẩm định, scope có giá trị = trong scope) |
+| **Từ chối (403)** | Các vai trò khác ngoài phạm vi hoặc vai trò không có quyền WRITE; vai trò chỉ có `programIds` trong F01 (kể cả QA và PROGRAM_MANAGER, hạn chế đã biết, fail-closed) |
 
 Ghi chú:
 - `lecturerIds` là nguồn cấp quyền độc lập: LECTURER có scope rỗng nhưng nằm trong `CourseSection.lecturerIds` vẫn được phép truy cập lớp đó (miễn là user vẫn giữ vai trò LECTURER).
@@ -81,11 +81,11 @@ Ghi chú:
 | US-03/AC-1 | LECTURER chỉ thấy và thao tác trên lớp trong phạm vi phụ trách (`canAccessSection` khớp ma trận WRITE); lớp khác → 403 |
 | US-03/AC-2 | Mọi endpoint (trừ permitAll) từ chối khi chưa xác thực (401 qua AuthenticationEntryPoint) |
 | US-03/AC-3 | Có test tham số hóa kiểm tra toàn diện ma trận vai trò × phạm vi × READ/WRITE trên controller giả lập theo bảng ma trận mục 4.2 |
-| US-03/AC-4 | Kiểm thử độc lập: LECTURER có `scope == null` hoặc scope rỗng nhưng nằm trong `lecturerIds` được cấp quyền; LECTURER có scope rỗng và không nằm trong `lecturerIds` bị từ chối 403; VIEWER chỉ có `programIds` bị từ chối 403 (không bị coi là scope rỗng); PROGRAM_MANAGER chỉ có `programIds` bị từ chối 403 (hạn chế đã biết) |
+| US-03/AC-4 | Kiểm thử độc lập: LECTURER có `scope == null` hoặc scope rỗng nhưng nằm trong `lecturerIds` được cấp quyền; LECTURER có scope rỗng và không nằm trong `lecturerIds` bị từ chối 403; QA chỉ có `programIds` bị từ chối 403 (không bị coi là scope rỗng); PROGRAM_MANAGER chỉ có `programIds` bị từ chối 403 (hạn chế đã biết) |
 | US-03/AC-5 | Kiểm thử: Đổi vai trò hoặc scope của người dùng trong CSDL thì request kế tiếp với token hợp lệ hiện tại sử dụng ngay quyền hạn mới |
 | US-04/AC-1 | `GET /api/v1/audit-logs` trả danh sách phân trang chuẩn (zero-indexed, `content`, `page`, `size`, `totalElements`, `totalPages`, `last`), dòng mới nhất trước; trang vượt quá cuối hoặc không có dòng khớp trả `content` rỗng, không lỗi |
 | US-04/AC-2 | Lọc tùy chọn theo `action`, `entity` (tên collection), `entityId`, `userId` (người thực hiện), `from`, `to` (ISO-8601, bao gồm hai đầu mút); các bộ lọc kết hợp bằng AND |
-| US-04/AC-3 | Chỉ `ADMIN` đọc được; mọi vai trò khác → 403, chưa đăng nhập → 401 *(giữ ADMIN-only, chưa mở cho `QA_OFFICER`; nếu Khoa muốn mở thì sửa `@PreAuthorize` và test)* |
+| US-04/AC-3 | Chỉ `ADMIN` đọc được; mọi vai trò khác → 403, chưa đăng nhập → 401 *(giữ ADMIN-only, chưa mở cho `QA`; nếu Khoa muốn mở thì sửa `@PreAuthorize` và test)* |
 | US-04/AC-4 | `before`/`after` không lộ `passwordHash`, token, secret: khử khuẩn lúc ghi (`AuditLogMapper.sanitize`) và **khử khuẩn lại lúc đọc**, nên dòng cũ ghi trước khi có quy tắc vẫn được che (`[PROTECTED]`) |
 | US-04/AC-5 | `page < 0`, `size < 1`, `size > 100`, `action` không thuộc `AuditAction`, `userId` không phải ObjectId 24 hex, `from`/`to` sai định dạng ISO-8601, hoặc `from` sau `to` → 400 `VALIDATION_ERROR` |
 
@@ -126,8 +126,8 @@ Ghi chú:
 
 - Không làm: Đăng ký tự do, quên mật khẩu qua email, đăng nhập mạng xã hội, phân quyền suy diễn theo `programIds` cho `canAccessSection` (hạn chế đã biết của F01).
 - Nợ kỹ thuật: Rate limit cho endpoint đăng nhập, cơ chế khóa bi quan/write-conflict ép buộc cho guard ADMIN đồng thời (ghi vào `doc/tech-debt.md`).
-- Chuyển giao cho F02: F01 chỉ có `canAccessSection` (quyền trên lớp). Quyền trên CTĐT (ví dụ `QA_OFFICER` xác nhận
-  `program_versions`/PLO/PI theo `scope.programIds`, xem ADR 0004) cần hàm kiểm tra riêng (ví dụ `canAccessProgram`,
+- Chuyển giao cho F02: F01 chỉ có `canAccessSection` (quyền trên lớp). Quyền trên CTĐT (ví dụ `QA` xác nhận
+  `program_versions`/PLO/PI theo `scope.programIds`, xem ADR 0004 & ADR 0014) cần hàm kiểm tra riêng (ví dụ `canAccessProgram`,
   fail-closed) do F02 bổ sung, kèm việc ánh xạ CTĐT → lớp để vai trò chỉ có `programIds` không bị 403 trên lớp.
 - US-04 (API xem nhật ký thao tác, issue #18) đã làm phần API đọc/lọc; màn hình hiển thị thuộc repo `LMS-UI`. Việc *ghi* audit cho các hành động khác ngoài `LOGIN` thuộc các feature sở hữu hành động đó (F04, F05b, F06...).
 - NEW-03 (vai trò STUDENT xem kết quả của chính mình, issue #19) **hoãn**, làm khi có thời gian; phụ thuộc F05a (`students.userId`) và F06 (`student_results`).

@@ -1,36 +1,30 @@
 package com.hcmute.lms.lmsapi.enums;
 
 /**
- * Danh mục 7 vai trò người dùng trong hệ thống LMS-API (F01). Khớp 100% với danh mục vai trò trong
- * CSDL MongoDB (database_import.js) và ADR 0003.
+ * Danh mục 4 vai trò người dùng cốt lõi trong hệ thống LMS-API (ADR 0014, DB Schema v0.7). Tinh gọn
+ * triệt để từ 7 vai trò cũ (loại bỏ DEPARTMENT_HEAD do bỏ duyệt đề, STUDENT không đăng nhập, và
+ * thống nhất cán bộ ĐBCL / khảo thí / xem báo cáo thành QA).
  */
 public enum Role {
 
   /** Quản trị viên hệ thống: toàn quyền trên toàn bộ tài nguyên (READ & WRITE). */
   ADMIN,
 
-  /** Quản lý chương trình đào tạo: quyền xem trong phạm vi CTĐT, học phần và lớp học phụ trách. */
+  /**
+   * Quản lý chương trình đào tạo & học thuật: quản lý CTĐT, đề cương, chuẩn đầu ra (PLO, PI, CLO),
+   * phân công học phần, tính toán chuẩn đầu ra cấp CTĐT / Khóa tuyển sinh.
+   */
   PROGRAM_MANAGER,
 
-  /** Trưởng bộ môn: quyền xem các học phần, lớp học và thẩm quyền duyệt ma trận đề thi (F04). */
-  DEPARTMENT_HEAD,
-
   /**
-   * Cán bộ bảo đảm chất lượng: quyền xem kết quả đo lường trong phạm vi phụ trách; đề xuất là người
-   * xác nhận nội dung CTĐT, PLO, PI (F02 / US-08, chờ Q08, xem ADR 0004).
-   */
-  QA_OFFICER,
-
-  /**
-   * Giảng viên: quyền nhập điểm, tạo bài đánh giá (WRITE) trên các lớp thuộc phân công hoặc scope.
+   * Giảng viên: phụ trách lớp học phần, soạn bài đánh giá, tự khóa ma trận đề, tải CSV mẫu, nhập
+   * điểm CSV (Vắng / trống = 0.0), tính toán CLO lớp học phần.
    */
   LECTURER,
 
   /**
-   * Sinh viên: xem kết quả học tập cá nhân (NEW-03, không có quyền trên tài nguyên lớp trong F01).
+   * Cán bộ Đảm bảo chất lượng / Khảo thí: quyền xem kết quả đo lường, báo cáo chuẩn đầu ra và thống
+   * kê chất lượng (READ-only) theo phạm vi phân công.
    */
-  STUDENT,
-
-  /** Người xem/Khảo thí: quyền chỉ đọc (READ-only) theo phạm vi phân công. */
-  VIEWER
+  QA
 }

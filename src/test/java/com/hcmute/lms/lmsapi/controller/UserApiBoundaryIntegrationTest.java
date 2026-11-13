@@ -59,7 +59,7 @@ class UserApiBoundaryIntegrationTest extends IntegrationTestBase {
         .email(username + "@itest.invalid")
         .password(VALID_PASSWORD)
         .fullName(ApiTestFixtures.LABEL + " " + username)
-        .roleAssignments(List.of(RoleAssignment.builder().role(Role.VIEWER).build()))
+        .roleAssignments(List.of(RoleAssignment.builder().role(Role.QA).build()))
         .build();
   }
 
@@ -237,7 +237,7 @@ class UserApiBoundaryIntegrationTest extends IntegrationTestBase {
             + username
             + "@itest.invalid\",\"password\":\""
             + VALID_PASSWORD
-            + "\",\"fullName\":\"x\",\"roleAssignments\":[{\"role\":\"VIEWER\"}],"
+            + "\",\"fullName\":\"x\",\"roleAssignments\":[{\"role\":\"QA\"}],"
             + "\"status\":\"LOCKED\",\"tokenVersion\":99,\"passwordHash\":\"chu-nghia-gia\","
             + "\"id\":\""
             + forgedId
@@ -330,7 +330,7 @@ class UserApiBoundaryIntegrationTest extends IntegrationTestBase {
         UpdateUserRequest.builder()
             .email("a@itest.invalid")
             .fullName("x")
-            .roleAssignments(List.of(RoleAssignment.builder().role(Role.VIEWER).build()))
+            .roleAssignments(List.of(RoleAssignment.builder().role(Role.QA).build()))
             .build();
     mockMvc
         .perform(getAs(admin, USER_BY_ID, id))

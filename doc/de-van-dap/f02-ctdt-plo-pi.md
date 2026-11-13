@@ -41,7 +41,7 @@ Trong phân hệ F02, nhóm phát triển IT đã thiết kế và hiện thực
 
 4. **Quy trình Thẩm định chất lượng độc lập của Chuyên viên QA (US-08 - ADR 0004):**
    - Mở rộng [ScopeAuthorizationService.java](file:///D:/Code/Project/LMS-API/src/main/java/com/hcmute/lms/lmsapi/service/ScopeAuthorizationService.java) với phương thức `canAccessProgram(principal, programId)` theo cơ chế fail-closed: Chuyên viên QA chỉ được thẩm định các CTĐT nằm trong danh sách `scope.programIds` được phân công.
-   - Phân quyền chặt chẽ các endpoint thẩm định (`PUT /api/v1/program-versions/{id}/verification`, `PUT .../plos/{id}/verification`, `PUT .../pis/{id}/verification`): Chỉ tài khoản có vai trò `QA_OFFICER` đúng scope mới được thực hiện; `PROGRAM_MANAGER` và `ADMIN` đều bị từ chối bằng HTTP 403 `FORBIDDEN`.
+   - Phân quyền chặt chẽ các endpoint thẩm định (`PUT /api/v1/program-versions/{id}/verification`, `PUT .../plos/{id}/verification`, `PUT .../pis/{id}/verification`): Chỉ tài khoản có vai trò `QA` đúng scope mới được thực hiện; `PROGRAM_MANAGER` và `ADMIN` đều bị từ chối bằng HTTP 403 `FORBIDDEN`.
    - Tự động ghi nhận định danh người duyệt (`verifiedBy = principal.id`) và mốc thời gian thẩm định (`verifiedAt = Instant.now()`).
 
 5. **Bộ kiểm thử tự động toàn diện (Integration & Unit Testing):**
@@ -72,7 +72,7 @@ Trong phân hệ F02, nhóm IBS tập trung vào việc thiết kế cấu trúc
 
 4. **Thiết lập Quy trình Kiểm soát Chất lượng Nội bộ Độc lập (ADR 0004 — Nguyên tắc Bốn Mắt):**
    - Trong quản trị chất lượng đại học (IQA), người xây dựng CTĐT không được phép tự thẩm định và phê duyệt sản phẩm của chính mình.
-   - Phân hệ F02 thiết lập cơ chế phân quyền độc lập: Trưởng chương trình (`PROGRAM_MANAGER`) chịu trách nhiệm xây dựng nội dung chuyên môn, trong khi Chuyên viên Đảm bảo chất lượng (`QA_OFFICER`) độc lập rà soát tính tương thích với tiêu chuẩn kiểm định AUN-QA/ABET, sau đó mới xác nhận (`VERIFIED`). Quản trị viên kỹ thuật (`ADMIN`) tuyệt đối không được can thiệp vào nghiệp vụ thẩm định học thuật này.
+   - Phân hệ F02 thiết lập cơ chế phân quyền độc lập: Trưởng chương trình (`PROGRAM_MANAGER`) chịu trách nhiệm xây dựng nội dung chuyên môn, trong khi Cán bộ Đảm bảo chất lượng (`QA`) độc lập rà soát tính tương thích với tiêu chuẩn kiểm định AUN-QA/ABET, sau đó mới xác nhận (`VERIFIED`). Quản trị viên kỹ thuật (`ADMIN`) tuyệt đối không được can thiệp vào nghiệp vụ thẩm định học thuật này.
 
 ---
 
@@ -201,7 +201,7 @@ Toàn bộ các tham số và quy tắc kỹ thuật trong F02 đều xuất ph�
    - Nếu hệ thống không có F02, nhà trường hoàn toàn bất lực trong việc trả lời các câu hỏi kiểm định này, dẫn đến việc CTĐT bị đánh giá "Không đạt" (Not Met).
 
 3. **Vi phạm Nguyên tắc Kiểm soát Nội bộ (Internal Governance Breakdown):**
-   - Nếu cho phép người soạn (`PROGRAM_MANAGER`) tự xác nhận nội dung của mình (`VERIFIED`) mà không có sự kiểm tra độc lập của `QA_OFFICER` (như đã phân tích trong ADR 0004), hệ thống sẽ vi phạm nguyên tắc "Bốn mắt" (Four-Eyes Principle) trong quản trị giáo dục đại học, biến khâu thẩm định chất lượng thành một thủ tục hình thức vô giá trị.
+   - Nếu cho phép người soạn (`PROGRAM_MANAGER`) tự xác nhận nội dung của mình (`VERIFIED`) mà không có sự kiểm tra độc lập của cán bộ `QA` (như đã phân tích trong ADR 0004 & ADR 0014), hệ thống sẽ vi phạm nguyên tắc "Bốn mắt" (Four-Eyes Principle) trong quản trị giáo dục đại học, biến khâu thẩm định chất lượng thành một thủ tục hình thức vô giá trị.
 
 ---
 
@@ -283,21 +283,21 @@ Toàn bộ các tham số và quy tắc kỹ thuật trong F02 đều xuất ph�
 
 ---
 
-### 5.7. Tại sao lại phân quyền cho `QA_OFFICER` thẩm định CTĐT thay vì `ADMIN` hay `PROGRAM_MANAGER` tự duyệt? (ADR 0004)
+### 5.7. Tại sao lại phân quyền cho cán bộ `QA` thẩm định CTĐT thay vì `ADMIN` hay `PROGRAM_MANAGER` tự duyệt? (ADR 0004 & ADR 0014)
 
 **Trả lời:**
 - **Nguyên tắc "Bốn mắt" và Kiểm soát chất lượng độc lập (IBS):**
   - Trong quản trị doanh nghiệp và giáo dục đại học, nguyên tắc Bốn mắt (Four-Eyes Principle / Separation of Duties) quy định: Người trực tiếp lập kế hoạch hoặc xây dựng nội dung (`PROGRAM_MANAGER`) không được phép là người phê duyệt chính thức nội dung đó. Nếu người soạn tự phê duyệt, nguy cơ bỏ lọt sai sót chủ quan hoặc thiếu khách quan là rất lớn.
-  - Chuyên viên Đảm bảo chất lượng (`QA_OFFICER`) đóng vai trò là cơ quan giám sát độc lập, kiểm tra xem việc phân rã PLO/PI có tuân thủ đúng hướng dẫn AUN-QA và quy chế đào tạo của trường hay không.
+  - Cán bộ Đảm bảo chất lượng (`QA`) đóng vai trò là cơ quan giám sát độc lập, kiểm tra xem việc phân rã PLO/PI có tuân thủ đúng hướng dẫn AUN-QA và quy chế đào tạo của trường hay không.
 - **Phân định rõ ranh giới Quản trị kỹ thuật và Thẩm quyền Học thuật (IT):**
   - Vai trò `ADMIN` trong hệ thống là Quản trị viên kỹ thuật (Technical Administrator), phụ trách việc khởi tạo tài khoản, cấu hình tham số hạ tầng và phân quyền hệ thống. `ADMIN` không có chuyên môn về chương trình đào tạo và không có thẩm quyền ký duyệt nội dung học thuật.
-  - Do đó, việc thiết lập quyền thẩm định chỉ dành riêng cho `QA_OFFICER` (với đúng phạm vi `scope.programIds`) là một quyết định kiến trúc chuẩn xác cả về mặt bảo mật (Principle of Least Privilege) lẫn nghiệp vụ quản trị đại học.
+  - Do đó, việc thiết lập quyền thẩm định chỉ dành riêng cho `QA` (với đúng phạm vi `scope.programIds`) là một quyết định kiến trúc chuẩn xác cả về mặt bảo mật (Principle of Least Privilege) lẫn nghiệp vụ quản trị đại học.
 
 ---
 
-## Bảng Tóm Tắt Ma Trận Phân Quyền Phân Hệ F02
+## Bảng Tóm Tắt Ma Trận Phân Quyền Phân Hệ F02 (4 Vai trò chuẩn hóa)
 
-| Tài nguyên & Hành vi | Đường dẫn API | `PROGRAM_MANAGER` | `QA_OFFICER` | `ADMIN` | `LECTURER` / `VIEWER` / `STUDENT` |
+| Tài nguyên & Hành vi | Đường dẫn API | `PROGRAM_MANAGER` | `QA` | `ADMIN` | `LECTURER` |
 |---|---|---|---|---|---|
 | **Xem danh mục CTĐT & Phiên bản** | `GET /api/v1/programs/**`, `GET /api/v1/program-versions/**` | **CHO PHÉP** | **CHO PHÉP** | **CHO PHÉP** | **CHO PHÉP** (Chỉ đọc) |
 | **Khởi tạo/Sửa Ngành đào tạo (Master Data)** | `POST/PUT /api/v1/programs/**` | **TỪ CHỐI (403)** | **TỪ CHỐI (403)** | **CHO PHÉP** (ADR 0005) | **TỪ CHỐI (403)** |

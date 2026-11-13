@@ -238,7 +238,7 @@ class SectionServiceImplTest {
         .hasMessageContaining("ACTIVE");
 
     when(userRepository.findAllById(List.of(LECTURER_ID)))
-        .thenReturn(List.of(lecturer(UserStatus.ACTIVE, Role.VIEWER)));
+        .thenReturn(List.of(lecturer(UserStatus.ACTIVE, Role.QA)));
     assertThatThrownBy(() -> service.createSection(request()))
         .isInstanceOf(BusinessRuleViolationException.class)
         .hasMessageContaining("LECTURER");

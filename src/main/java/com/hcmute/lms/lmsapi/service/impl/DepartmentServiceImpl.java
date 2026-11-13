@@ -201,7 +201,7 @@ public class DepartmentServiceImpl implements DepartmentService {
     }
     for (RoleAssignment assignment : principal.getRoleAssignments()) {
       if (assignment != null
-          && assignment.getRole() == Role.DEPARTMENT_HEAD
+          && (assignment.getRole() == Role.PROGRAM_MANAGER || assignment.getRole() == Role.ADMIN)
           && assignment.getScope() != null
           && assignment.getScope().getProgramIds() != null) {
         for (String pid : assignment.getScope().getProgramIds()) {
@@ -221,7 +221,7 @@ public class DepartmentServiceImpl implements DepartmentService {
     }
     for (RoleAssignment assignment : principal.getRoleAssignments()) {
       if (assignment != null
-          && assignment.getRole() == Role.DEPARTMENT_HEAD
+          && (assignment.getRole() == Role.PROGRAM_MANAGER || assignment.getRole() == Role.ADMIN)
           && assignment.getScope() != null
           && assignment.getScope().getCourseIds() != null) {
         for (String cid : assignment.getScope().getCourseIds()) {

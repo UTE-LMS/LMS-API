@@ -43,7 +43,7 @@ public class SyllabusController {
 
   @PostMapping("/courses/{courseId}/syllabi")
   @PreAuthorize(
-      "hasAnyRole('LECTURER', 'DEPARTMENT_HEAD') and @scopeAuthorizationService.canAccessCourse(authentication.principal, #courseId, T(com.hcmute.lms.lmsapi.enums.AccessType).WRITE)")
+      "hasAnyRole('LECTURER', 'PROGRAM_MANAGER') and @scopeAuthorizationService.canAccessCourse(authentication.principal, #courseId, T(com.hcmute.lms.lmsapi.enums.AccessType).WRITE)")
   public ResponseEntity<SyllabusResponse> createSyllabus(
       @PathVariable("courseId")
           @Pattern(
@@ -72,7 +72,7 @@ public class SyllabusController {
 
   @PutMapping("/syllabi/{id}/status")
   @PreAuthorize(
-      "hasRole('DEPARTMENT_HEAD') and @scopeAuthorizationService.canAccessSyllabus(authentication.principal, #id, T(com.hcmute.lms.lmsapi.enums.AccessType).WRITE)")
+      "hasRole('PROGRAM_MANAGER') and @scopeAuthorizationService.canAccessSyllabus(authentication.principal, #id, T(com.hcmute.lms.lmsapi.enums.AccessType).WRITE)")
   public ResponseEntity<SyllabusResponse> updateStatus(
       @PathVariable("id")
           @Pattern(

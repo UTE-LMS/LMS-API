@@ -49,31 +49,25 @@ class ProgramScopeAuthorizationTest {
   void qaOfficerMatchingScope_allowed() {
     UserScope scope = UserScope.builder().programIds(List.of(PROGRAM_ID)).build();
 
-    assertThat(
-            service.canAccessProgram(
-                principal(Role.QA_OFFICER, scope), PROGRAM_ID, AccessType.WRITE))
+    assertThat(service.canAccessProgram(principal(Role.QA, scope), PROGRAM_ID, AccessType.WRITE))
         .isTrue();
   }
 
   @Test
-  @DisplayName("QA_OFFICER không có programIds bị từ chối (fail-closed)")
+  @DisplayName("QA không có programIds bị từ chối (fail-closed)")
   void qaOfficerEmptyScope_denied() {
     UserScope scope = UserScope.builder().build();
 
-    assertThat(
-            service.canAccessProgram(
-                principal(Role.QA_OFFICER, scope), PROGRAM_ID, AccessType.WRITE))
+    assertThat(service.canAccessProgram(principal(Role.QA, scope), PROGRAM_ID, AccessType.WRITE))
         .isFalse();
   }
 
   @Test
-  @DisplayName("QA_OFFICER khác chương trình bị từ chối")
+  @DisplayName("QA khác chương trình bị từ chối")
   void qaOfficerOtherProgram_denied() {
     UserScope scope = UserScope.builder().programIds(List.of(OTHER_PROGRAM_ID)).build();
 
-    assertThat(
-            service.canAccessProgram(
-                principal(Role.QA_OFFICER, scope), PROGRAM_ID, AccessType.WRITE))
+    assertThat(service.canAccessProgram(principal(Role.QA, scope), PROGRAM_ID, AccessType.WRITE))
         .isFalse();
   }
 
@@ -96,15 +90,15 @@ class ProgramScopeAuthorizationTest {
   }
 
   @Test
-  @DisplayName("VIEWER chỉ đọc và cần scope rỗng nghiêm ngặt hoặc khớp chương trình")
-  void viewer_readOnly() {
+  @DisplayName("QA có thể đọc với scope rỗng nghiêm ngặt hoặc khớp chương trình")
+  void qa_readScope() {
     assertThat(
             service.canAccessProgram(
-                principal(Role.VIEWER, UserScope.builder().build()), PROGRAM_ID, AccessType.READ))
+                principal(Role.QA, UserScope.builder().build()), PROGRAM_ID, AccessType.READ))
         .isTrue();
     assertThat(
             service.canAccessProgram(
-                principal(Role.VIEWER, UserScope.builder().build()), PROGRAM_ID, AccessType.WRITE))
+                principal(Role.QA, UserScope.builder().build()), PROGRAM_ID, AccessType.WRITE))
         .isFalse();
   }
 
@@ -112,10 +106,8 @@ class ProgramScopeAuthorizationTest {
   @DisplayName("Tham số null hoặc rỗng bị từ chối")
   void nullParameters_denied() {
     assertThat(service.canAccessProgram(null, PROGRAM_ID, AccessType.WRITE)).isFalse();
-    assertThat(service.canAccessProgram(principal(Role.QA_OFFICER, null), " ", AccessType.WRITE))
-        .isFalse();
-    assertThat(service.canAccessProgram(principal(Role.QA_OFFICER, null), PROGRAM_ID, null))
-        .isFalse();
+    assertThat(service.canAccessProgram(principal(Role.QA, null), " ", AccessType.WRITE)).isFalse();
+    assertThat(service.canAccessProgram(principal(Role.QA, null), PROGRAM_ID, null)).isFalse();
   }
 
   @Test

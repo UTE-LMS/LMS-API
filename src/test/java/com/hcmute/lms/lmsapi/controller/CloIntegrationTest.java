@@ -79,19 +79,18 @@ class CloIntegrationTest extends IntegrationTestBase {
 
     qaToken =
         fixtures.bearerFor(
-            Role.QA_OFFICER, UserScope.builder().programIds(List.of(program.getId())).build());
+            Role.QA, UserScope.builder().programIds(List.of(program.getId())).build());
     qaOutOfScopeToken =
         fixtures.bearerFor(
-            Role.QA_OFFICER,
-            UserScope.builder().programIds(List.of("671dcba5f123456789abc999")).build());
+            Role.QA, UserScope.builder().programIds(List.of("671dcba5f123456789abc999")).build());
 
     deptHeadToken =
         fixtures.bearerFor(
-            Role.DEPARTMENT_HEAD,
+            Role.PROGRAM_MANAGER,
             UserScope.builder().courseIds(List.of(course1.getId(), course2.getId())).build());
     deptHeadOutOfScopeToken =
         fixtures.bearerFor(
-            Role.DEPARTMENT_HEAD,
+            Role.PROGRAM_MANAGER,
             UserScope.builder().courseIds(List.of("671dcba5f123456789abc999")).build());
 
     lecturerToken =
