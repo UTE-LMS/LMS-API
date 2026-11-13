@@ -2,7 +2,6 @@ package com.hcmute.lms.lmsapi.service.impl;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -12,10 +11,6 @@ import com.hcmute.lms.lmsapi.document.Pi;
 import com.hcmute.lms.lmsapi.document.Syllabus;
 import com.hcmute.lms.lmsapi.dto.CloPiLinkRequest;
 import com.hcmute.lms.lmsapi.dto.CloPiLinkResponse;
-import com.hcmute.lms.lmsapi.dto.UserPrincipal;
-import com.hcmute.lms.lmsapi.dto.VerificationRequest;
-import com.hcmute.lms.lmsapi.enums.AccessType;
-import com.hcmute.lms.lmsapi.enums.VerificationStatus;
 import com.hcmute.lms.lmsapi.exception.AppException;
 import com.hcmute.lms.lmsapi.exception.BusinessRuleViolationException;
 import com.hcmute.lms.lmsapi.exception.ErrorCode;
@@ -183,45 +178,6 @@ class CloPiLinkServiceImplTest {
     CloPiLinkResponse result = cloPiLinkService.createLink(syllabusId, request);
     assertThat(result).isNotNull();
     assertThat(result.getCloId()).isEqualTo(cloId);
-    verify(cloPiLinkRepository).save(link);
-  }
-
-  @Test
-  @DisplayName("verifyLink: Chặn khi QA_OFFICER ngoài scope của programVersion (ADR 0004)")
-  void verifyLink_OutOfScope_ThrowsForbidden() {
-    when(cloPiLinkRepository.findById(linkId)).thenReturn(Optional.of(link));
-    UserPrincipal principal = UserPrincipal.builder().id("qa1").build();
-    when(scopeAuthorizationService.canAccessProgramVersion(
-            principal, programVersionId, AccessType.WRITE))
-        .thenReturn(false);
-
-    VerificationRequest req =
-        VerificationRequest.builder().status(VerificationStatus.VERIFIED).build();
-
-    assertThatThrownBy(() -> cloPiLinkService.verifyLink(linkId, req, principal))
-        .isInstanceOf(AppException.class)
-        .hasFieldOrPropertyWithValue("errorCode", ErrorCode.FORBIDDEN);
-  }
-
-  @Test
-  @DisplayName("verifyLink: Thành công khi QA_OFFICER đúng scope (US-12/AC-3)")
-  void verifyLink_Success() {
-    when(cloPiLinkRepository.findById(linkId)).thenReturn(Optional.of(link));
-    UserPrincipal principal = UserPrincipal.builder().id("qa1").build();
-    when(scopeAuthorizationService.canAccessProgramVersion(
-            principal, programVersionId, AccessType.WRITE))
-        .thenReturn(true);
-    when(cloPiLinkRepository.save(any(CloPiLink.class))).thenReturn(link);
-    when(cloPiLinkMapper.toResponse(link)).thenReturn(response);
-
-    VerificationRequest req =
-        VerificationRequest.builder()
-            .status(VerificationStatus.VERIFIED)
-            .note("Đã đối chiếu")
-            .build();
-
-    CloPiLinkResponse result = cloPiLinkService.verifyLink(linkId, req, principal);
-    assertThat(result).isNotNull();
     verify(cloPiLinkRepository).save(link);
   }
 }

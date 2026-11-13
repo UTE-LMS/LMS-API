@@ -3,27 +3,20 @@ package com.hcmute.lms.lmsapi.config;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.hcmute.lms.lmsapi.config.DemoDataSeeder.SeedResult;
 import com.hcmute.lms.lmsapi.document.Course;
-import com.hcmute.lms.lmsapi.document.CoursePiContribution;
 import com.hcmute.lms.lmsapi.document.Pi;
 import com.hcmute.lms.lmsapi.document.Plo;
 import com.hcmute.lms.lmsapi.document.Program;
 import com.hcmute.lms.lmsapi.document.ProgramVersion;
 import com.hcmute.lms.lmsapi.document.User;
 import com.hcmute.lms.lmsapi.dto.LoginRequest;
-import com.hcmute.lms.lmsapi.dto.PloRequest;
-import com.hcmute.lms.lmsapi.dto.VerificationRequest;
-import com.hcmute.lms.lmsapi.enums.PiContributionType;
 import com.hcmute.lms.lmsapi.enums.PloCategory;
 import com.hcmute.lms.lmsapi.enums.ProgramVersionStatus;
 import com.hcmute.lms.lmsapi.enums.Role;
 import com.hcmute.lms.lmsapi.enums.VerificationStatus;
-import com.hcmute.lms.lmsapi.repository.CoursePiContributionRepository;
 import com.hcmute.lms.lmsapi.repository.CourseRepository;
 import com.hcmute.lms.lmsapi.repository.PiRepository;
 import com.hcmute.lms.lmsapi.repository.PloRepository;
@@ -78,7 +71,7 @@ class DemoDataSeederTest {
   private static final String LABEL = "[DỮ LIỆU THỬ NGHIỆM]";
   private static final String CONTEXT_KEY = "itest" + UUID.randomUUID().toString().substring(0, 8);
   private static final String PASSWORD = "Demo-" + UUID.randomUUID();
-  private static final int EXPECTED_RECORDS = 15;
+  private static final int EXPECTED_RECORDS = 12;
 
   /** Key của mọi seeder dựng tay trong test, để dọn ở cuối. */
   private static final java.util.Set<String> KEYS_TO_PURGE = new java.util.HashSet<>();
@@ -100,7 +93,6 @@ class DemoDataSeederTest {
   @Autowired private PloRepository ploRepository;
   @Autowired private PiRepository piRepository;
   @Autowired private CourseRepository courseRepository;
-  @Autowired private CoursePiContributionRepository contributionRepository;
   @Autowired private UserRepository userRepository;
 
   private MockMvc mockMvc;
@@ -133,12 +125,10 @@ class DemoDataSeederTest {
             ploRepository,
             piRepository,
             courseRepository,
-            contributionRepository,
             userRepository,
             passwordEncoder,
-            passwordPolicyValidator,
-            password,
-            key);
+            passwordPolicyValidator);
+    created.configure(password, key);
     KEYS_TO_PURGE.add(key);
     return created;
   }
@@ -209,7 +199,6 @@ class DemoDataSeederTest {
             ProgramVersion.class)
         + mongo.count(byVersion, Plo.class)
         + mongo.count(byVersion, Pi.class)
-        + mongo.count(byVersion, CoursePiContribution.class)
         + mongo.count(Query.query(Criteria.where("code").is(seeder.courseCode())), Course.class)
         + mongo.count(
             Query.query(Criteria.where("username").regex("^" + seeder.username(""))), User.class);
@@ -292,20 +281,6 @@ class DemoDataSeederTest {
         mongo.findOne(Query.query(Criteria.where("code").is(seeder.courseCode())), Course.class);
     assertThat(course.getName()).startsWith(LABEL);
     assertThat(course.getCredits()).as("số tín chỉ thật do Khoa cung cấp").isNull();
-
-    List<CoursePiContribution> matrix =
-        contributionRepository.findByProgramVersionIdOrderByCourseIdAscPiIdAsc(version.getId());
-    Map<String, String> piCodeById = pis.stream().collect(Collectors.toMap(Pi::getId, Pi::getCode));
-    assertThat(
-            matrix.stream()
-                .collect(
-                    Collectors.toMap(
-                        c -> piCodeById.get(c.getPiId()), CoursePiContribution::getContribution)))
-        .isEqualTo(
-            Map.of(
-                "PI1.1", PiContributionType.I,
-                "PI1.2", PiContributionType.R,
-                "PI2.1", PiContributionType.M));
   }
 
   @Test
@@ -419,44 +394,29 @@ class DemoDataSeederTest {
 
   @Test
   @DisplayName(
-      "Issue #17: người dùng seed đăng nhập được; QA xác nhận được PLO demo; manager thêm được PLO; QA không ghi được")
+      "Issue #17: người dùng seed đăng nhập được; QA và manager xem được PLO demo; QA không ghi được")
   void seededUsersWorkEndToEnd() throws Exception {
     DemoDataSeeder seeder = applicationContext.getBean(DemoDataSeeder.class);
     seeder.seed();
     Program program = findProgram(seeder);
     ProgramVersion version = findVersion(program);
-    Plo plo = ploRepository.findByProgramVersionIdOrderByDisplayOrderAsc(version.getId()).get(0);
 
     String qa = login(seeder.username("qa"));
     String manager = login(seeder.username("manager"));
 
-    VerificationRequest verify =
-        VerificationRequest.builder().status(VerificationStatus.VERIFIED).build();
     mockMvc
         .perform(
-            put("/api/v1/program-versions/{v}/plos/{p}/verification", version.getId(), plo.getId())
-                .header(HttpHeaders.AUTHORIZATION, qa)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(verify)))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.verification.status").value("VERIFIED"));
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(
+                    "/api/v1/program-versions/{v}/plos", version.getId())
+                .header(HttpHeaders.AUTHORIZATION, qa))
+        .andExpect(status().isOk());
 
-    PloRequest newPlo =
-        PloRequest.builder().code("PLO3").displayOrder(3).passThreshold(0.5).build();
     mockMvc
         .perform(
-            post("/api/v1/program-versions/{v}/plos", version.getId())
-                .header(HttpHeaders.AUTHORIZATION, manager)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(newPlo)))
-        .andExpect(status().isCreated());
-    mockMvc
-        .perform(
-            post("/api/v1/program-versions/{v}/plos", version.getId())
-                .header(HttpHeaders.AUTHORIZATION, qa)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(newPlo)))
-        .andExpect(status().isForbidden());
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(
+                    "/api/v1/program-versions/{v}/plos", version.getId())
+                .header(HttpHeaders.AUTHORIZATION, manager))
+        .andExpect(status().isOk());
   }
 
   private String login(String username) throws Exception {

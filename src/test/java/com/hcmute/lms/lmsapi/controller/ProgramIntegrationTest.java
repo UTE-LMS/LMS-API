@@ -1,7 +1,6 @@
 package com.hcmute.lms.lmsapi.controller;
 
 import static org.hamcrest.Matchers.hasSize;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -17,20 +16,13 @@ import com.hcmute.lms.lmsapi.document.RoleAssignment;
 import com.hcmute.lms.lmsapi.document.User;
 import com.hcmute.lms.lmsapi.document.UserScope;
 import com.hcmute.lms.lmsapi.document.Verification;
-import com.hcmute.lms.lmsapi.dto.CoursePiContributionRequest;
 import com.hcmute.lms.lmsapi.dto.LoginRequest;
-import com.hcmute.lms.lmsapi.dto.PiRequest;
-import com.hcmute.lms.lmsapi.dto.PloRequest;
 import com.hcmute.lms.lmsapi.dto.ProgramRequest;
-import com.hcmute.lms.lmsapi.dto.ProgramVersionRequest;
 import com.hcmute.lms.lmsapi.dto.ProgramVersionStatusUpdateRequest;
-import com.hcmute.lms.lmsapi.dto.VerificationRequest;
-import com.hcmute.lms.lmsapi.enums.PiContributionType;
 import com.hcmute.lms.lmsapi.enums.ProgramVersionStatus;
 import com.hcmute.lms.lmsapi.enums.Role;
 import com.hcmute.lms.lmsapi.enums.UserStatus;
 import com.hcmute.lms.lmsapi.enums.VerificationStatus;
-import com.hcmute.lms.lmsapi.repository.CoursePiContributionRepository;
 import com.hcmute.lms.lmsapi.repository.CourseRepository;
 import com.hcmute.lms.lmsapi.repository.PiRepository;
 import com.hcmute.lms.lmsapi.repository.PloRepository;
@@ -75,8 +67,6 @@ class ProgramIntegrationTest {
 
   @Autowired private CourseRepository courseRepository;
 
-  @Autowired private CoursePiContributionRepository contributionRepository;
-
   @Autowired private PasswordEncoder passwordEncoder;
 
   @Autowired private ObjectMapper objectMapper;
@@ -97,8 +87,6 @@ class ProgramIntegrationTest {
   private User lecturerUser;
 
   private String managerToken;
-  private String qaToken;
-  private String qaOutOfScopeToken;
   private String adminToken;
   private String lecturerToken;
 
@@ -154,20 +142,12 @@ class ProgramIntegrationTest {
     lecturerUser = createUser("f02_lecturer_" + SUFFIX, Role.LECTURER, UserScope.builder().build());
 
     managerToken = obtainAccessToken(managerUser.getUsername());
-    qaToken = obtainAccessToken(qaUser.getUsername());
-    qaOutOfScopeToken = obtainAccessToken(qaOutOfScopeUser.getUsername());
     adminToken = obtainAccessToken(adminUser.getUsername());
     lecturerToken = obtainAccessToken(lecturerUser.getUsername());
   }
 
   @AfterEach
   void tearDown() {
-    contributionRepository
-        .findByProgramVersionIdOrderByCourseIdAscPiIdAsc(draftVersion.getId())
-        .forEach(contributionRepository::delete);
-    contributionRepository
-        .findByProgramVersionIdOrderByCourseIdAscPiIdAsc(activeVersion.getId())
-        .forEach(contributionRepository::delete);
     ploRepository.deleteAll(
         ploRepository.findByProgramVersionIdOrderByDisplayOrderAsc(draftVersion.getId()));
     ploRepository.deleteAll(
@@ -251,25 +231,6 @@ class ProgramIntegrationTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.content", hasSize(2)));
 
-    ProgramVersionRequest outOfScopeProgram =
-        ProgramVersionRequest.builder()
-            .programId("671dcba5f123456789abc999")
-            .version("9999")
-            .build();
-    ApiTestSupport.performJson(
-            mockMvc,
-            objectMapper,
-            post("/api/v1/program-versions"),
-            managerToken,
-            outOfScopeProgram)
-        .andExpect(status().isForbidden());
-
-    ProgramVersionRequest missingProgram =
-        ProgramVersionRequest.builder().programId("671dcba5f123456789abc777").version("X").build();
-    ApiTestSupport.performJson(
-            mockMvc, objectMapper, post("/api/v1/program-versions"), managerToken, missingProgram)
-        .andExpect(status().isUnprocessableEntity());
-
     ProgramVersionStatusUpdateRequest backward =
         ProgramVersionStatusUpdateRequest.builder().status(ProgramVersionStatus.DRAFT).build();
     ApiTestSupport.performJson(
@@ -293,110 +254,38 @@ class ProgramIntegrationTest {
   }
 
   @Test
-  @DisplayName("PLO/PI/I-R-M: validate mã, ràng buộc PLO-PI, trùng lặp và chặn xóa PLO còn PI")
-  void ploPiAndContributionFlow() throws Exception {
-    PloRequest invalid = PloRequest.builder().code("PLO0").displayOrder(1).build();
-    ApiTestSupport.performJson(
-            mockMvc,
-            objectMapper,
-            post("/api/v1/program-versions/" + draftVersion.getId() + "/plos"),
-            managerToken,
-            invalid)
-        .andExpect(status().isBadRequest());
-
-    PloRequest ploRequest =
-        PloRequest.builder()
-            .code("PLO1")
-            .displayOrder(1)
-            .contentSummary("Nội dung PLO")
-            .passThreshold(0.5)
-            .capabilityLevelRaw(3)
-            .build();
-
-    MvcResult ploResult =
-        ApiTestSupport.performJson(
-                mockMvc,
-                objectMapper,
-                post("/api/v1/program-versions/" + draftVersion.getId() + "/plos"),
-                managerToken,
-                ploRequest)
-            .andExpect(status().isCreated())
-            .andExpect(jsonPath("$.verification.status").value("NEEDS_CLARIFICATION"))
-            .andReturn();
-    String ploId = JsonPath.read(ploResult.getResponse().getContentAsString(), "$.id");
-
-    ApiTestSupport.performJson(
-            mockMvc,
-            objectMapper,
-            post("/api/v1/program-versions/" + draftVersion.getId() + "/plos"),
-            managerToken,
-            ploRequest)
-        .andExpect(status().isConflict());
-
-    PiRequest wrongPlo =
-        PiRequest.builder()
-            .ploId("671dcba5f123456789abc778")
-            .code("PI1.1")
-            .displayOrder(1)
-            .weight(0.5)
-            .passThreshold(0.5)
-            .build();
-    ApiTestSupport.performJson(
-            mockMvc,
-            objectMapper,
-            post("/api/v1/program-versions/" + draftVersion.getId() + "/pis"),
-            managerToken,
-            wrongPlo)
-        .andExpect(status().isUnprocessableEntity());
-
-    PiRequest piRequest =
-        PiRequest.builder()
-            .ploId(ploId)
+  @DisplayName("PLO/PI chỉ đọc qua API GET và các endpoint tạo/sửa/xóa tay không còn tồn tại")
+  void ploPiReadOnlyFlow() throws Exception {
+    Plo plo =
+        ploRepository.save(
+            Plo.builder()
+                .programVersionId(draftVersion.getId())
+                .code("PLO1")
+                .displayOrder(1)
+                .contentSummary("Nội dung PLO")
+                .passThreshold(0.5)
+                .capabilityLevelRaw(3)
+                .verification(Verification.builder().status(VerificationStatus.VERIFIED).build())
+                .build());
+    piRepository.save(
+        Pi.builder()
+            .programVersionId(draftVersion.getId())
+            .ploId(plo.getId())
             .code("PI1.1")
             .displayOrder(1)
             .weight(0.5)
             .passThreshold(0.5)
             .capabilityLevelRaw(3)
             .targetPassRate(0.8)
-            .build();
-    MvcResult piResult =
-        ApiTestSupport.performJson(
-                mockMvc,
-                objectMapper,
-                post("/api/v1/program-versions/" + draftVersion.getId() + "/pis"),
-                managerToken,
-                piRequest)
-            .andExpect(status().isCreated())
-            .andReturn();
-    String piId = JsonPath.read(piResult.getResponse().getContentAsString(), "$.id");
-
-    CoursePiContributionRequest contributionRequest =
-        CoursePiContributionRequest.builder()
-            .courseId(course.getId())
-            .piId(piId)
-            .contribution(PiContributionType.R)
-            .build();
-    ApiTestSupport.performJson(
-            mockMvc,
-            objectMapper,
-            post("/api/v1/program-versions/" + draftVersion.getId() + "/pi-contributions"),
-            managerToken,
-            contributionRequest)
-        .andExpect(status().isCreated());
-
-    ApiTestSupport.performJson(
-            mockMvc,
-            objectMapper,
-            post("/api/v1/program-versions/" + draftVersion.getId() + "/pi-contributions"),
-            managerToken,
-            contributionRequest)
-        .andExpect(status().isConflict());
+            .verification(Verification.builder().status(VerificationStatus.VERIFIED).build())
+            .build());
 
     mockMvc
         .perform(
-            delete("/api/v1/program-versions/" + draftVersion.getId() + "/plos/" + ploId)
+            get("/api/v1/program-versions/" + draftVersion.getId() + "/plos")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + managerToken))
-        .andExpect(status().isUnprocessableEntity());
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$", hasSize(1)));
 
     mockMvc
         .perform(
@@ -404,102 +293,5 @@ class ProgramIntegrationTest {
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + managerToken))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$", hasSize(1)));
-  }
-
-  @Test
-  @DisplayName("Xác nhận chỉ QA_OFFICER đúng phạm vi chương trình; ADMIN và PROGRAM_MANAGER bị 403")
-  void verificationRequiresQaOfficerInProgramScope() throws Exception {
-    VerificationRequest request =
-        VerificationRequest.builder()
-            .status(VerificationStatus.VERIFIED)
-            .note("Đã kiểm tra")
-            .build();
-    String body = objectMapper.writeValueAsString(request);
-
-    mockMvc
-        .perform(
-            put("/api/v1/program-versions/" + draftVersion.getId() + "/verification")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + managerToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(body))
-        .andExpect(status().isForbidden());
-
-    mockMvc
-        .perform(
-            put("/api/v1/program-versions/" + draftVersion.getId() + "/verification")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(body))
-        .andExpect(status().isForbidden());
-
-    mockMvc
-        .perform(
-            put("/api/v1/program-versions/" + draftVersion.getId() + "/verification")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + qaOutOfScopeToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(body))
-        .andExpect(status().isForbidden());
-
-    mockMvc
-        .perform(
-            put("/api/v1/program-versions/" + draftVersion.getId() + "/verification")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + qaToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(body))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.verification.status").value("VERIFIED"))
-        .andExpect(jsonPath("$.verification.verifiedBy").value(qaUser.getId()));
-
-    Plo plo =
-        ploRepository.save(
-            Plo.builder()
-                .programVersionId(draftVersion.getId())
-                .code("PLO2")
-                .displayOrder(2)
-                .contentSummary("Nội dung PLO2")
-                .passThreshold(0.5)
-                .verification(
-                    Verification.builder().status(VerificationStatus.NEEDS_CLARIFICATION).build())
-                .build());
-
-    mockMvc
-        .perform(
-            put("/api/v1/program-versions/"
-                    + draftVersion.getId()
-                    + "/plos/"
-                    + plo.getId()
-                    + "/verification")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + qaToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(body))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.verification.status").value("VERIFIED"));
-
-    Pi pi =
-        piRepository.save(
-            Pi.builder()
-                .programVersionId(draftVersion.getId())
-                .ploId(plo.getId())
-                .code("PI2.1")
-                .displayOrder(3)
-                .contentShort("Nội dung PI2.1")
-                .weight(0.5)
-                .passThreshold(0.5)
-                .verification(
-                    Verification.builder().status(VerificationStatus.NEEDS_CLARIFICATION).build())
-                .build());
-
-    mockMvc
-        .perform(
-            put("/api/v1/program-versions/"
-                    + draftVersion.getId()
-                    + "/pis/"
-                    + pi.getId()
-                    + "/verification")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + qaToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(body))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.verification.status").value("VERIFIED"));
   }
 }

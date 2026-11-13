@@ -18,7 +18,6 @@ import com.hcmute.lms.lmsapi.exception.BusinessRuleViolationException;
 import com.hcmute.lms.lmsapi.exception.ErrorCode;
 import com.hcmute.lms.lmsapi.exception.ResourceNotFoundException;
 import com.hcmute.lms.lmsapi.mapper.CourseMapper;
-import com.hcmute.lms.lmsapi.repository.CoursePiContributionRepository;
 import com.hcmute.lms.lmsapi.repository.CourseRepository;
 import com.hcmute.lms.lmsapi.repository.ProgramCourseRepository;
 import java.nio.charset.StandardCharsets;
@@ -44,7 +43,6 @@ class CourseServiceImplTest {
 
   @Mock private CourseRepository courseRepository;
   @Mock private ProgramCourseRepository programCourseRepository;
-  @Mock private CoursePiContributionRepository coursePiContributionRepository;
   @Mock private CourseMapper courseMapper;
 
   @InjectMocks private CourseServiceImpl courseService;
@@ -150,7 +148,6 @@ class CourseServiceImplTest {
   void deleteCourse_success() {
     when(courseRepository.existsById(COURSE_ID)).thenReturn(true);
     when(programCourseRepository.existsByCourseId(COURSE_ID)).thenReturn(false);
-    when(coursePiContributionRepository.existsByCourseId(COURSE_ID)).thenReturn(false);
 
     courseService.deleteCourse(COURSE_ID);
     verify(courseRepository).deleteById(COURSE_ID);

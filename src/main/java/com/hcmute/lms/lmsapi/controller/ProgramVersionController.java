@@ -1,22 +1,23 @@
 package com.hcmute.lms.lmsapi.controller;
 
+import com.hcmute.lms.lmsapi.dto.AssessmentScoreTemplate;
 import com.hcmute.lms.lmsapi.dto.PageResponse;
-import com.hcmute.lms.lmsapi.dto.ProgramVersionRequest;
+import com.hcmute.lms.lmsapi.dto.ProgramCsvImportResponse;
 import com.hcmute.lms.lmsapi.dto.ProgramVersionResponse;
 import com.hcmute.lms.lmsapi.dto.ProgramVersionStatusUpdateRequest;
-import com.hcmute.lms.lmsapi.dto.ProgramVersionUpdateRequest;
 import com.hcmute.lms.lmsapi.dto.UserPrincipal;
-import com.hcmute.lms.lmsapi.dto.VerificationRequest;
-import com.hcmute.lms.lmsapi.service.ProgramVerificationService;
+import com.hcmute.lms.lmsapi.service.ProgramImportService;
 import com.hcmute.lms.lmsapi.service.ProgramVersionService;
 import com.hcmute.lms.lmsapi.util.PageableValidationUtils;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -28,7 +29,9 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 @Slf4j
 @Validated
@@ -38,7 +41,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class ProgramVersionController {
 
   private final ProgramVersionService programVersionService;
-  private final ProgramVerificationService programVerificationService;
+  private final ProgramImportService programImportService;
 
   @GetMapping
   public ResponseEntity<PageResponse<ProgramVersionResponse>> getProgramVersions(
@@ -68,28 +71,53 @@ public class ProgramVersionController {
     return ResponseEntity.ok(programVersionService.getProgramVersionById(id));
   }
 
-  @PostMapping
-  @PreAuthorize(
-      "hasRole('PROGRAM_MANAGER') and @scopeAuthorizationService.canAccessProgram(authentication.principal, #request.programId, T(com.hcmute.lms.lmsapi.enums.AccessType).WRITE)")
-  public ResponseEntity<ProgramVersionResponse> createProgramVersion(
-      @Valid @RequestBody ProgramVersionRequest request) {
-    log.info("API request: POST /api/v1/program-versions for program [{}]", request.getProgramId());
-    return ResponseEntity.status(HttpStatus.CREATED)
-        .body(programVersionService.createProgramVersion(request));
+  @GetMapping(value = "/import-template", produces = "text/csv; charset=UTF-8")
+  @PreAuthorize("hasAnyRole('PROGRAM_MANAGER', 'ADMIN')")
+  public ResponseEntity<byte[]> getImportTemplateCsv() {
+    log.info("API request: GET /api/v1/program-versions/import-template");
+    AssessmentScoreTemplate template = programImportService.generateTemplateCsv();
+    return ResponseEntity.ok()
+        .header(
+            HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + template.fileName() + "\"")
+        .contentType(MediaType.parseMediaType("text/csv; charset=UTF-8"))
+        .body(template.content());
   }
 
-  @PutMapping("/{id}")
+  @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   @PreAuthorize(
-      "hasRole('PROGRAM_MANAGER') and @scopeAuthorizationService.canAccessProgramVersion(authentication.principal, #id, T(com.hcmute.lms.lmsapi.enums.AccessType).WRITE)")
-  public ResponseEntity<ProgramVersionResponse> updateProgramVersion(
+      "hasRole('ADMIN') or (hasRole('PROGRAM_MANAGER') and @scopeAuthorizationService.canAccessProgram(authentication.principal, #programId, T(com.hcmute.lms.lmsapi.enums.AccessType).WRITE))")
+  public ResponseEntity<ProgramCsvImportResponse> importProgramCsv(
+      @RequestParam("programId")
+          @Pattern(
+              regexp = "^[0-9a-fA-F]{24}$",
+              message = "ID ngành đào tạo phải là ObjectId 24 ký tự hex")
+          String programId,
+      @RequestParam("version") @NotBlank(message = "Phiên bản CTĐT không được để trống")
+          String version,
+      @RequestPart("file") MultipartFile file,
+      @AuthenticationPrincipal UserPrincipal principal) {
+    log.info(
+        "API request: POST /api/v1/program-versions/import for program [{}] version [{}]",
+        programId,
+        version);
+    String actorId = principal != null ? principal.getId() : null;
+    return ResponseEntity.ok(
+        programImportService.importProgramCsv(programId, version, file, actorId));
+  }
+
+  @PostMapping("/{id}/confirm-import")
+  @PreAuthorize(
+      "hasRole('ADMIN') or (hasRole('PROGRAM_MANAGER') and @scopeAuthorizationService.canAccessProgramVersion(authentication.principal, #id, T(com.hcmute.lms.lmsapi.enums.AccessType).WRITE))")
+  public ResponseEntity<ProgramCsvImportResponse> confirmImport(
       @PathVariable("id")
           @Pattern(
               regexp = "^[0-9a-fA-F]{24}$",
               message = "ID phiên bản phải là ObjectId 24 ký tự hex")
           String id,
-      @Valid @RequestBody ProgramVersionUpdateRequest request) {
-    log.info("API request: PUT /api/v1/program-versions/{}", id);
-    return ResponseEntity.ok(programVersionService.updateProgramVersion(id, request));
+      @AuthenticationPrincipal UserPrincipal principal) {
+    log.info("API request: POST /api/v1/program-versions/{}/confirm-import", id);
+    String actorId = principal != null ? principal.getId() : null;
+    return ResponseEntity.ok(programImportService.confirmImport(id, actorId));
   }
 
   @PutMapping("/{id}/status")
@@ -105,23 +133,5 @@ public class ProgramVersionController {
     log.info(
         "API request: PUT /api/v1/program-versions/{}/status to [{}]", id, request.getStatus());
     return ResponseEntity.ok(programVersionService.updateProgramVersionStatus(id, request));
-  }
-
-  @PutMapping("/{id}/verification")
-  @PreAuthorize("hasRole('QA')")
-  public ResponseEntity<ProgramVersionResponse> verifyProgramVersion(
-      @PathVariable("id")
-          @Pattern(
-              regexp = "^[0-9a-fA-F]{24}$",
-              message = "ID phiên bản phải là ObjectId 24 ký tự hex")
-          String id,
-      @Valid @RequestBody VerificationRequest request,
-      @AuthenticationPrincipal UserPrincipal principal) {
-    log.info(
-        "API request: PUT /api/v1/program-versions/{}/verification to [{}]",
-        id,
-        request.getStatus());
-    return ResponseEntity.ok(
-        programVerificationService.verifyProgramVersion(id, request, principal));
   }
 }

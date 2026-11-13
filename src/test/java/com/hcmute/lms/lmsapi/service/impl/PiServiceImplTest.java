@@ -17,7 +17,6 @@ import com.hcmute.lms.lmsapi.exception.AppException;
 import com.hcmute.lms.lmsapi.exception.BusinessRuleViolationException;
 import com.hcmute.lms.lmsapi.exception.ErrorCode;
 import com.hcmute.lms.lmsapi.mapper.PiMapper;
-import com.hcmute.lms.lmsapi.repository.CoursePiContributionRepository;
 import com.hcmute.lms.lmsapi.repository.PiRepository;
 import com.hcmute.lms.lmsapi.repository.PloRepository;
 import com.hcmute.lms.lmsapi.repository.ProgramReferenceRepository;
@@ -44,8 +43,6 @@ class PiServiceImplTest {
   @Mock private PloRepository ploRepository;
 
   @Mock private ProgramVersionRepository programVersionRepository;
-
-  @Mock private CoursePiContributionRepository coursePiContributionRepository;
 
   @Mock private ProgramReferenceRepository programReferenceRepository;
 
@@ -131,27 +128,12 @@ class PiServiceImplTest {
   }
 
   @Test
-  @DisplayName("Xóa PI còn học phần tham chiếu trả 422")
-  void delete_hasContribution_businessRule() {
-    Pi pi = Pi.builder().id(PI_ID).programVersionId(VERSION_ID).build();
-    when(programVersionRepository.findById(VERSION_ID))
-        .thenReturn(Optional.of(version(ProgramVersionStatus.DRAFT)));
-    when(piRepository.findByIdAndProgramVersionId(PI_ID, VERSION_ID)).thenReturn(Optional.of(pi));
-    when(coursePiContributionRepository.countByPiId(PI_ID)).thenReturn(1L);
-
-    assertThatThrownBy(() -> service.deletePi(VERSION_ID, PI_ID))
-        .isInstanceOf(BusinessRuleViolationException.class);
-    verify(piRepository, never()).delete(any());
-  }
-
-  @Test
   @DisplayName("Xóa PI còn CLO/câu hỏi tham chiếu trả 422")
   void delete_hasQuestionReference_businessRule() {
     Pi pi = Pi.builder().id(PI_ID).programVersionId(VERSION_ID).build();
     when(programVersionRepository.findById(VERSION_ID))
         .thenReturn(Optional.of(version(ProgramVersionStatus.DRAFT)));
     when(piRepository.findByIdAndProgramVersionId(PI_ID, VERSION_ID)).thenReturn(Optional.of(pi));
-    when(coursePiContributionRepository.countByPiId(PI_ID)).thenReturn(0L);
     when(programReferenceRepository.existsPiReference(PI_ID)).thenReturn(true);
 
     assertThatThrownBy(() -> service.deletePi(VERSION_ID, PI_ID))
@@ -165,7 +147,6 @@ class PiServiceImplTest {
     when(programVersionRepository.findById(VERSION_ID))
         .thenReturn(Optional.of(version(ProgramVersionStatus.DRAFT)));
     when(piRepository.findByIdAndProgramVersionId(PI_ID, VERSION_ID)).thenReturn(Optional.of(pi));
-    when(coursePiContributionRepository.countByPiId(PI_ID)).thenReturn(0L);
     when(programReferenceRepository.existsPiReference(PI_ID)).thenReturn(false);
 
     service.deletePi(VERSION_ID, PI_ID);

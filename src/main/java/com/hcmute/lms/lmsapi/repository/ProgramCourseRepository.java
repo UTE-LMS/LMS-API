@@ -21,4 +21,6 @@ public interface ProgramCourseRepository extends MongoRepository<ProgramCourse, 
   boolean existsByCourseId(String courseId);
 
   void deleteByProgramVersionIdAndCourseId(String programVersionId, String courseId);
+
+  void deleteByProgramVersionId(String programVersionId);
 }
