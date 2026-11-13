@@ -34,7 +34,6 @@ class DepartmentIntegrationTest extends IntegrationTestBase {
   private Course course1;
   private Course course2;
 
-  private String adminToken;
   private String deptHeadInScopeToken;
   private String deptHeadOutOfScopeToken;
   private String deptHeadProgram1Token;
@@ -52,8 +51,6 @@ class DepartmentIntegrationTest extends IntegrationTestBase {
     program2 = fixtures.program();
     course1 = fixtures.course();
     course2 = fixtures.course();
-
-    adminToken = fixtures.bearerFor(Role.ADMIN, UserScope.builder().build());
 
     deptHeadInScopeToken =
         fixtures.bearerFor(
