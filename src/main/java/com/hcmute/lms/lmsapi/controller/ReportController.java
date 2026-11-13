@@ -43,7 +43,10 @@ public class ReportController {
       @Valid @RequestBody ReportCreateRequest request,
       @AuthenticationPrincipal UserPrincipal principal) {
     String actorId = principal != null ? principal.getId() : null;
-    log.info("API request: POST /api/v1/reports type=[{}] runId=[{}]", request.getType(), request.getRunId());
+    log.info(
+        "API request: POST /api/v1/reports type=[{}] runId=[{}]",
+        request.getType(),
+        request.getRunId());
     return ResponseEntity.status(HttpStatus.CREATED)
         .body(reportService.generateReport(request, actorId));
   }

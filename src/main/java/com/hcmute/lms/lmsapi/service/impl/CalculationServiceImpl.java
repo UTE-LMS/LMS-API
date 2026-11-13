@@ -105,11 +105,16 @@ public class CalculationServiceImpl implements CalculationService {
     String lockKey = buildLockKey(request, programVersionId, sections);
     if (calculationRunRepository.existsByLockKeyAndStatusIn(
         lockKey, List.of(CalculationStatus.PENDING, CalculationStatus.PROCESSING))) {
-      throw new BusinessRuleViolationException("Đang có lượt tính toán chạy cùng phạm vi (lockKey=" + lockKey + ")");
+      throw new BusinessRuleViolationException(
+          "Đang có lượt tính toán chạy cùng phạm vi (lockKey=" + lockKey + ")");
     }
 
     List<String> syllabusIds =
-        sections.stream().map(CourseSection::getSyllabusId).filter(Objects::nonNull).distinct().toList();
+        sections.stream()
+            .map(CourseSection::getSyllabusId)
+            .filter(Objects::nonNull)
+            .distinct()
+            .toList();
 
     CalculationRun run =
         calculationRunRepository.save(
@@ -133,7 +138,8 @@ public class CalculationServiceImpl implements CalculationService {
                 .build());
 
     try {
-      ExecutionAccumulator acc = executeFourLevelCalculation(run, request, sections, programVersionId);
+      ExecutionAccumulator acc =
+          executeFourLevelCalculation(run, request, sections, programVersionId);
       run.setDataSnapshot(acc.dataSnapshot);
       run.setStatus(CalculationStatus.SUCCESS);
       run.setFinishedAt(Instant.now());
@@ -200,7 +206,8 @@ public class CalculationServiceImpl implements CalculationService {
     }
 
     Map<String, String> studentRefs = loadStudentRefs(results);
-    Map<String, String> subjectCodes = loadSubjectCodes(results.stream().map(StudentResult::getSubjectId).toList());
+    Map<String, String> subjectCodes =
+        loadSubjectCodes(results.stream().map(StudentResult::getSubjectId).toList());
     return results.stream()
         .map(
             r ->
@@ -260,7 +267,8 @@ public class CalculationServiceImpl implements CalculationService {
     Instant lastScoreUpdatedAt = null;
 
     Map<String, Term> termMap =
-        termRepository.findAll().stream().collect(Collectors.toMap(Term::getId, t -> t, (a, b) -> a));
+        termRepository.findAll().stream()
+            .collect(Collectors.toMap(Term::getId, t -> t, (a, b) -> a));
 
     // Lưu tất cả Level 2 CLO results để phục vụ Level 3 (PI)
     List<StudentResult> allSectionCloResults = new ArrayList<>();
@@ -306,12 +314,28 @@ public class CalculationServiceImpl implements CalculationService {
       // Map<(assessmentId, cloId), Map<studentId, StudentResult>>
       Map<String, Map<String, StudentResult>> level1ByAssessmentClo =
           computeLevel1AssessmentClo(
-              run, section, syllabus, programVersionId, cloMap, assessments, studentIds, sectionScores, acc);
+              run,
+              section,
+              syllabus,
+              programVersionId,
+              cloMap,
+              assessments,
+              studentIds,
+              sectionScores,
+              acc);
 
       // Cấp độ 2: CLO toàn học phần
       List<StudentResult> sectionCloResults =
           computeLevel2CourseClo(
-              run, section, syllabus, programVersionId, clos, assessments, studentIds, level1ByAssessmentClo, acc);
+              run,
+              section,
+              syllabus,
+              programVersionId,
+              clos,
+              assessments,
+              studentIds,
+              level1ByAssessmentClo,
+              acc);
       allSectionCloResults.addAll(sectionCloResults);
     }
 
@@ -319,13 +343,7 @@ public class CalculationServiceImpl implements CalculationService {
     if (programVersionId != null && !programVersionId.isBlank()) {
       List<StudentResult> piResults =
           computeLevel3Pi(
-              run,
-              request,
-              programVersionId,
-              cohortStudentIds,
-              allSectionCloResults,
-              termMap,
-              acc);
+              run, request, programVersionId, cohortStudentIds, allSectionCloResults, termMap, acc);
       computeLevel4Plo(run, request, programVersionId, cohortStudentIds, piResults, acc);
     }
 
@@ -333,7 +351,11 @@ public class CalculationServiceImpl implements CalculationService {
         CalculationRun.DataSnapshot.builder()
             .totalScores(totalScores)
             .lastScoreUpdatedAt(lastScoreUpdatedAt)
-            .scoreChecksum("SCORES:" + totalScores + ":" + (lastScoreUpdatedAt != null ? lastScoreUpdatedAt.toEpochMilli() : 0L))
+            .scoreChecksum(
+                "SCORES:"
+                    + totalScores
+                    + ":"
+                    + (lastScoreUpdatedAt != null ? lastScoreUpdatedAt.toEpochMilli() : 0L))
             .build();
     return acc;
   }
@@ -418,7 +440,10 @@ public class CalculationServiceImpl implements CalculationService {
                         StudentResult.Completeness.builder()
                             .requiredCount(requiredItems)
                             .availableCount(matchedScores.size())
-                            .ratio(requiredItems > 0 ? Math.min(1.0, (double) matchedScores.size() / requiredItems) : 1.0)
+                            .ratio(
+                                requiredItems > 0
+                                    ? Math.min(1.0, (double) matchedScores.size() / requiredItems)
+                                    : 1.0)
                             .build())
                     .inputs(inputs)
                     .programVersionId(programVersionId)
@@ -646,7 +671,8 @@ public class CalculationServiceImpl implements CalculationService {
       if (piLinks.isEmpty()) {
         continue;
       }
-      double threshold = pi.getPassThreshold() != null ? pi.getPassThreshold() : DEFAULT_PASS_THRESHOLD;
+      double threshold =
+          pi.getPassThreshold() != null ? pi.getPassThreshold() : DEFAULT_PASS_THRESHOLD;
       List<StudentResult> batchResults = new ArrayList<>();
 
       for (String studentId : cohortStudentIds) {
@@ -774,10 +800,15 @@ public class CalculationServiceImpl implements CalculationService {
           childPis.stream().mapToDouble(p -> p.getWeight() != null ? p.getWeight() : 0.0).sum();
       if (Math.abs(weightSum - 1.0) > WEIGHT_TOLERANCE) {
         throw new BusinessRuleViolationException(
-            "Tổng trọng số các PI thuộc PLO " + plo.getCode() + " phải bằng 1.0 (hiện tại: " + weightSum + ")");
+            "Tổng trọng số các PI thuộc PLO "
+                + plo.getCode()
+                + " phải bằng 1.0 (hiện tại: "
+                + weightSum
+                + ")");
       }
 
-      double threshold = plo.getPassThreshold() != null ? plo.getPassThreshold() : DEFAULT_PASS_THRESHOLD;
+      double threshold =
+          plo.getPassThreshold() != null ? plo.getPassThreshold() : DEFAULT_PASS_THRESHOLD;
       List<StudentResult> batchResults = new ArrayList<>();
 
       for (String studentId : cohortStudentIds) {
@@ -872,7 +903,8 @@ public class CalculationServiceImpl implements CalculationService {
     if (request.getScope() == CalculationScope.SECTION) {
       List<String> ids = safeList(request.getSectionIds());
       if (ids.isEmpty()) {
-        throw new BusinessRuleViolationException("Phạm vi SECTION bắt buộc cung cấp danh sách sectionIds");
+        throw new BusinessRuleViolationException(
+            "Phạm vi SECTION bắt buộc cung cấp danh sách sectionIds");
       }
       List<CourseSection> sections = courseSectionRepository.findAllById(ids);
       if (sections.size() != ids.size()) {
@@ -902,8 +934,10 @@ public class CalculationServiceImpl implements CalculationService {
     }
     if (request.getScope() == CalculationScope.SECTION) {
       for (CourseSection section : sections) {
-        if (!scopeAuthorizationService.canAccessLoadedSection(principal, section, AccessType.READ)) {
-          throw new AccessDeniedException("Không có quyền chạy tính toán trên lớp: " + section.getCode());
+        if (!scopeAuthorizationService.canAccessLoadedSection(
+            principal, section, AccessType.READ)) {
+          throw new AccessDeniedException(
+              "Không có quyền chạy tính toán trên lớp: " + section.getCode());
         }
       }
     } else if (request.getProgramVersionId() != null
@@ -941,7 +975,8 @@ public class CalculationServiceImpl implements CalculationService {
         .toList();
   }
 
-  private boolean isLaterTerm(String candidateTermId, String currentTermId, Map<String, Term> termMap) {
+  private boolean isLaterTerm(
+      String candidateTermId, String currentTermId, Map<String, Term> termMap) {
     if (candidateTermId == null) {
       return false;
     }
@@ -950,7 +985,10 @@ public class CalculationServiceImpl implements CalculationService {
     }
     Term cand = termMap.get(candidateTermId);
     Term curr = termMap.get(currentTermId);
-    if (cand != null && curr != null && cand.getStartDate() != null && curr.getStartDate() != null) {
+    if (cand != null
+        && curr != null
+        && cand.getStartDate() != null
+        && curr.getStartDate() != null) {
       return cand.getStartDate().isAfter(curr.getStartDate());
     }
     return candidateTermId.compareTo(currentTermId) > 0;
@@ -1061,9 +1099,14 @@ public class CalculationServiceImpl implements CalculationService {
   }
 
   private AggregateResultResponse toAggregateResponse(AggregateResult r, String subjectCode) {
-    int enrolled = r.getCounts() != null && r.getCounts().getEnrolled() != null ? r.getCounts().getEnrolled() : 0;
-    int passed = r.getCounts() != null && r.getCounts().getPassed() != null ? r.getCounts().getPassed() : 0;
-    int failed = r.getCounts() != null && r.getCounts().getFailed() != null ? r.getCounts().getFailed() : 0;
+    int enrolled =
+        r.getCounts() != null && r.getCounts().getEnrolled() != null
+            ? r.getCounts().getEnrolled()
+            : 0;
+    int passed =
+        r.getCounts() != null && r.getCounts().getPassed() != null ? r.getCounts().getPassed() : 0;
+    int failed =
+        r.getCounts() != null && r.getCounts().getFailed() != null ? r.getCounts().getFailed() : 0;
     int evaluated = passed + failed;
     int insufficient = Math.max(0, enrolled - evaluated);
     Double passRateOfEnrolled = enrolled > 0 ? (double) passed / enrolled : null;

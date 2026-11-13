@@ -2,9 +2,6 @@ package com.hcmute.lms.lmsapi.service.impl;
 
 import com.hcmute.lms.lmsapi.document.AggregateResult;
 import com.hcmute.lms.lmsapi.document.CalculationRun;
-import com.hcmute.lms.lmsapi.document.Clo;
-import com.hcmute.lms.lmsapi.document.Pi;
-import com.hcmute.lms.lmsapi.document.Plo;
 import com.hcmute.lms.lmsapi.document.Report;
 import com.hcmute.lms.lmsapi.document.Student;
 import com.hcmute.lms.lmsapi.document.StudentResult;
@@ -66,10 +63,12 @@ public class ReportServiceImpl implements ReportService {
             .findById(request.getRunId())
             .orElseThrow(
                 () ->
-                    new ResourceNotFoundException("Không tìm thấy lượt tính: " + request.getRunId()));
+                    new ResourceNotFoundException(
+                        "Không tìm thấy lượt tính: " + request.getRunId()));
 
     if (run.getStatus() != CalculationStatus.SUCCESS) {
-      throw new BusinessRuleViolationException("Chỉ được sinh báo cáo từ lượt tính có trạng thái SUCCESS");
+      throw new BusinessRuleViolationException(
+          "Chỉ được sinh báo cáo từ lượt tính có trạng thái SUCCESS");
     }
 
     verifyScopeAccess(request, run);
@@ -104,7 +103,9 @@ public class ReportServiceImpl implements ReportService {
     if (runId != null && !runId.isBlank()) {
       reports = reportRepository.findByRunIdOrderByCreatedAtDesc(runId);
     } else if (type != null && programVersionId != null && !programVersionId.isBlank()) {
-      reports = reportRepository.findByTypeAndProgramVersionIdOrderByCreatedAtDesc(type, programVersionId);
+      reports =
+          reportRepository.findByTypeAndProgramVersionIdOrderByCreatedAtDesc(
+              type, programVersionId);
     } else {
       reports = reportRepository.findAllByOrderByCreatedAtDesc();
     }
@@ -152,7 +153,8 @@ public class ReportServiceImpl implements ReportService {
 
     Object itemsObj = report.getSummary().get("items");
     if (itemsObj instanceof List<?> items && !items.isEmpty()) {
-      csv.append("Level,SubjectCode,Enrolled,Evaluated,Passed,Failed,PassRate,PassRateOfEnrolled,DataCompleteness\n");
+      csv.append(
+          "Level,SubjectCode,Enrolled,Evaluated,Passed,Failed,PassRate,PassRateOfEnrolled,DataCompleteness\n");
       for (Object itemObj : items) {
         if (itemObj instanceof Map<?, ?> row) {
           csv.append(escapeCsv(String.valueOf(row.get("level"))))
@@ -177,12 +179,14 @@ public class ReportServiceImpl implements ReportService {
       }
     }
 
-    report.getExports().add(
-        Report.ReportExport.builder()
-            .format("csv")
-            .fileRef("report-" + report.getId() + ".csv")
-            .generatedAt(Instant.now())
-            .build());
+    report
+        .getExports()
+        .add(
+            Report.ReportExport.builder()
+                .format("csv")
+                .fileRef("report-" + report.getId() + ".csv")
+                .generatedAt(Instant.now())
+                .build());
     reportRepository.save(report);
     return csv.toString().getBytes(StandardCharsets.UTF_8);
   }
@@ -217,9 +221,18 @@ public class ReportServiceImpl implements ReportService {
     List<Map<String, Object>> rows = new ArrayList<>();
     boolean hasIncomplete = false;
     for (AggregateResult agg : ordered) {
-      int enrolled = agg.getCounts() != null && agg.getCounts().getEnrolled() != null ? agg.getCounts().getEnrolled() : 0;
-      int passed = agg.getCounts() != null && agg.getCounts().getPassed() != null ? agg.getCounts().getPassed() : 0;
-      int failed = agg.getCounts() != null && agg.getCounts().getFailed() != null ? agg.getCounts().getFailed() : 0;
+      int enrolled =
+          agg.getCounts() != null && agg.getCounts().getEnrolled() != null
+              ? agg.getCounts().getEnrolled()
+              : 0;
+      int passed =
+          agg.getCounts() != null && agg.getCounts().getPassed() != null
+              ? agg.getCounts().getPassed()
+              : 0;
+      int failed =
+          agg.getCounts() != null && agg.getCounts().getFailed() != null
+              ? agg.getCounts().getFailed()
+              : 0;
       int evaluated = passed + failed;
       int insufficient = Math.max(0, enrolled - evaluated);
       Double passRateOfEnrolled = enrolled > 0 ? (double) passed / enrolled : null;
@@ -304,10 +317,12 @@ public class ReportServiceImpl implements ReportService {
         if (request.getSectionId() == null || request.getSectionId().isBlank()) {
           throw new BusinessRuleViolationException("Báo cáo SECTION_CLO yêu cầu sectionId");
         }
-        yield aggregateResultRepository.findByRunIdAndSectionId(run.getId(), request.getSectionId());
+        yield aggregateResultRepository.findByRunIdAndSectionId(
+            run.getId(), request.getSectionId());
       }
       case COURSE_PI -> aggregateResultRepository.findByRunIdAndLevel(run.getId(), ResultLevel.PI);
-      case PROGRAM_PLO -> aggregateResultRepository.findByRunIdAndLevel(run.getId(), ResultLevel.PLO);
+      case PROGRAM_PLO ->
+          aggregateResultRepository.findByRunIdAndLevel(run.getId(), ResultLevel.PLO);
       case DATA_COMPLETENESS -> List.of();
     };
   }
@@ -324,8 +339,7 @@ public class ReportServiceImpl implements ReportService {
     if (Boolean.TRUE.equals(summary.get("hasIncompleteData"))) {
       notes.add("Có sinh viên chưa đủ dữ liệu để đánh giá đầy đủ (xem chi tiết mẫu số).");
     }
-    if (request.getType() == ReportType.PROGRAM_PLO
-        && run.getScope() == CalculationScope.SECTION) {
+    if (request.getType() == ReportType.PROGRAM_PLO && run.getScope() == CalculationScope.SECTION) {
       notes.add("Chưa đủ dữ liệu để kết luận toàn chương trình.");
     }
     return String.join(" ", notes);
@@ -348,7 +362,9 @@ public class ReportServiceImpl implements ReportService {
   private Map<String, SubjectMeta> loadSubjectMeta(List<AggregateResult> aggregates) {
     List<String> ids = aggregates.stream().map(AggregateResult::getSubjectId).distinct().toList();
     Map<String, SubjectMeta> map = new HashMap<>();
-    cloRepository.findAllById(ids).forEach(c -> map.put(c.getId(), new SubjectMeta(c.getCode(), 0)));
+    cloRepository
+        .findAllById(ids)
+        .forEach(c -> map.put(c.getId(), new SubjectMeta(c.getCode(), 0)));
     piRepository
         .findAllById(ids)
         .forEach(
@@ -374,7 +390,8 @@ public class ReportServiceImpl implements ReportService {
       return;
     }
     if (request.getSectionId() != null && !request.getSectionId().isBlank()) {
-      if (!scopeAuthorizationService.canAccessSection(principal, request.getSectionId(), AccessType.READ)) {
+      if (!scopeAuthorizationService.canAccessSection(
+          principal, request.getSectionId(), AccessType.READ)) {
         throw new AccessDeniedException("Không có quyền xem/sinh báo cáo lớp học phần này");
       }
     } else if (run.getProgramVersionId() != null

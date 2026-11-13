@@ -163,10 +163,7 @@ public class TraceServiceImpl implements TraceService {
     return studentResultRepository
         .findById(input.getRefId())
         .map(
-            sr ->
-                sr.getLevel().name()
-                    + " "
-                    + resolveSubjectCode(sr.getLevel(), sr.getSubjectId()))
+            sr -> sr.getLevel().name() + " " + resolveSubjectCode(sr.getLevel(), sr.getSubjectId()))
         .orElse("Result#" + input.getRefId());
   }
 

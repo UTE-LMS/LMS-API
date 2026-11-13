@@ -27,6 +27,7 @@ import com.hcmute.lms.lmsapi.document.Student;
 import com.hcmute.lms.lmsapi.document.Syllabus;
 import com.hcmute.lms.lmsapi.document.Term;
 import com.hcmute.lms.lmsapi.document.UserScope;
+import com.hcmute.lms.lmsapi.document.Verification;
 import com.hcmute.lms.lmsapi.dto.CalculationRunRequest;
 import com.hcmute.lms.lmsapi.dto.ReportCreateRequest;
 import com.hcmute.lms.lmsapi.enums.AssessmentPhase;
@@ -44,7 +45,6 @@ import com.hcmute.lms.lmsapi.enums.ReportType;
 import com.hcmute.lms.lmsapi.enums.Role;
 import com.hcmute.lms.lmsapi.enums.SectionStatus;
 import com.hcmute.lms.lmsapi.enums.SyllabusStatus;
-import com.hcmute.lms.lmsapi.document.Verification;
 import com.hcmute.lms.lmsapi.enums.VerificationStatus;
 import com.hcmute.lms.lmsapi.repository.AggregateResultRepository;
 import com.hcmute.lms.lmsapi.repository.AssessmentRepository;
@@ -112,14 +112,18 @@ class CalculationAndReportIntegrationTest extends IntegrationTestBase {
   }
 
   @Test
-  @DisplayName("Chạy đo lường 4 cấp độ -> Sinh báo cáo QA -> Xuất CSV -> Truy vết về Score & ImportBatch")
+  @DisplayName(
+      "Chạy đo lường 4 cấp độ -> Sinh báo cáo QA -> Xuất CSV -> Truy vết về Score & ImportBatch")
   void fullCalculationReportAndTraceabilityFlow() throws Exception {
     Program program = fixtures.program();
     Course course = fixtures.course();
     Term term = fixtures.term();
 
     Verification verified =
-        Verification.builder().status(VerificationStatus.VERIFIED).verifiedAt(Instant.now()).build();
+        Verification.builder()
+            .status(VerificationStatus.VERIFIED)
+            .verifiedAt(Instant.now())
+            .build();
 
     ProgramVersion pv =
         programVersionRepository.save(
@@ -231,7 +235,8 @@ class CalculationAndReportIntegrationTest extends IntegrationTestBase {
                 .phase(AssessmentPhase.MIDTERM)
                 .status(AssessmentStatus.SCORE_ENTERED)
                 .locked(true)
-                .cloWeights(List.of(AssessmentCloWeight.builder().cloId(clo.getId()).weight(1.0).build()))
+                .cloWeights(
+                    List.of(AssessmentCloWeight.builder().cloId(clo.getId()).weight(1.0).build()))
                 .items(
                     List.of(
                         AssessmentItem.builder()
@@ -285,8 +290,7 @@ class CalculationAndReportIntegrationTest extends IntegrationTestBase {
                 .programIds(List.of(program.getId()))
                 .courseIds(List.of(course.getId()))
                 .build());
-    String otherLecturerToken =
-        fixtures.bearerFor(Role.LECTURER, UserScope.builder().build());
+    String otherLecturerToken = fixtures.bearerFor(Role.LECTURER, UserScope.builder().build());
 
     CalculationRunRequest runReq =
         CalculationRunRequest.builder()
@@ -312,13 +316,12 @@ class CalculationAndReportIntegrationTest extends IntegrationTestBase {
             .andReturn();
     createdRunId = JsonPath.read(runRes.getResponse().getContentAsString(), "$.id");
 
-    // Kiểm tra aggregate PLO (1 passed / 2 enrolled -> passRateOfEnrolled = 0.5, dataCompleteness = 0.5)
+    // Kiểm tra aggregate PLO (1 passed / 2 enrolled -> passRateOfEnrolled = 0.5, dataCompleteness =
+    // 0.5)
     mockMvc
         .perform(
             getAs(
-                qaToken,
-                "/api/v1/calculation-runs/{id}/aggregate-results?level=PLO",
-                createdRunId))
+                qaToken, "/api/v1/calculation-runs/{id}/aggregate-results?level=PLO", createdRunId))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$", hasSize(1)))
         .andExpect(jsonPath("$[0].subjectCode").value("PLO1"))
@@ -329,16 +332,16 @@ class CalculationAndReportIntegrationTest extends IntegrationTestBase {
 
     // Sinh báo cáo PROGRAM_PLO cho QA
     ReportCreateRequest reportReq =
-        ReportCreateRequest.builder()
-            .type(ReportType.PROGRAM_PLO)
-            .runId(createdRunId)
-            .build();
+        ReportCreateRequest.builder().type(ReportType.PROGRAM_PLO).runId(createdRunId).build();
     MvcResult repRes =
         mockMvc
             .perform(postAs(qaToken, "/api/v1/reports", reportReq))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.type").value("PROGRAM_PLO"))
-            .andExpect(jsonPath("$.limitations", containsString("Chưa đủ dữ liệu để kết luận toàn chương trình")))
+            .andExpect(
+                jsonPath(
+                    "$.limitations",
+                    containsString("Chưa đủ dữ liệu để kết luận toàn chương trình")))
             .andReturn();
     createdReportId = JsonPath.read(repRes.getResponse().getContentAsString(), "$.id");
 
@@ -348,7 +351,9 @@ class CalculationAndReportIntegrationTest extends IntegrationTestBase {
         .andExpect(status().isOk())
         .andExpect(
             header()
-                .string(HttpHeaders.CONTENT_DISPOSITION, containsString("report-" + createdReportId + ".csv")))
+                .string(
+                    HttpHeaders.CONTENT_DISPOSITION,
+                    containsString("report-" + createdReportId + ".csv")))
         .andExpect(content().string(containsString("PLO1")));
 
     // Truy vết ngược: PLO student_result -> PI -> CLO -> ASSESSMENT_CLO -> SCORE -> ImportBatch
@@ -362,8 +367,7 @@ class CalculationAndReportIntegrationTest extends IntegrationTestBase {
             .andExpect(status().isOk())
             .andReturn();
     String ploResultId =
-        JsonPath.read(
-            ploSrRes.getResponse().getContentAsString(), "$[?(@.status=='COMPUTED')].id")
+        JsonPath.read(ploSrRes.getResponse().getContentAsString(), "$[?(@.status=='COMPUTED')].id")
             .toString()
             .replaceAll("[\\[\\]\"]", "");
 
