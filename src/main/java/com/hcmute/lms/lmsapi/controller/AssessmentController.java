@@ -3,6 +3,7 @@ package com.hcmute.lms.lmsapi.controller;
 import com.hcmute.lms.lmsapi.dto.AssessmentItemsRequest;
 import com.hcmute.lms.lmsapi.dto.AssessmentRequest;
 import com.hcmute.lms.lmsapi.dto.AssessmentResponse;
+import com.hcmute.lms.lmsapi.dto.AssessmentScoreTemplate;
 import com.hcmute.lms.lmsapi.dto.AssessmentUpdateRequest;
 import com.hcmute.lms.lmsapi.dto.CoverageResponse;
 import com.hcmute.lms.lmsapi.dto.UserPrincipal;
@@ -12,7 +13,9 @@ import jakarta.validation.constraints.Pattern;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -201,5 +204,23 @@ public class AssessmentController {
     log.info("API request: DELETE /assessments/{} by [{}]", id, principal.getUsername());
     assessmentService.deleteAssessment(id, principal.getId());
     return ResponseEntity.noContent().build();
+  }
+
+  // ------------------------------------------------------------------ xuất tệp CSV mẫu nhập điểm
+
+  @GetMapping(value = "/assessments/{id}/scores/template-csv", produces = "text/csv; charset=UTF-8")
+  @PreAuthorize(
+      "@scopeAuthorizationService.canAccessAssessment(authentication.principal, #id, " + READ + ")")
+  public ResponseEntity<byte[]> getScoreTemplateCsv(
+      @PathVariable("id")
+          @Pattern(regexp = ID_PATTERN, message = "ID bài đánh giá phải là ObjectId 24 ký tự hex")
+          String id) {
+    log.info("API request: GET /assessments/{}/scores/template-csv", id);
+    AssessmentScoreTemplate template = assessmentService.generateScoreTemplateCsv(id);
+    return ResponseEntity.ok()
+        .header(
+            HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + template.fileName() + "\"")
+        .contentType(MediaType.parseMediaType("text/csv; charset=UTF-8"))
+        .body(template.content());
   }
 }

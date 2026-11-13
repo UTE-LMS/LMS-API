@@ -3,6 +3,7 @@ package com.hcmute.lms.lmsapi.service.impl;
 import com.hcmute.lms.lmsapi.document.Assessment;
 import com.hcmute.lms.lmsapi.document.AssessmentItem;
 import com.hcmute.lms.lmsapi.document.AuditEntity;
+import com.hcmute.lms.lmsapi.document.Clo;
 import com.hcmute.lms.lmsapi.document.CourseSection;
 import com.hcmute.lms.lmsapi.document.Enrollment;
 import com.hcmute.lms.lmsapi.document.ImportBatch;
@@ -33,6 +34,7 @@ import com.hcmute.lms.lmsapi.exception.ErrorCode;
 import com.hcmute.lms.lmsapi.exception.ResourceNotFoundException;
 import com.hcmute.lms.lmsapi.mapper.ImportBatchMapper;
 import com.hcmute.lms.lmsapi.repository.AssessmentRepository;
+import com.hcmute.lms.lmsapi.repository.CloRepository;
 import com.hcmute.lms.lmsapi.repository.CourseSectionRepository;
 import com.hcmute.lms.lmsapi.repository.EnrollmentRepository;
 import com.hcmute.lms.lmsapi.repository.ImportBatchRepository;
@@ -54,6 +56,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -81,6 +84,7 @@ public class ImportBatchServiceImpl implements ImportBatchService {
   private final ImportBatchRepository batchRepository;
   private final ImportRowErrorRepository rowErrorRepository;
   private final ScoreRepository scoreRepository;
+  private final CloRepository cloRepository;
   private final ImportFileStorage fileStorage;
   private final ScoreRowValidator rowValidator;
   private final ImportBatchMapper batchMapper;
@@ -191,11 +195,12 @@ public class ImportBatchServiceImpl implements ImportBatchService {
       mapping = resolveRequested(requested, assessment);
     } else {
       mapping =
-          previousMapping(sectionId, assessment.getId())
+          autoDetectMapping(assessment, table)
+              .or(() -> previousMapping(sectionId, assessment.getId()))
               .orElseThrow(
                   () ->
                       invalid(
-                          "Chưa có ánh xạ cột: gửi columnMapping (bài này chưa có lô trước để dùng lại)"));
+                          "Chưa có ánh xạ cột: gửi columnMapping hoặc sử dụng tệp CSV mẫu đúng định dạng"));
     }
     if (table.indexOf(mapping.getStudentColumn()) < 0) {
       throw invalid("Tệp thiếu cột mã sinh viên [" + mapping.getStudentColumn() + "]");
@@ -207,6 +212,184 @@ public class ImportBatchServiceImpl implements ImportBatchService {
     }
     return mapping;
   }
+
+  private Optional<ImportColumnMapping> autoDetectMapping(
+      Assessment assessment, ScoreCsvParser.Table table) {
+    if (table.headers().isEmpty()
+        || assessment.getItems() == null
+        || assessment.getItems().isEmpty()) {
+      return Optional.empty();
+    }
+
+    String studentColumn = detectStudentColumn(table.headers());
+    if (studentColumn == null) {
+      return Optional.empty();
+    }
+
+    Set<String> cloIds =
+        assessment.getItems().stream()
+            .filter(it -> it.getOutcomeMappings() != null)
+            .flatMap(it -> it.getOutcomeMappings().stream())
+            .map(OutcomeMapping::getCloId)
+            .filter(Objects::nonNull)
+            .filter(s -> !s.isBlank())
+            .collect(Collectors.toSet());
+    Map<String, String> cloCodeMap =
+        cloRepository.findAllById(cloIds).stream()
+            .collect(Collectors.toMap(Clo::getId, Clo::getCode, (c1, c2) -> c1));
+
+    List<AutoDetectTarget> targets = new ArrayList<>();
+    for (AssessmentItem item : assessment.getItems()) {
+      if (item.getOutcomeMappings() == null) {
+        continue;
+      }
+      for (OutcomeMapping mapping : item.getOutcomeMappings()) {
+        String cloCode = cloCodeMap.getOrDefault(mapping.getCloId(), mapping.getCloId());
+        targets.add(new AutoDetectTarget(item, mapping, cloCode));
+      }
+    }
+    if (targets.isEmpty()) {
+      return Optional.empty();
+    }
+
+    Set<String> matchedTargets = new HashSet<>();
+    List<ImportColumnMapping.Entry> entries = new ArrayList<>();
+
+    for (String header : table.headers()) {
+      if (header.equalsIgnoreCase(studentColumn) || isNonScoreColumn(header)) {
+        continue;
+      }
+      AutoDetectTarget matched = findMatchingTarget(header, targets, matchedTargets);
+      if (matched != null) {
+        String targetKey = matched.item().getId() + ":" + matched.mapping().getCloId();
+        matchedTargets.add(targetKey);
+        entries.add(
+            ImportColumnMapping.Entry.builder()
+                .column(header)
+                .itemId(matched.item().getId())
+                .cloId(matched.mapping().getCloId())
+                .build());
+      }
+    }
+
+    if (entries.isEmpty()) {
+      return Optional.empty();
+    }
+
+    log.info(
+        "Tự động nhận diện ánh xạ cột từ header tệp mẫu cho bài [{}]: {} cột điểm, cột sinh viên=[{}]",
+        assessment.getCode(),
+        entries.size(),
+        studentColumn);
+
+    return Optional.of(
+        ImportColumnMapping.builder().studentColumn(studentColumn).items(entries).build());
+  }
+
+  private String detectStudentColumn(List<String> headers) {
+    Set<String> knownStudentHeaders =
+        Set.of(
+            "masv",
+            "mã sv",
+            "mã sinh viên",
+            "mssv",
+            "studentref",
+            "student_ref",
+            "student id",
+            "student_id",
+            "studentcode",
+            "student_code",
+            "ma_sv",
+            "mã_sv");
+    for (String header : headers) {
+      String norm = header.trim().toLowerCase(Locale.ROOT);
+      if (knownStudentHeaders.contains(norm)) {
+        return header;
+      }
+    }
+    for (String header : headers) {
+      String norm = header.trim().toLowerCase(Locale.ROOT);
+      if (norm.startsWith("masv") || norm.startsWith("mssv") || norm.startsWith("studentref")) {
+        return header;
+      }
+    }
+    for (String header : headers) {
+      if (header.equalsIgnoreCase(DEFAULT_STUDENT_COLUMN)) {
+        return header;
+      }
+    }
+    return null;
+  }
+
+  private boolean isNonScoreColumn(String header) {
+    String norm = header.trim().toLowerCase(Locale.ROOT);
+    return norm.equals("hoten")
+        || norm.equals("họ tên")
+        || norm.equals("họ và tên")
+        || norm.equals("ho va ten")
+        || norm.equals("fullname")
+        || norm.equals("full name")
+        || norm.equals("name")
+        || norm.equals("tên")
+        || norm.equals("stt")
+        || norm.equals("email");
+  }
+
+  private AutoDetectTarget findMatchingTarget(
+      String header, List<AutoDetectTarget> targets, Set<String> matchedTargets) {
+    String hTrim = header.trim();
+    String separator = null;
+    if (hTrim.contains(" - ")) {
+      separator = " - ";
+    } else if (hTrim.contains("_")) {
+      separator = "_";
+    }
+
+    if (separator == null) {
+      return null;
+    }
+
+    int sepIndex = hTrim.indexOf(separator);
+    String itemCodeCandidate = hTrim.substring(0, sepIndex).trim();
+    String rest = hTrim.substring(sepIndex + separator.length()).trim().toLowerCase(Locale.ROOT);
+
+    List<AutoDetectTarget> candidateTargets =
+        targets.stream()
+            .filter(t -> t.item().getCode().equalsIgnoreCase(itemCodeCandidate))
+            .filter(t -> !matchedTargets.contains(t.item().getId() + ":" + t.mapping().getCloId()))
+            .toList();
+
+    if (candidateTargets.isEmpty()) {
+      return null;
+    }
+
+    if (candidateTargets.size() == 1) {
+      return candidateTargets.get(0);
+    }
+
+    for (AutoDetectTarget t : candidateTargets) {
+      if (t.cloCode() != null && !t.cloCode().isBlank()) {
+        String cloCodeLower = t.cloCode().toLowerCase(Locale.ROOT);
+        if (rest.contains(cloCodeLower)) {
+          return t;
+        }
+      }
+    }
+
+    for (AutoDetectTarget t : candidateTargets) {
+      String maxScoreStr =
+          java.math.BigDecimal.valueOf(t.mapping().getMaxScore())
+              .stripTrailingZeros()
+              .toPlainString();
+      if (rest.contains(maxScoreStr)) {
+        return t;
+      }
+    }
+
+    return candidateTargets.get(0);
+  }
+
+  private record AutoDetectTarget(AssessmentItem item, OutcomeMapping mapping, String cloCode) {}
 
   private Optional<ImportColumnMapping> previousMapping(String sectionId, String assessmentId) {
     return batchRepository

@@ -3,6 +3,8 @@ package com.hcmute.lms.lmsapi.controller;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.closeTo;
 import static org.hamcrest.Matchers.hasSize;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -11,6 +13,7 @@ import com.hcmute.lms.lmsapi.document.Clo;
 import com.hcmute.lms.lmsapi.document.Course;
 import com.hcmute.lms.lmsapi.document.CourseSection;
 import com.hcmute.lms.lmsapi.document.Score;
+import com.hcmute.lms.lmsapi.document.Student;
 import com.hcmute.lms.lmsapi.document.Syllabus;
 import com.hcmute.lms.lmsapi.document.User;
 import com.hcmute.lms.lmsapi.document.UserScope;
@@ -21,10 +24,12 @@ import com.hcmute.lms.lmsapi.dto.AssessmentRequest;
 import com.hcmute.lms.lmsapi.dto.AssessmentUpdateRequest;
 import com.hcmute.lms.lmsapi.dto.OutcomeMappingDto;
 import com.hcmute.lms.lmsapi.enums.AssessmentStatus;
+import com.hcmute.lms.lmsapi.enums.EnrollmentStatus;
 import com.hcmute.lms.lmsapi.enums.Role;
 import com.hcmute.lms.lmsapi.enums.SyllabusStatus;
 import com.hcmute.lms.lmsapi.testsupport.ApiTestFixtures;
 import com.hcmute.lms.lmsapi.testsupport.IntegrationTestBase;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -662,5 +667,94 @@ class AssessmentIntegrationTest extends IntegrationTestBase {
         .perform(getAs(deptHeadToken, "/api/v1/sections/{id}/assessments", section.getId()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$", hasSize(2)));
+  }
+
+  // ------------------------------------------------------------------ template-csv tests
+
+  @Test
+  @DisplayName(
+      "Xuất CSV mẫu: bài LOCKED + có sinh viên enrolled -> 200, UTF-8 BOM, đúng header và danh sách SV")
+  void templateCsv_lockedAssessment_success() throws Exception {
+    String id = createSectionAssessment(sectionRequest().build());
+    mockMvc
+        .perform(postAs(lecturerToken, "/api/v1/assessments/{id}/lock", null, id))
+        .andExpect(status().isOk());
+
+    Student s1 = fixtures.student();
+    s1.setFullName("Nguyen Van A");
+    mongo().save(s1);
+
+    Student s2 = fixtures.student();
+    s2.setFullName("Tran Thi B");
+    mongo().save(s2);
+
+    fixtures.enrollment(section, s1, EnrollmentStatus.ENROLLED);
+    fixtures.enrollment(section, s2, EnrollmentStatus.ENROLLED);
+
+    MvcResult res =
+        mockMvc
+            .perform(getAs(lecturerToken, "/api/v1/assessments/{id}/scores/template-csv", id))
+            .andExpect(status().isOk())
+            .andExpect(content().contentType("text/csv; charset=UTF-8"))
+            .andExpect(header().exists("Content-Disposition"))
+            .andReturn();
+
+    byte[] bytes = res.getResponse().getContentAsByteArray();
+    String content = new String(bytes, StandardCharsets.UTF_8);
+
+    assertThat(content.charAt(0)).isEqualTo('\uFEFF');
+    assertThat(content)
+        .contains("MaSV,HoTen,Q1 - CLO1 (Max: 4),Q2 - CLO1 (Max: 3),Q2 - CLO2 (Max: 3)");
+    assertThat(content).contains(s1.getStudentRef() + ",Nguyen Van A,,,");
+    assertThat(content).contains(s2.getStudentRef() + ",Tran Thi B,,,");
+  }
+
+  @Test
+  @DisplayName("Xuất CSV mẫu: bài DRAFT chưa khóa -> 422")
+  void templateCsv_draftAssessment_returns422() throws Exception {
+    String id = createSectionAssessment(sectionRequest().build());
+
+    mockMvc
+        .perform(getAs(lecturerToken, "/api/v1/assessments/{id}/scores/template-csv", id))
+        .andExpect(status().isUnprocessableEntity())
+        .andExpect(
+            jsonPath("$.message")
+                .value(org.hamcrest.Matchers.containsString("LOCKED hoặc SCORE_ENTERED")));
+  }
+
+  @Test
+  @DisplayName("Xuất CSV mẫu: bài khung SYLLABUS_TEMPLATE -> 422")
+  void templateCsv_syllabusTemplate_returns422() throws Exception {
+    Assessment template =
+        mongo()
+            .save(
+                Assessment.builder()
+                    .syllabusId(syllabus.getId())
+                    .scope(com.hcmute.lms.lmsapi.enums.AssessmentScope.SYLLABUS_TEMPLATE)
+                    .code(fixtures.code("AT"))
+                    .name("Bài khung mẫu")
+                    .status(AssessmentStatus.DRAFT)
+                    .build());
+
+    mockMvc
+        .perform(
+            getAs(lecturerToken, "/api/v1/assessments/{id}/scores/template-csv", template.getId()))
+        .andExpect(status().isUnprocessableEntity())
+        .andExpect(
+            jsonPath("$.message")
+                .value(org.hamcrest.Matchers.containsString("bài đánh giá của lớp học phần")));
+  }
+
+  @Test
+  @DisplayName("Xuất CSV mẫu: giảng viên khác không phụ trách lớp -> 403")
+  void templateCsv_otherLecturer_forbidden() throws Exception {
+    String id = createSectionAssessment(sectionRequest().build());
+    mockMvc
+        .perform(postAs(lecturerToken, "/api/v1/assessments/{id}/lock", null, id))
+        .andExpect(status().isOk());
+
+    mockMvc
+        .perform(getAs(otherLecturerToken, "/api/v1/assessments/{id}/scores/template-csv", id))
+        .andExpect(status().isForbidden());
   }
 }

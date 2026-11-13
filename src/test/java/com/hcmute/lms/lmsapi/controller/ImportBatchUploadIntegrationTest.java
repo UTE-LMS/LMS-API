@@ -443,4 +443,43 @@ class ImportBatchUploadIntegrationTest extends ScoreImportIntegrationBase {
 
     assertThat(countBatches()).isZero();
   }
+
+  @Test
+  @DisplayName(
+      "US-21 (Phase 3): tự động nhận diện cột điểm và sinh viên từ header tệp mẫu khi không gửi columnMapping")
+  void us21_autoDetectMappingFromTemplateCsvHeaders() throws Exception {
+    String csv =
+        "MaSV,HoTen,Q1 - CLO1 (Max: 4.0),Q2 - CLO1 (Max: 6.0)\n"
+            + s1.getStudentRef()
+            + ",Nguyen Van A,3.5,5.5\n";
+
+    MvcResult uploadRes =
+        mockMvc
+            .perform(upload(lecturerToken, csv, "BLANK", null))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.status").value("UPLOADED"))
+            .andExpect(jsonPath("$.columnMapping.studentColumn").value("MaSV"))
+            .andExpect(jsonPath("$.columnMapping.items", hasSize(2)))
+            .andExpect(jsonPath("$.columnMapping.items[0].column").value("Q1 - CLO1 (Max: 4.0)"))
+            .andExpect(jsonPath("$.columnMapping.items[0].item").value(itemId(0)))
+            .andExpect(jsonPath("$.columnMapping.items[1].column").value("Q2 - CLO1 (Max: 6.0)"))
+            .andExpect(jsonPath("$.columnMapping.items[1].item").value(itemId(1)))
+            .andReturn();
+
+    String batchId = read(uploadRes, "$.id");
+
+    // Validate thành công
+    mockMvc
+        .perform(postAction(lecturerToken, batchId, "validate"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("VALIDATED"))
+        .andExpect(jsonPath("$.stats.errorRows").value(0))
+        .andExpect(jsonPath("$.stats.scoreCount").value(2));
+
+    // Confirm thành công
+    mockMvc
+        .perform(postAction(lecturerToken, batchId, "confirm"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("CONFIRMED"));
+  }
 }

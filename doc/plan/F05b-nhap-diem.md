@@ -141,7 +141,8 @@ GVHD xác nhận**; mục nào đổi thì sửa mã kèm test tương ứng. Ba
 
 | Phương thức | Đường dẫn | Quyền | Ghi chú |
 |---|---|---|---|
-| POST | `/sections/{sectionId}/assessments/{assessmentId}/import-batches` | LECTURER của lớp | `multipart/form-data`: `file` (CSV), `emptyCellAs` (`BLANK`\|`MISSING`, bắt buộc), `reimportPolicy` (bắt buộc, chỉ `REJECT_ON_CONFLICT`), `sourceSystem` (`CSV`\|`MOODLE_EXPORT`, tùy chọn), `columnMapping` (chuỗi JSON, tùy chọn). 201 `ImportBatchResponse` (`UPLOADED`) |
+| GET | `/assessments/{id}/scores/template-csv` | đọc bài đánh giá | Xuất tệp CSV mẫu có UTF-8 BOM, header `MaSV,HoTen,<item.code> - <clo.code> (Max: <maxScore>)`, danh sách sinh viên `ENROLLED` với ô điểm để trống. 422 nếu bài chưa `LOCKED`/`SCORE_ENTERED` hoặc là bài khung `SYLLABUS_TEMPLATE` |
+| POST | `/sections/{sectionId}/assessments/{assessmentId}/import-batches` | LECTURER của lớp | `multipart/form-data`: `file` (CSV), `emptyCellAs` (`BLANK`\|`MISSING`, bắt buộc), `reimportPolicy` (bắt buộc, chỉ `REJECT_ON_CONFLICT`), `sourceSystem` (`CSV`\|`MOODLE_EXPORT`, tùy chọn), `columnMapping` (chuỗi JSON, tùy chọn; nếu bỏ trống hệ thống **tự động nhận diện** cột điểm từ header tệp mẫu). 201 `ImportBatchResponse` (`UPLOADED`) |
 | GET | `/sections/{sectionId}/assessments/{assessmentId}/import-batches` | đọc lớp | `ImportBatchResponse[]`, mới nhất trước |
 | GET | `/import-batches/{id}` | đọc lớp của lô | `ImportBatchResponse` |
 | GET | `/import-batches/{id}/errors?page=0&size=20` | đọc lớp của lô | `PageResponse<ImportRowErrorResponse>` sắp theo `rowNumber` (size 1..100) |

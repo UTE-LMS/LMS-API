@@ -27,6 +27,7 @@ import com.hcmute.lms.lmsapi.enums.TermStatus;
 import com.hcmute.lms.lmsapi.exception.AppException;
 import com.hcmute.lms.lmsapi.mapper.ImportBatchMapper;
 import com.hcmute.lms.lmsapi.repository.AssessmentRepository;
+import com.hcmute.lms.lmsapi.repository.CloRepository;
 import com.hcmute.lms.lmsapi.repository.CourseSectionRepository;
 import com.hcmute.lms.lmsapi.repository.EnrollmentRepository;
 import com.hcmute.lms.lmsapi.repository.ImportBatchRepository;
@@ -62,6 +63,7 @@ class ImportBatchServiceImplTest {
   @Mock private ImportBatchRepository batchRepository;
   @Mock private ImportRowErrorRepository rowErrorRepository;
   @Mock private ScoreRepository scoreRepository;
+  @Mock private CloRepository cloRepository;
   @Mock private ImportFileStorage fileStorage;
   @Mock private ScoreRowValidator rowValidator;
   @Mock private ImportBatchMapper batchMapper;
@@ -87,6 +89,7 @@ class ImportBatchServiceImplTest {
             batchRepository,
             rowErrorRepository,
             scoreRepository,
+            cloRepository,
             fileStorage,
             rowValidator,
             batchMapper,

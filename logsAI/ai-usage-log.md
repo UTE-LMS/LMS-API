@@ -378,3 +378,37 @@ Phần này chuẩn bị sẵn câu trả lời khoa học, chuẩn mực cho 4 
   - Rà soát tính nhất quán giữa `$jsonSchema` trong `doc/database_import.js`, công thức toán học 4 cấp độ (`ASSESSMENT_CLO`, `CLO`, `PI`, `PLO` kèm chuẩn hóa mẫu số $\text{Evaluated}$, lấy lần học gần nhất `LATEST`, tách $N_{\text{section}}$ và $N_{\text{cohort}}$, `PassThreshold` bắt buộc) trong `doc/dac-ta-thay-doi-nghiep-vu-va-phuong-an-tinh-clo.md`, và danh sách class/file thực tế `com.hcmute.lms.lmsapi` trong `doc/ke-hoach-sua-doi-theo-nghiep-vu-moi.md`.
 - **Sinh viên đã sửa/rà soát:** _chờ sinh viên rà soát_
 - **Commit / PR:** commit `df0a673` trên nhánh `docs/v0.7-adr0014-obe-4-levels` (sẵn sàng mở PR vào `main`).
+
+---
+
+## Phiên #31 — 2026-11-13: Hoàn thiện F05b (Phase 3) — API xuất CSV mẫu và tự động nhận diện cột điểm từ header
+
+- **Sinh viên yêu cầu:** TinMH (IT) & IBS
+- **Công cụ / mô hình:** Antigravity, Gemini 3.1 Pro
+- **Mục tiêu:**
+  1. Xây dựng API xuất tệp CSV mẫu nhập điểm `GET /api/v1/assessments/{id}/scores/template-csv`:
+     - Kiểm tra bài đánh giá ở trạng thái `LOCKED` hoặc `SCORE_ENTERED`, phạm vi lớp `SECTION` và đã có câu hỏi/ma trận `OutcomeMapping`.
+     - Sinh tiêu đề cột dạng `MaSV,HoTen,<item.code> - <clo.code> (Max: <mapping.maxScore>)` kèm UTF-8 BOM (`\uFEFF`) để Excel trên Windows hiển thị đúng font tiếng Việt.
+     - Tự động điền danh sách sinh viên `ENROLLED` trong lớp (mã sinh viên `studentRef`, họ và tên `fullName`) và để trống các ô điểm.
+  2. Tích hợp cơ chế tự động nhận diện cột điểm (`autoDetectMapping`):
+     - Khi người dùng tải tệp CSV mẫu lên `POST /sections/{sectionId}/assessments/{assessmentId}/import-batches` mà không gửi `columnMapping`, hệ thống tự động đối sánh header:
+       - Cột sinh viên: nhận diện `MaSV`, `MSSV`, `studentRef`,...
+       - Bỏ qua các cột thông tin sinh viên phụ như `HoTen`, `STT`,...
+       - Cột điểm: trích xuất `item.code` và `clo.code` đối chiếu với ma trận bài đánh giá.
+     - Tự động fallback về cấu hình lô trước nếu tệp không phải định dạng mẫu.
+  3. Bổ sung trường `fullName` trong `Student.java` (đã có sẵn trong MongoDB validator schema).
+  4. Viết integration test toàn diện:
+     - `AssessmentIntegrationTest`: test xuất template CSV (LOCKED, DRAFT 422, SYLLABUS_TEMPLATE 422, 403 khác lớp).
+     - `ImportBatchUploadIntegrationTest`: test tự động nhận diện header tệp mẫu và nhập điểm thành công khi `columnMapping = null`.
+- **File AI sinh/sửa:**
+  - Backend: `src/main/java/com/hcmute/lms/lmsapi/controller/AssessmentController.java`, `src/main/java/com/hcmute/lms/lmsapi/service/AssessmentService.java`, `src/main/java/com/hcmute/lms/lmsapi/service/impl/AssessmentServiceImpl.java`, `src/main/java/com/hcmute/lms/lmsapi/service/impl/ImportBatchServiceImpl.java`, `src/main/java/com/hcmute/lms/lmsapi/document/Student.java`, `src/main/java/com/hcmute/lms/lmsapi/dto/AssessmentScoreTemplate.java`.
+  - Tests: `src/test/java/com/hcmute/lms/lmsapi/controller/AssessmentIntegrationTest.java`, `src/test/java/com/hcmute/lms/lmsapi/controller/ImportBatchUploadIntegrationTest.java`, `src/test/java/com/hcmute/lms/lmsapi/service/impl/ImportBatchServiceImplTest.java`.
+  - Tài liệu: `doc/plan/F05b-nhap-diem.md`, `logsAI/ai-usage-log.md`.
+- **Kiểm chứng đã làm:**
+  - `./mvnw test "-Dtest=AssessmentIntegrationTest"` pass 18/18 test (100%).
+  - `./mvnw test "-Dtest=ImportBatchUploadIntegrationTest"` pass 18/18 test (100%).
+  - `./mvnw test "-Dtest=*Import*,*Score*"` pass 79/79 test (100%).
+  - `./mvnw spotless:apply` đạt BUILD SUCCESS trên toàn bộ 392 files.
+- **Sinh viên đã sửa/rà soát:** _chờ sinh viên rà soát_
+- **Commit / PR:** _sẵn sàng commit_
+

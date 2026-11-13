@@ -32,6 +32,10 @@ public class Student {
   @Field("studentRef")
   private String studentRef;
 
+  /** Họ và tên sinh viên (tùy chọn). */
+  @Field("fullName")
+  private String fullName;
+
   /** Khóa/niên khóa (tùy chọn). */
   @Field("cohort")
   private String cohort;
