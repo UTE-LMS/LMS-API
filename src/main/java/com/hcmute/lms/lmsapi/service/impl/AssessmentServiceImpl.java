@@ -4,7 +4,6 @@ import com.hcmute.lms.lmsapi.document.Assessment;
 import com.hcmute.lms.lmsapi.document.AssessmentCloWeight;
 import com.hcmute.lms.lmsapi.document.AssessmentItem;
 import com.hcmute.lms.lmsapi.document.AuditEntity;
-import com.hcmute.lms.lmsapi.document.Clo;
 import com.hcmute.lms.lmsapi.document.CourseSection;
 import com.hcmute.lms.lmsapi.document.Enrollment;
 import com.hcmute.lms.lmsapi.document.OutcomeMapping;
@@ -42,7 +41,6 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -432,17 +430,7 @@ public class AssessmentServiceImpl implements AssessmentService {
           "Bài đánh giá chưa có ma trận câu hỏi - CLO để xuất tệp CSV mẫu");
     }
 
-    Set<String> cloIds =
-        items.stream()
-            .filter(it -> it.getOutcomeMappings() != null)
-            .flatMap(it -> it.getOutcomeMappings().stream())
-            .map(OutcomeMapping::getCloId)
-            .filter(Objects::nonNull)
-            .filter(s -> !s.isBlank())
-            .collect(Collectors.toSet());
-    Map<String, String> cloCodeMap =
-        cloRepository.findAllById(cloIds).stream()
-            .collect(Collectors.toMap(Clo::getId, Clo::getCode, (c1, c2) -> c1));
+    Map<String, String> cloCodeMap = itemValidator.resolveCloCodeMap(items);
 
     List<Enrollment> enrollments =
         enrollmentRepository.findBySectionIdAndStatus(

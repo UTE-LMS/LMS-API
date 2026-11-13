@@ -3,7 +3,6 @@ package com.hcmute.lms.lmsapi.service.impl;
 import com.hcmute.lms.lmsapi.document.Assessment;
 import com.hcmute.lms.lmsapi.document.AssessmentItem;
 import com.hcmute.lms.lmsapi.document.AuditEntity;
-import com.hcmute.lms.lmsapi.document.Clo;
 import com.hcmute.lms.lmsapi.document.CourseSection;
 import com.hcmute.lms.lmsapi.document.Enrollment;
 import com.hcmute.lms.lmsapi.document.ImportBatch;
@@ -34,7 +33,6 @@ import com.hcmute.lms.lmsapi.exception.ErrorCode;
 import com.hcmute.lms.lmsapi.exception.ResourceNotFoundException;
 import com.hcmute.lms.lmsapi.mapper.ImportBatchMapper;
 import com.hcmute.lms.lmsapi.repository.AssessmentRepository;
-import com.hcmute.lms.lmsapi.repository.CloRepository;
 import com.hcmute.lms.lmsapi.repository.CourseSectionRepository;
 import com.hcmute.lms.lmsapi.repository.EnrollmentRepository;
 import com.hcmute.lms.lmsapi.repository.ImportBatchRepository;
@@ -56,7 +54,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -84,7 +81,7 @@ public class ImportBatchServiceImpl implements ImportBatchService {
   private final ImportBatchRepository batchRepository;
   private final ImportRowErrorRepository rowErrorRepository;
   private final ScoreRepository scoreRepository;
-  private final CloRepository cloRepository;
+  private final AssessmentItemValidator assessmentItemValidator;
   private final ImportFileStorage fileStorage;
   private final ScoreRowValidator rowValidator;
   private final ImportBatchMapper batchMapper;
@@ -226,17 +223,8 @@ public class ImportBatchServiceImpl implements ImportBatchService {
       return Optional.empty();
     }
 
-    Set<String> cloIds =
-        assessment.getItems().stream()
-            .filter(it -> it.getOutcomeMappings() != null)
-            .flatMap(it -> it.getOutcomeMappings().stream())
-            .map(OutcomeMapping::getCloId)
-            .filter(Objects::nonNull)
-            .filter(s -> !s.isBlank())
-            .collect(Collectors.toSet());
     Map<String, String> cloCodeMap =
-        cloRepository.findAllById(cloIds).stream()
-            .collect(Collectors.toMap(Clo::getId, Clo::getCode, (c1, c2) -> c1));
+        assessmentItemValidator.resolveCloCodeMap(assessment.getItems());
 
     List<AutoDetectTarget> targets = new ArrayList<>();
     for (AssessmentItem item : assessment.getItems()) {

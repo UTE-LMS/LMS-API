@@ -169,6 +169,22 @@ class ScopeAuthorizationMatrixIntegrationTest {
         .andExpect(jsonPath("$.code").value("FORBIDDEN"));
   }
 
+  /** Cả READ và WRITE đều bị từ chối (403, FORBIDDEN). */
+  private void expectReadAndWriteForbidden(String token) throws Exception {
+    mockMvc
+        .perform(
+            get("/api/v1/test/sections/" + TARGET_SECTION_ID)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+    mockMvc
+        .perform(
+            post("/api/v1/test/sections/" + TARGET_SECTION_ID + "/grades")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+  }
+
   /** Tiện ích tạo nhanh User thử nghiệm và trả về Access Token. */
   private String createUserAndGetToken(String username, Role role, UserScope scope)
       throws Exception {
@@ -289,19 +305,7 @@ class ScopeAuthorizationMatrixIntegrationTest {
       String token =
           createUserAndGetToken("test_sec_lecturer_unassigned", Role.LECTURER, new UserScope());
 
-      mockMvc
-          .perform(
-              get("/api/v1/test/sections/" + TARGET_SECTION_ID)
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
-          .andExpect(status().isForbidden())
-          .andExpect(jsonPath("$.code").value("FORBIDDEN"));
-
-      mockMvc
-          .perform(
-              post("/api/v1/test/sections/" + TARGET_SECTION_ID + "/grades")
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
-          .andExpect(status().isForbidden())
-          .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+      expectReadAndWriteForbidden(token);
     }
 
     @Test
@@ -349,19 +353,7 @@ class ScopeAuthorizationMatrixIntegrationTest {
       UserScope scope = UserScope.builder().programIds(List.of("671dcba5f123456789abc777")).build();
       String token = createUserAndGetToken("test_sec_viewer_prog_only", Role.QA, scope);
 
-      mockMvc
-          .perform(
-              get("/api/v1/test/sections/" + TARGET_SECTION_ID)
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
-          .andExpect(status().isForbidden())
-          .andExpect(jsonPath("$.code").value("FORBIDDEN"));
-
-      mockMvc
-          .perform(
-              post("/api/v1/test/sections/" + TARGET_SECTION_ID + "/grades")
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
-          .andExpect(status().isForbidden())
-          .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+      expectReadAndWriteForbidden(token);
     }
 
     @Test
@@ -371,19 +363,7 @@ class ScopeAuthorizationMatrixIntegrationTest {
       UserScope scope = UserScope.builder().sectionIds(List.of("671dcba5f123456789abc888")).build();
       String token = createUserAndGetToken("test_sec_lecturer_diff", Role.LECTURER, scope);
 
-      mockMvc
-          .perform(
-              get("/api/v1/test/sections/" + TARGET_SECTION_ID)
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
-          .andExpect(status().isForbidden())
-          .andExpect(jsonPath("$.code").value("FORBIDDEN"));
-
-      mockMvc
-          .perform(
-              post("/api/v1/test/sections/" + TARGET_SECTION_ID + "/grades")
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
-          .andExpect(status().isForbidden())
-          .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+      expectReadAndWriteForbidden(token);
     }
   }
 
