@@ -63,9 +63,9 @@ public interface ScopeAuthorizationService {
       UserPrincipal principal, String programVersionId, AccessType accessType);
 
   /**
-   * Kiểm tra quyền trên một học phần (ADR 0010). ADMIN luôn được phép. Cho thao tác WRITE, chỉ
-   * DEPARTMENT_HEAD hoặc LECTURER có {@code courseId} trong {@code scope.courseIds} được phép; các
-   * vai trò khác (PROGRAM_MANAGER, QA_OFFICER,...) bị từ chối (fail-closed).
+   * Kiểm tra quyền trên một học phần (ADR 0010, v0.7). ADMIN luôn được phép. Cho thao tác WRITE,
+   * PROGRAM_MANAGER hoặc LECTURER có {@code courseId} trong {@code scope.courseIds} được phép; QA
+   * bị từ chối WRITE (fail-closed).
    */
   boolean canAccessCourse(UserPrincipal principal, String courseId, AccessType accessType);
 
@@ -82,7 +82,7 @@ public interface ScopeAuthorizationService {
 
   /**
    * Kiểm tra quyền phân công môn học cho giảng viên (ADR 0010). ADMIN luôn được phép.
-   * DEPARTMENT_HEAD chỉ được phân công khi {@code courseId} nằm trong {@code scope.courseIds} của
+   * PROGRAM_MANAGER chỉ được phân công khi {@code courseId} nằm trong {@code scope.courseIds} của
    * chính mình.
    */
   boolean canAssignCourse(UserPrincipal principal, String courseId);

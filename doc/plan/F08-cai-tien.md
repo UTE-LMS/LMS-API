@@ -60,11 +60,11 @@ Chỉ mục: `(programVersionId, status)`, `ownerId`, `targetTermId`.
 
 | Phương thức | Đường dẫn | Quyền |
 |---|---|---|
-| POST | `/api/improvement-actions` | PROGRAM_MANAGER, DEPARTMENT_HEAD, QA_OFFICER |
+| POST | `/api/improvement-actions` | PROGRAM_MANAGER, QA |
 | GET | `/api/improvement-actions`, `/api/improvement-actions/{id}` (lọc theo trạng thái, chủ trì, học kỳ) | theo phạm vi |
 | PUT | `/api/improvement-actions/{id}` (sửa nội dung khi chưa `VERIFIED`) | như trên |
 | POST | `/api/improvement-actions/{id}/transitions` `{ toStatus, note }` | chủ trì / vai trò được phép |
-| POST | `/api/improvement-actions/{id}/evaluation` (MR) | PROGRAM_MANAGER, QA_OFFICER |
+| POST | `/api/improvement-actions/{id}/evaluation` (MR) | PROGRAM_MANAGER, QA |
 
 ## 7. Kiểm tra tham chiếu ở service
 

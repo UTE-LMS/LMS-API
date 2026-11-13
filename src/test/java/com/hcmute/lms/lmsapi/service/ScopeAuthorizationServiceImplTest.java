@@ -401,7 +401,7 @@ class ScopeAuthorizationServiceImplTest {
     @ParameterizedTest(name = "Role {0}: WRITE luôn bị từ chối 403 kể cả khi khớp scope")
     @EnumSource(
         value = Role.class,
-        names = {"PROGRAM_MANAGER", "DEPARTMENT_HEAD", "QA_OFFICER"})
+        names = {"PROGRAM_MANAGER"})
     void managementRoles_Write_AlwaysDenied(Role role) {
       UserPrincipal user =
           createPrincipal(
@@ -425,7 +425,7 @@ class ScopeAuthorizationServiceImplTest {
     @ParameterizedTest(name = "Role {0}: READ cho phép khi lớp nằm trong sectionIds hoặc courseIds")
     @EnumSource(
         value = Role.class,
-        names = {"PROGRAM_MANAGER", "DEPARTMENT_HEAD", "QA_OFFICER"})
+        names = {"PROGRAM_MANAGER"})
     void managementRoles_Read_ScopeMatches_Granted(Role role) {
       UserPrincipal userSec =
           createPrincipal(
@@ -460,7 +460,7 @@ class ScopeAuthorizationServiceImplTest {
         name = "Role {0}: READ từ chối khi chỉ có programIds (F01 limitation fail-closed)")
     @EnumSource(
         value = Role.class,
-        names = {"PROGRAM_MANAGER", "DEPARTMENT_HEAD", "QA_OFFICER"})
+        names = {"PROGRAM_MANAGER"})
     void managementRoles_Read_ProgramOnlyScope_Denied(Role role) {
       UserPrincipal user =
           createPrincipal(
@@ -481,7 +481,7 @@ class ScopeAuthorizationServiceImplTest {
         name = "Role {0}: Không áp dụng quy tắc lecturerIds nếu không có vai trò LECTURER")
     @EnumSource(
         value = Role.class,
-        names = {"PROGRAM_MANAGER", "DEPARTMENT_HEAD", "QA_OFFICER"})
+        names = {"PROGRAM_MANAGER"})
     void managementRoles_InLecturerIds_WithoutLecturerRole_Denied(Role role) {
       // User TARGET_LECTURER_ID có tên trong defaultCourseSection.lecturerIds nhưng chỉ giữ vai trò
       // quản lý
@@ -519,16 +519,14 @@ class ScopeAuthorizationServiceImplTest {
     void viewer_Write_AlwaysDenied() {
       UserPrincipal viewerNullScope =
           createPrincipal(
-              "v1",
-              "viewer1",
-              List.of(RoleAssignment.builder().role(Role.VIEWER).scope(null).build()));
+              "v1", "viewer1", List.of(RoleAssignment.builder().role(Role.QA).scope(null).build()));
       UserPrincipal viewerScoped =
           createPrincipal(
               "v2",
               "viewer2",
               List.of(
                   RoleAssignment.builder()
-                      .role(Role.VIEWER)
+                      .role(Role.QA)
                       .scope(UserScope.builder().sectionIds(List.of(TARGET_SECTION_ID)).build())
                       .build()));
 
@@ -548,21 +546,19 @@ class ScopeAuthorizationServiceImplTest {
     void viewer_StrictEmptyScope_ReadSystemWide_Granted() {
       UserPrincipal viewerNullScope =
           createPrincipal(
-              "v1",
-              "viewer1",
-              List.of(RoleAssignment.builder().role(Role.VIEWER).scope(null).build()));
+              "v1", "viewer1", List.of(RoleAssignment.builder().role(Role.QA).scope(null).build()));
       UserPrincipal viewerEmptyScope =
           createPrincipal(
               "v2",
               "viewer2",
-              List.of(RoleAssignment.builder().role(Role.VIEWER).scope(new UserScope()).build()));
+              List.of(RoleAssignment.builder().role(Role.QA).scope(new UserScope()).build()));
       UserPrincipal viewerEmptyLists =
           createPrincipal(
               "v3",
               "viewer3",
               List.of(
                   RoleAssignment.builder()
-                      .role(Role.VIEWER)
+                      .role(Role.QA)
                       .scope(
                           UserScope.builder()
                               .programIds(new ArrayList<>())
@@ -594,7 +590,7 @@ class ScopeAuthorizationServiceImplTest {
               "viewer_sec",
               List.of(
                   RoleAssignment.builder()
-                      .role(Role.VIEWER)
+                      .role(Role.QA)
                       .scope(UserScope.builder().sectionIds(List.of(TARGET_SECTION_ID)).build())
                       .build()));
       UserPrincipal viewerCrs =
@@ -603,7 +599,7 @@ class ScopeAuthorizationServiceImplTest {
               "viewer_crs",
               List.of(
                   RoleAssignment.builder()
-                      .role(Role.VIEWER)
+                      .role(Role.QA)
                       .scope(UserScope.builder().courseIds(List.of(TARGET_COURSE_ID)).build())
                       .build()));
 
@@ -627,7 +623,7 @@ class ScopeAuthorizationServiceImplTest {
               "viewer_prog_only",
               List.of(
                   RoleAssignment.builder()
-                      .role(Role.VIEWER)
+                      .role(Role.QA)
                       .scope(UserScope.builder().programIds(List.of("prog-1")).build())
                       .build()));
 
@@ -647,7 +643,7 @@ class ScopeAuthorizationServiceImplTest {
               "viewer_mismatch",
               List.of(
                   RoleAssignment.builder()
-                      .role(Role.VIEWER)
+                      .role(Role.QA)
                       .scope(
                           UserScope.builder()
                               .sectionIds(List.of(OTHER_SECTION_ID))
@@ -677,21 +673,14 @@ class ScopeAuthorizationServiceImplTest {
     }
 
     @Test
-    @DisplayName("STUDENT bị từ chối 403 trên cả READ và WRITE (chờ story NEW-03)")
-    void student_ReadAndWrite_AlwaysDenied() {
-      UserPrincipal student =
+    @DisplayName("QA bị từ chối 403 trên WRITE tài nguyên lớp học phần")
+    void qa_Write_AlwaysDenied() {
+      UserPrincipal qa =
           createPrincipal(
-              "st-1",
-              "student1",
-              List.of(RoleAssignment.builder().role(Role.STUDENT).scope(null).build()));
+              "st-1", "qa1", List.of(RoleAssignment.builder().role(Role.QA).scope(null).build()));
 
       assertThat(
-              scopeAuthorizationService.canAccessSection(
-                  student, TARGET_SECTION_ID, AccessType.READ))
-          .isFalse();
-      assertThat(
-              scopeAuthorizationService.canAccessSection(
-                  student, TARGET_SECTION_ID, AccessType.WRITE))
+              scopeAuthorizationService.canAccessSection(qa, TARGET_SECTION_ID, AccessType.WRITE))
           .isFalse();
     }
   }
@@ -712,14 +701,14 @@ class ScopeAuthorizationServiceImplTest {
 
     @Test
     @DisplayName(
-        "Người dùng có STUDENT + LECTURER (được phân công) -> Kế thừa quyền LECTURER (WRITE & READ CHO PHÉP)")
-    void multiRole_StudentPlusLecturer_GrantsLecturerAccess() {
+        "Người dùng có QA + LECTURER (được phân công) -> Kế thừa quyền LECTURER (WRITE & READ CHO PHÉP)")
+    void multiRole_QaPlusLecturer_GrantsLecturerAccess() {
       UserPrincipal multiUser =
           createPrincipal(
               TARGET_LECTURER_ID,
-              "ta_student_lecturer",
+              "ta_qa_lecturer",
               List.of(
-                  RoleAssignment.builder().role(Role.STUDENT).scope(null).build(),
+                  RoleAssignment.builder().role(Role.QA).scope(null).build(),
                   RoleAssignment.builder().role(Role.LECTURER).scope(null).build()));
 
       assertThat(
@@ -745,7 +734,7 @@ class ScopeAuthorizationServiceImplTest {
                       .role(Role.PROGRAM_MANAGER)
                       .scope(UserScope.builder().programIds(List.of("prog-1")).build())
                       .build(),
-                  RoleAssignment.builder().role(Role.VIEWER).scope(null).build()));
+                  RoleAssignment.builder().role(Role.QA).scope(null).build()));
 
       // READ: PM bị 403 (chỉ có programIds), nhưng VIEWER (scope rỗng) cho phép -> UNION: true
       assertThat(
@@ -781,7 +770,7 @@ class ScopeAuthorizationServiceImplTest {
               "qa_and_lecturer",
               List.of(
                   RoleAssignment.builder()
-                      .role(Role.QA_OFFICER)
+                      .role(Role.QA)
                       .scope(UserScope.builder().courseIds(List.of(TARGET_COURSE_ID)).build())
                       .build(),
                   RoleAssignment.builder()

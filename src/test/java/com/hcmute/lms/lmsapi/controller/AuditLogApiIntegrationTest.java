@@ -238,10 +238,7 @@ class AuditLogApiIntegrationTest extends IntegrationTestBase {
   @Test
   @DisplayName("US-04/AC-3: vai trò không phải ADMIN nhận 403")
   void nonAdminRolesAreForbidden() throws Exception {
-    for (Role role :
-        new Role[] {
-          Role.PROGRAM_MANAGER, Role.QA_OFFICER, Role.DEPARTMENT_HEAD, Role.LECTURER, Role.VIEWER
-        }) {
+    for (Role role : new Role[] {Role.PROGRAM_MANAGER, Role.LECTURER, Role.QA}) {
       String bearer = fixtures.bearerFor(role, UserScope.builder().build());
       ApiTestSupport.expectForbidden(mockMvc, getAs(bearer, URL));
     }

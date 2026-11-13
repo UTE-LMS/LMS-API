@@ -1,7 +1,9 @@
 package com.hcmute.lms.lmsapi.service.impl;
 
 import com.hcmute.lms.lmsapi.document.Assessment;
+import com.hcmute.lms.lmsapi.document.AssessmentItem;
 import com.hcmute.lms.lmsapi.document.Clo;
+import com.hcmute.lms.lmsapi.document.OutcomeMapping;
 import com.hcmute.lms.lmsapi.dto.AssessmentCloWeightDto;
 import com.hcmute.lms.lmsapi.dto.AssessmentItemDto;
 import com.hcmute.lms.lmsapi.dto.OutcomeMappingDto;
@@ -9,10 +11,12 @@ import com.hcmute.lms.lmsapi.enums.AssessmentStatus;
 import com.hcmute.lms.lmsapi.exception.BusinessRuleViolationException;
 import com.hcmute.lms.lmsapi.repository.AssessmentRepository;
 import com.hcmute.lms.lmsapi.repository.CloRepository;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -48,6 +52,26 @@ public class AssessmentItemValidator {
       item.getOutcomeMappings().forEach(m -> allCloIds.add(m.getCloId()));
     }
     validateClosBelongToSyllabus(syllabusId, allCloIds);
+  }
+
+  /** Phân giải bảng ánh xạ cloId -> cloCode từ danh sách items của bài đánh giá. */
+  public Map<String, String> resolveCloCodeMap(Collection<AssessmentItem> items) {
+    if (items == null || items.isEmpty()) {
+      return Map.of();
+    }
+    Set<String> cloIds =
+        items.stream()
+            .filter(it -> it.getOutcomeMappings() != null)
+            .flatMap(it -> it.getOutcomeMappings().stream())
+            .map(OutcomeMapping::getCloId)
+            .filter(Objects::nonNull)
+            .filter(s -> !s.isBlank())
+            .collect(Collectors.toSet());
+    if (cloIds.isEmpty()) {
+      return Map.of();
+    }
+    return cloRepository.findAllById(cloIds).stream()
+        .collect(Collectors.toMap(Clo::getId, Clo::getCode, (c1, c2) -> c1));
   }
 
   private void validateMappings(AssessmentItemDto item) {

@@ -66,8 +66,7 @@ class ProgramVerificationApiIntegrationTest extends IntegrationTestBase {
   }
 
   private User qaInScope() {
-    return fixtures.user(
-        Role.QA_OFFICER, UserScope.builder().programIds(List.of(program.getId())).build());
+    return fixtures.user(Role.QA, UserScope.builder().programIds(List.of(program.getId())).build());
   }
 
   private static VerificationRequest verified(String note) {
@@ -129,24 +128,18 @@ class ProgramVerificationApiIntegrationTest extends IntegrationTestBase {
 
   // ------------------------------------------------------------------ US-08/AC-3: ma trận
 
-  /**
-   * Chỉ QA_OFFICER có programIds chứa CTĐT được ghi verification (cột write); mọi người đọc được.
-   */
+  /** Chỉ QA có programIds chứa CTĐT được ghi verification (cột write); mọi người đọc được. */
   static Stream<Case> verificationMatrix() {
     return RoleScopeMatrix.cases(
-        row(Role.QA_OFFICER, PROGRAM_MATCH, true, true),
-        row(Role.QA_OFFICER, NULL_SCOPE, true, false),
-        row(Role.QA_OFFICER, EMPTY_ARRAYS, true, false),
-        row(Role.QA_OFFICER, OTHER_RESOURCES, true, false),
+        row(Role.QA, PROGRAM_MATCH, true, true),
+        row(Role.QA, NULL_SCOPE, true, false),
+        row(Role.QA, EMPTY_ARRAYS, true, false),
+        row(Role.QA, OTHER_RESOURCES, true, false),
         row(Role.ADMIN, NULL_SCOPE, true, false),
         row(Role.ADMIN, PROGRAM_MATCH, true, false),
         row(Role.PROGRAM_MANAGER, PROGRAM_MATCH, true, false),
         row(Role.PROGRAM_MANAGER, NULL_SCOPE, true, false),
-        row(Role.DEPARTMENT_HEAD, PROGRAM_MATCH, true, false),
-        row(Role.LECTURER, PROGRAM_MATCH, true, false),
-        row(Role.VIEWER, NULL_SCOPE, true, false),
-        row(Role.VIEWER, PROGRAM_MATCH, true, false),
-        row(Role.STUDENT, NULL_SCOPE, true, false));
+        row(Role.LECTURER, PROGRAM_MATCH, true, false));
   }
 
   @ParameterizedTest(name = "{0}")
@@ -178,9 +171,9 @@ class ProgramVerificationApiIntegrationTest extends IntegrationTestBase {
   @ParameterizedTest(name = "{0} bị 403 trên PLO và PI")
   @EnumSource(
       value = Role.class,
-      names = {"QA_OFFICER"},
+      names = {"QA"},
       mode = EnumSource.Mode.EXCLUDE)
-  @DisplayName("US-08/AC-3: mọi vai trò khác QA_OFFICER (kể cả ADMIN) gọi xác nhận PLO/PI -> 403")
+  @DisplayName("US-08/AC-3: mọi vai trò khác QA (kể cả ADMIN) gọi xác nhận PLO/PI -> 403")
   void nonQaRolesAreForbiddenOnPloAndPi(Role role) throws Exception {
     String bearer =
         fixtures.bearerFor(role, UserScope.builder().programIds(List.of(program.getId())).build());
@@ -202,8 +195,7 @@ class ProgramVerificationApiIntegrationTest extends IntegrationTestBase {
   void qaOutOfScopeIsForbiddenOnPloAndPi() throws Exception {
     String outOfScope =
         fixtures.bearerFor(
-            Role.QA_OFFICER,
-            UserScope.builder().programIds(List.of(ApiTestFixtures.missingId())).build());
+            Role.QA, UserScope.builder().programIds(List.of(ApiTestFixtures.missingId())).build());
     mockMvc
         .perform(putAs(outOfScope, PLO_VERIFY, verified("x"), version.getId(), plo.getId()))
         .andExpect(status().isForbidden());

@@ -113,7 +113,7 @@ public class BearerTokenResolverAndSecurityChallengerTest {
             .fullName("[DỮ LIỆU THỬ NGHIỆM] Challenger Locked User")
             .status(UserStatus.LOCKED)
             .tokenVersion(0L)
-            .roleAssignments(List.of(RoleAssignment.builder().role(Role.STUDENT).build()))
+            .roleAssignments(List.of(RoleAssignment.builder().role(Role.QA).build()))
             .createdAt(Instant.now())
             .updatedAt(Instant.now())
             .build());

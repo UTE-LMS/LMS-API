@@ -170,7 +170,7 @@ class SectionIntegrationTest extends IntegrationTestBase {
   @Test
   @DisplayName("US-19/AC-2: người dùng không có vai trò LECTURER hoặc bị khóa -> 422")
   void us19_ac2_lecturerMustBeActiveLecturer() throws Exception {
-    User notLecturer = fixtures.user(Role.VIEWER, UserScope.builder().build());
+    User notLecturer = fixtures.user(Role.QA, UserScope.builder().build());
     mockMvc
         .perform(
             postAs(

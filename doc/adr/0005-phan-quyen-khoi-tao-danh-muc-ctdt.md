@@ -43,7 +43,7 @@ Chọn phương án **C**.
    - **Bắt buộc kiểm tra Scope:** Mọi thao tác ghi của `PROGRAM_MANAGER` đều phải thỏa mãn `scope.programIds` chứa đúng `programId` của chương trình tương ứng (thông qua `ScopeAuthorizationService.canAccessProgram` và `canAccessProgramVersion`, cơ chế fail-closed). Nếu thao tác ngoài scope $\to$ bị từ chối bằng **HTTP 403 Forbidden**.
 
 3. **Thẩm định độc lập (`verification`):**
-   - Giữ nguyên quyết định theo **ADR 0004**: Chỉ `QA_OFFICER` đúng phạm vi `scope.programIds` mới được phép đổi trạng thái xác nhận; `PROGRAM_MANAGER` và `ADMIN` đều bị **HTTP 403 Forbidden**.
+   - Giữ nguyên quyết định theo **ADR 0004 & ADR 0014**: Chỉ cán bộ `QA` đúng phạm vi `scope.programIds` mới được phép đổi trạng thái thẩm định; `PROGRAM_MANAGER` và `ADMIN` đều bị **HTTP 403 Forbidden**.
 
 ---
 

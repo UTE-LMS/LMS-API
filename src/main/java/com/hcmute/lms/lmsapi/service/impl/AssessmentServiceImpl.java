@@ -5,15 +5,20 @@ import com.hcmute.lms.lmsapi.document.AssessmentCloWeight;
 import com.hcmute.lms.lmsapi.document.AssessmentItem;
 import com.hcmute.lms.lmsapi.document.AuditEntity;
 import com.hcmute.lms.lmsapi.document.CourseSection;
+import com.hcmute.lms.lmsapi.document.Enrollment;
+import com.hcmute.lms.lmsapi.document.OutcomeMapping;
+import com.hcmute.lms.lmsapi.document.Student;
 import com.hcmute.lms.lmsapi.dto.AssessmentItemDto;
 import com.hcmute.lms.lmsapi.dto.AssessmentItemsRequest;
 import com.hcmute.lms.lmsapi.dto.AssessmentRequest;
 import com.hcmute.lms.lmsapi.dto.AssessmentResponse;
+import com.hcmute.lms.lmsapi.dto.AssessmentScoreTemplate;
 import com.hcmute.lms.lmsapi.dto.AssessmentUpdateRequest;
 import com.hcmute.lms.lmsapi.dto.CoverageResponse;
 import com.hcmute.lms.lmsapi.enums.AssessmentScope;
 import com.hcmute.lms.lmsapi.enums.AssessmentStatus;
 import com.hcmute.lms.lmsapi.enums.AuditAction;
+import com.hcmute.lms.lmsapi.enums.EnrollmentStatus;
 import com.hcmute.lms.lmsapi.exception.AppException;
 import com.hcmute.lms.lmsapi.exception.BusinessRuleViolationException;
 import com.hcmute.lms.lmsapi.exception.ErrorCode;
@@ -22,14 +27,22 @@ import com.hcmute.lms.lmsapi.mapper.AssessmentMapper;
 import com.hcmute.lms.lmsapi.repository.AssessmentRepository;
 import com.hcmute.lms.lmsapi.repository.CloRepository;
 import com.hcmute.lms.lmsapi.repository.CourseSectionRepository;
+import com.hcmute.lms.lmsapi.repository.EnrollmentRepository;
 import com.hcmute.lms.lmsapi.repository.ScoreRepository;
+import com.hcmute.lms.lmsapi.repository.StudentRepository;
 import com.hcmute.lms.lmsapi.repository.SyllabusRepository;
 import com.hcmute.lms.lmsapi.service.AssessmentService;
 import com.hcmute.lms.lmsapi.service.AuditService;
 import com.hcmute.lms.lmsapi.util.ObjectIdUtils;
+import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
@@ -46,6 +59,8 @@ public class AssessmentServiceImpl implements AssessmentService {
   private final CourseSectionRepository sectionRepository;
   private final CloRepository cloRepository;
   private final ScoreRepository scoreRepository;
+  private final EnrollmentRepository enrollmentRepository;
+  private final StudentRepository studentRepository;
   private final AssessmentItemValidator itemValidator;
   private final AssessmentCoverageCalculator coverageCalculator;
   private final AssessmentMapper assessmentMapper;
@@ -386,5 +401,102 @@ public class AssessmentServiceImpl implements AssessmentService {
         ErrorCode.CONFLICT,
         HttpStatus.CONFLICT,
         String.format("Mã bài đánh giá [%s] đã tồn tại trong phạm vi này", code));
+  }
+
+  @Override
+  public AssessmentScoreTemplate generateScoreTemplateCsv(String id) {
+    Assessment assessment = requireAssessment(id);
+    if (assessment.getScope() != AssessmentScope.SECTION || assessment.getSectionId() == null) {
+      throw new BusinessRuleViolationException(
+          "Chỉ xuất tệp CSV mẫu cho bài đánh giá của lớp học phần");
+    }
+    if (assessment.getStatus() != AssessmentStatus.LOCKED
+        && assessment.getStatus() != AssessmentStatus.SCORE_ENTERED) {
+      throw new BusinessRuleViolationException(
+          "Chỉ xuất tệp CSV mẫu khi bài đánh giá ở trạng thái LOCKED hoặc SCORE_ENTERED, hiện là "
+              + assessment.getStatus());
+    }
+    List<AssessmentItem> items = assessment.getItems();
+    if (items == null || items.isEmpty()) {
+      throw new BusinessRuleViolationException(
+          "Bài đánh giá chưa có câu hỏi nào để xuất tệp CSV mẫu");
+    }
+    long totalMappings =
+        items.stream()
+            .mapToLong(it -> it.getOutcomeMappings() == null ? 0 : it.getOutcomeMappings().size())
+            .sum();
+    if (totalMappings == 0) {
+      throw new BusinessRuleViolationException(
+          "Bài đánh giá chưa có ma trận câu hỏi - CLO để xuất tệp CSV mẫu");
+    }
+
+    Map<String, String> cloCodeMap = itemValidator.resolveCloCodeMap(items);
+
+    List<Enrollment> enrollments =
+        enrollmentRepository.findBySectionIdAndStatus(
+            assessment.getSectionId(), EnrollmentStatus.ENROLLED);
+    Set<String> studentIds =
+        enrollments.stream().map(Enrollment::getStudentId).collect(Collectors.toSet());
+    List<Student> students = new ArrayList<>(studentRepository.findAllById(studentIds));
+    students.sort(
+        Comparator.comparing(Student::getStudentRef, Comparator.nullsLast(String::compareTo)));
+
+    StringBuilder sb = new StringBuilder();
+    sb.append('\uFEFF'); // UTF-8 BOM
+    sb.append("MaSV,HoTen");
+    for (AssessmentItem item : items) {
+      if (item.getOutcomeMappings() == null) {
+        continue;
+      }
+      for (OutcomeMapping mapping : item.getOutcomeMappings()) {
+        String cloCode = cloCodeMap.getOrDefault(mapping.getCloId(), mapping.getCloId());
+        String maxScoreStr = formatScore(mapping.getMaxScore());
+        String colHeader = item.getCode() + " - " + cloCode + " (Max: " + maxScoreStr + ")";
+        sb.append(',').append(escapeCsv(colHeader));
+      }
+    }
+    sb.append("\r\n");
+
+    int scoreColCount = (int) totalMappings;
+    for (Student student : students) {
+      sb.append(escapeCsv(student.getStudentRef() != null ? student.getStudentRef() : ""));
+      sb.append(',');
+      sb.append(escapeCsv(student.getFullName() != null ? student.getFullName() : ""));
+      for (int i = 0; i < scoreColCount; i++) {
+        sb.append(',');
+      }
+      sb.append("\r\n");
+    }
+
+    byte[] content = sb.toString().getBytes(StandardCharsets.UTF_8);
+    String fileName = sanitizeFileName(assessment.getCode()) + "-scores-template.csv";
+    return new AssessmentScoreTemplate(fileName, content);
+  }
+
+  private String formatScore(Double score) {
+    if (score == null) {
+      return "0";
+    }
+    return BigDecimal.valueOf(score).stripTrailingZeros().toPlainString();
+  }
+
+  private String escapeCsv(String value) {
+    if (value == null) {
+      return "";
+    }
+    if (value.contains(",")
+        || value.contains("\"")
+        || value.contains("\n")
+        || value.contains("\r")) {
+      return "\"" + value.replace("\"", "\"\"") + "\"";
+    }
+    return value;
+  }
+
+  private String sanitizeFileName(String code) {
+    if (code == null || code.isBlank()) {
+      return "assessment";
+    }
+    return code.replaceAll("[^a-zA-Z0-9-_]", "_");
   }
 }

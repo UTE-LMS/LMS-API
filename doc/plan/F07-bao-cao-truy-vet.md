@@ -55,7 +55,7 @@ ngược từ một kết quả về dòng điểm trong tệp gốc trong ≤ 3
 
 | Phương thức | Đường dẫn | Quyền |
 |---|---|---|
-| POST | `/api/reports` `{ type, params, runId }` (sinh và lưu báo cáo) | PROGRAM_MANAGER, DEPARTMENT_HEAD, QA_OFFICER; LECTURER (lớp mình) |
+| POST | `/api/reports` `{ type, params, runId }` (sinh và lưu báo cáo) | PROGRAM_MANAGER, QA; LECTURER (lớp mình), ADMIN |
 | GET | `/api/reports`, `/api/reports/{id}` | theo phạm vi |
 | GET | `/api/trace/student-results/{id}` (một cấp), `/api/trace/scores/{id}` (về lô và dòng gốc) | theo phạm vi |
 | POST | `/api/reports/{id}/export?format=xlsx` (MR) | như trên |

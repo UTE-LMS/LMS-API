@@ -131,19 +131,19 @@ class AssessmentScopeAuthorizationTest {
 
   @Test
   @DisplayName(
-      "Khung: quyền theo đề cương (ADR 0010) - giảng viên có học phần trong scope ghi được, PM chỉ đọc")
+      "Khung: quyền theo đề cương (ADR 0010) - PM và giảng viên có học phần trong scope ghi được, QA chỉ đọc")
   void templateFollowsSyllabusAccess() {
     assertThat(
             service.canAccessAssessment(
-                principal(Role.LECTURER, COURSE_ID), TEMPLATE_ID, AccessType.WRITE))
+                principal(Role.PROGRAM_MANAGER, COURSE_ID), TEMPLATE_ID, AccessType.WRITE))
         .isTrue();
     assertThat(
             service.canAccessAssessment(
-                principal(Role.PROGRAM_MANAGER, COURSE_ID), TEMPLATE_ID, AccessType.WRITE))
+                principal(Role.QA, COURSE_ID), TEMPLATE_ID, AccessType.WRITE))
         .isFalse();
     assertThat(
             service.canAccessAssessment(
-                principal(Role.PROGRAM_MANAGER, COURSE_ID), TEMPLATE_ID, AccessType.READ))
+                principal(Role.QA, COURSE_ID), TEMPLATE_ID, AccessType.READ))
         .isTrue();
   }
 

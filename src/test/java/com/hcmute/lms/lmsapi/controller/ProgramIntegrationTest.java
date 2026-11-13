@@ -147,10 +147,9 @@ class ProgramIntegrationTest {
     qaUser =
         createUser(
             "f02_qa_" + SUFFIX,
-            Role.QA_OFFICER,
+            Role.QA,
             UserScope.builder().programIds(List.of(program.getId())).build());
-    qaOutOfScopeUser =
-        createUser("f02_qa_out_" + SUFFIX, Role.QA_OFFICER, UserScope.builder().build());
+    qaOutOfScopeUser = createUser("f02_qa_out_" + SUFFIX, Role.QA, UserScope.builder().build());
     adminUser = createUser("f02_admin_" + SUFFIX, Role.ADMIN, UserScope.builder().build());
     lecturerUser = createUser("f02_lecturer_" + SUFFIX, Role.LECTURER, UserScope.builder().build());
 

@@ -147,7 +147,7 @@ class ApiContractIntegrationTest extends IntegrationTestBase {
   @DisplayName(
       "Hợp đồng F02: tập khóa JSON của CTĐT/phiên bản/PLO/PI/ma trận đúng bảng trường trong kế hoạch")
   void f02ResponsesMatchDocumentedFields() throws Exception {
-    String bearer = fixtures.bearerFor(Role.VIEWER, null);
+    String bearer = fixtures.bearerFor(Role.QA, null);
     Program program = fixtures.program();
     ProgramVersion version = fixtures.programVersion(program, ProgramVersionStatus.DRAFT);
     Plo plo = fixtures.plo(version, "PLO1", 1);
@@ -213,7 +213,7 @@ class ApiContractIntegrationTest extends IntegrationTestBase {
   @DisplayName(
       "US-07/AC-4: không API nào trả trọng số suy từ I/R/M (khóa weight/score/coefficient/ratio)")
   void matrixNeverExposesWeights() throws Exception {
-    String bearer = fixtures.bearerFor(Role.VIEWER, null);
+    String bearer = fixtures.bearerFor(Role.QA, null);
     ProgramVersion version =
         fixtures.programVersion(fixtures.program(), ProgramVersionStatus.DRAFT);
     Pi pi = fixtures.pi(version, fixtures.plo(version, "PLO1", 1), "PI1.1", 1);

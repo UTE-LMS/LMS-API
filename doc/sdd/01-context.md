@@ -7,11 +7,11 @@
 
 ```mermaid
 flowchart LR
-    subgraph users["Người dùng (7 vai trò trong enum Role)"]
+    subgraph users["Người dùng (4 vai trò cốt lõi trong enum Role)"]
         admin["ADMIN"]
         pm["PROGRAM_MANAGER"]
-        qa["QA_OFFICER"]
-        others["DEPARTMENT_HEAD, LECTURER,<br/>STUDENT, VIEWER"]
+        lecturer["LECTURER"]
+        qa["QA"]
     end
 
     ui["LMS-UI<br/>Angular 21 (repo riêng)"]
@@ -21,8 +21,8 @@ flowchart LR
 
     admin --> ui
     pm --> ui
+    lecturer --> ui
     qa --> ui
-    others --> ui
     ui -- "HTTP + Bearer JWT (CORS theo app.cors.allowed-origins)" --> api
     api -- "Spring Data MongoDB, giao dịch đa tài liệu" --> db
     gha -. "build, chạy test với MongoDB rs0 trong container" .-> api
@@ -32,7 +32,7 @@ flowchart LR
 
 | Thành phần | Nội dung | Căn cứ đã đọc |
 |---|---|---|
-| Người dùng | 7 giá trị `Role`: `ADMIN`, `PROGRAM_MANAGER`, `DEPARTMENT_HEAD`, `QA_OFFICER`, `LECTURER`, `STUDENT`, `VIEWER`. Hiện chỉ có 3 vai trò có quyền riêng trên endpoint: `ADMIN` (quản lý người dùng), `PROGRAM_MANAGER` (ghi CTĐT/PLO/PI/ma trận), `QA_OFFICER` (xác nhận nội dung). Vai trò khác chỉ gọi được các endpoint "đã đăng nhập" (đăng nhập, `GET /auth/me`, các `GET` của F02) | `enums/Role.java`, `@PreAuthorize` trong `controller/*`, `SecurityConfig` |
+| Người dùng | 4 giá trị `Role` (tinh gọn theo ADR 0014 & OBE Schema v0.7): `ADMIN` (quản trị toàn hệ thống), `PROGRAM_MANAGER` (quản lý CTĐT, đề cương & bài đánh giá mẫu), `LECTURER` (giảng viên lớp học phần, soạn ma trận đề thi lớp, tự khóa ma trận, tải CSV và nhập điểm), `QA` (cán bộ ĐBCL & Khảo thí, xem báo cáo đo lường chất lượng, thẩm định CTĐT). | `enums/Role.java`, `@PreAuthorize` trong `controller/*`, `SecurityConfig`, `ScopeAuthorizationServiceImpl` |
 | LMS-UI | Giao diện Angular gọi API qua HTTP; **không** truy cập MongoDB. Quan hệ UI → API vẽ theo thiết kế (`CLAUDE.md`); trạng thái màn hình UI do repo `LMS-UI` ghi | `CLAUDE.md`, rule 02 |
 | LMS-API | Ứng dụng Spring Boot, ứng dụng không dùng phiên (stateless), xác thực JWT HS256 (Nimbus OAuth2 Resource Server), CORS cho origin cấu hình bởi `app.cors.allowed-origins` (mặc định `http://localhost:4200,http://localhost:3000`) | `SecurityConfig`, `JwtConfig` |
 | MongoDB | Một CSDL `learning_outcomes`, chạy dạng **replica set** `rs0` để dùng transaction; chuỗi kết nối qua `spring.mongodb.uri` (biến `MONGODB_URI`) | `application.properties.example`, `MongoConfig`, `docker/mongo/` |

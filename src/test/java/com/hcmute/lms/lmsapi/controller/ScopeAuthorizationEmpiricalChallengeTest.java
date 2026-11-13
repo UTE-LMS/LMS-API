@@ -109,7 +109,7 @@ class ScopeAuthorizationEmpiricalChallengeTest {
                 .updatedAt(Instant.now())
                 .build());
 
-    // 2. Người dùng KHÔNG có vai trò LECTURER (chỉ là VIEWER) nhưng ID xuất hiện trong lecturerIds
+    // 2. Người dùng KHÔNG có vai trò LECTURER (chỉ là QA) nhưng ID xuất hiện trong lecturerIds
     // của SECTION_1
     targetNonLecturerUser =
         userRepository.save(
@@ -121,7 +121,7 @@ class ScopeAuthorizationEmpiricalChallengeTest {
                 .status(UserStatus.ACTIVE)
                 .tokenVersion(0L)
                 .roleAssignments(
-                    List.of(RoleAssignment.builder().role(Role.VIEWER).scope(null).build()))
+                    List.of(RoleAssignment.builder().role(Role.QA).scope(null).build()))
                 .createdAt(Instant.now())
                 .updatedAt(Instant.now())
                 .build());
@@ -164,12 +164,12 @@ class ScopeAuthorizationEmpiricalChallengeTest {
             "challenge_lecturer_assigned",
             "challenge_viewer_in_lecturer_ids",
             "challenge_admin",
-            "challenge_student",
+            "challenge_pm_out_of_scope",
             "challenge_viewer_scoped",
             "challenge_viewer_prog_only",
             "challenge_lecturer_other_sec",
-            "challenge_qa_in_lecturer_ids",
-            "challenge_student_in_lecturer_ids",
+            "challenge_pm_in_lecturer_ids",
+            "challenge_qa_diff_scope_in_lecturer_ids",
             "challenge_multi_viewer_lecturer",
             "challenge_no_roles");
     for (String uname : usernames) {
@@ -316,49 +316,51 @@ class ScopeAuthorizationEmpiricalChallengeTest {
   }
 
   // =========================================================================
-  // 3. STUDENT ROLE ATTEMPTING READ OR WRITE (SCENARIO 3)
+  // 3. PROGRAM_MANAGER WITH OUT-OF-SCOPE PROGRAM (SCENARIO 3)
   // =========================================================================
 
   @Nested
-  @DisplayName("Challenge 3: STUDENT Role Attempting READ or WRITE -> 403 Forbidden")
-  class StudentRoleTests {
+  @DisplayName("Challenge 3: PROGRAM_MANAGER with Out-of-Scope Program -> 403 Forbidden")
+  class ProgramManagerOutOfScopeTests {
 
     @Test
     @DisplayName(
-        "STUDENT gọi READ hoặc WRITE trên tài nguyên lớp học phần -> Trả về HTTP 403 FORBIDDEN")
-    void studentAttemptingReadOrWrite_Returns403() throws Exception {
-      String studentToken = createUserAndGetToken("challenge_student", Role.STUDENT, null);
+        "PROGRAM_MANAGER thuộc CTĐT khác gọi READ hoặc WRITE trên tài nguyên lớp học phần ngoài phạm vi -> Trả về HTTP 403 FORBIDDEN")
+    void programManagerOutOfScope_Returns403() throws Exception {
+      UserScope progScope =
+          UserScope.builder().programIds(List.of("671dcba5f123456789abc999")).build();
+      String pmToken =
+          createUserAndGetToken("challenge_pm_out_of_scope", Role.PROGRAM_MANAGER, progScope);
 
       mockMvc
           .perform(
               get("/api/v1/test/sections/" + SECTION_1_ID)
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + studentToken))
+                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + pmToken))
           .andExpect(status().isForbidden())
           .andExpect(jsonPath("$.code").value("FORBIDDEN"));
 
       mockMvc
           .perform(
               post("/api/v1/test/sections/" + SECTION_1_ID + "/grades")
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + studentToken))
+                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + pmToken))
           .andExpect(status().isForbidden())
           .andExpect(jsonPath("$.code").value("FORBIDDEN"));
     }
   }
 
   // =========================================================================
-  // 4. VIEWER ATTEMPTING WRITE (SCENARIO 4)
+  // 4. QA ATTEMPTING WRITE (SCENARIO 4)
   // =========================================================================
 
   @Nested
-  @DisplayName("Challenge 4: VIEWER Attempting WRITE -> 403 Forbidden")
+  @DisplayName("Challenge 4: QA Attempting WRITE -> 403 Forbidden")
   class ViewerWriteTests {
 
     @Test
-    @DisplayName(
-        "VIEWER có scope khớp sectionId gọi WRITE -> Tuyệt đối bị từ chối HTTP 403 FORBIDDEN")
+    @DisplayName("QA có scope khớp sectionId gọi WRITE -> Tuyệt đối bị từ chối HTTP 403 FORBIDDEN")
     void viewerWithMatchingScope_AttemptingWrite_Returns403() throws Exception {
       UserScope scope = UserScope.builder().sectionIds(List.of(SECTION_1_ID)).build();
-      String viewerToken = createUserAndGetToken("challenge_viewer_scoped", Role.VIEWER, scope);
+      String viewerToken = createUserAndGetToken("challenge_viewer_scoped", Role.QA, scope);
 
       // READ cho phép vì scope khớp
       mockMvc
@@ -378,19 +380,19 @@ class ScopeAuthorizationEmpiricalChallengeTest {
   }
 
   // =========================================================================
-  // 5. VIEWER WITH PROGRAM-ONLY SCOPE (SCENARIO 5 - BOUNDARY CHECK)
+  // 5. QA WITH PROGRAM-ONLY SCOPE (SCENARIO 5 - BOUNDARY CHECK)
   // =========================================================================
 
   @Nested
-  @DisplayName("Challenge 5: VIEWER with Non-Empty Scope (programIds only) -> 403 Forbidden")
+  @DisplayName("Challenge 5: QA with Non-Empty Scope (programIds only) -> 403 Forbidden")
   class ViewerProgramOnlyScopeTests {
 
     @Test
     @DisplayName(
-        "VIEWER chỉ có programIds thì scope KHÔNG rỗng -> Không được rơi vào system-wide read -> Bị 403 FORBIDDEN")
+        "QA chỉ có programIds thì scope KHÔNG rỗng -> Không được rơi vào system-wide read -> Bị 403 FORBIDDEN")
     void viewerWithProgramOnlyScope_DoesNotFallIntoSystemWideRead_Returns403() throws Exception {
       UserScope progScope = UserScope.builder().programIds(List.of(PROGRAM_1_ID)).build();
-      String token = createUserAndGetToken("challenge_viewer_prog_only", Role.VIEWER, progScope);
+      String token = createUserAndGetToken("challenge_viewer_prog_only", Role.QA, progScope);
 
       // READ bị 403 (chứng minh không rơi vào nhánh scope rỗng đọc toàn hệ thống!)
       mockMvc
@@ -512,40 +514,86 @@ class ScopeAuthorizationEmpiricalChallengeTest {
 
     @Test
     @DisplayName(
-        "QA_OFFICER có ID trong lecturerIds của lớp nhưng scope rỗng -> WRITE bị 403, READ bị 403 (không được thừa hưởng quyền LECTURER)")
-    void qaOfficerInLecturerIds_WithoutLecturerRole_MustNotGetAccess() throws Exception {
-      // Tạo user QA_OFFICER có ID trùng với targetLecturerUser (được liệt kê trong lecturerIds của
-      // SECTION_1)
-      // Thay vì tạo mới, ta đổi role của targetLecturerUser sang QA_OFFICER với scope rỗng
-      User qaUser =
+        "PROGRAM_MANAGER thuộc CTĐT khác có ID trong lecturerIds của lớp -> WRITE bị 403, READ bị 403 (không được thừa hưởng quyền LECTURER)")
+    void programManagerInLecturerIds_WithoutLecturerRole_MustNotGetAccess() throws Exception {
+      User pmUser =
           userRepository.save(
               User.builder()
-                  .username("challenge_qa_in_lecturer_ids")
-                  .email("challenge_qa_in_lecturer_ids@hcmute.edu.vn")
+                  .username("challenge_pm_in_lecturer_ids")
+                  .email("challenge_pm_in_lecturer_ids@hcmute.edu.vn")
                   .passwordHash(passwordEncoder.encode(COMMON_PASSWORD))
-                  .fullName("[DỮ LIỆU THỬ NGHIỆM] QA Officer in lecturerIds")
+                  .fullName("[DỮ LIỆU THỬ NGHIỆM] PM in lecturerIds")
                   .status(UserStatus.ACTIVE)
                   .tokenVersion(0L)
                   .roleAssignments(
                       List.of(
                           RoleAssignment.builder()
-                              .role(Role.QA_OFFICER)
-                              .scope(new UserScope())
+                              .role(Role.PROGRAM_MANAGER)
+                              .scope(
+                                  UserScope.builder()
+                                      .programIds(List.of("671dcba5f123456789abc999"))
+                                      .build())
                               .build()))
                   .createdAt(Instant.now())
                   .updatedAt(Instant.now())
                   .build());
 
-      // Thêm QA user vào lecturerIds của SECTION_1
+      // Thêm PM user vào lecturerIds của SECTION_1
+      CourseSection sec1 = courseSectionRepository.findById(SECTION_1_ID).orElseThrow();
+      List<String> updatedLecturerIds = new ArrayList<>(sec1.getLecturerIds());
+      updatedLecturerIds.add(pmUser.getId());
+      sec1.setLecturerIds(updatedLecturerIds);
+      courseSectionRepository.save(sec1);
+
+      String pmToken = loginAndGetToken("challenge_pm_in_lecturer_ids", COMMON_PASSWORD);
+
+      // WRITE: 403 FORBIDDEN
+      mockMvc
+          .perform(
+              post("/api/v1/test/sections/" + SECTION_1_ID + "/grades")
+                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + pmToken))
+          .andExpect(status().isForbidden())
+          .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+
+      // READ: 403 FORBIDDEN (PM CTĐT khác -> không khớp scope, không được kế thừa lecturerIds)
+      mockMvc
+          .perform(
+              get("/api/v1/test/sections/" + SECTION_1_ID)
+                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + pmToken))
+          .andExpect(status().isForbidden())
+          .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+    }
+
+    @Test
+    @DisplayName("QA có scope lớp khác nhưng có ID trong lecturerIds -> WRITE bị 403, READ bị 403")
+    void qaWithDifferentScopeInLecturerIds_MustNotGetAccess() throws Exception {
+      User qaUser =
+          userRepository.save(
+              User.builder()
+                  .username("challenge_qa_diff_scope_in_lecturer_ids")
+                  .email("challenge_qa_diff_scope_in_lecturer_ids@hcmute.edu.vn")
+                  .passwordHash(passwordEncoder.encode(COMMON_PASSWORD))
+                  .fullName("[DỮ LIỆU THỬ NGHIỆM] QA scoped in lecturerIds")
+                  .status(UserStatus.ACTIVE)
+                  .tokenVersion(0L)
+                  .roleAssignments(
+                      List.of(
+                          RoleAssignment.builder()
+                              .role(Role.QA)
+                              .scope(UserScope.builder().sectionIds(List.of(SECTION_2_ID)).build())
+                              .build()))
+                  .createdAt(Instant.now())
+                  .updatedAt(Instant.now())
+                  .build());
+
       CourseSection sec1 = courseSectionRepository.findById(SECTION_1_ID).orElseThrow();
       List<String> updatedLecturerIds = new ArrayList<>(sec1.getLecturerIds());
       updatedLecturerIds.add(qaUser.getId());
       sec1.setLecturerIds(updatedLecturerIds);
       courseSectionRepository.save(sec1);
 
-      String qaToken = loginAndGetToken("challenge_qa_in_lecturer_ids", COMMON_PASSWORD);
+      String qaToken = loginAndGetToken("challenge_qa_diff_scope_in_lecturer_ids", COMMON_PASSWORD);
 
-      // WRITE: 403 FORBIDDEN
       mockMvc
           .perform(
               post("/api/v1/test/sections/" + SECTION_1_ID + "/grades")
@@ -553,84 +601,41 @@ class ScopeAuthorizationEmpiricalChallengeTest {
           .andExpect(status().isForbidden())
           .andExpect(jsonPath("$.code").value("FORBIDDEN"));
 
-      // READ: 403 FORBIDDEN (QA_OFFICER có scope rỗng -> fail closed; không được kế thừa
-      // lecturerIds)
       mockMvc
           .perform(
               get("/api/v1/test/sections/" + SECTION_1_ID)
                   .header(HttpHeaders.AUTHORIZATION, "Bearer " + qaToken))
-          .andExpect(status().isForbidden())
-          .andExpect(jsonPath("$.code").value("FORBIDDEN"));
-    }
-
-    @Test
-    @DisplayName("STUDENT có ID trong lecturerIds của lớp -> WRITE bị 403, READ bị 403")
-    void studentInLecturerIds_MustNotGetAccess() throws Exception {
-      User studentUser =
-          userRepository.save(
-              User.builder()
-                  .username("challenge_student_in_lecturer_ids")
-                  .email("challenge_student_in_lecturer_ids@hcmute.edu.vn")
-                  .passwordHash(passwordEncoder.encode(COMMON_PASSWORD))
-                  .fullName("[DỮ LIỆU THỬ NGHIỆM] Student in lecturerIds")
-                  .status(UserStatus.ACTIVE)
-                  .tokenVersion(0L)
-                  .roleAssignments(
-                      List.of(RoleAssignment.builder().role(Role.STUDENT).scope(null).build()))
-                  .createdAt(Instant.now())
-                  .updatedAt(Instant.now())
-                  .build());
-
-      CourseSection sec1 = courseSectionRepository.findById(SECTION_1_ID).orElseThrow();
-      List<String> updatedLecturerIds = new ArrayList<>(sec1.getLecturerIds());
-      updatedLecturerIds.add(studentUser.getId());
-      sec1.setLecturerIds(updatedLecturerIds);
-      courseSectionRepository.save(sec1);
-
-      String studentToken = loginAndGetToken("challenge_student_in_lecturer_ids", COMMON_PASSWORD);
-
-      mockMvc
-          .perform(
-              post("/api/v1/test/sections/" + SECTION_1_ID + "/grades")
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + studentToken))
-          .andExpect(status().isForbidden())
-          .andExpect(jsonPath("$.code").value("FORBIDDEN"));
-
-      mockMvc
-          .perform(
-              get("/api/v1/test/sections/" + SECTION_1_ID)
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + studentToken))
           .andExpect(status().isForbidden())
           .andExpect(jsonPath("$.code").value("FORBIDDEN"));
     }
   }
 
   // =========================================================================
-  // 9. MULTI-ROLE UNION TESTS: VIEWER + LECTURER (SCENARIO 9)
+  // 9. MULTI-ROLE UNION TESTS: QA + LECTURER (SCENARIO 9)
   // =========================================================================
 
   @Nested
-  @DisplayName("Challenge 9: Multi-Role Union Tests (VIEWER + LECTURER)")
+  @DisplayName("Challenge 9: Multi-Role Union Tests (QA + LECTURER)")
   class MultiRoleUnionTests {
 
     @Test
     @DisplayName(
-        "Người dùng có VIEWER (scope rỗng) VÀ LECTURER (phụ trách SECTION_1): có thể READ bất kỳ đâu, chỉ WRITE được SECTION_1, không WRITE được SECTION_2")
+        "Người dùng có QA (scope rỗng) VÀ LECTURER (phụ trách SECTION_1): có thể READ bất kỳ đâu, chỉ WRITE được SECTION_1, không WRITE được SECTION_2")
     void viewerAndLecturerUnion_PermissionsScopedCorrectly() throws Exception {
       // Tạo user có 2 vai trò:
-      // 1. VIEWER: scope null (đọc toàn hệ thống)
+      // 1. QA: scope null (đọc toàn hệ thống)
       // 2. LECTURER: scope chỉ chứa SECTION_1_ID
       userRepository.save(
           User.builder()
               .username("challenge_multi_viewer_lecturer")
               .email("challenge_multi_viewer_lecturer@hcmute.edu.vn")
               .passwordHash(passwordEncoder.encode(COMMON_PASSWORD))
-              .fullName("[DỮ LIỆU THỬ NGHIỆM] Đa vai trò VIEWER + LECTURER")
+              .fullName("[DỮ LIỆU THỬ NGHIỆM] Đa vai trò QA + LECTURER")
               .status(UserStatus.ACTIVE)
               .tokenVersion(0L)
               .roleAssignments(
                   List.of(
-                      RoleAssignment.builder().role(Role.VIEWER).scope(null).build(),
+                      RoleAssignment.builder().role(Role.QA).scope(null).build(),
                       RoleAssignment.builder()
                           .role(Role.LECTURER)
                           .scope(UserScope.builder().sectionIds(List.of(SECTION_1_ID)).build())

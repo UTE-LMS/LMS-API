@@ -95,10 +95,10 @@ Bảng endpoint hiện có (đọc từ `@RequestMapping`/`@…Mapping`/`@PreAut
 | `POST /api/v1/programs`, `PUT /api/v1/programs/{id}` | `ADMIN` (ADR 0005) |
 | `GET /api/v1/program-versions`, `GET /api/v1/program-versions/{id}` | đã đăng nhập |
 | `POST /api/v1/program-versions`, `PUT /api/v1/program-versions/{id}` | `PROGRAM_MANAGER` (+ kiểm tra phạm vi chương trình qua SpEL, ADR 0005) |
-| `PUT /api/v1/program-versions/{id}/verification` | `QA_OFFICER` (+ kiểm tra phạm vi ở service) |
+| `PUT /api/v1/program-versions/{id}/verification` | `QA` (+ kiểm tra phạm vi ở service) |
 | `GET …/{pvId}/plos`, `GET …/{pvId}/plos/{id}` (tương tự `pis`) | đã đăng nhập |
 | `POST …/{pvId}/plos`, `PUT, DELETE …/{pvId}/plos/{id}` (tương tự `pis`) | `PROGRAM_MANAGER` (+ kiểm tra phạm vi chương trình qua SpEL, ADR 0005) |
-| `PUT …/{pvId}/plos/{id}/verification` (tương tự `pis`) | `QA_OFFICER` (+ kiểm tra phạm vi ở service) |
+| `PUT …/{pvId}/plos/{id}/verification` (tương tự `pis`) | `QA` (+ kiểm tra phạm vi ở service) |
 | `GET …/{pvId}/pi-contributions` | đã đăng nhập |
 | `POST …/{pvId}/pi-contributions`, `DELETE …/{pvId}/pi-contributions/{id}` | `PROGRAM_MANAGER` (+ kiểm tra phạm vi chương trình qua SpEL, ADR 0005) |
 | `GET /actuator/health`, `/actuator/health/**`, `/actuator/info` | công khai (`SecurityConfig`); các endpoint actuator khác cần token và không được mở (`management.endpoints.web.exposure.include=health,info`) |
@@ -142,11 +142,11 @@ done
 - `ScopeAuthorizationService.canAccessProgram` được gọi duy nhất từ `ProgramVerificationServiceImpl`;
   `canAccessSection` **không** được lớp production nào gọi (chỉ test gọi qua controller thử nghiệm).
 
-**Mô hình phân quyền F03 (ADR 0010 thay thế ADR 0009):** `ScopeAuthorizationService` cung cấp kiểm soát truy cập phân cấp:
-- Master Catalog `courses`: Chỉ `ADMIN` (Phòng Đào tạo) tạo/sửa/xóa (`hasRole('ADMIN')`). Thu hồi quyền tạo/sửa môn của `PROGRAM_MANAGER`.
-- Đề cương môn học (`syllabi`) & CLO (`clos`): `ScopeAuthorizationService.canAccessCourse(principal, courseId)` kiểm tra tập hợp $O(1)$ trực tiếp: `principal.getScope().getCourseIds().contains(courseId)` với vai trò `DEPARTMENT_HEAD` (Trưởng bộ môn) hoặc `LECTURER` (Giảng viên được phân công). Giảng viên chỉ soạn khi đề cương ở `DRAFT`; Trưởng bộ môn duyệt chuyển trạng thái sang `CONFIRMED`. `PROGRAM_MANAGER` không có quyền can thiệp vào đề cương/CLO (bị chặn 403).
-- Liên kết CLO–PI (`clo_pi_links`): `PROGRAM_MANAGER` thiết lập ma trận liên kết cho CTĐT của ngành mình qua `@scopeAuthorizationService.canAccessProgramVersion(principal, programVersionId)`.
-- Thẩm định CLO–PI: `QA_OFFICER` kiểm tra theo `canAccessProgramVersion` (ADR 0004). Bảng endpoint và sơ đồ lớp sẽ được cập nhật khi mã F03 được tích hợp vào nhánh chứa tài liệu này.
+**Mô hình phân quyền F03 (chuẩn hóa theo ADR 0014 & OBE Schema v0.7):** `ScopeAuthorizationService` cung cấp kiểm soát truy cập chuẩn hóa cho 4 vai trò:
+- Master Catalog `courses`: `ADMIN` quản trị toàn hệ thống (tạo/sửa/xóa).
+- Đề cương môn học (`syllabi`) & CLO (`clos`): `PROGRAM_MANAGER` (hoặc `ADMIN`) có học phần trong scope quản lý biên soạn đề cương và CLO; cán bộ `QA` thực hiện thẩm định (`verification`).
+- Liên kết CLO–PI (`clo_pi_links`): `PROGRAM_MANAGER` thiết lập ma trận liên kết cho CTĐT ngành mình quản lý qua `canAccessProgramVersion`.
+- Thẩm định CLO–PI: Cán bộ `QA` kiểm tra theo `canAccessProgramVersion` (ADR 0004 & ADR 0014).
 
 **Thành phần F05a (lớp học phần, sinh viên, ghi danh; `doc/plan/F05a-hoc-ky-lop-sinh-vien.md` §11):**
 
@@ -162,18 +162,16 @@ Phân quyền thêm vào `ScopeAuthorizationService`: `canManageCourseSections`/
 `scope.programIds`), `canAccessLoadedSection` (như `canAccessSection` nhưng nhận lớp đã nạp để lọc danh sách không truy vấn lặp), `canAccessEnrollment`
 (suy quyền từ lớp của ghi danh). Collection mới: `students` (chỉ `studentRef`, `cohort`, `majorCode`, `status`), `enrollments` (unique `sectionId + studentId`).
 
-**Thành phần F04 (bài đánh giá, `doc/plan/F04-bai-danh-gia.md` §11):**
+**Thành phần F04 (bài đánh giá, `doc/plan/F04-bai-danh-gia.md` — ADR 0013 & ADR 0014):**
 
 | Lớp | Vai trò | Phụ thuộc chính |
 |---|---|---|
-| `AssessmentController` (`/api/v1/syllabi/{id}/assessment-templates`, `/sections/{id}/assessments`, `/assessments/{id}[/items\|/coverage\|/submit\|/approve\|/reject]`) | Khung theo đề cương, bài của lớp, items, độ phủ, quy trình duyệt | `AssessmentService`, `AssessmentApprovalService`; kiểm quyền bằng `ScopeAuthorizationService` |
-| `AssessmentServiceImpl` | Tạo/sửa khung và bản lớp, sao chép khung thành snapshot, khóa sửa khi đã gửi duyệt/duyệt | `AssessmentRepository`, `SyllabusRepository`, `CourseSectionRepository`, `CloRepository`, `AssessmentItemValidator`, `AssessmentCoverageCalculator`, `AssessmentMapper` |
-| `AssessmentItemValidator` | Quy tắc items: Σ weight = 1, CLO không trùng và thuộc đề cương, rubric 1–4 | `CloRepository` (đọc) |
-| `AssessmentCoverageCalculator` | Độ phủ theo CLO và Bloom (lớp thuần, không truy cập CSDL) | không |
-| `AssessmentApprovalServiceImpl` | Gửi duyệt, duyệt, từ chối trong transaction; ghi `audit_logs` | `AssessmentRepository`, `AuditService` |
+| `AssessmentController` (`/api/v1/syllabi/{id}/assessment-templates`, `/sections/{id}/assessments`, `/assessments/{id}[/items\|/coverage\|/lock\|/unlock]`) | Khung bài mẫu theo đề cương, bài đánh giá của lớp, ma trận items, độ phủ, tự khóa/mở khóa | `AssessmentService`; kiểm quyền bằng `ScopeAuthorizationService` |
+| `AssessmentServiceImpl` | Tạo/sửa khung mẫu (PM) và bản lớp (GV), sao chép khung thành snapshot, tự khóa/mở khóa ma trận | `AssessmentRepository`, `SyllabusRepository`, `CourseSectionRepository`, `CloRepository`, `AssessmentItemValidator`, `AssessmentCoverageCalculator`, `AssessmentMapper` |
+| `AssessmentItemValidator` | Quy tắc items: CLO không trùng và thuộc đề cương, `outcomeMappings[].maxScore > 0` | `CloRepository` (đọc) |
+| `AssessmentCoverageCalculator` | Độ phủ theo CLO và Bloom từ `outcomeMappings[].maxScore` (lớp thuần, không truy cập CSDL) | không |
 
-Phân quyền thêm: `canAccessAssessment` (bản lớp theo quyền trên lớp, khung theo quyền trên đề cương) và `canReviewAssessment` (chỉ DEPARTMENT_HEAD có học phần
-của đề cương trong `scope.courseIds`, ADMIN không có). Collection `assessments` có thêm trường `revision` (khóa lạc quan, xem plan F04 §11 D7).
+Phân quyền: `canAccessAssessment` (bản lớp theo quyền giảng viên phụ trách lớp `LECTURER`, khung mẫu theo quyền đề cương của `PROGRAM_MANAGER`/`ADMIN`). Giảng viên phụ trách lớp tự bấm khóa ma trận (`POST /lock`, `DRAFT -> LOCKED`) trước khi nhập điểm.
 
 
 **Thành phần F05b (nhập điểm từ tệp CSV; `doc/plan/F05b-nhap-diem.md` §11, ADR 0013 nháp):**

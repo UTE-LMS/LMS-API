@@ -208,7 +208,7 @@ public class AdminGuardsAndPaginationEmpiricalChallengeTest {
               .roleAssignments(
                   List.of(
                       RoleAssignment.builder().role(Role.ADMIN).build(),
-                      RoleAssignment.builder().role(Role.VIEWER).build()))
+                      RoleAssignment.builder().role(Role.QA).build()))
               .build();
 
       ApiTestSupport.performJson(

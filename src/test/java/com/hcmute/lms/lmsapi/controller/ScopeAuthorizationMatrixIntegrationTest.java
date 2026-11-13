@@ -22,8 +22,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpHeaders;
@@ -122,7 +120,7 @@ class ScopeAuthorizationMatrixIntegrationTest {
             "test_sec_viewer_empty",
             "test_sec_viewer_scoped",
             "test_sec_viewer_prog_only",
-            "test_sec_student",
+            "test_sec_lecturer_diff",
             "test_sec_dynamic_user");
     for (String uname : testUsernames) {
       userRepository.findByUsername(uname).ifPresent(userRepository::delete);
@@ -163,6 +161,22 @@ class ScopeAuthorizationMatrixIntegrationTest {
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.status").value("SUCCESS"));
+    mockMvc
+        .perform(
+            post("/api/v1/test/sections/" + TARGET_SECTION_ID + "/grades")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+  }
+
+  /** Cả READ và WRITE đều bị từ chối (403, FORBIDDEN). */
+  private void expectReadAndWriteForbidden(String token) throws Exception {
+    mockMvc
+        .perform(
+            get("/api/v1/test/sections/" + TARGET_SECTION_ID)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("FORBIDDEN"));
     mockMvc
         .perform(
             post("/api/v1/test/sections/" + TARGET_SECTION_ID + "/grades")
@@ -291,31 +305,14 @@ class ScopeAuthorizationMatrixIntegrationTest {
       String token =
           createUserAndGetToken("test_sec_lecturer_unassigned", Role.LECTURER, new UserScope());
 
-      mockMvc
-          .perform(
-              get("/api/v1/test/sections/" + TARGET_SECTION_ID)
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
-          .andExpect(status().isForbidden())
-          .andExpect(jsonPath("$.code").value("FORBIDDEN"));
-
-      mockMvc
-          .perform(
-              post("/api/v1/test/sections/" + TARGET_SECTION_ID + "/grades")
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
-          .andExpect(status().isForbidden())
-          .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+      expectReadAndWriteForbidden(token);
     }
 
-    @ParameterizedTest(
-        name = "Vai trò quản lý {0}: READ trong phạm vi (200 OK), WRITE bị cấm (403 FORBIDDEN)")
-    @CsvSource({
-      "PROGRAM_MANAGER, test_sec_pm",
-      "DEPARTMENT_HEAD, test_sec_dh",
-      "QA_OFFICER, test_sec_qa"
-    })
-    void managementRoles_ReadOk_WriteForbidden(Role role, String username) throws Exception {
+    @Test
+    @DisplayName("PROGRAM_MANAGER: READ trong phạm vi (200 OK), WRITE bị cấm (403 FORBIDDEN)")
+    void programManager_ReadOk_WriteForbidden() throws Exception {
       UserScope scope = UserScope.builder().courseIds(List.of(TARGET_COURSE_ID)).build();
-      String token = createUserAndGetToken(username, role, scope);
+      String token = createUserAndGetToken("test_sec_pm", Role.PROGRAM_MANAGER, scope);
 
       // READ: Cho phép 200 OK vì courseId khớp scope
       expectReadGrantedWriteForbidden(token);
@@ -325,7 +322,7 @@ class ScopeAuthorizationMatrixIntegrationTest {
     @DisplayName(
         "VIEWER (Scope rỗng nghiêm ngặt): READ toàn hệ thống (200 OK), WRITE bị cấm (403 FORBIDDEN)")
     void viewer_StrictEmptyScope_ReadOk_WriteForbidden() throws Exception {
-      String token = createUserAndGetToken("test_sec_viewer_empty", Role.VIEWER, null);
+      String token = createUserAndGetToken("test_sec_viewer_empty", Role.QA, null);
 
       expectReadGrantedWriteForbidden(token);
     }
@@ -334,7 +331,7 @@ class ScopeAuthorizationMatrixIntegrationTest {
     @DisplayName("VIEWER (Có scope khớp): READ cho phép (200 OK), WRITE bị cấm (403 FORBIDDEN)")
     void viewer_ScopedMatching_ReadOk_WriteForbidden() throws Exception {
       UserScope scope = UserScope.builder().sectionIds(List.of(TARGET_SECTION_ID)).build();
-      String token = createUserAndGetToken("test_sec_viewer_scoped", Role.VIEWER, scope);
+      String token = createUserAndGetToken("test_sec_viewer_scoped", Role.QA, scope);
 
       mockMvc
           .perform(
@@ -354,41 +351,19 @@ class ScopeAuthorizationMatrixIntegrationTest {
         "ĐIỂM BIÊN: VIEWER chỉ có programIds -> Scope KHÔNG rỗng nhưng ko khớp -> READ bị 403, WRITE bị 403")
     void viewer_ProgramOnlyScope_Forbidden() throws Exception {
       UserScope scope = UserScope.builder().programIds(List.of("671dcba5f123456789abc777")).build();
-      String token = createUserAndGetToken("test_sec_viewer_prog_only", Role.VIEWER, scope);
+      String token = createUserAndGetToken("test_sec_viewer_prog_only", Role.QA, scope);
 
-      mockMvc
-          .perform(
-              get("/api/v1/test/sections/" + TARGET_SECTION_ID)
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
-          .andExpect(status().isForbidden())
-          .andExpect(jsonPath("$.code").value("FORBIDDEN"));
-
-      mockMvc
-          .perform(
-              post("/api/v1/test/sections/" + TARGET_SECTION_ID + "/grades")
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
-          .andExpect(status().isForbidden())
-          .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+      expectReadAndWriteForbidden(token);
     }
 
     @Test
-    @DisplayName("STUDENT: Bị từ chối 403 trên cả READ và WRITE (chờ story NEW-03)")
-    void student_ReadAndWrite_Forbidden() throws Exception {
-      String token = createUserAndGetToken("test_sec_student", Role.STUDENT, null);
+    @DisplayName(
+        "LECTURER (Scope khác): Bị từ chối 403 trên cả READ và WRITE khi không được phân công lớp")
+    void lecturerDifferentScope_ReadAndWrite_Forbidden() throws Exception {
+      UserScope scope = UserScope.builder().sectionIds(List.of("671dcba5f123456789abc888")).build();
+      String token = createUserAndGetToken("test_sec_lecturer_diff", Role.LECTURER, scope);
 
-      mockMvc
-          .perform(
-              get("/api/v1/test/sections/" + TARGET_SECTION_ID)
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
-          .andExpect(status().isForbidden())
-          .andExpect(jsonPath("$.code").value("FORBIDDEN"));
-
-      mockMvc
-          .perform(
-              post("/api/v1/test/sections/" + TARGET_SECTION_ID + "/grades")
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
-          .andExpect(status().isForbidden())
-          .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+      expectReadAndWriteForbidden(token);
     }
   }
 
@@ -406,7 +381,8 @@ class ScopeAuthorizationMatrixIntegrationTest {
     void dynamicPermissionReload_ImmediateEffectWithSameToken() throws Exception {
       String dynamicUsername = "test_sec_dynamic_user";
 
-      // Bước 1: Tạo tài khoản với vai trò ban đầu là STUDENT (không có quyền xem lớp)
+      // Bước 1: Tạo tài khoản với vai trò ban đầu là LECTURER phụ trách lớp khác (không có quyền
+      // xem lớp TARGET)
       User user =
           userRepository.save(
               User.builder()
@@ -417,7 +393,14 @@ class ScopeAuthorizationMatrixIntegrationTest {
                   .status(UserStatus.ACTIVE)
                   .tokenVersion(0L)
                   .roleAssignments(
-                      List.of(RoleAssignment.builder().role(Role.STUDENT).scope(null).build()))
+                      List.of(
+                          RoleAssignment.builder()
+                              .role(Role.LECTURER)
+                              .scope(
+                                  UserScope.builder()
+                                      .sectionIds(List.of("671dcba5f123456789abc888"))
+                                      .build())
+                              .build()))
                   .createdAt(Instant.now())
                   .updatedAt(Instant.now())
                   .build());
@@ -425,7 +408,7 @@ class ScopeAuthorizationMatrixIntegrationTest {
       // Đăng nhập một lần duy nhất để lấy Access Token
       String token = loginAndGetToken(dynamicUsername, COMMON_PASSWORD);
 
-      // Giai đoạn 1: Với vai trò STUDENT, cả READ và WRITE đều bị từ chối 403
+      // Giai đoạn 1: Với vai trò LECTURER lớp khác, cả READ và WRITE đều bị từ chối 403
       mockMvc
           .perform(
               get("/api/v1/test/sections/" + TARGET_SECTION_ID)
@@ -456,8 +439,7 @@ class ScopeAuthorizationMatrixIntegrationTest {
       expectReadAndWriteGranted(token);
 
       // Bước 3: Quản trị viên hạ quyền người dùng xuống VIEWER (scope rỗng)
-      user.setRoleAssignments(
-          List.of(RoleAssignment.builder().role(Role.VIEWER).scope(null).build()));
+      user.setRoleAssignments(List.of(RoleAssignment.builder().role(Role.QA).scope(null).build()));
       user.setUpdatedAt(Instant.now());
       userRepository.save(user);
 

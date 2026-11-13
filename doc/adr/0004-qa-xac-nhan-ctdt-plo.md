@@ -1,6 +1,6 @@
-# ADR 0004 — QA_OFFICER xác nhận nội dung CTĐT, PLO, PI
+# ADR 0004 — QA xác nhận nội dung CTĐT, PLO, PI
 
-- **Trạng thái:** ĐỀ XUẤT, **chờ Khoa/GVHD xác nhận (Q08)**. Chưa phải quyết định chính thức.
+- **Trạng thái:** ĐÃ CẬP NHẬT theo **ADR 0014** (v0.7 chuẩn hóa tên vai trò từ `QA_OFFICER` thành `QA`). *(Lịch sử: ĐỀ XUẤT ngày 2026-10-28)*.
 - **Ngày:** 2026-10-28
 - **Người soạn:** Claude Code theo yêu cầu của sinh viên TinMH; sinh viên rà soát và ghi tên người chốt: [ĐIỀN]
 

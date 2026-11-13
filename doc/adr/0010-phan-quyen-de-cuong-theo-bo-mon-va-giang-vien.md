@@ -1,6 +1,6 @@
 # ADR 0010 — Phân quyền quản lý danh mục học phần, biên soạn và phê duyệt đề cương theo Bộ môn và Giảng viên
 
-- **Trạng thái:** ĐÃ CẬP NHẬT bởi **[ADR 0013](file:///D:/Code/Project/LMS-API/doc/adr/0013-import-ctdt-de-cuong-va-nhap-diem-clo-truc-tiep.md)** ngày 2026-11-10 (Bổ sung luồng R1: một vai trò Quản lý học thuật `PROGRAM_MANAGER` / `ADMIN` được quyền Import đồng bộ Bản mô tả CTĐT và Đề cương chi tiết học phần đã ban hành). *(Trước đó: thay thế ADR 0009).*
+- **Trạng thái:** **ĐÃ BỊ THAY THẾ BỞI ADR 0014 (v0.7)** ngày 2026-11-13. Toàn bộ hệ thống được tinh gọn xuống **4 vai trò cốt lõi**: `ADMIN`, `PROGRAM_MANAGER`, `LECTURER`, `QA`. Vai trò `DEPARTMENT_HEAD` đã bị bãi bỏ hoàn toàn; quyền quản lý CTĐT, học phần, đề cương và bài mẫu chuyển giao tập trung cho `PROGRAM_MANAGER` (hoặc `ADMIN`), giảng viên phụ trách lớp `LECTURER` thiết lập ma trận bài lớp và tự bấm khóa `POST /lock`, cán bộ `QA` thẩm định chất lượng và xem báo cáo. *(Lịch sử cũ: cập nhật bởi ADR 0013 ngày 2026-11-10; thay thế ADR 0009 ngày 2026-11-05).*
 - **Ngày:** 2026-11-05 (cập nhật 2026-11-06)
 - **Người soạn:** Antigravity theo yêu cầu của sinh viên TinMH (IT); sinh viên rà soát và chốt: [ĐIỀN]
 - **Thay thế:** ADR 0009 (`0009-phan-quyen-pham-vi-de-cuong-clo.md`)

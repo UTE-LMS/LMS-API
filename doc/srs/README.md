@@ -41,7 +41,7 @@ Liên quan: [`doc/plan/README.md`](../plan/README.md) (ưu tiên C/MR/K, nguồn
 | US-05 | Chương trình + phiên bản | C | US-05/AC-1…AC-4 | **Có API:** `/programs` (GET, POST/PUT: `ADMIN` per ADR 0005), `/program-versions` (GET, POST/PUT: `PROGRAM_MANAGER` trong scope per ADR 0005) |
 | US-06 | 7 PLO / 17 PI theo mã | C | US-06/AC-1…AC-5 | **Có API:** `/program-versions/{pvId}/plos` và `/pis` (GET, POST, PUT, DELETE). Dữ liệu 7 PLO/17 PI đến từ seed của `database_import.js`, không phải từ API |
 | US-07 | Ma trận học phần đóng góp PI | C | US-07/AC-1…AC-4 | **Có API:** `/program-versions/{pvId}/pi-contributions` (GET, POST, DELETE; không có PUT). Kiểm "học phần thuộc phiên bản" chưa làm (chờ `program_courses`, F03) |
-| US-08 | Xác nhận nội dung | MR | US-08/AC-1…AC-3 | **Có API:** `PUT …/verification` cho phiên bản, PLO, PI (chỉ `QA_OFFICER`, đề xuất chờ Q08) |
+| US-08 | Thẩm định nội dung | MR | US-08/AC-1…AC-3 | **Có API:** `PUT …/verification` cho phiên bản, PLO, PI (chỉ cán bộ `QA` theo ADR 0004 & ADR 0014) |
 
 ## 3. Mục lục theo feature (chưa có mã)
 

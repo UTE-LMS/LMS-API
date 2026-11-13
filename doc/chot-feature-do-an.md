@@ -52,7 +52,7 @@ Cột "Đề xuất" phân biệt story gốc (giữ nguyên ưu tiên) với th
 | ID | Story | Quyết định | Ghi chú |
 |---|---|---|---|
 | US-01 | Đăng nhập / đăng xuất | **C** | |
-| US-02 | Tạo người dùng, gán vai trò và phạm vi | **C** | 6 vai trò dùng trong cam kết: ADMIN, PROGRAM_MANAGER, DEPARTMENT_HEAD, QA_OFFICER, LECTURER, VIEWER |
+| US-02 | Tạo người dùng, gán vai trò và phạm vi | **C** | 4 vai trò chuẩn hóa hệ thống (ADR 0014): ADMIN, PROGRAM_MANAGER, LECTURER, QA |
 | US-03 | Backend kiểm tra quyền theo phạm vi mọi API | **C** | Giảng viên chỉ thấy và nhập điểm lớp mình; trái phạm vi trả 403 |
 | US-04 | Màn hình xem nhật ký thao tác | MR | **Việc ghi `audit_logs` vẫn thuộc cam kết**, nằm trong AC của US-24, US-26, US-27, NEW-01 (sửa điểm, xác nhận nhập, chạy tính, xác nhận quy tắc, duyệt đề, đăng nhập) |
 
@@ -63,7 +63,7 @@ Cột "Đề xuất" phân biệt story gốc (giữ nguyên ưu tiên) với th
 | US-05 | Chương trình và phiên bản CTĐT (hỗ trợ Import CTĐT — Phương án R1, ADR 0013) | **C** | `(programId, version)` duy nhất; có `totalCredits`, `durationYears`; `PROGRAM_MANAGER` nạp từ file CTĐT |
 | US-06 | 7 PLO, 17 PI theo mã | **C** | Nhận diện bằng mã; `category`, `displayOrder`; không tự điền nguyên văn |
 | US-07 | Ma trận học phần đóng góp PI (I/R/M) | **C** | I/R/M chỉ là thiết kế sư phạm, không là trọng số |
-| US-08 | Quy trình xác nhận nội dung | MR | Trạng thái `verification` vẫn có trong dữ liệu; chỉ làm màn hình luồng xác nhận nếu còn thời gian. Người xác nhận CTĐT, PLO, PI: `QA_OFFICER` |
+| US-08 | Quy trình xác nhận nội dung | MR | Trạng thái `verification` vẫn có trong dữ liệu; chỉ làm màn hình luồng xác nhận nếu còn thời gian. Người thẩm định CTĐT, PLO, PI: `QA` |
 
 ### E03 Học phần, CLO (F03)
 
@@ -179,21 +179,19 @@ Thứ tự ưu tiên làm: nền tảng và staging (T5–T7) → US-01–03 →
 
 ---
 
-## 6. Phân quyền theo vai trò (đề xuất, chờ Q08)
+## 6. Phân quyền theo vai trò (Chuẩn hóa 4 vai trò — ADR 0014)
 
-Vai trò là bên *chủ trì* thao tác; backend kiểm tra theo `roleAssignments[].scope`. Bảng này chưa được Khoa duyệt;
-điểm cần Khoa chốt là ai được xác nhận quy tắc đo (`RULE_CONFIRM`).
+Vai trò là bên *chủ trì* thao tác; backend kiểm tra theo `roleAssignments[].scope`. 4 vai trò chuẩn hóa hệ thống:
 
-| Thao tác | ADMIN | PROGRAM_MANAGER | DEPARTMENT_HEAD | QA_OFFICER | LECTURER | VIEWER |
-|---|---|---|---|---|---|---|
-| Quản lý người dùng | ✔ | | | | | |
-| Import CTĐT & Đề cương học phần (Phương án R1, ADR 0013); quản lý PLO/PI, ma trận I/R/M, đề cương, CLO, liên kết CLO–PI | ✔ | ✔ | | | | |
-| Xác nhận nội dung phiên bản CTĐT, PLO, PI (`verification`, US-08; ADR 0004) | | | | ✔ | | |
-| Lập bài đánh giá lớp, thiết lập ma trận câu hỏi – CLO và **tự khóa ma trận** (`DRAFT → LOCKED`, ADR 0013) | | | | | ✔ (lớp mình) | |
-| Nhập điểm trực tiếp từng CLO của từng câu hỏi, xác nhận lô | | | | | ✔ (lớp mình) | |
-| Xác nhận quy tắc đo | | ? | | ✔ | | |
-| Chạy đo lường, xem báo cáo | | ✔ | ✔ | ✔ | ✔ (lớp mình) | đọc |
-| Tạo / theo dõi hành động cải tiến | | ✔ | ✔ | ✔ | | |
+| Thao tác | ADMIN | PROGRAM_MANAGER | LECTURER | QA |
+|---|---|---|---|---|
+| Quản lý người dùng | ✔ | | | |
+| Import CTĐT & Đề cương học phần (Phương án R1, ADR 0013 / ADR 0014); quản lý PLO/PI, ma trận I/R/M, đề cương, CLO, liên kết CLO–PI | ✔ | ✔ | | |
+| Thẩm định chất lượng phiên bản CTĐT, PLO, PI, Đề cương (`verification`, US-08; ADR 0004 & ADR 0014) | | | | ✔ |
+| Lập bài đánh giá lớp, thiết lập ma trận câu hỏi – CLO và **tự khóa ma trận** (`DRAFT → LOCKED`, ADR 0013 / ADR 0014) | | | ✔ (lớp mình) | |
+| Nhập điểm trực tiếp từng CLO của từng câu hỏi, xác nhận lô (vắng/trống = 0.0) | | | ✔ (lớp mình) | |
+| Chạy đo lường 4 cấp (`ASSESSMENT_CLO -> CLO -> PI -> PLO`), xem báo cáo | ✔ | ✔ | ✔ (lớp mình) | ✔ (toàn hệ thống) |
+| Tạo / theo dõi hành động cải tiến | ✔ | ✔ | | ✔ |
 
 ---
 
@@ -201,8 +199,8 @@ Vai trò là bên *chủ trì* thao tác; backend kiểm tra theo `roleAssignmen
 
 Tóm tắt từ `GiaiThich_CoSoDuLieu.md` mục 2 và ADR 0013; vi phạm là lỗi nghiệp vụ.
 
-1. Không hardcode công thức, trọng số, ngưỡng, mẫu số; đọc từ `measurement_rules`.
-2. Thiếu dữ liệu không mặc định bằng 0: chỉ `BLANK` tính 0; `ABSENT`, `NOT_GRADED`, `EXEMPT`, `MISSING` có `rawScore = null`.
+1. Không hardcode công thức: toàn bộ ngưỡng đạt và trọng số gắn trực tiếp trên `plos`, `pis`, `clos`, `clo_pi_links`, `assessments.cloWeights` (đã xóa collection `measurement_rules`).
+2. Sinh viên vắng thi hoặc bỏ trống câu hỏi lưu trực tiếp `rawScore = 0.0`. Mẫu số lớp học phần $N_{\text{section}}$ là toàn bộ sinh viên có ghi danh `status = ENROLLED`. Đo lường 4 cấp độ: `ASSESSMENT_CLO -> CLO -> PI -> PLO` (bỏ `COURSE`).
 3. Bloom ≠ điểm; I/R/M ≠ trọng số; `capabilityLevelRaw` lưu nguyên, không diễn giải. Hệ thống chỉ đo chuẩn đầu ra (`CLO`, `PI`, `PLO`), không tính điểm bài kiểm tra hay điểm học phần (`COURSE`).
 4. Tỷ lệ đạt luôn kèm mẫu số: ghi danh, đủ dữ liệu, đạt, chưa đạt, chưa đủ dữ liệu.
 5. Một câu hỏi có thể đánh giá 1 hoặc nhiều CLO; mỗi CLO trong câu hỏi có `maxScore` riêng và được giảng viên nhập `rawScore` trực tiếp riêng (không chia điểm theo trọng số `weight`). Mức đạt CLO tính theo Phương án B1 (`POINTS_RATIO`) cho cả từng bài đánh giá và toàn học phần.

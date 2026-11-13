@@ -425,15 +425,14 @@ class ImportBatchUploadIntegrationTest extends ScoreImportIntegrationBase {
   void authorizationOnUpload() throws Exception {
     UserScope inSection =
         UserScope.builder().sectionIds(new java.util.ArrayList<>(List.of(section.getId()))).build();
-    String qa = fixtures.bearerFor(Role.QA_OFFICER, inSection);
+    String qa = fixtures.bearerFor(Role.QA, inSection);
     String pm = fixtures.bearerFor(Role.PROGRAM_MANAGER, inSection);
-    String head = fixtures.bearerFor(Role.DEPARTMENT_HEAD, inSection);
 
     mockMvc
         .perform(upload(otherLecturerToken, goodCsv(), "BLANK", defaultMapping()))
         .andExpect(status().isForbidden());
     // Plan F05b §6: chỉ LECTURER (lớp mình) nhập điểm; ADMIN và các vai trò đọc không có quyền này.
-    for (String token : new String[] {adminToken, qa, pm, head}) {
+    for (String token : new String[] {adminToken, qa, pm}) {
       mockMvc
           .perform(upload(token, goodCsv(), "BLANK", defaultMapping()))
           .andExpect(status().isForbidden());
@@ -443,5 +442,44 @@ class ImportBatchUploadIntegrationTest extends ScoreImportIntegrationBase {
         .andExpect(status().isUnauthorized());
 
     assertThat(countBatches()).isZero();
+  }
+
+  @Test
+  @DisplayName(
+      "US-21 (Phase 3): tự động nhận diện cột điểm và sinh viên từ header tệp mẫu khi không gửi columnMapping")
+  void us21_autoDetectMappingFromTemplateCsvHeaders() throws Exception {
+    String csv =
+        "MaSV,HoTen,Q1 - CLO1 (Max: 4.0),Q2 - CLO1 (Max: 6.0)\n"
+            + s1.getStudentRef()
+            + ",Nguyen Van A,3.5,5.5\n";
+
+    MvcResult uploadRes =
+        mockMvc
+            .perform(upload(lecturerToken, csv, "BLANK", null))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.status").value("UPLOADED"))
+            .andExpect(jsonPath("$.columnMapping.studentColumn").value("MaSV"))
+            .andExpect(jsonPath("$.columnMapping.items", hasSize(2)))
+            .andExpect(jsonPath("$.columnMapping.items[0].column").value("Q1 - CLO1 (Max: 4.0)"))
+            .andExpect(jsonPath("$.columnMapping.items[0].item").value(itemId(0)))
+            .andExpect(jsonPath("$.columnMapping.items[1].column").value("Q2 - CLO1 (Max: 6.0)"))
+            .andExpect(jsonPath("$.columnMapping.items[1].item").value(itemId(1)))
+            .andReturn();
+
+    String batchId = read(uploadRes, "$.id");
+
+    // Validate thành công
+    mockMvc
+        .perform(postAction(lecturerToken, batchId, "validate"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("VALIDATED"))
+        .andExpect(jsonPath("$.stats.errorRows").value(0))
+        .andExpect(jsonPath("$.stats.scoreCount").value(2));
+
+    // Confirm thành công
+    mockMvc
+        .perform(postAction(lecturerToken, batchId, "confirm"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("CONFIRMED"));
   }
 }

@@ -76,7 +76,13 @@ users, audit_logs: dùng chung cho toàn hệ thống
 ## Nhóm A — Người dùng
 
 ### 3.1 `users` — người dùng và phân quyền
-- Các trường: `username`, `email`, `passwordHash`, `fullName`, `status` (`ACTIVE` / `LOCKED`), `tokenVersion`, `roleAssignments[]` (`role` $\in$ `ADMIN | PROGRAM_MANAGER | DEPARTMENT_HEAD | QA_OFFICER | LECTURER | STUDENT | VIEWER`, `scope = { programIds[], courseIds[], sectionIds[] }`).
+- Các trường: `username`, `email`, `passwordHash`, `fullName`, `status` (`ACTIVE` / `LOCKED`), `tokenVersion`, `roleAssignments[]` (`role` $\in$ `ADMIN | PROGRAM_MANAGER | LECTURER | QA`, `scope = { programIds[], courseIds[], sectionIds[] }`).
+- 4 vai trò chuẩn hóa hệ thống (theo ADR 0014 & OBE Schema v0.7):
+  - `ADMIN`: Quản trị toàn hệ thống (phạm vi toàn cục `GLOBAL`).
+  - `PROGRAM_MANAGER`: Quản lý chương trình đào tạo, học thuật, phân công học phần, quản lý đề cương & bài đánh giá mẫu.
+  - `LECTURER`: Giảng viên phụ trách lớp học phần (`SECTION`), thiết lập ma trận câu hỏi – CLO, tự khóa ma trận (`POST /lock`), tải CSV và nhập điểm.
+  - `QA`: Cán bộ Đảm bảo chất lượng & Khảo thí, xem báo cáo đo lường chất lượng, thẩm định CTĐT (thay thế hoàn toàn `VIEWER` và `QA_OFFICER`).
+  *(Lưu ý: Không còn vai trò `DEPARTMENT_HEAD` do đã bỏ luồng duyệt ma trận; `STUDENT` là thực thể dữ liệu học vụ trong `students`/`enrollments` để tính mẫu số, không đăng nhập hệ thống)*.
 - Chỉ mục: `username` (unique), `email` (unique).
 
 ## Nhóm B — Chương trình đào tạo

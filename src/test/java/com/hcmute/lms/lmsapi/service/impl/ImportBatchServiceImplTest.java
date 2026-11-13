@@ -62,6 +62,7 @@ class ImportBatchServiceImplTest {
   @Mock private ImportBatchRepository batchRepository;
   @Mock private ImportRowErrorRepository rowErrorRepository;
   @Mock private ScoreRepository scoreRepository;
+  @Mock private AssessmentItemValidator assessmentItemValidator;
   @Mock private ImportFileStorage fileStorage;
   @Mock private ScoreRowValidator rowValidator;
   @Mock private ImportBatchMapper batchMapper;
@@ -87,6 +88,7 @@ class ImportBatchServiceImplTest {
             batchRepository,
             rowErrorRepository,
             scoreRepository,
+            assessmentItemValidator,
             fileStorage,
             rowValidator,
             batchMapper,

@@ -147,7 +147,7 @@ class UserServiceImplTest {
               .email("user@hcmute.edu.vn")
               .password("Password123!")
               .fullName("User")
-              .roleAssignments(List.of(RoleAssignment.builder().role(Role.STUDENT).build()))
+              .roleAssignments(List.of(RoleAssignment.builder().role(Role.QA).build()))
               .build();
 
       when(userRepository.existsByUsername("existing_user")).thenReturn(true);
@@ -169,7 +169,7 @@ class UserServiceImplTest {
               .email("existing@hcmute.edu.vn")
               .password("Password123!")
               .fullName("User")
-              .roleAssignments(List.of(RoleAssignment.builder().role(Role.STUDENT).build()))
+              .roleAssignments(List.of(RoleAssignment.builder().role(Role.QA).build()))
               .build();
 
       when(userRepository.existsByUsername("new_user")).thenReturn(false);

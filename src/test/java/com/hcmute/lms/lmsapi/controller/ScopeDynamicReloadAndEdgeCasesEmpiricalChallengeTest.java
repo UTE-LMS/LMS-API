@@ -296,10 +296,10 @@ public class ScopeDynamicReloadAndEdgeCasesEmpiricalChallengeTest {
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.status").value("SUCCESS"));
 
-      // Bước 2: Hạ quyền user từ ADMIN xuống VIEWER với scope rỗng (null) trong CSDL
+      // Bước 2: Hạ quyền user từ ADMIN xuống QA với scope rỗng (null) trong CSDL
       User userInDb = userRepository.findById(admin.getId()).orElseThrow();
       userInDb.setRoleAssignments(
-          List.of(RoleAssignment.builder().role(Role.VIEWER).scope(null).build()));
+          List.of(RoleAssignment.builder().role(Role.QA).scope(null).build()));
       userInDb.setUpdatedAt(Instant.now());
       userRepository.save(userInDb);
 
@@ -310,7 +310,7 @@ public class ScopeDynamicReloadAndEdgeCasesEmpiricalChallengeTest {
           post("/api/v1/test/sections/" + SECTION_A_ID + "/grades")
               .header(HttpHeaders.AUTHORIZATION, "Bearer " + token));
 
-      // - READ tiếp tục thành công với HTTP 200 OK theo quy tắc VIEWER scope rỗng (đọc toàn hệ
+      // - READ tiếp tục thành công với HTTP 200 OK theo quy tắc QA scope rỗng (đọc toàn hệ
       // thống)
       mockMvc
           .perform(
@@ -323,18 +323,18 @@ public class ScopeDynamicReloadAndEdgeCasesEmpiricalChallengeTest {
 
     @Test
     @DisplayName(
-        "ADMIN demoted to VIEWER with specific scope: Read inside scope 200 OK, Read outside scope 403, Write everywhere 403")
+        "ADMIN demoted to QA with specific scope: Read inside scope 200 OK, Read outside scope 403, Write everywhere 403")
     void demotingAdminToViewer_Scoped_ReadScopedOnly_WriteForbidden() throws Exception {
       // Bước 1: Khởi tạo tài khoản ADMIN
       User admin = createTestUser("admin_to_scoped_viewer", Role.ADMIN, null);
       String token = obtainAccessToken(admin.getUsername(), RAW_PASSWORD);
 
-      // Bước 2: Hạ quyền user từ ADMIN xuống VIEWER chỉ có Section B trong scope
+      // Bước 2: Hạ quyền user từ ADMIN xuống QA chỉ có Section B trong scope
       User userInDb = userRepository.findById(admin.getId()).orElseThrow();
       userInDb.setRoleAssignments(
           List.of(
               RoleAssignment.builder()
-                  .role(Role.VIEWER)
+                  .role(Role.QA)
                   .scope(UserScope.builder().sectionIds(List.of(SECTION_B_ID)).build())
                   .build()));
       userInDb.setUpdatedAt(Instant.now());

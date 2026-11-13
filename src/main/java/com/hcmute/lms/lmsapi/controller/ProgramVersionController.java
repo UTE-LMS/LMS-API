@@ -108,7 +108,7 @@ public class ProgramVersionController {
   }
 
   @PutMapping("/{id}/verification")
-  @PreAuthorize("hasRole('QA_OFFICER')")
+  @PreAuthorize("hasRole('QA')")
   public ResponseEntity<ProgramVersionResponse> verifyProgramVersion(
       @PathVariable("id")
           @Pattern(

@@ -31,10 +31,7 @@
 theo chuỗi *câu hỏi/tiêu chí → CLO → PI → PLO → báo cáo → hành động cải tiến*; có phiên bản; truy vết được về dữ
 liệu gốc; luôn báo rõ phạm vi, mẫu số và số sinh viên chưa đủ dữ liệu.
 
-**Người dùng mục tiêu** (vai trò hệ thống): quản trị (ADMIN), người phụ trách CTĐT (PROGRAM_MANAGER), trưởng bộ
-môn (DEPARTMENT_HEAD, duyệt ma trận đề thi, **[CHỜ GVHD, Q11]**), cán bộ đảm bảo chất lượng (QA_OFFICER), giảng viên
-(LECTURER), người xem (VIEWER). CSDL còn vai trò `STUDENT` (sinh viên xem kết quả của mình), chỉ là mục tiêu mở rộng
-(NEW-03). Chân dung chi tiết: [ĐIỀN sau khảo sát, xem TC1].
+**Người dùng mục tiêu** (4 vai trò chuẩn hóa theo ADR 0014 & OBE Schema v0.7): Quản trị viên toàn hệ thống (`ADMIN`), Người phụ trách CTĐT & học thuật (`PROGRAM_MANAGER`), Giảng viên phụ trách lớp học phần (`LECTURER`), Cán bộ Đảm bảo chất lượng & Khảo thí (`QA`, hợp nhất `VIEWER` và `QA_OFFICER`). Sinh viên (`STUDENT`) là thực thể dữ liệu học vụ trong `students`/`enrollments` để tính mẫu số $N_{\text{section}}$, không đăng nhập. Chân dung chi tiết: [ĐIỀN sau khảo sát, xem TC1].
 
 ## 3. Phạm vi
 

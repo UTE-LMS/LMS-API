@@ -346,14 +346,14 @@ public class ScopeAuthorizationServiceImpl implements ScopeAuthorizationService 
       return false;
     }
 
-    // Chỉ duy nhất Trưởng bộ môn (DEPARTMENT_HEAD) có courseId trong scope.courseIds mới được phân
-    // công (ADMIN không có thẩm quyền Bộ môn)
+    // Quản lý CTĐT (PROGRAM_MANAGER) có courseId trong scope.courseIds hoặc ADMIN
     return principal.getRoleAssignments().stream()
         .anyMatch(
             a ->
                 a != null
-                    && a.getRole() == Role.DEPARTMENT_HEAD
-                    && matchesCourseScope(a.getScope(), courseId.trim()));
+                    && (a.getRole() == Role.PROGRAM_MANAGER || a.getRole() == Role.ADMIN)
+                    && (a.getRole() == Role.ADMIN
+                        || matchesCourseScope(a.getScope(), courseId.trim())));
   }
 
   @Override
@@ -411,14 +411,14 @@ public class ScopeAuthorizationServiceImpl implements ScopeAuthorizationService 
     UserScope scope = assignment.getScope();
     return switch (assignment.getRole()) {
       case ADMIN -> true;
-      case DEPARTMENT_HEAD, LECTURER -> matchesCourseScope(scope, courseId);
-      case PROGRAM_MANAGER, QA_OFFICER ->
+      case LECTURER -> matchesCourseScope(scope, courseId);
+      case PROGRAM_MANAGER ->
           accessType == AccessType.READ
-              && (matchesCourseScope(scope, courseId) || isStrictEmptyScope(scope));
-      case VIEWER ->
+              ? (matchesCourseScope(scope, courseId) || isStrictEmptyScope(scope))
+              : matchesCourseScope(scope, courseId);
+      case QA ->
           accessType == AccessType.READ
               && (isStrictEmptyScope(scope) || matchesCourseScope(scope, courseId));
-      case STUDENT -> false;
     };
   }
 
@@ -437,11 +437,12 @@ public class ScopeAuthorizationServiceImpl implements ScopeAuthorizationService 
     UserScope scope = assignment.getScope();
     return switch (assignment.getRole()) {
       case ADMIN -> true;
-      case PROGRAM_MANAGER, QA_OFFICER -> matchesProgramScope(scope, programId);
-      case VIEWER ->
+      case PROGRAM_MANAGER -> matchesProgramScope(scope, programId);
+      case QA ->
           accessType == AccessType.READ
-              && (isStrictEmptyScope(scope) || matchesProgramScope(scope, programId));
-      case DEPARTMENT_HEAD, LECTURER, STUDENT -> false;
+              ? (isStrictEmptyScope(scope) || matchesProgramScope(scope, programId))
+              : matchesProgramScope(scope, programId);
+      case LECTURER -> false;
     };
   }
 
@@ -453,7 +454,7 @@ public class ScopeAuthorizationServiceImpl implements ScopeAuthorizationService 
 
   /**
    * Kiểm tra quyền truy cập của một phân công vai trò cụ thể trên lớp học phần theo ma trận ADR
-   * 0003.
+   * 0003 (tinh gọn 4 vai trò ADR 0014).
    */
   private boolean checkAssignment(
       RoleAssignment assignment,
@@ -483,7 +484,7 @@ public class ScopeAuthorizationServiceImpl implements ScopeAuthorizationService 
             matchesScope(scope, sectionId, courseId) || isAssignedLecturer(section, userId);
 
         // Tất cả các vai trò khác không có quyền WRITE trên tài nguyên lớp học phần
-        case PROGRAM_MANAGER, DEPARTMENT_HEAD, QA_OFFICER, VIEWER, STUDENT -> false;
+        case PROGRAM_MANAGER, QA -> false;
       };
     } else if (accessType == AccessType.READ) {
       return switch (role) {
@@ -495,26 +496,19 @@ public class ScopeAuthorizationServiceImpl implements ScopeAuthorizationService 
         case LECTURER ->
             matchesScope(scope, sectionId, courseId) || isAssignedLecturer(section, userId);
 
-        // PROGRAM_MANAGER, DEPARTMENT_HEAD, QA_OFFICER:
-        // Cho phép đọc khi lớp nằm trong scope.sectionIds hoặc courseId nằm trong scope.courseIds.
-        // Nếu chỉ có programIds thì fail-closed (hạn chế kỹ thuật F01 chờ F02 ánh xạ CTĐT -> Lớp).
-        case PROGRAM_MANAGER, DEPARTMENT_HEAD, QA_OFFICER ->
-            matchesScope(scope, sectionId, courseId);
+        // PROGRAM_MANAGER: Cho phép đọc khi lớp nằm trong scope.sectionIds hoặc courseId nằm trong
+        // scope.courseIds.
+        case PROGRAM_MANAGER -> matchesScope(scope, sectionId, courseId);
 
-        // VIEWER:
+        // QA:
         // - Strict empty scope (scope == null hoặc cả 3 mảng rỗng) -> Đọc toàn hệ thống.
         // - Non-empty scope -> Chỉ đọc trong phạm vi sectionIds hoặc courseIds.
-        // - Nếu chỉ có programIds -> Scope không rỗng và không khớp section/course -> Fail-closed
-        // (từ chối 403).
-        case VIEWER -> {
+        case QA -> {
           if (isStrictEmptyScope(scope)) {
             yield true;
           }
           yield matchesScope(scope, sectionId, courseId);
         }
-
-        // STUDENT: Từ chối truy cập trên tài nguyên lớp (chờ story NEW-03 xem kết quả cá nhân)
-        case STUDENT -> false;
       };
     }
 

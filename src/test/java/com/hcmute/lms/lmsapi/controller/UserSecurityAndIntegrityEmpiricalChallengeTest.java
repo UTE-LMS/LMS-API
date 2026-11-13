@@ -641,7 +641,7 @@ public class UserSecurityAndIntegrityEmpiricalChallengeTest {
               .fullName("Empty Scope User")
               .roleAssignments(
                   List.of(
-                      RoleAssignment.builder().role(Role.VIEWER).scope(null).build(),
+                      RoleAssignment.builder().role(Role.QA).scope(null).build(),
                       RoleAssignment.builder()
                           .role(Role.LECTURER)
                           .scope(

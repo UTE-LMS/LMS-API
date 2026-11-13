@@ -81,24 +81,22 @@ Quy tắc **7** (đề cương `CONFIRMED` không sửa CLO) đã có qua US-10/
 | GET/POST/DELETE | `/api/v1/syllabi/{syllabusId}/clo-pi-links`, `/api/v1/clo-pi-links/{id}`; `GET .../clo-pi-matrix` |
 | PUT | `/api/v1/clo-pi-links/{id}/verification` |
 
-Quyền (Kiến trúc chuẩn theo ADR 0010 thay thế ADR 0009): Môn học (`courses`) do `ADMIN` quản trị; Đề cương (`syllabi`) và CLO do Giảng viên (`LECTURER`) biên soạn và Trưởng bộ môn (`DEPARTMENT_HEAD`) duyệt theo `scope.courseIds`; Trưởng ngành (`PROGRAM_MANAGER`) quản lý CTĐT (`program_courses`) và liên kết CLO–PI (`clo_pi_links`) theo `scope.programIds`; Thẩm định chất lượng: `QA_OFFICER` theo `scope.programIds` (ADR 0004); Đọc: mọi vai trò đã xác thực (`isAuthenticated()`).
+Quyền (Kiến trúc chuẩn theo ADR 0014 & OBE Schema v0.7): Môn học (`courses`) do `ADMIN` quản trị; Đề cương (`syllabi`), CLO và liên kết CLO–PI (`clo_pi_links`) do Quản lý học thuật (`PROGRAM_MANAGER`) quản lý theo `scope.programIds` (hoặc `ADMIN`); Thẩm định chất lượng: Cán bộ `QA` theo `scope.programIds` (ADR 0004 & ADR 0014); Đọc: mọi vai trò đã xác thực (`isAuthenticated()`).
 
-**Phân quyền chuẩn theo ADR 0010 (Bộ môn và Giảng viên, thay thế ADR 0009):**
-Admin quản lý kho môn `courses`; Trưởng bộ môn nhận scope môn và phân công Giảng viên soạn đề cương; Trưởng bộ môn duyệt `CONFIRMED`; Trưởng ngành quản lý CTĐT và liên kết CLO-PI:
+**Phân quyền chuẩn theo 4 vai trò cốt lõi (ADR 0014):**
 
 | Endpoint ghi | Vai trò | Điều kiện kiểm tra Scope |
 |---|---|---|
 | `POST /api/v1/courses/**` | ADMIN | — (Chỉ Admin tạo/sửa/xóa Master Catalog) |
-| `POST /api/v1/departments/assign-course` | ADMIN, DEPARTMENT_HEAD | `courseId` ∈ `scope.courseIds` của TBM (phân môn cho GV) |
-| `POST /courses/{courseId}/syllabi` | ADMIN, LECTURER | `courseId` ∈ `scope.courseIds` của GV (tạo đề cương DRAFT) |
-| `PUT /syllabi/{id}/status` | ADMIN, DEPARTMENT_HEAD | `courseId` ∈ `scope.courseIds` của TBM (duyệt CONFIRMED) |
-| `POST /syllabi/{syllabusId}/clos` | ADMIN, LECTURER | `courseId` ∈ `scope.courseIds` của GV (khi đề cương DRAFT) |
-| `PUT`, `DELETE /clos/{id}` | ADMIN, LECTURER | `courseId` ∈ `scope.courseIds` của GV (khi đề cương DRAFT) |
+| `POST /courses/{courseId}/syllabi` | ADMIN, PROGRAM_MANAGER | `courseId` trong CTĐT thuộc `scope.programIds` (tạo đề cương DRAFT) |
+| `PUT /syllabi/{id}/status` | ADMIN, PROGRAM_MANAGER | `courseId` trong CTĐT thuộc `scope.programIds` (chuyển trạng thái đề cương) |
+| `POST /syllabi/{syllabusId}/clos` | ADMIN, PROGRAM_MANAGER | `courseId` trong CTĐT thuộc `scope.programIds` (khi đề cương DRAFT) |
+| `PUT`, `DELETE /clos/{id}` | ADMIN, PROGRAM_MANAGER | `courseId` trong CTĐT thuộc `scope.programIds` (khi đề cương DRAFT) |
 | `POST /syllabi/{syllabusId}/clo-pi-links` | ADMIN, PROGRAM_MANAGER | `programVersionId` ∈ `scope.programIds` (nối CLO vào PI của ngành mình) |
 | `DELETE /clo-pi-links/{id}` | ADMIN, PROGRAM_MANAGER | `programVersionId` ∈ `scope.programIds` (xóa liên kết của ngành mình) |
-| `PUT /clo-pi-links/{id}/verification` | QA_OFFICER đúng scope (ADR 0004), không đổi | — |
+| `PUT /clo-pi-links/{id}/verification` | QA | `programVersionId` ∈ `scope.programIds` (thẩm định liên kết CLO-PI) |
 
-`ADMIN` luôn có toàn quyền. Giảng viên chỉ soạn đề cương/CLO cho môn được phân công (`scope.courseIds`). Trưởng bộ môn chỉ duyệt đề cương cho môn thuộc bộ môn mình (`scope.courseIds`). Trưởng ngành (`PROGRAM_MANAGER`) chỉ thao tác trên CTĐT và liên kết CLO-PI thuộc ngành mình (`scope.programIds`). Các API `GET` giữ `isAuthenticated()` để tra cứu công khai toàn trường.
+`ADMIN` có toàn quyền hệ thống. Quản lý học thuật (`PROGRAM_MANAGER`) thao tác trên đề cương, CLO và liên kết CLO-PI thuộc ngành mình (`scope.programIds`). Cán bộ `QA` thẩm định chất lượng CTĐT, PLO, PI, đề cương và liên kết CLO-PI. Giảng viên (`LECTURER`) có quyền đọc để nắm bắt CĐR và thiết lập ma trận đề thi cho lớp học phần mình phụ trách. Các API `GET` giữ `isAuthenticated()`.
 
 
 ## 7. Kiểm tra tham chiếu ở service

@@ -266,7 +266,7 @@ class AdminGuardsEmpiricalChallengeTest {
               .roleAssignments(
                   List.of(
                       RoleAssignment.builder().role(Role.ADMIN).build(),
-                      RoleAssignment.builder().role(Role.VIEWER).build()))
+                      RoleAssignment.builder().role(Role.QA).build()))
               .build();
 
       UserResponse response =
@@ -445,7 +445,7 @@ class AdminGuardsEmpiricalChallengeTest {
           UpdateUserRequest.builder()
               .email("lecturer@hcmute.edu.vn")
               .fullName("Lecturer Updated")
-              .roleAssignments(List.of(RoleAssignment.builder().role(Role.STUDENT).build()))
+              .roleAssignments(List.of(RoleAssignment.builder().role(Role.QA).build()))
               .build();
 
       UserResponse response = userService.updateUser(NON_ADMIN_ID, updateRequest, CURRENT_ADMIN_ID);

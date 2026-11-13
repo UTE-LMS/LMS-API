@@ -104,7 +104,7 @@ const COLLECTIONS = {
       roleAssignments: arr({
         bsonType: 'object', required: ['role'],
         properties: {
-          role: en('ADMIN', 'PROGRAM_MANAGER', 'DEPARTMENT_HEAD', 'QA_OFFICER', 'LECTURER', 'STUDENT', 'VIEWER'),
+          role: en('ADMIN', 'PROGRAM_MANAGER', 'LECTURER', 'QA'),
           scope: {
             bsonType: ['object', 'null'],
             properties: { programIds: arr(OID), courseIds: arr(OID), sectionIds: arr(OID) }
