@@ -229,7 +229,8 @@ class FacultyAndDecentralizedRbacIntegrationTest extends IntegrationTestBase {
     String course2Id = JsonPath.read(course2Res.getResponse().getContentAsString(), "$.id");
 
     // Liên kết môn Toán (Khoa 2) vào Phiên bản CTĐT ACTIVE của Khoa 1
-    Program prog1 = mongoTemplate.findById(prog1Id, Program.class);
+    Program prog1 =
+        java.util.Objects.requireNonNull(mongoTemplate.findById(prog1Id, Program.class));
     ProgramVersion pv1 = fixtures.programVersion(prog1, ProgramVersionStatus.ACTIVE);
     mongoTemplate.save(
         ProgramCourse.builder()

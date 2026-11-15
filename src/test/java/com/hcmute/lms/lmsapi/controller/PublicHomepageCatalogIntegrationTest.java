@@ -61,7 +61,7 @@ class PublicHomepageCatalogIntegrationTest extends IntegrationTestBase {
     mathProg.setFacultyId(math.getId());
     mathProg.setLevel("Thạc sĩ");
     mathProg.setDegree("Thạc sĩ");
-    mathProg = mongo().save(mathProg);
+    mongo().save(mathProg);
 
     ProgramVersion itV2025 = fixtures.programVersion(itProg, ProgramVersionStatus.ACTIVE);
     itV2025.setVersion("2025.1");
@@ -71,7 +71,7 @@ class PublicHomepageCatalogIntegrationTest extends IntegrationTestBase {
     ProgramVersion itV2020 = fixtures.programVersion(itProg, ProgramVersionStatus.ARCHIVED);
     itV2020.setVersion("2020.1");
     itV2020.setApplicableCohorts(List.of("K2020"));
-    itV2020 = mongo().save(itV2020);
+    mongo().save(itV2020);
 
     Course javaCourse = fixtures.course();
     javaCourse.setFacultyId(fit.getId());
