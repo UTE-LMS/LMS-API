@@ -111,7 +111,7 @@ class TermIntegrationTest extends IntegrationTestBase {
 
     MvcResult result =
         mockMvc
-            .perform(postAs(pmToken, "/api/v1/terms", req))
+            .perform(postAs(adminToken, "/api/v1/terms", req))
             .andExpect(status().isCreated())
             .andReturn();
 
@@ -121,7 +121,7 @@ class TermIntegrationTest extends IntegrationTestBase {
     mockMvc
         .perform(
             putAs(
-                pmToken,
+                adminToken,
                 "/api/v1/terms/{id}/status",
                 TermStatusUpdateRequest.builder().status(TermStatus.SCORE_LOCKED).build(),
                 termId))
@@ -132,7 +132,7 @@ class TermIntegrationTest extends IntegrationTestBase {
     mockMvc
         .perform(
             putAs(
-                pmToken,
+                adminToken,
                 "/api/v1/terms/{id}/status",
                 TermStatusUpdateRequest.builder().status(TermStatus.OPEN).build(),
                 termId))
@@ -143,7 +143,7 @@ class TermIntegrationTest extends IntegrationTestBase {
     mockMvc
         .perform(
             putAs(
-                pmToken,
+                adminToken,
                 "/api/v1/terms/{id}/status",
                 TermStatusUpdateRequest.builder()
                     .status(TermStatus.OPEN)
@@ -155,9 +155,13 @@ class TermIntegrationTest extends IntegrationTestBase {
   }
 
   @Test
-  @DisplayName("RBAC: LECTURER không thể thêm/sửa học kỳ (403); Chưa đăng nhập trả 401")
+  @DisplayName(
+      "RBAC: PROGRAM_MANAGER và LECTURER không thể thêm/sửa học kỳ (403); Chưa đăng nhập trả 401")
   void rbac_enforcementOnTerms() throws Exception {
     TermRequest req = TermRequest.builder().code(fixtures.code("RBAC")).build();
+
+    // PROGRAM_MANAGER tạo -> 403 Forbidden
+    mockMvc.perform(postAs(pmToken, "/api/v1/terms", req)).andExpect(status().isForbidden());
 
     // LECTURER tạo -> 403 Forbidden
     mockMvc.perform(postAs(lecturerToken, "/api/v1/terms", req)).andExpect(status().isForbidden());

@@ -40,7 +40,7 @@ Biết **ai học lớp nào, học kỳ nào, đề cương nào**. Số ghi da
 |---|---|---|
 | US-18/AC-1 | Tạo học kỳ với `code` mới, `startDate ≤ endDate` → thành công; trùng `code` → 409; `startDate > endDate` → 400/422 | **ĐÃ HIỆN THỰC trên nhánh F03 (Issue #28 - làm trước cho F03); PR chưa mở/chưa merge** |
 | US-18/AC-2 | Đổi `status` sang `SCORE_LOCKED` → ghi nhận trạng thái và log; chặn nhập/sửa điểm (test cùng F05b) | **MỘT PHẦN (chưa hoàn thành):** đã có trạng thái `SCORE_LOCKED` và việc mở lại cần lý do (xem AC-3), có log ứng dụng, chưa ghi `audit_logs`; vế **từ chối nhập/sửa điểm CHỜ F05b** (chưa có mã nhập điểm) |
-| US-18/AC-3 | Mở lại học kỳ `SCORE_LOCKED → OPEN` chỉ ADMIN/PROGRAM_MANAGER và có lý do giải trình | **ĐÃ HIỆN THỰC trên nhánh F03 (Issue #28 - làm trước cho F03); PR chưa mở/chưa merge** |
+| US-18/AC-3 | Mở lại học kỳ `SCORE_LOCKED → OPEN` chỉ ADMIN và có lý do giải trình | **ĐÃ HIỆN THỰC trên nhánh F03 (Issue #28 - làm trước cho F03); PR chưa mở/chưa merge** |
 | US-19/AC-1 | Tạo lớp với `courseId`, `syllabusId` (cùng học phần), `termId`, ≥ 1 giảng viên → thành công | **ĐÃ HIỆN THỰC** (xem §11) |
 | US-19/AC-2 | `syllabusId` không thuộc `courseId`, hoặc `termId`/`lecturerIds` không tồn tại → 422 | **ĐÃ HIỆN THỰC** (xem §11) |
 | US-19/AC-3 | Trùng `code` lớp → 409 | **ĐÃ HIỆN THỰC** (xem §11) |
@@ -54,7 +54,7 @@ Biết **ai học lớp nào, học kỳ nào, đề cương nào**. Số ghi da
 
 | Phương thức | Đường dẫn | Quyền | Trạng thái |
 |---|---|---|---|
-| GET/POST/PUT/DELETE | `/api/v1/terms`, `/api/v1/terms/{id}`; `PUT /api/v1/terms/{id}/status` | ADMIN, PROGRAM_MANAGER; đọc: authenticated | **ĐÃ HIỆN THỰC** |
+| GET/POST/PUT/DELETE | `/api/v1/terms`, `/api/v1/terms/{id}`; `PUT /api/v1/terms/{id}/status` | ghi/đổi trạng thái/xóa: chỉ ADMIN; đọc: authenticated | **ĐÃ HIỆN THỰC** |
 | GET | `/api/v1/sections?termId=&courseId=` | authenticated; chỉ trả lớp người gọi đọc/quản lý được | **ĐÃ HIỆN THỰC** |
 | GET | `/api/v1/sections/{id}` | đọc được lớp (giảng viên lớp mình, ADMIN, scope) hoặc quản lý được lớp | **ĐÃ HIỆN THỰC** |
 | POST | `/api/v1/sections` | ADMIN; PROGRAM_MANAGER có CTĐT chứa học phần trong `scope.programIds` | **ĐÃ HIỆN THỰC** |
