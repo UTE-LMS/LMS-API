@@ -187,3 +187,14 @@ Phân quyền: `canAccessAssessment` (bản lớp theo quyền giảng viên ph�
 
 Phân quyền thêm vào `ScopeAuthorizationService`: `canAccessImportBatch` (suy quyền từ lớp của lô, `canAccessSection`). Collection mới có `document`:
 `import_batches`, `import_row_errors`, `scores` (xem `03-erd-collection.md` mục 6). Không thêm dependency Maven nào.
+
+**Thành phần F07 mở rộng — Báo cáo phân tích đa chiều 5 chiều & Xuất CSV ma trận (`doc/plan/F07-bao-cao-truy-vet.md` §11):**
+
+| Lớp / Package | Vai trò | Phụ thuộc chính |
+|---|---|---|
+| `AnalyticsController` (`/api/v1/reports/analytics`, `/api/v1/reports/analytics/export`) | Cung cấp API truy vấn ma trận chỉ số đa chiều (JSON) và tải tệp CSV ma trận cho 4 vai trò (`ADMIN`, `QA`, `PROGRAM_MANAGER`, `LECTURER`) | `AnalyticsService`, `AnalyticsQueryRequest`, `AnalyticsMatrixResponse` |
+| `AnalyticsService` / `AnalyticsServiceImpl` | Kiểm soát phân quyền theo phạm vi fail-closed, xác thực lượt tính `SUCCESS`, và tổng hợp chỉ đọc ma trận 2D cho 5 chiều (`TIME_TERM`, `COURSE_SECTIONS`, `COHORT`, `ASSESSMENT_COMPONENT`, `CURRICULUM_CLASSIFICATION`) tuân thủ bất biến 10 chỉ số & mẫu số bằng 0 trả `null` | `CalculationRunRepository`, `AggregateResultRepository`, `StudentResultRepository`, `CourseSectionRepository`, `TermRepository`, `ProgramCourseRepository`, `ProgramVersionRepository`, `CloRepository`, `PiRepository`, `PloRepository`, `AssessmentRepository`, `MongoTemplate`, `ScopeAuthorizationService`, `MatrixCsvExporter` |
+| `MatrixCsvExporter` (`exporter`) | Kết xuất `AnalyticsMatrixResponse` sang mảng byte CSV chuẩn RFC 4180 kèm UTF-8 BOM (`\uFEFF`) và vô hiệu hóa CSV Formula Injection (CWE-1236) | `dto.analytics` (lớp thuần, không truy cập CSDL, không thêm thư viện ngoài) |
+| `dto.analytics` (`AnalyticsQueryRequest`, `AnalyticsMatrixResponse`, `MatrixHeader`, `MatrixMetricCell`) & `enums` (`AnalyticsDimension`, `CurriculumClassificationType`) | Hợp đồng truy vấn và phản hồi ma trận 2D chuẩn hóa cho dashboard/báo cáo | `enums` (`ResultLevel`, `AssessmentType`) |
+
+Không phát sinh collection MongoDB mới (giữ nguyên 25 collections v0.7) và không thêm dependency Maven mới.

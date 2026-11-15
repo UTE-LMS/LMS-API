@@ -79,3 +79,25 @@ truy vết: kết quả không có `inputs`, `refId` mồ côi, sinh viên ngoà
 
 Vì sao báo cáo không tự tính lại (một nguồn sự thật duy nhất là engine ở F06, tránh hai con số khác nhau); vì sao `limitations` (kết quả nháp/thiếu dữ liệu không được đọc như kết luận chính thức);
 vì sao truy vết đi từng cấp (mỗi kết quả tự chứng minh bằng đầu vào cấp liền kề); bỏ mẫu số thì "80% đạt" có thể là 32/40 hay 32/45.
+
+## 11. Hiện thực Báo cáo phân tích đa chiều 5 chiều & Xuất CSV ma trận (US-36 / US-35)
+
+Mở rộng tầng đọc báo cáo/dashboard của F07 bằng động cơ tổng hợp ma trận 2D đa chiều (**không tạo mới collection hay thay đổi `$jsonSchema` của 25 collections MongoDB v0.7**):
+
+- **Endpoint đã hiện thực (`AnalyticsController`):**
+  - `GET /api/v1/reports/analytics`: Trả về cấu trúc ma trận 2D `AnalyticsMatrixResponse` (`dimension`, `level`, `runId`, `isOfficial`, `isStale`, `columns[]`, `rows[]`, `matrix[][]`).
+  - `GET /api/v1/reports/analytics/export`: Xuất ma trận và bảng bản ghi chi tiết ra tệp CSV chuẩn RFC 4180 kèm UTF-8 BOM (`\uFEFF`) để mở trực tiếp trên Microsoft Excel tiếng Việt, có cơ chế chống CSV Formula Injection (CWE-1236: tiền tố `'` khi giá trị sau trim bắt đầu bằng `=`, `+`, `-`, `@` hoặc bắt đầu bằng `\t`, `\r`).
+- **5 chiều phân tích (`AnalyticsDimension`):**
+  1. `TIME_TERM`: Xu hướng mức đạt CLO / PI / PLO qua các học kỳ (`terms`).
+  2. `COURSE_SECTIONS`: Đối sánh các lớp học phần song song (`course_sections`) của cùng một học phần trên từng CLO.
+  3. `COHORT`: Đối sánh mức đạt PI / PLO giữa các khóa tuyển sinh (`students.cohort` / `aggregate_results.scope.cohort`) trong một `programVersionId`.
+  4. `ASSESSMENT_COMPONENT`: Phân rã mức đạt CLO theo loại thành phần đánh giá (`AssessmentType`: `QUIZ`, `PRACTICAL`, `PROJECT`, `MIDTERM`, `FINAL`, `OTHER`) từ kết quả cấp `ASSESSMENT_CLO`.
+  5. `CURRICULUM_CLASSIFICATION`: Gom nhóm kết quả theo phân loại khung chương trình (`CurriculumClassificationType`):
+     - `PLO_CATEGORY`: Nhóm chuẩn đầu ra chung (`GENERAL`), chuyên ngành (`SPECIALIZED`), chưa phân loại (`UNSPECIFIED`).
+     - `COURSE_TYPE`: Nhóm học phần bắt buộc (`COMPULSORY`) và tự chọn (`ELECTIVE`) trong `program_courses`.
+     - `BLOOM_LEVEL`: Gom nhóm CLO theo 6 mức nhận thức Bloom (`1..6`) — tuân thủ bất biến miền: `bloomLevel` **chỉ dùng để gom nhóm/thống kê độ phủ, tuyệt đối không nhân trọng số hay biến đổi điểm số**.
+- **Bất biến dữ liệu & Phân quyền fail-closed:**
+  - Chỉ đọc từ lượt tính `calculation_runs` có `status = SUCCESS` (từ chối `422` nếu chỉ định `runId` ở trạng thái `RUNNING`/`FAILED`).
+  - Mỗi ô `MatrixMetricCell` luôn mang đủ 10 trường chỉ số (`enrolled`, `evaluated`, `passed`, `failed`, `insufficientData`, `mean`, `passRate`, `passRateOfEnrolled`, `isOfficial`, `isStale`); khi `evaluated == 0` thì `passRate = null` và `mean = null`, khi `enrolled == 0` thì `passRateOfEnrolled = null` (không bao giờ trả `0.0` giả tạo).
+  - Kiểm soát phạm vi 4 vai trò qua `ScopeAuthorizationService`: `ADMIN` và `QA` (strict empty scope) đọc toàn hệ thống; `PROGRAM_MANAGER` bắt buộc truyền `programVersionId` hoặc `courseId` thuộc phạm vi quản lý; `LECTURER` chỉ xem chiều cấp lớp/môn mình phụ trách và bị chặn `403` ở chiều cấp CTĐT (`COHORT`, `PLO_CATEGORY`) hoặc lớp/lượt tính ngoài phân công.
+- **Tài liệu vấn đáp chi tiết:** xem `doc/de-van-dap/f07-bao-cao-phan-tich-da-chieu.md`.
