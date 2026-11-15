@@ -51,14 +51,14 @@ public class TermController {
   }
 
   @PostMapping
-  @PreAuthorize("hasAnyRole('ADMIN', 'PROGRAM_MANAGER')")
+  @PreAuthorize("hasRole('ADMIN')")
   public ResponseEntity<TermResponse> createTerm(@Valid @RequestBody TermRequest request) {
     log.info("API request: POST /api/v1/terms code=[{}]", request.getCode());
     return ResponseEntity.status(HttpStatus.CREATED).body(termService.createTerm(request));
   }
 
   @PutMapping("/{id}")
-  @PreAuthorize("hasAnyRole('ADMIN', 'PROGRAM_MANAGER')")
+  @PreAuthorize("hasRole('ADMIN')")
   public ResponseEntity<TermResponse> updateTerm(
       @PathVariable("id")
           @Pattern(
@@ -71,7 +71,7 @@ public class TermController {
   }
 
   @PutMapping("/{id}/status")
-  @PreAuthorize("hasAnyRole('ADMIN', 'PROGRAM_MANAGER')")
+  @PreAuthorize("hasRole('ADMIN')")
   public ResponseEntity<TermResponse> updateStatus(
       @PathVariable("id")
           @Pattern(
