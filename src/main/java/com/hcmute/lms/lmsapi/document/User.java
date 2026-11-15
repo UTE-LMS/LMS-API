@@ -66,8 +66,8 @@ public class User {
   private long tokenVersion = 0L;
 
   /**
-   * Định danh Khoa quản lý trực tiếp của người dùng (bắt buộc cho PROGRAM_MANAGER; mỗi PM chỉ
-   * thuộc tối đa 1 Khoa).
+   * Định danh Khoa quản lý trực tiếp của người dùng (bắt buộc cho PROGRAM_MANAGER; mỗi PM chỉ thuộc
+   * tối đa 1 Khoa).
    */
   @Indexed
   @Field(name = "facultyId", targetType = FieldType.OBJECT_ID)

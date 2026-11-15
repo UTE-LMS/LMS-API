@@ -145,9 +145,7 @@ class FacultyAndDecentralizedRbacIntegrationTest extends IntegrationTestBase {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.facultyId").value(createdFacultyId2));
 
-    mockMvc
-        .perform(getAs(pm1OldBearer, "/api/v1/faculties"))
-        .andExpect(status().isUnauthorized());
+    mockMvc.perform(getAs(pm1OldBearer, "/api/v1/faculties")).andExpect(status().isUnauthorized());
 
     // Hủy gán PM2 khỏi Khoa 1 -> token cũ của PM2 bị vô hiệu hóa
     String pm2OldBearer = fixtures.bearer(pm2);
@@ -158,9 +156,7 @@ class FacultyAndDecentralizedRbacIntegrationTest extends IntegrationTestBase {
                 "/api/v1/faculties/" + createdFacultyId1 + "/program-managers/" + pm2.getId()))
         .andExpect(status().isNoContent());
 
-    mockMvc
-        .perform(getAs(pm2OldBearer, "/api/v1/faculties"))
-        .andExpect(status().isUnauthorized());
+    mockMvc.perform(getAs(pm2OldBearer, "/api/v1/faculties")).andExpect(status().isUnauthorized());
   }
 
   @Test
@@ -196,10 +192,7 @@ class FacultyAndDecentralizedRbacIntegrationTest extends IntegrationTestBase {
                 postAs(
                     pm1Bearer,
                     "/api/v1/programs",
-                    ProgramRequest.builder()
-                        .code(fixtures.code("PRG"))
-                        .name("Ngành CNTT")
-                        .build()))
+                    ProgramRequest.builder().code(fixtures.code("PRG")).name("Ngành CNTT").build()))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.facultyId").value(f1.getId()))
             .andReturn();
@@ -246,7 +239,8 @@ class FacultyAndDecentralizedRbacIntegrationTest extends IntegrationTestBase {
             .credits(3)
             .build());
 
-    // Chống TD-29: PM1 tuy có dùng môn Toán trong CTĐT nhưng không được preview/import đề cương môn Toán
+    // Chống TD-29: PM1 tuy có dùng môn Toán trong CTĐT nhưng không được preview/import đề cương môn
+    // Toán
     MockMultipartFile csv =
         new MockMultipartFile(
             "file",
@@ -263,7 +257,8 @@ class FacultyAndDecentralizedRbacIntegrationTest extends IntegrationTestBase {
                 .header(HttpHeaders.AUTHORIZATION, pm1Bearer))
         .andExpect(status().isForbidden());
 
-    // Toàn vẹn liên khoa: PM2 cố vô hiệu hóa hoặc xóa môn Toán đang nằm trong CTĐT ACTIVE của Khoa 1 -> 422
+    // Toàn vẹn liên khoa: PM2 cố vô hiệu hóa hoặc xóa môn Toán đang nằm trong CTĐT ACTIVE của Khoa
+    // 1 -> 422
     mockMvc
         .perform(
             putAs(

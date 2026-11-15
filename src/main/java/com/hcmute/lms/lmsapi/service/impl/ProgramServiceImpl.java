@@ -57,7 +57,10 @@ public class ProgramServiceImpl implements ProgramService {
     String cleanDegree = trimToNull(degree);
     String cleanSearch = trimToNull(search);
 
-    if (cleanFacultyId == null && cleanLevel == null && cleanDegree == null && cleanSearch == null) {
+    if (cleanFacultyId == null
+        && cleanLevel == null
+        && cleanDegree == null
+        && cleanSearch == null) {
       Page<Program> programPage = programRepository.findAll(pageable);
       List<ProgramResponse> content = programMapper.toResponseList(programPage.getContent());
       return PageResponse.of(
@@ -70,12 +73,10 @@ public class ProgramServiceImpl implements ProgramService {
       criteriaList.add(Criteria.where("facultyId").is(new ObjectId(cleanFacultyId)));
     }
     if (cleanLevel != null) {
-      criteriaList.add(
-          Criteria.where("level").regex("^" + Pattern.quote(cleanLevel) + "$", "i"));
+      criteriaList.add(Criteria.where("level").regex("^" + Pattern.quote(cleanLevel) + "$", "i"));
     }
     if (cleanDegree != null) {
-      criteriaList.add(
-          Criteria.where("degree").regex("^" + Pattern.quote(cleanDegree) + "$", "i"));
+      criteriaList.add(Criteria.where("degree").regex("^" + Pattern.quote(cleanDegree) + "$", "i"));
     }
     if (cleanSearch != null) {
       String regex = Pattern.quote(cleanSearch);
@@ -91,7 +92,10 @@ public class ProgramServiceImpl implements ProgramService {
     query.with(pageable);
     List<Program> programs = mongoTemplate.find(query, Program.class);
     return PageResponse.of(
-        programMapper.toResponseList(programs), pageable.getPageNumber(), pageable.getPageSize(), total);
+        programMapper.toResponseList(programs),
+        pageable.getPageNumber(),
+        pageable.getPageSize(),
+        total);
   }
 
   @Override
@@ -118,9 +122,12 @@ public class ProgramServiceImpl implements ProgramService {
           facultyRepository
               .findById(facultyId)
               .orElseThrow(
-                  () -> new BusinessRuleViolationException("FACULTY_NOT_FOUND", "Khoa không tồn tại: " + facultyId));
+                  () ->
+                      new BusinessRuleViolationException(
+                          "FACULTY_NOT_FOUND", "Khoa không tồn tại: " + facultyId));
       if (!faculty.isActive()) {
-        throw new BusinessRuleViolationException("FACULTY_INACTIVE", "Khoa đang bị khóa: " + facultyId);
+        throw new BusinessRuleViolationException(
+            "FACULTY_INACTIVE", "Khoa đang bị khóa: " + facultyId);
       }
     }
 

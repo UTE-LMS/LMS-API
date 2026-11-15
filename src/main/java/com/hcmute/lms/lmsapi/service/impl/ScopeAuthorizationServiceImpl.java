@@ -531,10 +531,7 @@ public class ScopeAuthorizationServiceImpl implements ScopeAuthorizationService 
   }
 
   private boolean checkProgramAssignment(
-      RoleAssignment assignment,
-      UserPrincipal principal,
-      String programId,
-      AccessType accessType) {
+      RoleAssignment assignment, UserPrincipal principal, String programId, AccessType accessType) {
     if (assignment == null || assignment.getRole() == null) {
       return false;
     }

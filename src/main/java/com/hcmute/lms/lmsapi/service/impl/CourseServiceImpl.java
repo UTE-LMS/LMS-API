@@ -118,7 +118,10 @@ public class CourseServiceImpl implements CourseService {
     query.with(pageable);
     List<Course> courses = mongoTemplate.find(query, Course.class);
     return PageResponse.of(
-        courseMapper.toResponseList(courses), pageable.getPageNumber(), pageable.getPageSize(), total);
+        courseMapper.toResponseList(courses),
+        pageable.getPageNumber(),
+        pageable.getPageSize(),
+        total);
   }
 
   @Override
@@ -250,8 +253,7 @@ public class CourseServiceImpl implements CourseService {
 
   @Override
   public CourseImportResultResponse importCourses(MultipartFile file, String facultyId) {
-    String cleanFacultyId =
-        (facultyId != null && !facultyId.isBlank()) ? facultyId.trim() : null;
+    String cleanFacultyId = (facultyId != null && !facultyId.isBlank()) ? facultyId.trim() : null;
     if (cleanFacultyId != null) {
       validateActiveFaculty(cleanFacultyId);
     }

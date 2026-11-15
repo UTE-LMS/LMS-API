@@ -78,8 +78,7 @@ public class CourseController {
   @PreAuthorize(
       "hasRole('ADMIN') or (hasRole('PROGRAM_MANAGER') and (#request.facultyId == null or authentication.principal.facultyId == #request.facultyId))")
   public ResponseEntity<CourseResponse> createCourse(
-      @Valid @RequestBody CourseRequest request,
-      @AuthenticationPrincipal UserPrincipal principal) {
+      @Valid @RequestBody CourseRequest request, @AuthenticationPrincipal UserPrincipal principal) {
     if (principal != null && !hasRole(principal, Role.ADMIN)) {
       if (principal.getFacultyId() == null) {
         throw new AccessDeniedException("Program Manager chưa được gán vào Khoa nào");
@@ -128,8 +127,10 @@ public class CourseController {
     log.info("API request: PUT /api/v1/courses/{}", id);
     if (principal != null && !hasRole(principal, Role.ADMIN)) {
       CourseResponse existing = courseService.getCourseById(id);
-      if (request.getFacultyId() != null && !request.getFacultyId().equals(existing.getFacultyId())) {
-        throw new AccessDeniedException("Program Manager không có quyền chuyển Khoa chủ quản của học phần");
+      if (request.getFacultyId() != null
+          && !request.getFacultyId().equals(existing.getFacultyId())) {
+        throw new AccessDeniedException(
+            "Program Manager không có quyền chuyển Khoa chủ quản của học phần");
       }
     }
     return ResponseEntity.ok(courseService.updateCourse(id, request));

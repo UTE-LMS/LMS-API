@@ -167,10 +167,7 @@ class PublicHomepageCatalogIntegrationTest extends IntegrationTestBase {
 
     // 6. Public GET courses filtered by facultyId & isActive
     mockMvc
-        .perform(
-            get("/api/v1/courses")
-                .param("facultyId", fit.getId())
-                .param("isActive", "true"))
+        .perform(get("/api/v1/courses").param("facultyId", fit.getId()).param("isActive", "true"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.content[*].id", hasItem(javaCourse.getId())))
         .andExpect(jsonPath("$.content[?(@.id=='" + inactiveCourse.getId() + "')]").isEmpty());

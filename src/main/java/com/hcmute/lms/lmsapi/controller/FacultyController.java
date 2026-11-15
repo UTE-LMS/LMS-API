@@ -70,9 +70,7 @@ public class FacultyController {
   @GetMapping("/{id}")
   public ResponseEntity<FacultyResponse> getFacultyById(
       @PathVariable("id")
-          @Pattern(
-              regexp = "^[0-9a-fA-F]{24}$",
-              message = "ID Khoa phải là ObjectId 24 ký tự hex")
+          @Pattern(regexp = "^[0-9a-fA-F]{24}$", message = "ID Khoa phải là ObjectId 24 ký tự hex")
           String id) {
     return ResponseEntity.ok(facultyService.getFacultyById(id));
   }
@@ -81,9 +79,7 @@ public class FacultyController {
   @PreAuthorize("hasRole('ADMIN')")
   public ResponseEntity<FacultyResponse> updateFaculty(
       @PathVariable("id")
-          @Pattern(
-              regexp = "^[0-9a-fA-F]{24}$",
-              message = "ID Khoa phải là ObjectId 24 ký tự hex")
+          @Pattern(regexp = "^[0-9a-fA-F]{24}$", message = "ID Khoa phải là ObjectId 24 ký tự hex")
           String id,
       @Valid @RequestBody FacultyUpdateRequest request) {
     log.info("API request: PUT /api/v1/faculties/{}", id);
@@ -94,9 +90,7 @@ public class FacultyController {
   @PreAuthorize("hasRole('ADMIN')")
   public ResponseEntity<FacultyResponse> updateFacultyStatus(
       @PathVariable("id")
-          @Pattern(
-              regexp = "^[0-9a-fA-F]{24}$",
-              message = "ID Khoa phải là ObjectId 24 ký tự hex")
+          @Pattern(regexp = "^[0-9a-fA-F]{24}$", message = "ID Khoa phải là ObjectId 24 ký tự hex")
           String id,
       @Valid @RequestBody FacultyStatusUpdateRequest request) {
     log.info("API request: PUT /api/v1/faculties/{}/status", id);
@@ -108,9 +102,7 @@ public class FacultyController {
       "hasRole('ADMIN') or (hasRole('PROGRAM_MANAGER') and authentication.principal.facultyId == #facultyId)")
   public ResponseEntity<List<UserResponse>> getProgramManagers(
       @PathVariable("facultyId")
-          @Pattern(
-              regexp = "^[0-9a-fA-F]{24}$",
-              message = "ID Khoa phải là ObjectId 24 ký tự hex")
+          @Pattern(regexp = "^[0-9a-fA-F]{24}$", message = "ID Khoa phải là ObjectId 24 ký tự hex")
           String facultyId) {
     return ResponseEntity.ok(facultyService.getProgramManagers(facultyId));
   }
@@ -119,9 +111,7 @@ public class FacultyController {
   @PreAuthorize("hasRole('ADMIN')")
   public ResponseEntity<UserResponse> assignProgramManager(
       @PathVariable("facultyId")
-          @Pattern(
-              regexp = "^[0-9a-fA-F]{24}$",
-              message = "ID Khoa phải là ObjectId 24 ký tự hex")
+          @Pattern(regexp = "^[0-9a-fA-F]{24}$", message = "ID Khoa phải là ObjectId 24 ký tự hex")
           String facultyId,
       @Valid @RequestBody FacultyAssignPmRequest request) {
     log.info("API request: POST /api/v1/faculties/{}/program-managers", facultyId);
@@ -132,9 +122,7 @@ public class FacultyController {
   @PreAuthorize("hasRole('ADMIN')")
   public ResponseEntity<Void> unassignProgramManager(
       @PathVariable("facultyId")
-          @Pattern(
-              regexp = "^[0-9a-fA-F]{24}$",
-              message = "ID Khoa phải là ObjectId 24 ký tự hex")
+          @Pattern(regexp = "^[0-9a-fA-F]{24}$", message = "ID Khoa phải là ObjectId 24 ký tự hex")
           String facultyId,
       @PathVariable("userId")
           @Pattern(

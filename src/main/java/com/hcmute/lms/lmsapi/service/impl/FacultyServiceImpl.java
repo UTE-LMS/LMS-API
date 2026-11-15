@@ -104,7 +104,8 @@ public class FacultyServiceImpl implements FacultyService {
       facultyPage = facultyRepository.findAll(pageable);
     }
 
-    List<FacultyResponse> content = facultyPage.getContent().stream().map(this::toResponse).toList();
+    List<FacultyResponse> content =
+        facultyPage.getContent().stream().map(this::toResponse).toList();
     return PageResponse.of(
         content, facultyPage.getNumber(), facultyPage.getSize(), facultyPage.getTotalElements());
   }
@@ -127,7 +128,8 @@ public class FacultyServiceImpl implements FacultyService {
     }
 
     faculty.setName(name);
-    faculty.setDescription(request.getDescription() != null ? request.getDescription().trim() : null);
+    faculty.setDescription(
+        request.getDescription() != null ? request.getDescription().trim() : null);
     if (request.getIsActive() != null) {
       faculty.setActive(request.getIsActive());
     }
@@ -196,7 +198,8 @@ public class FacultyServiceImpl implements FacultyService {
     User user =
         userRepository
             .findById(userId)
-            .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng: " + userId));
+            .orElseThrow(
+                () -> new ResourceNotFoundException("Không tìm thấy người dùng: " + userId));
 
     if (!Objects.equals(user.getFacultyId(), facultyId)) {
       throw new BusinessRuleViolationException(
@@ -256,7 +259,8 @@ public class FacultyServiceImpl implements FacultyService {
     User user =
         userRepository
             .findById(userId)
-            .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng: " + userId));
+            .orElseThrow(
+                () -> new ResourceNotFoundException("Không tìm thấy người dùng: " + userId));
 
     if (user.getStatus() != UserStatus.ACTIVE) {
       throw new BusinessRuleViolationException(
@@ -289,7 +293,8 @@ public class FacultyServiceImpl implements FacultyService {
 
   private FacultyResponse toResponse(Faculty faculty) {
     long pmCount =
-        userRepository.countByFacultyIdAndRoleAssignmentsRole(faculty.getId(), Role.PROGRAM_MANAGER);
+        userRepository.countByFacultyIdAndRoleAssignmentsRole(
+            faculty.getId(), Role.PROGRAM_MANAGER);
     return FacultyResponse.builder()
         .id(faculty.getId())
         .code(faculty.getCode())

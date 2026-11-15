@@ -67,7 +67,8 @@ public class SyllabusServiceImpl implements SyllabusService {
     }
 
     List<String> courseIds =
-        programCourseRepository.findByProgramVersionIdOrderBySemesterAscCourseIdAsc(programVersionId)
+        programCourseRepository
+            .findByProgramVersionIdOrderBySemesterAscCourseIdAsc(programVersionId)
             .stream()
             .map(ProgramCourse::getCourseId)
             .distinct()

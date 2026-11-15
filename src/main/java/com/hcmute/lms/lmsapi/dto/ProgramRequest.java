@@ -14,9 +14,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class ProgramRequest {
 
-  @Pattern(
-      regexp = "^[0-9a-fA-F]{24}$",
-      message = "ID Khoa phải là ObjectId 24 ký tự hex")
+  @Pattern(regexp = "^[0-9a-fA-F]{24}$", message = "ID Khoa phải là ObjectId 24 ký tự hex")
   private String facultyId;
 
   @NotBlank(message = "Mã chương trình đào tạo không được để trống")

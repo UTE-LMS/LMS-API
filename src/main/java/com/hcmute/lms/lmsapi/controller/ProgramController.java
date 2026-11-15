@@ -103,8 +103,10 @@ public class ProgramController {
     log.info("API request: PUT /api/v1/programs/{}", id);
     if (principal != null && !hasRole(principal, Role.ADMIN)) {
       ProgramResponse existing = programService.getProgramById(id);
-      if (request.getFacultyId() != null && !request.getFacultyId().equals(existing.getFacultyId())) {
-        throw new AccessDeniedException("Program Manager không có quyền chuyển Khoa chủ quản của CTĐT");
+      if (request.getFacultyId() != null
+          && !request.getFacultyId().equals(existing.getFacultyId())) {
+        throw new AccessDeniedException(
+            "Program Manager không có quyền chuyển Khoa chủ quản của CTĐT");
       }
     }
     return ResponseEntity.ok(programService.updateProgram(id, request));
