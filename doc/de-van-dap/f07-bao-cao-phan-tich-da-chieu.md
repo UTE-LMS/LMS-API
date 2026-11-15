@@ -1,4 +1,4 @@
-# Để vấn đáp — F07: Báo cáo phân tích đa chiều 5 chiều & Xuất CSV ma trận (US-35, US-36)
+# Để vấn đáp — F07: Báo cáo phân tích đa chiều 7 chiều & Xuất CSV ma trận (US-35, US-36)
 
 > Viết cho thành viên nhóm (cả **IT** và **IBS**) nắm vững logic để bảo vệ trước Hội đồng theo Rubric Mục 6.2 (4 câu hỏi cốt lõi: *làm gì, vì sao có trong đề tài, tham số/thư viện đến từ đâu, bỏ đi thì sao*). Đối chiếu đặc tả tại `doc/plan/F07-bao-cao-truy-vet.md` §11 và quy tắc miền `.claude/rules/02-domain-invariants.md`.
 
@@ -20,17 +20,19 @@
 - **Tham số/thư viện từ đâu:** Quy tắc cứng số 2 trong `doc/plan/F07-bao-cao-truy-vet.md` §4 và `.claude/rules/02-domain-invariants.md` (không bao giờ trả tỷ lệ đạt mà thiếu mẫu số).
 - **Bỏ đi thì sao:** Biểu đồ xu hướng qua các học kỳ (`TIME_TERM`) sẽ bị kéo tụt về `0%` ở những kỳ môn học không mở lớp, hoặc tính trung bình cộng đơn thuần `(mean1 + mean2) / 2` làm sai lệch trọng số giữa lớp 80 sinh viên và lớp 15 sinh viên.
 
-## 3. Thiết kế 5 chiều phân tích & Bất biến mức nhận thức Bloom (`AnalyticsDimension`)
+## 3. Thiết kế 7 chiều phân tích & Bất biến mức nhận thức Bloom (`AnalyticsDimension`)
 
-- **Làm gì:** Chuẩn hóa cả 5 góc nhìn phân tích về duy nhất một cấu trúc ma trận 2D (`rows x columns`):
+- **Làm gì:** Chuẩn hóa cả 7 góc nhìn phân tích về duy nhất một cấu trúc ma trận 2D (`rows x columns`):
   1. `TIME_TERM`: Dòng = `CLO/PI/PLO`, Cột = Học kỳ (`Term`).
   2. `COURSE_SECTIONS`: Dòng = `CLO`, Cột = Các lớp học phần song song (`CourseSection`).
   3. `COHORT`: Dòng = `PLO/PI`, Cột = Khóa tuyển sinh (`K23`, `K24`, ...).
   4. `ASSESSMENT_COMPONENT`: Dòng = `CLO`, Cột = Loại bài đánh giá (`QUIZ`, `MIDTERM`, `FINAL`, ...) đọc từ cấp `ASSESSMENT_CLO`.
   5. `CURRICULUM_CLASSIFICATION`: Gom nhóm theo `PLO_CATEGORY` (`GENERAL`/`SPECIALIZED`), `COURSE_TYPE` (`COMPULSORY`/`ELECTIVE`), hoặc `BLOOM_LEVEL` (`1..6`).
+  6. `COURSE_LECTURER`: Dòng = `CLO`, Cột = Giảng viên phụ trách các lớp của học phần (`course_sections.lecturerIds`), gộp gia quyền kết quả các lớp mà từng giảng viên giảng dạy.
+  7. `STUDENT`: Dòng = `CLO` (cấp môn/lớp) hoặc `PI/PLO` (cấp CTĐT), Cột = Sinh viên (`studentRef`), đọc trực tiếp từ `student_results` (`COMPUTED` so với chưa đủ dữ liệu `insufficientData = 1`).
 - **Vì sao có:**
-  - *Góc nhìn IBS:* Phục vụ chu trình cải tiến liên tục (CQI): Giảng viên nhìn `COURSE_SECTIONS` và `ASSESSMENT_COMPONENT` để biết lớp nào hoặc bài thi cuối kỳ nào làm tụt CLO; Quản lý CTĐT & QA nhìn `TIME_TERM`, `COHORT`, `CURRICULUM_CLASSIFICATION` để phát hiện khóa nào yếu ở nhóm môn tự chọn hoặc mức tư duy bậc cao (Bloom 4–6).
-  - *Góc nhìn IT:* Gom cả 5 chiều về một hợp đồng `AnalyticsMatrixResponse` giúp Frontend (`LMS-UI`) chỉ cần viết một component bảng nhiệt (heatmap matrix) và một luồng xuất CSV dùng chung thay vì 5 API rời rạc. Riêng `BLOOM_LEVEL` chỉ dùng `Clo.bloomLevel` làm khóa `groupingBy`, tuyệt đối không nhân hệ số vào điểm.
+  - *Góc nhìn IBS:* Phục vụ chu trình cải tiến liên tục (CQI) ở cả cấp vĩ mô lẫn vi mô: Quản lý CTĐT & QA dùng `COURSE_LECTURER` kết hợp `STUDENT` để đánh giá khách quan sự đồng đều chất lượng giảng dạy của từng giảng viên trên cùng một học phần và đối chiếu xuống kết quả cá nhân từng sinh viên; Giảng viên dùng `COURSE_SECTIONS`, `ASSESSMENT_COMPONENT` và `STUDENT` trong lớp mình dạy để phát hiện câu hỏi/CLO hoặc sinh viên cần hỗ trợ sớm.
+  - *Góc nhìn IT:* Gom cả 7 chiều về một hợp đồng `AnalyticsMatrixResponse` giúp Frontend (`LMS-UI`) chỉ cần viết một component bảng nhiệt (heatmap matrix) và một luồng xuất CSV dùng chung thay vì 7 API rời rạc. Riêng `BLOOM_LEVEL` chỉ dùng `Clo.bloomLevel` làm khóa `groupingBy`, tuyệt đối không nhân hệ số vào điểm.
 - **Tham số/thư viện từ đâu:** Các enum có sẵn trong CSDL v0.7 (`ResultLevel`, `AssessmentType`, `PloCategory`, `CourseType`, `Clo.bloomLevel`).
 - **Bỏ đi thì sao:** Báo cáo OBE chỉ dừng ở bảng phẳng từng lớp đơn lẻ, không trả lời được câu hỏi đối sánh ngang (giữa các lớp/khóa) và theo dõi dọc (qua các học kỳ, giữa giữa kỳ và cuối kỳ).
 
