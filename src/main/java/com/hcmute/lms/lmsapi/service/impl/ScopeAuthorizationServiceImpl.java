@@ -22,6 +22,7 @@ import com.hcmute.lms.lmsapi.repository.SyllabusRepository;
 import com.hcmute.lms.lmsapi.service.ScopeAuthorizationService;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Function;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -385,35 +386,23 @@ public class ScopeAuthorizationServiceImpl implements ScopeAuthorizationService 
 
   @Override
   public boolean canManageProgram(UserPrincipal principal, String programId) {
-    if (principal == null
-        || programId == null
-        || programId.isBlank()
-        || principal.getRoleAssignments() == null) {
-      return false;
-    }
-    boolean isAdmin =
-        principal.getRoleAssignments().stream()
-            .anyMatch(a -> a != null && a.getRole() == Role.ADMIN);
-    if (isAdmin) {
-      return true;
-    }
-    boolean isPm =
-        principal.getRoleAssignments().stream()
-            .anyMatch(a -> a != null && a.getRole() == Role.PROGRAM_MANAGER);
-    if (!isPm || principal.getFacultyId() == null) {
-      return false;
-    }
-    return programRepository
-        .findById(programId.trim())
-        .map(p -> Objects.equals(p.getFacultyId(), principal.getFacultyId()))
-        .orElse(false);
+    return canManageFacultyResource(
+        principal, programId, id -> programRepository.findById(id).map(p -> p.getFacultyId()));
   }
 
   @Override
   public boolean canManageCourse(UserPrincipal principal, String courseId) {
+    return canManageFacultyResource(
+        principal, courseId, id -> courseRepository.findById(id).map(Course::getFacultyId));
+  }
+
+  private boolean canManageFacultyResource(
+      UserPrincipal principal,
+      String resourceId,
+      Function<String, Optional<String>> facultyLookup) {
     if (principal == null
-        || courseId == null
-        || courseId.isBlank()
+        || resourceId == null
+        || resourceId.isBlank()
         || principal.getRoleAssignments() == null) {
       return false;
     }
@@ -429,9 +418,9 @@ public class ScopeAuthorizationServiceImpl implements ScopeAuthorizationService 
     if (!isPm || principal.getFacultyId() == null) {
       return false;
     }
-    return courseRepository
-        .findById(courseId.trim())
-        .map(c -> Objects.equals(c.getFacultyId(), principal.getFacultyId()))
+    return facultyLookup
+        .apply(resourceId.trim())
+        .map(facultyId -> Objects.equals(facultyId, principal.getFacultyId()))
         .orElse(false);
   }
 
