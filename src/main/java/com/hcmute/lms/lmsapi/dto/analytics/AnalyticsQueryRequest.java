@@ -55,4 +55,16 @@ public class AnalyticsQueryRequest {
    * Định danh lượt tính toán cụ thể. Nếu không truyền, hệ thống tự lấy lượt tính SUCCESS mới nhất.
    */
   private String runId;
+
+  /** Định danh giảng viên cần lọc (tùy chọn, dùng cho chiều COURSE_LECTURER). */
+  private String lecturerId;
+
+  /** Danh sách định danh giảng viên cần đối sánh (tùy chọn, dùng cho chiều COURSE_LECTURER). */
+  private List<String> lecturerIds;
+
+  /** Định danh sinh viên cần phân tích (tùy chọn, dùng cho chiều STUDENT). */
+  private String studentId;
+
+  /** Danh sách định danh sinh viên cần phân tích (tùy chọn, dùng cho chiều STUDENT). */
+  private List<String> studentIds;
 }

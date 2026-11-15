@@ -12,12 +12,14 @@ import com.hcmute.lms.lmsapi.document.Assessment;
 import com.hcmute.lms.lmsapi.document.CalculationRun;
 import com.hcmute.lms.lmsapi.document.Clo;
 import com.hcmute.lms.lmsapi.document.CourseSection;
+import com.hcmute.lms.lmsapi.document.Enrollment;
 import com.hcmute.lms.lmsapi.document.Plo;
 import com.hcmute.lms.lmsapi.document.ProgramCourse;
 import com.hcmute.lms.lmsapi.document.RoleAssignment;
 import com.hcmute.lms.lmsapi.document.Student;
 import com.hcmute.lms.lmsapi.document.StudentResult;
 import com.hcmute.lms.lmsapi.document.Term;
+import com.hcmute.lms.lmsapi.document.User;
 import com.hcmute.lms.lmsapi.document.UserScope;
 import com.hcmute.lms.lmsapi.dto.UserPrincipal;
 import com.hcmute.lms.lmsapi.dto.analytics.AnalyticsMatrixResponse;
@@ -31,6 +33,7 @@ import com.hcmute.lms.lmsapi.enums.AssessmentType;
 import com.hcmute.lms.lmsapi.enums.CalculationStatus;
 import com.hcmute.lms.lmsapi.enums.CourseType;
 import com.hcmute.lms.lmsapi.enums.CurriculumClassificationType;
+import com.hcmute.lms.lmsapi.enums.EnrollmentStatus;
 import com.hcmute.lms.lmsapi.enums.PloCategory;
 import com.hcmute.lms.lmsapi.enums.ResultLevel;
 import com.hcmute.lms.lmsapi.enums.ResultStatus;
@@ -42,12 +45,15 @@ import com.hcmute.lms.lmsapi.repository.AssessmentRepository;
 import com.hcmute.lms.lmsapi.repository.CalculationRunRepository;
 import com.hcmute.lms.lmsapi.repository.CloRepository;
 import com.hcmute.lms.lmsapi.repository.CourseSectionRepository;
+import com.hcmute.lms.lmsapi.repository.EnrollmentRepository;
 import com.hcmute.lms.lmsapi.repository.PiRepository;
 import com.hcmute.lms.lmsapi.repository.PloRepository;
 import com.hcmute.lms.lmsapi.repository.ProgramCourseRepository;
 import com.hcmute.lms.lmsapi.repository.ProgramVersionRepository;
+import com.hcmute.lms.lmsapi.repository.StudentRepository;
 import com.hcmute.lms.lmsapi.repository.StudentResultRepository;
 import com.hcmute.lms.lmsapi.repository.TermRepository;
+import com.hcmute.lms.lmsapi.repository.UserRepository;
 import com.hcmute.lms.lmsapi.service.impl.AnalyticsServiceImpl;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -82,6 +88,9 @@ class AnalyticsServiceImplTest {
   @Mock private AssessmentRepository assessmentRepository;
   @Mock private ProgramVersionRepository programVersionRepository;
   @Mock private ScopeAuthorizationService scopeAuthorizationService;
+  @Mock private UserRepository userRepository;
+  @Mock private StudentRepository studentRepository;
+  @Mock private EnrollmentRepository enrollmentRepository;
   @Spy private MatrixCsvExporter matrixCsvExporter = new MatrixCsvExporter();
 
   @InjectMocks private AnalyticsServiceImpl analyticsService;
@@ -1066,6 +1075,467 @@ class AnalyticsServiceImplTest {
       assertThat(csv).contains("'=cmd|calc");
       assertThat(csv).contains("'-10+20");
       assertThat(csv).contains("'@evil");
+    }
+  }
+
+  @Nested
+  @DisplayName("6. New Dimensions: COURSE_LECTURER & STUDENT (R1)")
+  class NewDimensionsTests {
+
+    // --- Chiều COURSE_LECTURER ---
+
+    @Test
+    @DisplayName(
+        "COURSE_LECTURER: Happy path cho ADMIN tổng hợp hiệu quả giảng dạy theo giảng viên")
+    void testCourseLecturerHappyPathAdmin() {
+      AnalyticsQueryRequest req =
+          AnalyticsQueryRequest.builder()
+              .dimension(AnalyticsDimension.COURSE_LECTURER)
+              .courseId("crs_algo")
+              .runId("run_success_1")
+              .build();
+
+      User lec1 = User.builder().id("lec_1").username("gv_nam").fullName("TS. Nam").build();
+      User lec2 = User.builder().id("lec_2").username("gv_hoa").fullName("ThS. Hoa").build();
+
+      CourseSection sec1 =
+          CourseSection.builder()
+              .id("sec_1")
+              .courseId("crs_algo")
+              .lecturerIds(List.of("lec_1"))
+              .build();
+      CourseSection sec2 =
+          CourseSection.builder()
+              .id("sec_2")
+              .courseId("crs_algo")
+              .lecturerIds(List.of("lec_2"))
+              .build();
+      CourseSection sec3 =
+          CourseSection.builder()
+              .id("sec_3")
+              .courseId("crs_algo")
+              .lecturerIds(List.of("lec_1"))
+              .build();
+
+      Clo clo1 =
+          Clo.builder().id("clo_1").code("CLO1").contentOriginal("Độ phức tạp thuật toán").build();
+
+      AggregateResult aggSec1 =
+          AggregateResult.builder()
+              .runId("run_success_1")
+              .level(ResultLevel.CLO)
+              .subjectId("clo_1")
+              .sectionId("sec_1")
+              .counts(AggregateResult.Counts.builder().enrolled(30).passed(24).failed(6).build())
+              .mean(0.70)
+              .build();
+
+      AggregateResult aggSec2 =
+          AggregateResult.builder()
+              .runId("run_success_1")
+              .level(ResultLevel.CLO)
+              .subjectId("clo_1")
+              .sectionId("sec_2")
+              .counts(AggregateResult.Counts.builder().enrolled(40).passed(36).failed(4).build())
+              .mean(0.85)
+              .build();
+
+      AggregateResult aggSec3 =
+          AggregateResult.builder()
+              .runId("run_success_1")
+              .level(ResultLevel.CLO)
+              .subjectId("clo_1")
+              .sectionId("sec_3")
+              .counts(AggregateResult.Counts.builder().enrolled(20).passed(16).failed(4).build())
+              .mean(0.80)
+              .build();
+
+      when(calculationRunRepository.findById("run_success_1")).thenReturn(Optional.of(successRun));
+      when(courseSectionRepository.findByCourseId("crs_algo"))
+          .thenReturn(List.of(sec1, sec2, sec3));
+      when(userRepository.findAllById(any())).thenReturn(List.of(lec2, lec1));
+      when(mongoTemplate.find(any(Query.class), eq(Clo.class))).thenReturn(List.of(clo1));
+      when(aggregateResultRepository.findByRunIdAndLevel("run_success_1", ResultLevel.CLO))
+          .thenReturn(List.of(aggSec1, aggSec2, aggSec3));
+
+      AnalyticsMatrixResponse resp = analyticsService.getAnalyticsMatrix(req, adminPrincipal);
+
+      assertThat(resp.getDimension()).isEqualTo(AnalyticsDimension.COURSE_LECTURER);
+      assertThat(resp.getLevel()).isEqualTo(ResultLevel.CLO);
+      assertThat(resp.getRows()).extracting("code").containsExactly("CLO1");
+      // Cột được sắp xếp theo username: gv_hoa, gv_nam
+      assertThat(resp.getColumns()).extracting("code").containsExactly("gv_hoa", "gv_nam");
+
+      // Cột 0: gv_hoa (sec2) -> enrolled=40, passed=36, failed=4, mean=0.85, passRate=0.90
+      MatrixMetricCell cellHoa = resp.getMatrix().get(0).get(0);
+      assertThat(cellHoa.getEnrolled()).isEqualTo(40);
+      assertThat(cellHoa.getPassed()).isEqualTo(36);
+      assertThat(cellHoa.getFailed()).isEqualTo(4);
+      assertThat(cellHoa.getMean()).isEqualTo(0.85);
+      assertThat(cellHoa.getPassRate()).isCloseTo(0.90, within(1e-9));
+
+      // Cột 1: gv_nam (sec1 + sec3) -> enrolled=50, passed=40, failed=10
+      // Mean có trọng số: (0.70*30 + 0.80*20) / 50 = (21 + 16) / 50 = 37 / 50 = 0.74
+      MatrixMetricCell cellNam = resp.getMatrix().get(0).get(1);
+      assertThat(cellNam.getEnrolled()).isEqualTo(50);
+      assertThat(cellNam.getPassed()).isEqualTo(40);
+      assertThat(cellNam.getFailed()).isEqualTo(10);
+      assertThat(cellNam.getMean()).isCloseTo(0.74, within(1e-9));
+      assertThat(cellNam.getPassRate()).isCloseTo(0.80, within(1e-9));
+    }
+
+    @Test
+    @DisplayName("COURSE_LECTURER: LECTURER tự xem chỉ xuất hiện cột của chính mình")
+    void testCourseLecturerLecturerSelfOnly() {
+      AnalyticsQueryRequest req =
+          AnalyticsQueryRequest.builder()
+              .dimension(AnalyticsDimension.COURSE_LECTURER)
+              .courseId("crs_algo")
+              .runId("run_success_1")
+              .build();
+
+      User lecMe =
+          User.builder().id("user_lecturer").username("lecturer").fullName("TS. Me").build();
+      CourseSection sec =
+          CourseSection.builder()
+              .id("sec_me")
+              .courseId("crs_algo")
+              .lecturerIds(List.of("user_lecturer"))
+              .build();
+      Clo clo = Clo.builder().id("clo_1").code("CLO1").build();
+
+      CalculationRun run =
+          CalculationRun.builder()
+              .id("run_success_1")
+              .status(CalculationStatus.SUCCESS)
+              .official(true)
+              .stale(false)
+              .scopeRef(CalculationRun.ScopeRef.builder().courseIds(List.of("crs_algo")).build())
+              .build();
+
+      when(scopeAuthorizationService.canAccessCourse(
+              lecturerPrincipal, "crs_algo", AccessType.READ))
+          .thenReturn(true);
+      when(calculationRunRepository.findById("run_success_1")).thenReturn(Optional.of(run));
+      when(courseSectionRepository.findByCourseId("crs_algo")).thenReturn(List.of(sec));
+      when(userRepository.findAllById(List.of("user_lecturer"))).thenReturn(List.of(lecMe));
+      when(mongoTemplate.find(any(Query.class), eq(Clo.class))).thenReturn(List.of(clo));
+      when(aggregateResultRepository.findByRunIdAndLevel("run_success_1", ResultLevel.CLO))
+          .thenReturn(List.of());
+
+      AnalyticsMatrixResponse resp = analyticsService.getAnalyticsMatrix(req, lecturerPrincipal);
+
+      assertThat(resp.getColumns()).extracting("id").containsExactly("user_lecturer");
+    }
+
+    @Test
+    @DisplayName(
+        "COURSE_LECTURER: LECTURER truy vấn ID của giảng viên khác bị ném AccessDeniedException")
+    void testCourseLecturerLecturerQueryingOtherLecturerForbidden() {
+      AnalyticsQueryRequest req =
+          AnalyticsQueryRequest.builder()
+              .dimension(AnalyticsDimension.COURSE_LECTURER)
+              .courseId("crs_algo")
+              .lecturerId("other_lecturer")
+              .build();
+
+      when(scopeAuthorizationService.canAccessCourse(
+              lecturerPrincipal, "crs_algo", AccessType.READ))
+          .thenReturn(true);
+
+      assertThatThrownBy(() -> analyticsService.getAnalyticsMatrix(req, lecturerPrincipal))
+          .isInstanceOf(AccessDeniedException.class)
+          .hasMessageContaining("Giảng viên chỉ được xem hiệu quả giảng dạy của chính mình");
+    }
+
+    @Test
+    @DisplayName(
+        "COURSE_LECTURER: Zero-denominator safety khi giảng viên có lớp nhưng chưa đánh giá")
+    void testCourseLecturerZeroDenominatorSafety() {
+      AnalyticsQueryRequest req =
+          AnalyticsQueryRequest.builder()
+              .dimension(AnalyticsDimension.COURSE_LECTURER)
+              .courseId("crs_algo")
+              .runId("run_success_1")
+              .build();
+
+      User lec = User.builder().id("lec_1").username("gv_moi").build();
+      CourseSection sec =
+          CourseSection.builder()
+              .id("sec_1")
+              .courseId("crs_algo")
+              .lecturerIds(List.of("lec_1"))
+              .build();
+      Clo clo = Clo.builder().id("clo_1").code("CLO1").build();
+
+      AggregateResult aggEmpty =
+          AggregateResult.builder()
+              .runId("run_success_1")
+              .level(ResultLevel.CLO)
+              .subjectId("clo_1")
+              .sectionId("sec_1")
+              .counts(AggregateResult.Counts.builder().enrolled(30).passed(0).failed(0).build())
+              .mean(null)
+              .passRate(null)
+              .build();
+
+      when(calculationRunRepository.findById("run_success_1")).thenReturn(Optional.of(successRun));
+      when(courseSectionRepository.findByCourseId("crs_algo")).thenReturn(List.of(sec));
+      when(userRepository.findAllById(any())).thenReturn(List.of(lec));
+      when(mongoTemplate.find(any(Query.class), eq(Clo.class))).thenReturn(List.of(clo));
+      when(aggregateResultRepository.findByRunIdAndLevel("run_success_1", ResultLevel.CLO))
+          .thenReturn(List.of(aggEmpty));
+
+      AnalyticsMatrixResponse resp = analyticsService.getAnalyticsMatrix(req, adminPrincipal);
+
+      MatrixMetricCell cell = resp.getMatrix().get(0).get(0);
+      assertThat(cell.getEvaluated()).isEqualTo(0);
+      assertThat(cell.getMean()).isNull();
+      assertThat(cell.getPassRate()).isNull();
+      assertThat(cell.getPassRateOfEnrolled()).isNull();
+    }
+
+    // --- Chiều STUDENT ---
+
+    @Test
+    @DisplayName("STUDENT: Happy path cấp độ CLO theo lớp học phần")
+    void testStudentHappyPathCloLevel() {
+      AnalyticsQueryRequest req =
+          AnalyticsQueryRequest.builder()
+              .dimension(AnalyticsDimension.STUDENT)
+              .courseId("crs_algo")
+              .sectionIds(List.of("sec_1"))
+              .runId("run_success_1")
+              .build();
+
+      Student s1 =
+          Student.builder().id("st_1").studentRef("21110001").fullName("Nguyễn Văn A").build();
+      Student s2 =
+          Student.builder().id("st_2").studentRef("21110002").fullName("Trần Thị B").build();
+
+      Enrollment e1 =
+          Enrollment.builder()
+              .sectionId("sec_1")
+              .studentId("st_1")
+              .status(EnrollmentStatus.ENROLLED)
+              .build();
+      Enrollment e2 =
+          Enrollment.builder()
+              .sectionId("sec_1")
+              .studentId("st_2")
+              .status(EnrollmentStatus.ENROLLED)
+              .build();
+
+      Clo clo1 = Clo.builder().id("clo_1").code("CLO1").build();
+      Clo clo2 = Clo.builder().id("clo_2").code("CLO2").build();
+
+      StudentResult sr1_clo1 =
+          StudentResult.builder()
+              .runId("run_success_1")
+              .level(ResultLevel.CLO)
+              .subjectId("clo_1")
+              .studentId("st_1")
+              .status(ResultStatus.COMPUTED)
+              .value(0.85)
+              .passed(true)
+              .build();
+
+      StudentResult sr2_clo1 =
+          StudentResult.builder()
+              .runId("run_success_1")
+              .level(ResultLevel.CLO)
+              .subjectId("clo_1")
+              .studentId("st_2")
+              .status(ResultStatus.COMPUTED)
+              .value(0.40)
+              .passed(false)
+              .build();
+
+      StudentResult sr1_clo2 =
+          StudentResult.builder()
+              .runId("run_success_1")
+              .level(ResultLevel.CLO)
+              .subjectId("clo_2")
+              .studentId("st_1")
+              .status(ResultStatus.INSUFFICIENT_DATA)
+              .build();
+
+      when(calculationRunRepository.findById("run_success_1")).thenReturn(Optional.of(successRun));
+      when(mongoTemplate.find(any(Query.class), eq(Clo.class))).thenReturn(List.of(clo1, clo2));
+      when(courseSectionRepository.findAllById(List.of("sec_1")))
+          .thenReturn(List.of(CourseSection.builder().id("sec_1").courseId("crs_algo").build()));
+      when(enrollmentRepository.findBySectionIdInAndStatus(
+              List.of("sec_1"), EnrollmentStatus.ENROLLED))
+          .thenReturn(List.of(e1, e2));
+      when(studentRepository.findAllById(any())).thenReturn(List.of(s2, s1));
+      when(studentResultRepository.findByRunIdAndLevel("run_success_1", ResultLevel.CLO))
+          .thenReturn(List.of(sr1_clo1, sr2_clo1, sr1_clo2));
+
+      AnalyticsMatrixResponse resp = analyticsService.getAnalyticsMatrix(req, adminPrincipal);
+
+      assertThat(resp.getDimension()).isEqualTo(AnalyticsDimension.STUDENT);
+      assertThat(resp.getLevel()).isEqualTo(ResultLevel.CLO);
+      // Cột sinh viên sắp xếp theo MSSV
+      assertThat(resp.getColumns()).extracting("code").containsExactly("21110001", "21110002");
+      assertThat(resp.getRows()).extracting("code").containsExactly("CLO1", "CLO2");
+
+      // Dòng CLO1:
+      // s1: đạt (mean=0.85, passed=1, passRate=1.0)
+      MatrixMetricCell cell1_1 = resp.getMatrix().get(0).get(0);
+      assertThat(cell1_1.getEvaluated()).isEqualTo(1);
+      assertThat(cell1_1.getPassed()).isEqualTo(1);
+      assertThat(cell1_1.getMean()).isEqualTo(0.85);
+      assertThat(cell1_1.getPassRate()).isEqualTo(1.0);
+
+      // s2: chưa đạt (mean=0.40, passed=0, failed=1, passRate=0.0)
+      MatrixMetricCell cell1_2 = resp.getMatrix().get(0).get(1);
+      assertThat(cell1_2.getEvaluated()).isEqualTo(1);
+      assertThat(cell1_2.getPassed()).isEqualTo(0);
+      assertThat(cell1_2.getFailed()).isEqualTo(1);
+      assertThat(cell1_2.getMean()).isEqualTo(0.40);
+      assertThat(cell1_2.getPassRate()).isEqualTo(0.0);
+
+      // Dòng CLO2:
+      // s1: INSUFFICIENT_DATA -> enrolled=1, evaluated=0, insufficientData=1, mean=null,
+      // passRate=null
+      MatrixMetricCell cell2_1 = resp.getMatrix().get(1).get(0);
+      assertThat(cell2_1.getEnrolled()).isEqualTo(1);
+      assertThat(cell2_1.getEvaluated()).isEqualTo(0);
+      assertThat(cell2_1.getInsufficientData()).isEqualTo(1);
+      assertThat(cell2_1.getMean()).isNull();
+      assertThat(cell2_1.getPassRate()).isNull();
+
+      // s2: vắng/không có kết quả -> empty cell
+      MatrixMetricCell cell2_2 = resp.getMatrix().get(1).get(1);
+      assertThat(cell2_2.getEnrolled()).isEqualTo(0);
+      assertThat(cell2_2.getEvaluated()).isEqualTo(0);
+      assertThat(cell2_2.getMean()).isNull();
+    }
+
+    @Test
+    @DisplayName("STUDENT: Happy path cấp độ PLO theo phiên bản CTĐT")
+    void testStudentHappyPathPloLevel() {
+      AnalyticsQueryRequest req =
+          AnalyticsQueryRequest.builder()
+              .dimension(AnalyticsDimension.STUDENT)
+              .programVersionId("pv_cntt")
+              .studentIds(List.of("st_1"))
+              .runId("run_success_1")
+              .build();
+
+      Student s1 =
+          Student.builder().id("st_1").studentRef("21110001").fullName("Nguyễn Văn A").build();
+      Plo plo1 =
+          Plo.builder().id("plo_1").code("PLO1").contentOriginal("Áp dụng kiến thức").build();
+
+      StudentResult sr =
+          StudentResult.builder()
+              .runId("run_success_1")
+              .level(ResultLevel.PLO)
+              .subjectId("plo_1")
+              .studentId("st_1")
+              .status(ResultStatus.COMPUTED)
+              .value(0.90)
+              .passed(true)
+              .build();
+
+      when(calculationRunRepository.findById("run_success_1")).thenReturn(Optional.of(successRun));
+      when(ploRepository.findByProgramVersionIdOrderByDisplayOrderAsc("pv_cntt"))
+          .thenReturn(List.of(plo1));
+      when(studentRepository.findAllById(List.of("st_1"))).thenReturn(List.of(s1));
+      when(studentResultRepository.findByRunIdAndLevel("run_success_1", ResultLevel.PLO))
+          .thenReturn(List.of(sr));
+
+      AnalyticsMatrixResponse resp = analyticsService.getAnalyticsMatrix(req, adminPrincipal);
+
+      assertThat(resp.getDimension()).isEqualTo(AnalyticsDimension.STUDENT);
+      assertThat(resp.getLevel()).isEqualTo(ResultLevel.PLO);
+      assertThat(resp.getColumns()).extracting("code").containsExactly("21110001");
+      assertThat(resp.getRows()).extracting("code").containsExactly("PLO1");
+      MatrixMetricCell cell = resp.getMatrix().get(0).get(0);
+      assertThat(cell.getEvaluated()).isEqualTo(1);
+      assertThat(cell.getPassed()).isEqualTo(1);
+      assertThat(cell.getMean()).isEqualTo(0.90);
+    }
+
+    @Test
+    @DisplayName("STUDENT: LECTURER bị từ chối khi truy vấn lớp không phụ trách")
+    void testStudentLecturerUnauthorizedSectionForbidden() {
+      AnalyticsQueryRequest req =
+          AnalyticsQueryRequest.builder()
+              .dimension(AnalyticsDimension.STUDENT)
+              .sectionIds(List.of("sec_unauthorized"))
+              .build();
+
+      when(scopeAuthorizationService.canAccessSection(
+              lecturerPrincipal, "sec_unauthorized", AccessType.READ))
+          .thenReturn(false);
+
+      assertThatThrownBy(() -> analyticsService.getAnalyticsMatrix(req, lecturerPrincipal))
+          .isInstanceOf(AccessDeniedException.class)
+          .hasMessageContaining("Không có quyền truy cập");
+    }
+
+    @Test
+    @DisplayName("Xuất CSV cho cả 2 chiều mới COURSE_LECTURER và STUDENT thành công với UTF-8 BOM")
+    void testCsvExportForNewDimensions() {
+      // 1. Export COURSE_LECTURER
+      AnalyticsMatrixResponse respLec =
+          AnalyticsMatrixResponse.builder()
+              .dimension(AnalyticsDimension.COURSE_LECTURER)
+              .level(ResultLevel.CLO)
+              .runId("run_1")
+              .columns(List.of(MatrixHeader.builder().id("l1").code("gv01").name("TS. An").build()))
+              .rows(List.of(MatrixHeader.builder().id("c1").code("CLO1").name("Mô tả CLO").build()))
+              .matrix(
+                  List.of(
+                      List.of(
+                          MatrixMetricCell.builder()
+                              .enrolled(30)
+                              .evaluated(30)
+                              .passed(27)
+                              .failed(3)
+                              .mean(0.85)
+                              .passRate(0.90)
+                              .build())))
+              .build();
+
+      byte[] bytesLec = matrixCsvExporter.exportToCsv(respLec);
+      String csvLec = new String(bytesLec, StandardCharsets.UTF_8);
+      assertThat(csvLec).startsWith("\uFEFF");
+      assertThat(csvLec).contains("COURSE_LECTURER");
+      assertThat(csvLec).contains("gv01");
+      assertThat(csvLec).contains("90.00%");
+
+      // 2. Export STUDENT
+      AnalyticsMatrixResponse respStu =
+          AnalyticsMatrixResponse.builder()
+              .dimension(AnalyticsDimension.STUDENT)
+              .level(ResultLevel.CLO)
+              .runId("run_1")
+              .columns(
+                  List.of(
+                      MatrixHeader.builder().id("s1").code("21110099").name("Lê Văn C").build()))
+              .rows(List.of(MatrixHeader.builder().id("c1").code("CLO1").name("Mô tả CLO").build()))
+              .matrix(
+                  List.of(
+                      List.of(
+                          MatrixMetricCell.builder()
+                              .enrolled(1)
+                              .evaluated(1)
+                              .passed(1)
+                              .failed(0)
+                              .mean(0.95)
+                              .passRate(1.0)
+                              .build())))
+              .build();
+
+      byte[] bytesStu = matrixCsvExporter.exportToCsv(respStu);
+      String csvStu = new String(bytesStu, StandardCharsets.UTF_8);
+      assertThat(csvStu).startsWith("\uFEFF");
+      assertThat(csvStu).contains("STUDENT");
+      assertThat(csvStu).contains("21110099");
+      assertThat(csvStu).contains("100.00%");
     }
   }
 
