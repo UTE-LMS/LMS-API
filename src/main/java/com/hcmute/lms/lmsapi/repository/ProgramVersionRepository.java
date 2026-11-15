@@ -2,6 +2,7 @@ package com.hcmute.lms.lmsapi.repository;
 
 import com.hcmute.lms.lmsapi.document.ProgramVersion;
 import com.hcmute.lms.lmsapi.enums.ProgramVersionStatus;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
@@ -21,4 +22,8 @@ public interface ProgramVersionRepository extends MongoRepository<ProgramVersion
   boolean existsByProgramIdAndVersion(String programId, String version);
 
   boolean existsByProgramIdAndVersionAndIdNot(String programId, String version, String id);
+
+  boolean existsByIdInAndStatus(Collection<String> ids, ProgramVersionStatus status);
+
+  boolean existsByProgramIdInAndStatus(Collection<String> programIds, ProgramVersionStatus status);
 }

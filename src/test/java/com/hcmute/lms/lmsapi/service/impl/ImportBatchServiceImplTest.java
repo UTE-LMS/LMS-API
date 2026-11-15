@@ -31,8 +31,11 @@ import com.hcmute.lms.lmsapi.repository.CourseSectionRepository;
 import com.hcmute.lms.lmsapi.repository.EnrollmentRepository;
 import com.hcmute.lms.lmsapi.repository.ImportBatchRepository;
 import com.hcmute.lms.lmsapi.repository.ImportRowErrorRepository;
+import com.hcmute.lms.lmsapi.repository.ProgramCourseRepository;
+import com.hcmute.lms.lmsapi.repository.ProgramVersionRepository;
 import com.hcmute.lms.lmsapi.repository.ScoreRepository;
 import com.hcmute.lms.lmsapi.repository.StudentRepository;
+import com.hcmute.lms.lmsapi.repository.SyllabusRepository;
 import com.hcmute.lms.lmsapi.repository.TermRepository;
 import com.hcmute.lms.lmsapi.service.AuditService;
 import com.hcmute.lms.lmsapi.service.ImportFileStorage;
@@ -62,6 +65,9 @@ class ImportBatchServiceImplTest {
   @Mock private ImportBatchRepository batchRepository;
   @Mock private ImportRowErrorRepository rowErrorRepository;
   @Mock private ScoreRepository scoreRepository;
+  @Mock private SyllabusRepository syllabusRepository;
+  @Mock private ProgramCourseRepository programCourseRepository;
+  @Mock private ProgramVersionRepository programVersionRepository;
   @Mock private AssessmentItemValidator assessmentItemValidator;
   @Mock private ImportFileStorage fileStorage;
   @Mock private ScoreRowValidator rowValidator;
@@ -88,6 +94,9 @@ class ImportBatchServiceImplTest {
             batchRepository,
             rowErrorRepository,
             scoreRepository,
+            syllabusRepository,
+            programCourseRepository,
+            programVersionRepository,
             assessmentItemValidator,
             fileStorage,
             rowValidator,

@@ -96,10 +96,20 @@ const ASSESSMENT_NEED_ITEMS_STATUSES = ['LOCKED', 'SCORE_ENTERED'];
 
 const COLLECTIONS = {
 
+  // ----- Khoa quản lý đào tạo -----
+  faculties: {
+    validator: schema(['code', 'name', 'isActive'], {
+      code: STR, name: STR, description: STR_N, isActive: BOOL,
+      createdAt: DATE_N, updatedAt: DATE_N
+    }),
+    indexes: [[{ code: 1 }, { unique: true }], [{ name: 1 }, { unique: true }], [{ isActive: 1 }]]
+  },
+
   // ----- Người dùng -----
   users: {
     validator: schema(['username', 'email', 'passwordHash', 'status', 'roleAssignments'], {
       username: STR, email: STR, passwordHash: STR, fullName: STR_N,
+      facultyId: OID_N,
       status: en('ACTIVE', 'LOCKED'), tokenVersion: INT,
       roleAssignments: arr({
         bsonType: 'object', required: ['role'],
@@ -112,13 +122,15 @@ const COLLECTIONS = {
         }
       })
     }),
-    indexes: [[{ username: 1 }, { unique: true }], [{ email: 1 }, { unique: true }]]
+    indexes: [[{ username: 1 }, { unique: true }], [{ email: 1 }, { unique: true }], [{ facultyId: 1 }]]
   },
 
   // ----- CTĐT -----
   programs: {
-    validator: schema(['code', 'name'], { code: STR, name: STR, level: STR_N, degree: STR_N, extra: OBJ_N }),
-    indexes: [[{ code: 1 }, { unique: true }]]
+    validator: schema(['code', 'name'], {
+      facultyId: OID_N, code: STR, name: STR, level: STR_N, degree: STR_N, extra: OBJ_N
+    }),
+    indexes: [[{ code: 1 }, { unique: true }], [{ facultyId: 1 }]]
   },
 
   program_versions: {
@@ -164,10 +176,10 @@ const COLLECTIONS = {
 
   courses: {
     validator: schema(['code', 'name'], {
-      code: STR, name: STR, credits: INT_N,
+      facultyId: OID_N, code: STR, name: STR, credits: INT_N, isActive: BOOL,
       extra: OBJ_N
     }),
-    indexes: [[{ code: 1 }, { unique: true }]]
+    indexes: [[{ code: 1 }, { unique: true }], [{ facultyId: 1 }]]
   },
 
   program_courses: {

@@ -12,6 +12,7 @@ import lombok.NoArgsConstructor;
 public class ProgramResponse {
 
   private String id;
+  private String facultyId;
   private String code;
   private String name;
   private String level;

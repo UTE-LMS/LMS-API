@@ -9,7 +9,16 @@ import org.springframework.web.multipart.MultipartFile;
 
 public interface CourseService {
 
-  PageResponse<CourseResponse> getCourses(int page, int size, String search);
+  default PageResponse<CourseResponse> getCourses(int page, int size, String search) {
+    return getCourses(page, size, search, null);
+  }
+
+  PageResponse<CourseResponse> getCourses(int page, int size, String search, String facultyId);
+
+  default PageResponse<CourseResponse> getCourses(
+      int page, int size, String search, String facultyId, Boolean isActive) {
+    return getCourses(page, size, search, facultyId);
+  }
 
   CourseResponse getCourseById(String id);
 
@@ -19,5 +28,9 @@ public interface CourseService {
 
   void deleteCourse(String id);
 
-  CourseImportResultResponse importCourses(MultipartFile file);
+  default CourseImportResultResponse importCourses(MultipartFile file) {
+    return importCourses(file, null);
+  }
+
+  CourseImportResultResponse importCourses(MultipartFile file, String facultyId);
 }

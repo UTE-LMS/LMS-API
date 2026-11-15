@@ -69,4 +69,10 @@ public interface UserRepository extends MongoRepository<User, String>, UserRepos
    */
   @Query(value = "{ 'roleAssignments.role': ?0, 'status': ?1 }")
   List<User> findByRoleAssignmentsRoleAndStatus(Role role, UserStatus status);
+
+  @Query(value = "{ 'facultyId': ObjectId(?0), 'roleAssignments.role': ?1 }")
+  List<User> findByFacultyIdAndRoleAssignmentsRole(String facultyId, Role role);
+
+  @Query(value = "{ 'facultyId': ObjectId(?0), 'roleAssignments.role': ?1 }", count = true)
+  long countByFacultyIdAndRoleAssignmentsRole(String facultyId, Role role);
 }

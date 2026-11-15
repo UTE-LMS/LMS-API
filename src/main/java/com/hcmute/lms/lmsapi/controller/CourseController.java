@@ -5,6 +5,8 @@ import com.hcmute.lms.lmsapi.dto.CourseRequest;
 import com.hcmute.lms.lmsapi.dto.CourseResponse;
 import com.hcmute.lms.lmsapi.dto.CourseUpdateRequest;
 import com.hcmute.lms.lmsapi.dto.PageResponse;
+import com.hcmute.lms.lmsapi.dto.UserPrincipal;
+import com.hcmute.lms.lmsapi.enums.Role;
 import com.hcmute.lms.lmsapi.service.CourseService;
 import com.hcmute.lms.lmsapi.util.PageableValidationUtils;
 import jakarta.validation.Valid;
@@ -16,7 +18,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -39,7 +43,6 @@ public class CourseController {
   private final CourseService courseService;
 
   @GetMapping
-  @PreAuthorize("isAuthenticated()")
   public ResponseEntity<PageResponse<CourseResponse>> getCourses(
       @RequestParam(defaultValue = "0", required = false)
           @Min(value = 0, message = "Chỉ số trang phải lớn hơn hoặc bằng 0")
@@ -48,17 +51,20 @@ public class CourseController {
           @Min(value = 1, message = "Kích thước trang phải lớn hơn hoặc bằng 1")
           @Max(value = 100, message = "Kích thước trang tối đa 100")
           Integer size,
-      @RequestParam(required = false) String search) {
+      @RequestParam(required = false) String search,
+      @RequestParam(required = false) String facultyId,
+      @RequestParam(required = false) Boolean isActive) {
     PageableValidationUtils.validate(page, size);
     return ResponseEntity.ok(
         courseService.getCourses(
             page != null ? page : PageableValidationUtils.DEFAULT_PAGE,
             size != null ? size : PageableValidationUtils.DEFAULT_SIZE,
-            search));
+            search,
+            facultyId,
+            isActive));
   }
 
   @GetMapping("/{id}")
-  @PreAuthorize("isAuthenticated()")
   public ResponseEntity<CourseResponse> getCourseById(
       @PathVariable("id")
           @Pattern(
@@ -69,37 +75,70 @@ public class CourseController {
   }
 
   @PostMapping
-  @PreAuthorize("hasRole('ADMIN')")
-  public ResponseEntity<CourseResponse> createCourse(@Valid @RequestBody CourseRequest request) {
+  @PreAuthorize(
+      "hasRole('ADMIN') or (hasRole('PROGRAM_MANAGER') and (#request.facultyId == null or authentication.principal.facultyId == #request.facultyId))")
+  public ResponseEntity<CourseResponse> createCourse(
+      @Valid @RequestBody CourseRequest request, @AuthenticationPrincipal UserPrincipal principal) {
+    if (principal != null && !hasRole(principal, Role.ADMIN)) {
+      if (principal.getFacultyId() == null) {
+        throw new AccessDeniedException("Program Manager chưa được gán vào Khoa nào");
+      }
+      if (request.getFacultyId() == null) {
+        request.setFacultyId(principal.getFacultyId());
+      }
+    }
     log.info("API request: POST /api/v1/courses with code [{}]", request.getCode());
     return ResponseEntity.status(HttpStatus.CREATED).body(courseService.createCourse(request));
   }
 
   @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize(
+      "hasRole('ADMIN') or (hasRole('PROGRAM_MANAGER') and (#facultyId == null or authentication.principal.facultyId == #facultyId))")
   public ResponseEntity<CourseImportResultResponse> importCourses(
-      @RequestParam("file") MultipartFile file) {
+      @RequestParam("file") MultipartFile file,
+      @RequestParam(value = "facultyId", required = false) String facultyId,
+      @AuthenticationPrincipal UserPrincipal principal) {
+    String effectiveFacultyId = facultyId;
+    if (principal != null && !hasRole(principal, Role.ADMIN)) {
+      if (principal.getFacultyId() == null) {
+        throw new AccessDeniedException("Program Manager chưa được gán vào Khoa nào");
+      }
+      if (effectiveFacultyId == null) {
+        effectiveFacultyId = principal.getFacultyId();
+      }
+    }
     log.info(
         "API request: POST /api/v1/courses/import with file [{}]",
         file != null ? file.getOriginalFilename() : "null");
-    return ResponseEntity.ok(courseService.importCourses(file));
+    return ResponseEntity.ok(courseService.importCourses(file, effectiveFacultyId));
   }
 
   @PutMapping("/{id}")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize(
+      "hasRole('ADMIN') or (hasRole('PROGRAM_MANAGER') and @scopeAuthorizationService.canManageCourse(authentication.principal, #id))")
   public ResponseEntity<CourseResponse> updateCourse(
       @PathVariable("id")
           @Pattern(
               regexp = "^[0-9a-fA-F]{24}$",
               message = "ID học phần phải là ObjectId 24 ký tự hex")
           String id,
-      @Valid @RequestBody CourseUpdateRequest request) {
+      @Valid @RequestBody CourseUpdateRequest request,
+      @AuthenticationPrincipal UserPrincipal principal) {
     log.info("API request: PUT /api/v1/courses/{}", id);
+    if (principal != null && !hasRole(principal, Role.ADMIN)) {
+      CourseResponse existing = courseService.getCourseById(id);
+      if (request.getFacultyId() != null
+          && !request.getFacultyId().equals(existing.getFacultyId())) {
+        throw new AccessDeniedException(
+            "Program Manager không có quyền chuyển Khoa chủ quản của học phần");
+      }
+    }
     return ResponseEntity.ok(courseService.updateCourse(id, request));
   }
 
   @DeleteMapping("/{id}")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize(
+      "hasRole('ADMIN') or (hasRole('PROGRAM_MANAGER') and @scopeAuthorizationService.canManageCourse(authentication.principal, #id))")
   public ResponseEntity<Void> deleteCourse(
       @PathVariable("id")
           @Pattern(
@@ -109,5 +148,11 @@ public class CourseController {
     log.info("API request: DELETE /api/v1/courses/{}", id);
     courseService.deleteCourse(id);
     return ResponseEntity.noContent().build();
+  }
+
+  private boolean hasRole(UserPrincipal principal, Role role) {
+    return principal.getRoleAssignments() != null
+        && principal.getRoleAssignments().stream()
+            .anyMatch(ra -> ra != null && ra.getRole() == role);
   }
 }

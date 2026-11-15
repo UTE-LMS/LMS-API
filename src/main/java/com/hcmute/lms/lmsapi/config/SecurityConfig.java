@@ -87,6 +87,32 @@ public class SecurityConfig {
                     .requestMatchers("/actuator/info")
                     .permitAll()
 
+                    // Công khai các endpoint GET học thuật cho Homepage (chỉ đọc)
+                    .requestMatchers(
+                        HttpMethod.GET,
+                        "/api/v1/faculties",
+                        "/api/v1/faculties/{id:[0-9a-fA-F]{24}}",
+                        "/api/v1/programs",
+                        "/api/v1/programs/{id:[0-9a-fA-F]{24}}",
+                        "/api/v1/program-versions",
+                        "/api/v1/program-versions/{id:[0-9a-fA-F]{24}}",
+                        "/api/v1/program-versions/{id:[0-9a-fA-F]{24}}/plos",
+                        "/api/v1/program-versions/{id:[0-9a-fA-F]{24}}/plos/{ploId:[0-9a-fA-F]{24}}",
+                        "/api/v1/program-versions/{id:[0-9a-fA-F]{24}}/pis",
+                        "/api/v1/program-versions/{id:[0-9a-fA-F]{24}}/pis/{piId:[0-9a-fA-F]{24}}",
+                        "/api/v1/program-versions/{id:[0-9a-fA-F]{24}}/courses",
+                        "/api/v1/program-versions/{id:[0-9a-fA-F]{24}}/courses/{courseId:[0-9a-fA-F]{24}}",
+                        "/api/v1/program-versions/{id:[0-9a-fA-F]{24}}/syllabi",
+                        "/api/v1/courses",
+                        "/api/v1/courses/{id:[0-9a-fA-F]{24}}",
+                        "/api/v1/courses/{id:[0-9a-fA-F]{24}}/syllabi",
+                        "/api/v1/syllabi/{id:[0-9a-fA-F]{24}}",
+                        "/api/v1/syllabi/{id:[0-9a-fA-F]{24}}/clos",
+                        "/api/v1/syllabi/{id:[0-9a-fA-F]{24}}/clo-pi-links",
+                        "/api/v1/syllabi/{id:[0-9a-fA-F]{24}}/clo-pi-matrix",
+                        "/api/v1/clos/{id:[0-9a-fA-F]{24}}")
+                    .permitAll()
+
                     // Phân hệ quản lý người dùng chỉ dành riêng cho ADMIN (US-02 / ADR 0003)
                     .requestMatchers("/api/v1/users", "/api/v1/users/**")
                     .hasRole("ADMIN")

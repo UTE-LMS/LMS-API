@@ -8,6 +8,11 @@ public interface ProgramService {
 
   PageResponse<ProgramResponse> getPrograms(int page, int size);
 
+  default PageResponse<ProgramResponse> getPrograms(
+      int page, int size, String facultyId, String level, String degree, String search) {
+    return getPrograms(page, size);
+  }
+
   ProgramResponse getProgramById(String id);
 
   ProgramResponse createProgram(ProgramRequest request);

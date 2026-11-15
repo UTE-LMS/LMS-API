@@ -1,5 +1,6 @@
 package com.hcmute.lms.lmsapi.service.impl;
 
+import com.hcmute.lms.lmsapi.document.ProgramCourse;
 import com.hcmute.lms.lmsapi.document.Syllabus;
 import com.hcmute.lms.lmsapi.document.Term;
 import com.hcmute.lms.lmsapi.dto.SyllabusRequest;
@@ -11,6 +12,8 @@ import com.hcmute.lms.lmsapi.exception.ErrorCode;
 import com.hcmute.lms.lmsapi.exception.ResourceNotFoundException;
 import com.hcmute.lms.lmsapi.mapper.SyllabusMapper;
 import com.hcmute.lms.lmsapi.repository.CourseRepository;
+import com.hcmute.lms.lmsapi.repository.ProgramCourseRepository;
+import com.hcmute.lms.lmsapi.repository.ProgramVersionRepository;
 import com.hcmute.lms.lmsapi.repository.SyllabusRepository;
 import com.hcmute.lms.lmsapi.repository.TermRepository;
 import com.hcmute.lms.lmsapi.service.SyllabusService;
@@ -29,14 +32,83 @@ public class SyllabusServiceImpl implements SyllabusService {
 
   private final SyllabusRepository syllabusRepository;
   private final CourseRepository courseRepository;
+  private final ProgramVersionRepository programVersionRepository;
+  private final ProgramCourseRepository programCourseRepository;
   private final TermRepository termRepository;
   private final SyllabusMapper syllabusMapper;
 
   @Override
   public List<SyllabusResponse> getSyllabi(String courseId) {
+    return getSyllabi(courseId, null, null, null);
+  }
+
+  @Override
+  public List<SyllabusResponse> getSyllabi(
+      String courseId, SyllabusStatus status, String effectiveFromTermId, String search) {
     requireCourse(courseId);
+    List<Syllabus> syllabi = syllabusRepository.findByCourseIdOrderByVersionAsc(courseId);
     return syllabusMapper.toResponseList(
-        syllabusRepository.findByCourseIdOrderByVersionAsc(courseId));
+        filterSyllabi(syllabi, null, status, effectiveFromTermId, search));
+  }
+
+  @Override
+  public List<SyllabusResponse> getSyllabiByProgramVersion(
+      String programVersionId,
+      String courseId,
+      SyllabusStatus status,
+      String effectiveFromTermId,
+      String search) {
+    ObjectIdUtils.requireValid(programVersionId, "programVersionId");
+    if (!programVersionRepository.existsById(programVersionId)) {
+      throw new ResourceNotFoundException("ProgramVersion", "id", programVersionId);
+    }
+    if (courseId != null && !courseId.isBlank()) {
+      ObjectIdUtils.requireValid(courseId.trim(), "courseId");
+    }
+
+    List<String> courseIds =
+        programCourseRepository
+            .findByProgramVersionIdOrderBySemesterAscCourseIdAsc(programVersionId)
+            .stream()
+            .map(ProgramCourse::getCourseId)
+            .distinct()
+            .toList();
+    if (courseIds.isEmpty()) {
+      return List.of();
+    }
+
+    List<Syllabus> syllabi =
+        syllabusRepository.findByCourseIdInOrderByCourseIdAscVersionAsc(courseIds);
+    return syllabusMapper.toResponseList(
+        filterSyllabi(syllabi, courseId, status, effectiveFromTermId, search));
+  }
+
+  private List<Syllabus> filterSyllabi(
+      List<Syllabus> syllabi,
+      String courseId,
+      SyllabusStatus status,
+      String effectiveFromTermId,
+      String search) {
+    String cleanCourseId = courseId != null && !courseId.isBlank() ? courseId.trim() : null;
+    String cleanTermId =
+        effectiveFromTermId != null && !effectiveFromTermId.isBlank()
+            ? effectiveFromTermId.trim()
+            : null;
+    if (cleanTermId != null) {
+      ObjectIdUtils.requireValid(cleanTermId, "effectiveFromTermId");
+    }
+    String cleanSearch = search != null && !search.isBlank() ? search.trim().toLowerCase() : null;
+
+    return syllabi.stream()
+        .filter(s -> cleanCourseId == null || cleanCourseId.equals(s.getCourseId()))
+        .filter(s -> status == null || status == s.getStatus())
+        .filter(s -> cleanTermId == null || cleanTermId.equals(s.getEffectiveFromTermId()))
+        .filter(
+            s ->
+                cleanSearch == null
+                    || (s.getVersion() != null
+                        && s.getVersion().toLowerCase().contains(cleanSearch)))
+        .toList();
   }
 
   @Override

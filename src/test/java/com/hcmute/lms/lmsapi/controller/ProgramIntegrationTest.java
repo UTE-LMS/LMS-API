@@ -196,9 +196,9 @@ class ProgramIntegrationTest {
 
   @Test
   @DisplayName(
-      "Đọc CTĐT yêu cầu đăng nhập, ghi cần PROGRAM_MANAGER, kiểm tra trùng mã và chuyển trạng thái")
+      "Đọc CTĐT công khai cho Homepage, ghi cần PROGRAM_MANAGER, kiểm tra trùng mã và chuyển trạng thái")
   void programAndVersionFlow() throws Exception {
-    mockMvc.perform(get("/api/v1/programs")).andExpect(status().isUnauthorized());
+    mockMvc.perform(get("/api/v1/programs")).andExpect(status().isOk());
 
     mockMvc
         .perform(

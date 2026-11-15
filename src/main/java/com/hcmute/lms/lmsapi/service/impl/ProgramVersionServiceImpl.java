@@ -1,5 +1,6 @@
 package com.hcmute.lms.lmsapi.service.impl;
 
+import com.hcmute.lms.lmsapi.document.Program;
 import com.hcmute.lms.lmsapi.document.ProgramVersion;
 import com.hcmute.lms.lmsapi.document.Verification;
 import com.hcmute.lms.lmsapi.dto.PageResponse;
@@ -21,13 +22,18 @@ import com.hcmute.lms.lmsapi.util.ObjectIdUtils;
 import com.hcmute.lms.lmsapi.util.PageableValidationUtils;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.bson.types.ObjectId;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
@@ -39,25 +45,89 @@ public class ProgramVersionServiceImpl implements ProgramVersionService {
   private final ProgramVersionRepository programVersionRepository;
   private final ProgramRepository programRepository;
   private final ProgramVersionMapper programVersionMapper;
+  private final MongoTemplate mongoTemplate;
 
   @Override
   public PageResponse<ProgramVersionResponse> getProgramVersions(
       int page, int size, String programId) {
+    return getProgramVersions(page, size, programId, null, null, null, null);
+  }
+
+  @Override
+  public PageResponse<ProgramVersionResponse> getProgramVersions(
+      int page,
+      int size,
+      String programId,
+      String facultyId,
+      String cohort,
+      ProgramVersionStatus status,
+      String search) {
     PageableValidationUtils.validate(page, size);
     Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, "version"));
 
-    Page<ProgramVersion> versionPage;
-    if (programId == null || programId.isBlank()) {
-      versionPage = programVersionRepository.findAll(pageable);
-    } else {
-      ObjectIdUtils.requireValid(programId, "programId");
-      versionPage = programVersionRepository.findByProgramId(programId, pageable);
+    String cleanProgramId = trimToNull(programId);
+    String cleanFacultyId = trimToNull(facultyId);
+    String cleanCohort = trimToNull(cohort);
+    String cleanSearch = trimToNull(search);
+
+    if (cleanFacultyId == null && cleanCohort == null && status == null && cleanSearch == null) {
+      Page<ProgramVersion> versionPage;
+      if (cleanProgramId == null) {
+        versionPage = programVersionRepository.findAll(pageable);
+      } else {
+        ObjectIdUtils.requireValid(cleanProgramId, "programId");
+        versionPage = programVersionRepository.findByProgramId(cleanProgramId, pageable);
+      }
+      List<ProgramVersionResponse> content =
+          programVersionMapper.toResponseList(versionPage.getContent());
+      return PageResponse.of(
+          content, versionPage.getNumber(), versionPage.getSize(), versionPage.getTotalElements());
     }
 
-    List<ProgramVersionResponse> content =
-        programVersionMapper.toResponseList(versionPage.getContent());
+    List<Criteria> criteriaList = new ArrayList<>();
+    if (cleanProgramId != null) {
+      ObjectIdUtils.requireValid(cleanProgramId, "programId");
+      criteriaList.add(Criteria.where("programId").is(new ObjectId(cleanProgramId)));
+    }
+    if (cleanFacultyId != null) {
+      ObjectIdUtils.requireValid(cleanFacultyId, "facultyId");
+      List<ObjectId> programObjectIds =
+          programRepository.findByFacultyId(cleanFacultyId).stream()
+              .map(Program::getId)
+              .map(ObjectId::new)
+              .toList();
+      if (programObjectIds.isEmpty()) {
+        return PageResponse.of(List.of(), pageable.getPageNumber(), pageable.getPageSize(), 0);
+      }
+      criteriaList.add(Criteria.where("programId").in(programObjectIds));
+    }
+    if (cleanCohort != null) {
+      criteriaList.add(Criteria.where("applicableCohorts").is(cleanCohort));
+    }
+    if (status != null) {
+      criteriaList.add(Criteria.where("status").is(status));
+    }
+    if (cleanSearch != null) {
+      criteriaList.add(Criteria.where("version").regex(Pattern.quote(cleanSearch), "i"));
+    }
+
+    Query query = new Query(new Criteria().andOperator(criteriaList.toArray(Criteria[]::new)));
+    long total = mongoTemplate.count(Query.of(query).limit(-1).skip(-1), ProgramVersion.class);
+    query.with(pageable);
+    List<ProgramVersion> versions = mongoTemplate.find(query, ProgramVersion.class);
     return PageResponse.of(
-        content, versionPage.getNumber(), versionPage.getSize(), versionPage.getTotalElements());
+        programVersionMapper.toResponseList(versions),
+        pageable.getPageNumber(),
+        pageable.getPageSize(),
+        total);
+  }
+
+  private String trimToNull(String value) {
+    if (value == null) {
+      return null;
+    }
+    String trimmed = value.trim();
+    return trimmed.isEmpty() ? null : trimmed;
   }
 
   @Override

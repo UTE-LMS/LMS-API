@@ -16,4 +16,9 @@ public interface CourseRepository extends MongoRepository<Course, String> {
 
   Page<Course> findByNameContainingIgnoreCaseOrCodeContainingIgnoreCase(
       String name, String code, Pageable pageable);
+
+  Page<Course> findByFacultyId(String facultyId, Pageable pageable);
+
+  Page<Course> findByFacultyIdAndNameContainingIgnoreCaseOrFacultyIdAndCodeContainingIgnoreCase(
+      String facultyId1, String name, String facultyId2, String code, Pageable pageable);
 }

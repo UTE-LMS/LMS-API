@@ -41,14 +41,33 @@ public class SyllabusController {
   private final SyllabusImportService syllabusImportService;
 
   @GetMapping("/courses/{courseId}/syllabi")
-  @PreAuthorize("isAuthenticated()")
   public ResponseEntity<List<SyllabusResponse>> getSyllabi(
       @PathVariable("courseId")
           @Pattern(
               regexp = "^[0-9a-fA-F]{24}$",
               message = "ID học phần phải là ObjectId 24 ký tự hex")
-          String courseId) {
-    return ResponseEntity.ok(syllabusService.getSyllabi(courseId));
+          String courseId,
+      @RequestParam(required = false) com.hcmute.lms.lmsapi.enums.SyllabusStatus status,
+      @RequestParam(required = false) String effectiveFromTermId,
+      @RequestParam(required = false) String search) {
+    return ResponseEntity.ok(
+        syllabusService.getSyllabi(courseId, status, effectiveFromTermId, search));
+  }
+
+  @GetMapping("/program-versions/{programVersionId}/syllabi")
+  public ResponseEntity<List<SyllabusResponse>> getSyllabiByProgramVersion(
+      @PathVariable("programVersionId")
+          @Pattern(
+              regexp = "^[0-9a-fA-F]{24}$",
+              message = "ID phiên bản CTĐT phải là ObjectId 24 ký tự hex")
+          String programVersionId,
+      @RequestParam(required = false) String courseId,
+      @RequestParam(required = false) com.hcmute.lms.lmsapi.enums.SyllabusStatus status,
+      @RequestParam(required = false) String effectiveFromTermId,
+      @RequestParam(required = false) String search) {
+    return ResponseEntity.ok(
+        syllabusService.getSyllabiByProgramVersion(
+            programVersionId, courseId, status, effectiveFromTermId, search));
   }
 
   @GetMapping(
@@ -71,10 +90,35 @@ public class SyllabusController {
   }
 
   @PostMapping(
+      value = "/courses/{courseId}/syllabi/import/preview",
+      consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+  @PreAuthorize(
+      "hasRole('ADMIN') or (hasRole('PROGRAM_MANAGER') and @scopeAuthorizationService.canManageCourseSyllabus(authentication.principal, #courseId))")
+  public ResponseEntity<SyllabusCsvImportResponse> previewImportSyllabusCsv(
+      @PathVariable("courseId")
+          @Pattern(
+              regexp = "^[0-9a-fA-F]{24}$",
+              message = "ID học phần phải là ObjectId 24 ký tự hex")
+          String courseId,
+      @RequestParam("version") @NotBlank(message = "Phiên bản đề cương không được để trống")
+          String version,
+      @RequestParam("programVersionId")
+          @Pattern(
+              regexp = "^[0-9a-fA-F]{24}$",
+              message = "ID phiên bản CTĐT phải là ObjectId 24 ký tự hex")
+          String programVersionId,
+      @RequestParam(value = "effectiveFromTermId", required = false) String effectiveFromTermId,
+      @RequestPart("file") MultipartFile file,
+      @AuthenticationPrincipal UserPrincipal principal) {
+    return importSyllabusCsv(
+        courseId, version, programVersionId, effectiveFromTermId, file, principal);
+  }
+
+  @PostMapping(
       value = "/courses/{courseId}/syllabi/import",
       consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   @PreAuthorize(
-      "hasRole('ADMIN') or (hasRole('PROGRAM_MANAGER') and @scopeAuthorizationService.canAccessCourse(authentication.principal, #courseId, T(com.hcmute.lms.lmsapi.enums.AccessType).WRITE))")
+      "hasRole('ADMIN') or (hasRole('PROGRAM_MANAGER') and @scopeAuthorizationService.canManageCourseSyllabus(authentication.principal, #courseId))")
   public ResponseEntity<SyllabusCsvImportResponse> importSyllabusCsv(
       @PathVariable("courseId")
           @Pattern(
@@ -100,7 +144,7 @@ public class SyllabusController {
 
   @PostMapping("/syllabi/{id}/confirm-import")
   @PreAuthorize(
-      "hasRole('ADMIN') or (hasRole('PROGRAM_MANAGER') and @scopeAuthorizationService.canAccessSyllabus(authentication.principal, #id, T(com.hcmute.lms.lmsapi.enums.AccessType).WRITE))")
+      "hasRole('ADMIN') or (hasRole('PROGRAM_MANAGER') and @scopeAuthorizationService.canManageSyllabus(authentication.principal, #id))")
   public ResponseEntity<SyllabusCsvImportResponse> confirmImport(
       @PathVariable("id")
           @Pattern(
@@ -114,7 +158,6 @@ public class SyllabusController {
   }
 
   @GetMapping("/syllabi/{id}")
-  @PreAuthorize("isAuthenticated()")
   public ResponseEntity<SyllabusResponse> getSyllabus(
       @PathVariable("id")
           @Pattern(
@@ -124,9 +167,23 @@ public class SyllabusController {
     return ResponseEntity.ok(syllabusService.getSyllabus(id));
   }
 
+  @PutMapping("/syllabi/{id}/lock")
+  @PreAuthorize(
+      "hasRole('ADMIN') or (hasRole('PROGRAM_MANAGER') and @scopeAuthorizationService.canManageSyllabus(authentication.principal, #id))")
+  public ResponseEntity<SyllabusResponse> lockSyllabus(
+      @PathVariable("id")
+          @Pattern(
+              regexp = "^[0-9a-fA-F]{24}$",
+              message = "ID đề cương phải là ObjectId 24 ký tự hex")
+          String id) {
+    log.info("API request: PUT /api/v1/syllabi/{}/lock", id);
+    return ResponseEntity.ok(
+        syllabusService.updateStatus(id, com.hcmute.lms.lmsapi.enums.SyllabusStatus.ARCHIVED));
+  }
+
   @PutMapping("/syllabi/{id}/status")
   @PreAuthorize(
-      "hasRole('PROGRAM_MANAGER') and @scopeAuthorizationService.canAccessSyllabus(authentication.principal, #id, T(com.hcmute.lms.lmsapi.enums.AccessType).WRITE)")
+      "hasRole('ADMIN') or (hasRole('PROGRAM_MANAGER') and @scopeAuthorizationService.canManageSyllabus(authentication.principal, #id))")
   public ResponseEntity<SyllabusResponse> updateStatus(
       @PathVariable("id")
           @Pattern(

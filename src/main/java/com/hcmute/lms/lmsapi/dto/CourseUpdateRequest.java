@@ -22,5 +22,9 @@ public class CourseUpdateRequest {
   @Min(value = 0, message = "Số tín chỉ phải không âm")
   private Integer credits;
 
+  private String facultyId;
+
+  private Boolean isActive;
+
   private Map<String, Object> extra;
 }

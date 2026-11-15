@@ -3,6 +3,8 @@ package com.hcmute.lms.lmsapi.controller;
 import com.hcmute.lms.lmsapi.dto.PageResponse;
 import com.hcmute.lms.lmsapi.dto.ProgramRequest;
 import com.hcmute.lms.lmsapi.dto.ProgramResponse;
+import com.hcmute.lms.lmsapi.dto.UserPrincipal;
+import com.hcmute.lms.lmsapi.enums.Role;
 import com.hcmute.lms.lmsapi.service.ProgramService;
 import com.hcmute.lms.lmsapi.util.PageableValidationUtils;
 import jakarta.validation.Valid;
@@ -13,7 +15,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -41,12 +45,20 @@ public class ProgramController {
       @RequestParam(defaultValue = "20", required = false)
           @Min(value = 1, message = "Kích thước trang phải lớn hơn hoặc bằng 1")
           @Max(value = 100, message = "Kích thước trang tối đa 100")
-          Integer size) {
+          Integer size,
+      @RequestParam(required = false) String facultyId,
+      @RequestParam(required = false) String level,
+      @RequestParam(required = false) String degree,
+      @RequestParam(required = false) String search) {
     PageableValidationUtils.validate(page, size);
     return ResponseEntity.ok(
         programService.getPrograms(
             page != null ? page : PageableValidationUtils.DEFAULT_PAGE,
-            size != null ? size : PageableValidationUtils.DEFAULT_SIZE));
+            size != null ? size : PageableValidationUtils.DEFAULT_SIZE,
+            facultyId,
+            level,
+            degree,
+            search));
   }
 
   @GetMapping("/{id}")
@@ -60,22 +72,49 @@ public class ProgramController {
   }
 
   @PostMapping
-  @PreAuthorize("hasRole('ADMIN')")
-  public ResponseEntity<ProgramResponse> createProgram(@Valid @RequestBody ProgramRequest request) {
+  @PreAuthorize(
+      "hasRole('ADMIN') or (hasRole('PROGRAM_MANAGER') and (#request.facultyId == null or authentication.principal.facultyId == #request.facultyId))")
+  public ResponseEntity<ProgramResponse> createProgram(
+      @Valid @RequestBody ProgramRequest request,
+      @AuthenticationPrincipal UserPrincipal principal) {
+    if (principal != null && !hasRole(principal, Role.ADMIN)) {
+      if (principal.getFacultyId() == null) {
+        throw new AccessDeniedException("Program Manager chưa được gán vào Khoa nào");
+      }
+      if (request.getFacultyId() == null) {
+        request.setFacultyId(principal.getFacultyId());
+      }
+    }
     log.info("API request: POST /api/v1/programs with code [{}]", request.getCode());
     return ResponseEntity.status(HttpStatus.CREATED).body(programService.createProgram(request));
   }
 
   @PutMapping("/{id}")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize(
+      "hasRole('ADMIN') or (hasRole('PROGRAM_MANAGER') and @scopeAuthorizationService.canManageProgram(authentication.principal, #id))")
   public ResponseEntity<ProgramResponse> updateProgram(
       @PathVariable("id")
           @Pattern(
               regexp = "^[0-9a-fA-F]{24}$",
               message = "ID chương trình đào tạo phải là ObjectId 24 ký tự hex")
           String id,
-      @Valid @RequestBody ProgramRequest request) {
+      @Valid @RequestBody ProgramRequest request,
+      @AuthenticationPrincipal UserPrincipal principal) {
     log.info("API request: PUT /api/v1/programs/{}", id);
+    if (principal != null && !hasRole(principal, Role.ADMIN)) {
+      ProgramResponse existing = programService.getProgramById(id);
+      if (request.getFacultyId() != null
+          && !request.getFacultyId().equals(existing.getFacultyId())) {
+        throw new AccessDeniedException(
+            "Program Manager không có quyền chuyển Khoa chủ quản của CTĐT");
+      }
+    }
     return ResponseEntity.ok(programService.updateProgram(id, request));
+  }
+
+  private boolean hasRole(UserPrincipal principal, Role role) {
+    return principal.getRoleAssignments() != null
+        && principal.getRoleAssignments().stream()
+            .anyMatch(ra -> ra != null && ra.getRole() == role);
   }
 }

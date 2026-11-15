@@ -1,5 +1,6 @@
 package com.hcmute.lms.lmsapi.service.impl;
 
+import com.hcmute.lms.lmsapi.document.Course;
 import com.hcmute.lms.lmsapi.document.CourseSection;
 import com.hcmute.lms.lmsapi.document.RoleAssignment;
 import com.hcmute.lms.lmsapi.document.UserScope;
@@ -15,10 +16,13 @@ import com.hcmute.lms.lmsapi.repository.CourseSectionRepository;
 import com.hcmute.lms.lmsapi.repository.EnrollmentRepository;
 import com.hcmute.lms.lmsapi.repository.ImportBatchRepository;
 import com.hcmute.lms.lmsapi.repository.ProgramCourseRepository;
+import com.hcmute.lms.lmsapi.repository.ProgramRepository;
 import com.hcmute.lms.lmsapi.repository.ProgramVersionRepository;
 import com.hcmute.lms.lmsapi.repository.SyllabusRepository;
 import com.hcmute.lms.lmsapi.service.ScopeAuthorizationService;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Function;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -37,6 +41,7 @@ public class ScopeAuthorizationServiceImpl implements ScopeAuthorizationService 
   private final CourseSectionRepository courseSectionRepository;
   private final CourseRepository courseRepository;
   private final ProgramVersionRepository programVersionRepository;
+  private final ProgramRepository programRepository;
   private final ProgramCourseRepository programCourseRepository;
   private final SyllabusRepository syllabusRepository;
   private final CloRepository cloRepository;
@@ -123,9 +128,20 @@ public class ScopeAuthorizationServiceImpl implements ScopeAuthorizationService 
       if (assignment.getRole() == Role.ADMIN) {
         return true;
       }
-      if (assignment.getRole() == Role.PROGRAM_MANAGER
-          && courseInManagedProgram(assignment.getScope(), courseId.trim())) {
-        return true;
+      if (assignment.getRole() == Role.PROGRAM_MANAGER) {
+        if (principal.getFacultyId() != null) {
+          boolean sameFaculty =
+              courseRepository
+                  .findById(courseId.trim())
+                  .map(c -> Objects.equals(c.getFacultyId(), principal.getFacultyId()))
+                  .orElse(false);
+          if (sameFaculty) {
+            return true;
+          }
+        }
+        if (courseInManagedProgram(assignment.getScope(), courseId.trim())) {
+          return true;
+        }
       }
     }
     log.debug(
@@ -235,7 +251,7 @@ public class ScopeAuthorizationServiceImpl implements ScopeAuthorizationService 
     }
 
     for (RoleAssignment assignment : principal.getRoleAssignments()) {
-      if (checkProgramAssignment(assignment, programId, accessType)) {
+      if (checkProgramAssignment(assignment, principal, programId, accessType)) {
         log.debug(
             "canAccessProgram: Access GRANTED to user [{}] for program [{}] with accessType [{}] via role [{}]",
             principal.getUsername(),
@@ -303,13 +319,14 @@ public class ScopeAuthorizationServiceImpl implements ScopeAuthorizationService 
     }
 
     // Môn học phải tồn tại trong CSDL
-    if (!courseRepository.existsById(courseId.trim())) {
+    Course course = courseRepository.findById(courseId.trim()).orElse(null);
+    if (course == null) {
       log.debug("canAccessCourse: Fail-closed - course [{}] not found in database", courseId);
       return false;
     }
 
     for (RoleAssignment assignment : principal.getRoleAssignments()) {
-      if (checkCourseAssignment(assignment, courseId.trim(), accessType)) {
+      if (checkCourseAssignment(assignment, principal, course, accessType)) {
         log.debug(
             "canAccessCourse: Access GRANTED to user [{}] for course [{}] with accessType [{}] via role [{}]",
             principal.getUsername(),
@@ -341,19 +358,86 @@ public class ScopeAuthorizationServiceImpl implements ScopeAuthorizationService 
       return false;
     }
 
-    if (!courseRepository.existsById(courseId.trim())) {
+    Course course = courseRepository.findById(courseId.trim()).orElse(null);
+    if (course == null) {
       log.debug("canAssignCourse: Fail-closed - course [{}] not found in database", courseId);
       return false;
     }
 
-    // Quản lý CTĐT (PROGRAM_MANAGER) có courseId trong scope.courseIds hoặc ADMIN
+    // ADMIN hoặc PROGRAM_MANAGER cùng Khoa (hoặc scope.courseIds cho tương thích ngược v0.7)
     return principal.getRoleAssignments().stream()
         .anyMatch(
-            a ->
-                a != null
-                    && (a.getRole() == Role.PROGRAM_MANAGER || a.getRole() == Role.ADMIN)
-                    && (a.getRole() == Role.ADMIN
-                        || matchesCourseScope(a.getScope(), courseId.trim())));
+            a -> {
+              if (a == null || a.getRole() == null) {
+                return false;
+              }
+              if (a.getRole() == Role.ADMIN) {
+                return true;
+              }
+              if (a.getRole() == Role.PROGRAM_MANAGER) {
+                if (principal.getFacultyId() != null && course.getFacultyId() != null) {
+                  return Objects.equals(principal.getFacultyId(), course.getFacultyId());
+                }
+                return matchesCourseScope(a.getScope(), courseId.trim());
+              }
+              return false;
+            });
+  }
+
+  @Override
+  public boolean canManageProgram(UserPrincipal principal, String programId) {
+    return canManageFacultyResource(
+        principal, programId, id -> programRepository.findById(id).map(p -> p.getFacultyId()));
+  }
+
+  @Override
+  public boolean canManageCourse(UserPrincipal principal, String courseId) {
+    return canManageFacultyResource(
+        principal, courseId, id -> courseRepository.findById(id).map(Course::getFacultyId));
+  }
+
+  private boolean canManageFacultyResource(
+      UserPrincipal principal,
+      String resourceId,
+      Function<String, Optional<String>> facultyLookup) {
+    if (principal == null
+        || resourceId == null
+        || resourceId.isBlank()
+        || principal.getRoleAssignments() == null) {
+      return false;
+    }
+    boolean isAdmin =
+        principal.getRoleAssignments().stream()
+            .anyMatch(a -> a != null && a.getRole() == Role.ADMIN);
+    if (isAdmin) {
+      return true;
+    }
+    boolean isPm =
+        principal.getRoleAssignments().stream()
+            .anyMatch(a -> a != null && a.getRole() == Role.PROGRAM_MANAGER);
+    if (!isPm || principal.getFacultyId() == null) {
+      return false;
+    }
+    return facultyLookup
+        .apply(resourceId.trim())
+        .map(facultyId -> Objects.equals(facultyId, principal.getFacultyId()))
+        .orElse(false);
+  }
+
+  @Override
+  public boolean canManageCourseSyllabus(UserPrincipal principal, String courseId) {
+    return canManageCourse(principal, courseId);
+  }
+
+  @Override
+  public boolean canManageSyllabus(UserPrincipal principal, String syllabusId) {
+    if (syllabusId == null || syllabusId.isBlank()) {
+      return false;
+    }
+    return syllabusRepository
+        .findById(syllabusId.trim())
+        .map(s -> canManageCourse(principal, s.getCourseId()))
+        .orElse(false);
   }
 
   @Override
@@ -403,21 +487,26 @@ public class ScopeAuthorizationServiceImpl implements ScopeAuthorizationService 
   }
 
   private boolean checkCourseAssignment(
-      RoleAssignment assignment, String courseId, AccessType accessType) {
+      RoleAssignment assignment, UserPrincipal principal, Course course, AccessType accessType) {
     if (assignment == null || assignment.getRole() == null) {
       return false;
     }
 
+    String courseId = course.getId();
     UserScope scope = assignment.getScope();
     return switch (assignment.getRole()) {
       case ADMIN -> true;
       case LECTURER -> matchesCourseScope(scope, courseId);
-      case PROGRAM_MANAGER ->
-          accessType == AccessType.READ
-              ? (matchesCourseScope(scope, courseId)
-                  || isCourseInProgramScope(scope, courseId)
-                  || isStrictEmptyScope(scope))
-              : (matchesCourseScope(scope, courseId) || isCourseInProgramScope(scope, courseId));
+      case PROGRAM_MANAGER -> {
+        if (accessType == AccessType.READ) {
+          yield true;
+        }
+        // Chống TD-29: Chỉ cho phép WRITE môn học/đề cương nếu môn thuộc đúng Khoa của PM
+        if (principal.getFacultyId() != null && course.getFacultyId() != null) {
+          yield Objects.equals(principal.getFacultyId(), course.getFacultyId());
+        }
+        yield matchesCourseScope(scope, courseId);
+      }
       case QA ->
           accessType == AccessType.READ
               && (isStrictEmptyScope(scope) || matchesCourseScope(scope, courseId));
@@ -430,21 +519,8 @@ public class ScopeAuthorizationServiceImpl implements ScopeAuthorizationService 
         && scope.getCourseIds().contains(courseId.trim());
   }
 
-  private boolean isCourseInProgramScope(UserScope scope, String courseId) {
-    if (scope == null || scope.getProgramIds() == null || scope.getProgramIds().isEmpty()) {
-      return false;
-    }
-    return programCourseRepository.findByCourseId(courseId.trim()).stream()
-        .anyMatch(
-            pc ->
-                programVersionRepository
-                    .findById(pc.getProgramVersionId())
-                    .map(pv -> scope.getProgramIds().contains(pv.getProgramId()))
-                    .orElse(false));
-  }
-
   private boolean checkProgramAssignment(
-      RoleAssignment assignment, String programId, AccessType accessType) {
+      RoleAssignment assignment, UserPrincipal principal, String programId, AccessType accessType) {
     if (assignment == null || assignment.getRole() == null) {
       return false;
     }
@@ -452,7 +528,18 @@ public class ScopeAuthorizationServiceImpl implements ScopeAuthorizationService 
     UserScope scope = assignment.getScope();
     return switch (assignment.getRole()) {
       case ADMIN -> true;
-      case PROGRAM_MANAGER -> matchesProgramScope(scope, programId);
+      case PROGRAM_MANAGER -> {
+        if (matchesProgramScope(scope, programId)) {
+          yield true;
+        }
+        if (principal.getFacultyId() == null) {
+          yield false;
+        }
+        yield programRepository
+            .findById(programId.trim())
+            .map(p -> Objects.equals(p.getFacultyId(), principal.getFacultyId()))
+            .orElse(false);
+      }
       case QA ->
           accessType == AccessType.READ
               ? (isStrictEmptyScope(scope) || matchesProgramScope(scope, programId))

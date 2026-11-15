@@ -7,7 +7,6 @@ import jakarta.validation.constraints.Pattern;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -24,7 +23,6 @@ public class CloPiLinkController {
   private final CloPiLinkService cloPiLinkService;
 
   @GetMapping("/syllabi/{syllabusId}/clo-pi-links")
-  @PreAuthorize("isAuthenticated()")
   public ResponseEntity<List<CloPiLinkResponse>> getLinks(
       @PathVariable("syllabusId")
           @Pattern(
@@ -35,7 +33,6 @@ public class CloPiLinkController {
   }
 
   @GetMapping("/syllabi/{syllabusId}/clo-pi-matrix")
-  @PreAuthorize("isAuthenticated()")
   public ResponseEntity<CloPiMatrixResponse> getMatrix(
       @PathVariable("syllabusId")
           @Pattern(

@@ -43,6 +43,9 @@ public class UserPrincipal implements Principal {
   /** Phiên bản token bảo mật lưu trong CSDL. */
   private long tokenVersion;
 
+  /** Định danh Khoa quản lý của người dùng (dành cho PROGRAM_MANAGER). */
+  private String facultyId;
+
   /** Danh sách các cặp phân công (vai trò, phạm vi phụ trách). */
   @Builder.Default private List<RoleAssignment> roleAssignments = new ArrayList<>();
 
@@ -83,6 +86,7 @@ public class UserPrincipal implements Principal {
         .fullName(user.getFullName())
         .status(user.getStatus())
         .tokenVersion(user.getTokenVersion())
+        .facultyId(user.getFacultyId())
         .roleAssignments(
             user.getRoleAssignments() != null
                 ? new ArrayList<>(user.getRoleAssignments())

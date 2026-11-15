@@ -5,6 +5,8 @@ import com.hcmute.lms.lmsapi.document.ProgramCourse;
 import com.hcmute.lms.lmsapi.dto.ProgramCourseRequest;
 import com.hcmute.lms.lmsapi.dto.ProgramCourseResponse;
 import com.hcmute.lms.lmsapi.dto.ProgramCourseUpdateRequest;
+import com.hcmute.lms.lmsapi.enums.CourseCategory;
+import com.hcmute.lms.lmsapi.enums.CourseType;
 import com.hcmute.lms.lmsapi.exception.AppException;
 import com.hcmute.lms.lmsapi.exception.BusinessRuleViolationException;
 import com.hcmute.lms.lmsapi.exception.ErrorCode;
@@ -39,6 +41,16 @@ public class ProgramCourseServiceImpl implements ProgramCourseService {
 
   @Override
   public List<ProgramCourseResponse> getCoursesByProgramVersion(String programVersionId) {
+    return getCoursesByProgramVersion(programVersionId, null, null, null, null);
+  }
+
+  @Override
+  public List<ProgramCourseResponse> getCoursesByProgramVersion(
+      String programVersionId,
+      Integer semester,
+      CourseType type,
+      CourseCategory category,
+      String search) {
     requireProgramVersion(programVersionId);
     List<ProgramCourse> programCourses =
         programCourseRepository.findByProgramVersionIdOrderBySemesterAscCourseIdAsc(
@@ -49,8 +61,25 @@ public class ProgramCourseServiceImpl implements ProgramCourseService {
         courseRepository.findAllById(courseIds).stream()
             .collect(Collectors.toMap(Course::getId, Function.identity()));
 
+    String query = search != null && !search.isBlank() ? search.trim().toLowerCase() : null;
     return programCourses.stream()
+        .filter(pc -> semester == null || semester.equals(pc.getSemester()))
+        .filter(pc -> type == null || type == pc.getType())
+        .filter(pc -> category == null || category == pc.getCategory())
         .map(pc -> programCourseMapper.toResponse(pc, courseMap.get(pc.getCourseId())))
+        .filter(
+            resp -> {
+              if (query == null) {
+                return true;
+              }
+              if (resp.getCourse() == null) {
+                return false;
+              }
+              String code = resp.getCourse().getCode();
+              String name = resp.getCourse().getName();
+              return (code != null && code.toLowerCase().contains(query))
+                  || (name != null && name.toLowerCase().contains(query));
+            })
         .toList();
   }
 

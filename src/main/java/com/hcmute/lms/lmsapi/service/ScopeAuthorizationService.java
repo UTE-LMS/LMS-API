@@ -86,4 +86,16 @@ public interface ScopeAuthorizationService {
    * chính mình.
    */
   boolean canAssignCourse(UserPrincipal principal, String courseId);
+
+  /** Kiểm tra quyền quản lý CTĐT theo Khoa (v0.8): ADMIN hoặc PM cùng facultyId. */
+  boolean canManageProgram(UserPrincipal principal, String programId);
+
+  /** Kiểm tra quyền quản lý học phần theo Khoa (v0.8): ADMIN hoặc PM cùng facultyId. */
+  boolean canManageCourse(UserPrincipal principal, String courseId);
+
+  /** Kiểm tra quyền quản lý đề cương theo Khoa sở hữu học phần (chống TD-29). */
+  boolean canManageCourseSyllabus(UserPrincipal principal, String courseId);
+
+  /** Kiểm tra quyền quản lý đề cương theo syllabusId (suy qua course.facultyId). */
+  boolean canManageSyllabus(UserPrincipal principal, String syllabusId);
 }
