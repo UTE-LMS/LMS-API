@@ -265,13 +265,11 @@ class ProgramApiIntegrationTest extends IntegrationTestBase {
   // ------------------------------------------------------------------ quyền
 
   @Test
-  @DisplayName("US-03/AC-2: không đăng nhập -> 401 trên mọi thao tác programs")
+  @DisplayName("Public GET programs -> 200; không đăng nhập ghi programs -> 401")
   void anonymousIsUnauthorized() throws Exception {
     Program program = fixtures.program();
-    mockMvc.perform(getAs(null, PROGRAMS)).andExpect(status().isUnauthorized());
-    mockMvc
-        .perform(getAs(null, PROGRAM_BY_ID, program.getId()))
-        .andExpect(status().isUnauthorized());
+    mockMvc.perform(getAs(null, PROGRAMS)).andExpect(status().isOk());
+    mockMvc.perform(getAs(null, PROGRAM_BY_ID, program.getId())).andExpect(status().isOk());
     mockMvc.perform(postAs(null, PROGRAMS, request("X"))).andExpect(status().isUnauthorized());
     mockMvc
         .perform(putAs(null, PROGRAM_BY_ID, request("X"), program.getId()))

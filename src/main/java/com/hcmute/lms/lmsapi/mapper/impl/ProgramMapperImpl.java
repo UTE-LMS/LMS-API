@@ -17,6 +17,7 @@ public class ProgramMapperImpl implements ProgramMapper {
     }
     return ProgramResponse.builder()
         .id(program.getId())
+        .facultyId(program.getFacultyId())
         .code(program.getCode())
         .name(program.getName())
         .level(program.getLevel())

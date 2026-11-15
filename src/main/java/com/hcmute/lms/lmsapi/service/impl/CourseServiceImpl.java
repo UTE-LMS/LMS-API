@@ -1,19 +1,23 @@
 package com.hcmute.lms.lmsapi.service.impl;
 
 import com.hcmute.lms.lmsapi.document.Course;
+import com.hcmute.lms.lmsapi.document.ProgramCourse;
 import com.hcmute.lms.lmsapi.dto.CourseImportResultResponse;
 import com.hcmute.lms.lmsapi.dto.CourseImportRowError;
 import com.hcmute.lms.lmsapi.dto.CourseRequest;
 import com.hcmute.lms.lmsapi.dto.CourseResponse;
 import com.hcmute.lms.lmsapi.dto.CourseUpdateRequest;
 import com.hcmute.lms.lmsapi.dto.PageResponse;
+import com.hcmute.lms.lmsapi.enums.ProgramVersionStatus;
 import com.hcmute.lms.lmsapi.exception.AppException;
 import com.hcmute.lms.lmsapi.exception.BusinessRuleViolationException;
 import com.hcmute.lms.lmsapi.exception.ErrorCode;
 import com.hcmute.lms.lmsapi.exception.ResourceNotFoundException;
 import com.hcmute.lms.lmsapi.mapper.CourseMapper;
 import com.hcmute.lms.lmsapi.repository.CourseRepository;
+import com.hcmute.lms.lmsapi.repository.FacultyRepository;
 import com.hcmute.lms.lmsapi.repository.ProgramCourseRepository;
+import com.hcmute.lms.lmsapi.repository.ProgramVersionRepository;
 import com.hcmute.lms.lmsapi.service.CourseService;
 import com.hcmute.lms.lmsapi.util.CsvUtils;
 import com.hcmute.lms.lmsapi.util.ObjectIdUtils;
@@ -24,13 +28,18 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.bson.types.ObjectId;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -41,27 +50,75 @@ import org.springframework.web.multipart.MultipartFile;
 public class CourseServiceImpl implements CourseService {
 
   private final CourseRepository courseRepository;
+  private final FacultyRepository facultyRepository;
   private final ProgramCourseRepository programCourseRepository;
+  private final ProgramVersionRepository programVersionRepository;
   private final CourseMapper courseMapper;
+  private final MongoTemplate mongoTemplate;
 
   @Override
-  public PageResponse<CourseResponse> getCourses(int page, int size, String search) {
+  public PageResponse<CourseResponse> getCourses(
+      int page, int size, String search, String facultyId) {
+    return getCourses(page, size, search, facultyId, null);
+  }
+
+  @Override
+  public PageResponse<CourseResponse> getCourses(
+      int page, int size, String search, String facultyId, Boolean isActive) {
     PageableValidationUtils.validate(page, size);
     Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, "code"));
-    Page<Course> coursePage;
+    boolean hasSearch = search != null && !search.isBlank();
+    boolean hasFaculty = facultyId != null && !facultyId.isBlank();
 
-    if (search != null && !search.isBlank()) {
-      String query = search.trim();
-      coursePage =
-          courseRepository.findByNameContainingIgnoreCaseOrCodeContainingIgnoreCase(
-              query, query, pageable);
-    } else {
-      coursePage = courseRepository.findAll(pageable);
+    if (isActive == null) {
+      Page<Course> coursePage;
+      if (hasFaculty) {
+        String cleanFacultyId = facultyId.trim();
+        ObjectIdUtils.requireValid(cleanFacultyId, "facultyId");
+        if (hasSearch) {
+          String query = search.trim();
+          coursePage =
+              courseRepository
+                  .findByFacultyIdAndNameContainingIgnoreCaseOrFacultyIdAndCodeContainingIgnoreCase(
+                      cleanFacultyId, query, cleanFacultyId, query, pageable);
+        } else {
+          coursePage = courseRepository.findByFacultyId(cleanFacultyId, pageable);
+        }
+      } else if (hasSearch) {
+        String query = search.trim();
+        coursePage =
+            courseRepository.findByNameContainingIgnoreCaseOrCodeContainingIgnoreCase(
+                query, query, pageable);
+      } else {
+        coursePage = courseRepository.findAll(pageable);
+      }
+      List<CourseResponse> content = courseMapper.toResponseList(coursePage.getContent());
+      return PageResponse.of(
+          content, coursePage.getNumber(), coursePage.getSize(), coursePage.getTotalElements());
     }
 
-    List<CourseResponse> content = courseMapper.toResponseList(coursePage.getContent());
+    List<Criteria> criteriaList = new ArrayList<>();
+    criteriaList.add(Criteria.where("isActive").is(isActive));
+    if (hasFaculty) {
+      String cleanFacultyId = facultyId.trim();
+      ObjectIdUtils.requireValid(cleanFacultyId, "facultyId");
+      criteriaList.add(Criteria.where("facultyId").is(new ObjectId(cleanFacultyId)));
+    }
+    if (hasSearch) {
+      String regex = Pattern.quote(search.trim());
+      criteriaList.add(
+          new Criteria()
+              .orOperator(
+                  Criteria.where("name").regex(regex, "i"),
+                  Criteria.where("code").regex(regex, "i")));
+    }
+
+    Query query = new Query(new Criteria().andOperator(criteriaList.toArray(Criteria[]::new)));
+    long total = mongoTemplate.count(Query.of(query).limit(-1).skip(-1), Course.class);
+    query.with(pageable);
+    List<Course> courses = mongoTemplate.find(query, Course.class);
     return PageResponse.of(
-        content, coursePage.getNumber(), coursePage.getSize(), coursePage.getTotalElements());
+        courseMapper.toResponseList(courses), pageable.getPageNumber(), pageable.getPageSize(), total);
   }
 
   @Override
@@ -81,11 +138,20 @@ public class CourseServiceImpl implements CourseService {
       throw conflict(code);
     }
 
+    String facultyId = request.getFacultyId() != null ? request.getFacultyId().trim() : null;
+    if (facultyId != null && !facultyId.isEmpty()) {
+      validateActiveFaculty(facultyId);
+    } else {
+      facultyId = null;
+    }
+
     Course course =
         Course.builder()
+            .facultyId(facultyId)
             .code(code)
             .name(request.getName().trim())
             .credits(request.getCredits())
+            .isActive(true)
             .extra(request.getExtra())
             .build();
 
@@ -108,6 +174,18 @@ public class CourseServiceImpl implements CourseService {
             .findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Course", "id", id));
 
+    if (Boolean.FALSE.equals(request.getIsActive()) && course.isActive()) {
+      ensureCourseNotInActiveProgramVersions(id);
+      course.setActive(false);
+    } else if (Boolean.TRUE.equals(request.getIsActive())) {
+      course.setActive(true);
+    }
+    if (request.getFacultyId() != null && !request.getFacultyId().isBlank()) {
+      String newFacultyId = request.getFacultyId().trim();
+      validateActiveFaculty(newFacultyId);
+      course.setFacultyId(newFacultyId);
+    }
+
     course.setName(request.getName().trim());
     course.setCredits(request.getCredits());
     course.setExtra(request.getExtra());
@@ -124,6 +202,7 @@ public class CourseServiceImpl implements CourseService {
       throw new ResourceNotFoundException("Course", "id", id);
     }
 
+    ensureCourseNotInActiveProgramVersions(id);
     if (programCourseRepository.existsByCourseId(id)) {
       throw new BusinessRuleViolationException(
           "COURSE_IN_USE", "Không thể xóa học phần đang được gán vào chương trình đào tạo: " + id);
@@ -131,6 +210,35 @@ public class CourseServiceImpl implements CourseService {
 
     courseRepository.deleteById(id);
     log.info("Course deleted successfully: id={}", id);
+  }
+
+  private void ensureCourseNotInActiveProgramVersions(String courseId) {
+    List<ProgramCourse> links = programCourseRepository.findByCourseId(courseId);
+    if (links.isEmpty()) {
+      return;
+    }
+    Set<String> pvIds =
+        links.stream().map(ProgramCourse::getProgramVersionId).collect(Collectors.toSet());
+    if (programVersionRepository.existsByIdInAndStatus(pvIds, ProgramVersionStatus.ACTIVE)) {
+      throw new BusinessRuleViolationException(
+          "COURSE_IN_USE_IN_ACTIVE_PROGRAM_VERSION",
+          "Học phần hiện đang được sử dụng trong phiên bản CTĐT đang ACTIVE. Vui lòng khóa phiên bản CTĐT liên quan trước khi vô hiệu hóa hoặc xóa học phần.");
+    }
+  }
+
+  private void validateActiveFaculty(String facultyId) {
+    ObjectIdUtils.requireValid(facultyId, "facultyId");
+    var faculty =
+        facultyRepository
+            .findById(facultyId)
+            .orElseThrow(
+                () ->
+                    new BusinessRuleViolationException(
+                        "FACULTY_NOT_FOUND", "Khoa không tồn tại: " + facultyId));
+    if (!faculty.isActive()) {
+      throw new BusinessRuleViolationException(
+          "FACULTY_INACTIVE", "Khoa đang bị khóa: " + facultyId);
+    }
   }
 
   private AppException conflict(String code) {
@@ -141,7 +249,12 @@ public class CourseServiceImpl implements CourseService {
   private static final Pattern COURSE_CODE_PATTERN = Pattern.compile("^[A-Za-z0-9_.-]+$");
 
   @Override
-  public CourseImportResultResponse importCourses(MultipartFile file) {
+  public CourseImportResultResponse importCourses(MultipartFile file, String facultyId) {
+    String cleanFacultyId =
+        (facultyId != null && !facultyId.isBlank()) ? facultyId.trim() : null;
+    if (cleanFacultyId != null) {
+      validateActiveFaculty(cleanFacultyId);
+    }
     if (file == null || file.isEmpty()) {
       throw new AppException(
           ErrorCode.VALIDATION_ERROR, HttpStatus.BAD_REQUEST, "Tệp CSV không được để trống");
@@ -327,7 +440,14 @@ public class CourseServiceImpl implements CourseService {
 
       // Thêm vào danh sách đã gặp và lưu CSDL (Best effort)
       seenCodesInFile.add(code);
-      Course course = Course.builder().code(code).name(name).credits(credits).build();
+      Course course =
+          Course.builder()
+              .facultyId(cleanFacultyId)
+              .code(code)
+              .name(name)
+              .credits(credits)
+              .isActive(true)
+              .build();
       try {
         courseRepository.save(course);
         successCount++;

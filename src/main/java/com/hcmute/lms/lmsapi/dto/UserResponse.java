@@ -35,6 +35,9 @@ public class UserResponse {
   /** Trạng thái hoạt động của tài khoản (ACTIVE, LOCKED). */
   private UserStatus status;
 
+  /** Định danh Khoa quản lý (dành cho PROGRAM_MANAGER). */
+  private String facultyId;
+
   /** Danh sách các phân công vai trò và phạm vi phụ trách. */
   @Builder.Default private List<RoleAssignment> roleAssignments = new ArrayList<>();
 

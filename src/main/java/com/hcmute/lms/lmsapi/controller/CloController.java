@@ -24,7 +24,6 @@ public class CloController {
   private final CloService cloService;
 
   @GetMapping("/syllabi/{syllabusId}/clos")
-  @PreAuthorize("isAuthenticated()")
   public ResponseEntity<List<CloResponse>> getClos(
       @PathVariable("syllabusId")
           @Pattern(
@@ -35,7 +34,6 @@ public class CloController {
   }
 
   @GetMapping("/clos/{id}")
-  @PreAuthorize("isAuthenticated()")
   public ResponseEntity<CloResponse> getClo(
       @PathVariable("id")
           @Pattern(regexp = "^[0-9a-fA-F]{24}$", message = "ID CLO phải là ObjectId 24 ký tự hex")

@@ -157,7 +157,7 @@ class ApiContractIntegrationTest extends IntegrationTestBase {
     String ploUrl = "/api/v1/program-versions/{v}/plos/{id}";
     String piUrl = "/api/v1/program-versions/{v}/pis/{id}";
     assertThat(topKeys(mockMvc.perform(getAs(bearer, programUrl, program.getId()))))
-        .containsExactlyInAnyOrder("id", "code", "name", "level", "degree");
+        .containsExactlyInAnyOrder("id", "code", "name", "level", "degree", "facultyId");
     assertThat(topKeys(mockMvc.perform(getAs(bearer, "/api/v1/program-versions/{id}", pv))))
         .containsExactlyInAnyOrder(
             "id",

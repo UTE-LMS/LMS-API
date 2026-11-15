@@ -6,6 +6,7 @@ import static org.mockito.Mockito.when;
 
 import com.hcmute.lms.lmsapi.document.Clo;
 import com.hcmute.lms.lmsapi.document.CloPiLink;
+import com.hcmute.lms.lmsapi.document.Course;
 import com.hcmute.lms.lmsapi.document.ProgramVersion;
 import com.hcmute.lms.lmsapi.document.RoleAssignment;
 import com.hcmute.lms.lmsapi.document.Syllabus;
@@ -88,7 +89,8 @@ class CourseScopeAuthorizationTest {
   @Test
   @DisplayName("PROGRAM_MANAGER có môn học trong scope.courseIds -> được phép ghi (ADR 0010, v0.7)")
   void programManagerInScope_allowed() {
-    when(courseRepository.existsById(COURSE_ID)).thenReturn(true);
+    when(courseRepository.findById(COURSE_ID))
+        .thenReturn(Optional.of(Course.builder().id(COURSE_ID).build()));
 
     assertThat(
             service.canAccessCourse(
@@ -101,7 +103,8 @@ class CourseScopeAuthorizationTest {
   @Test
   @DisplayName("PROGRAM_MANAGER không có môn học trong scope.courseIds -> bị từ chối")
   void programManagerOutOfScope_denied() {
-    when(courseRepository.existsById(COURSE_ID)).thenReturn(true);
+    when(courseRepository.findById(COURSE_ID))
+        .thenReturn(Optional.of(Course.builder().id(COURSE_ID).build()));
 
     assertThat(
             service.canAccessCourse(
@@ -114,7 +117,8 @@ class CourseScopeAuthorizationTest {
   @Test
   @DisplayName("LECTURER có môn học trong scope.courseIds -> được phép ghi (ADR 0010)")
   void lecturerInScope_allowed() {
-    when(courseRepository.existsById(COURSE_ID)).thenReturn(true);
+    when(courseRepository.findById(COURSE_ID))
+        .thenReturn(Optional.of(Course.builder().id(COURSE_ID).build()));
 
     assertThat(
             service.canAccessCourse(
@@ -127,7 +131,8 @@ class CourseScopeAuthorizationTest {
   @Test
   @DisplayName("LECTURER không có môn học trong scope.courseIds -> bị từ chối")
   void lecturerOutOfScope_denied() {
-    when(courseRepository.existsById(COURSE_ID)).thenReturn(true);
+    when(courseRepository.findById(COURSE_ID))
+        .thenReturn(Optional.of(Course.builder().id(COURSE_ID).build()));
 
     assertThat(
             service.canAccessCourse(
@@ -140,7 +145,8 @@ class CourseScopeAuthorizationTest {
   @Test
   @DisplayName("PROGRAM_MANAGER không có quyền ghi trên môn học/đề cương (ADR 0010)")
   void programManager_cannotWriteCourse() {
-    when(courseRepository.existsById(COURSE_ID)).thenReturn(true);
+    when(courseRepository.findById(COURSE_ID))
+        .thenReturn(Optional.of(Course.builder().id(COURSE_ID).build()));
 
     assertThat(
             service.canAccessCourse(
@@ -153,7 +159,7 @@ class CourseScopeAuthorizationTest {
   @Test
   @DisplayName("Môn học không tồn tại trong CSDL -> bị từ chối (fail-closed)")
   void courseNotFound_denied() {
-    when(courseRepository.existsById(COURSE_ID)).thenReturn(false);
+    when(courseRepository.findById(COURSE_ID)).thenReturn(Optional.empty());
 
     assertThat(
             service.canAccessCourse(
@@ -173,7 +179,8 @@ class CourseScopeAuthorizationTest {
   @Test
   @DisplayName("canAssignCourse: PROGRAM_MANAGER có môn học trong scope -> được phép phân công")
   void canAssignCourse_programManagerInScopeAllowed() {
-    when(courseRepository.existsById(COURSE_ID)).thenReturn(true);
+    when(courseRepository.findById(COURSE_ID))
+        .thenReturn(Optional.of(Course.builder().id(COURSE_ID).build()));
 
     assertThat(
             service.canAssignCourse(
@@ -184,7 +191,8 @@ class CourseScopeAuthorizationTest {
   @Test
   @DisplayName("canAssignCourse: PROGRAM_MANAGER ngoài scope môn -> bị từ chối")
   void canAssignCourse_programManagerOutOfScopeDenied() {
-    when(courseRepository.existsById(COURSE_ID)).thenReturn(true);
+    when(courseRepository.findById(COURSE_ID))
+        .thenReturn(Optional.of(Course.builder().id(COURSE_ID).build()));
 
     assertThat(
             service.canAssignCourse(
@@ -195,7 +203,8 @@ class CourseScopeAuthorizationTest {
   @Test
   @DisplayName("canAssignCourse: LECTURER và PROGRAM_MANAGER không có quyền phân công môn")
   void canAssignCourse_lecturerAndPmDenied() {
-    when(courseRepository.existsById(COURSE_ID)).thenReturn(true);
+    when(courseRepository.findById(COURSE_ID))
+        .thenReturn(Optional.of(Course.builder().id(COURSE_ID).build()));
 
     assertThat(
             service.canAssignCourse(
@@ -213,7 +222,8 @@ class CourseScopeAuthorizationTest {
     when(syllabusRepository.findById(SYLLABUS_ID))
         .thenReturn(Optional.of(Syllabus.builder().id(SYLLABUS_ID).courseId(COURSE_ID).build()));
     when(syllabusRepository.findById("671dcba5f123456789abc2ff")).thenReturn(Optional.empty());
-    when(courseRepository.existsById(COURSE_ID)).thenReturn(true);
+    when(courseRepository.findById(COURSE_ID))
+        .thenReturn(Optional.of(Course.builder().id(COURSE_ID).build()));
 
     assertThat(
             service.canAccessSyllabus(
@@ -241,7 +251,8 @@ class CourseScopeAuthorizationTest {
     when(cloRepository.findById(CLO_ID))
         .thenReturn(Optional.of(Clo.builder().id(CLO_ID).courseId(COURSE_ID).build()));
     when(cloRepository.findById("671dcba5f123456789abc3ff")).thenReturn(Optional.empty());
-    when(courseRepository.existsById(COURSE_ID)).thenReturn(true);
+    when(courseRepository.findById(COURSE_ID))
+        .thenReturn(Optional.of(Course.builder().id(COURSE_ID).build()));
 
     assertThat(
             service.canAccessClo(

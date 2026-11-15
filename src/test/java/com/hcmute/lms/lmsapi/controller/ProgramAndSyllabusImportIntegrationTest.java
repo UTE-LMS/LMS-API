@@ -7,7 +7,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.hcmute.lms.lmsapi.document.Course;
+import com.hcmute.lms.lmsapi.document.Faculty;
 import com.hcmute.lms.lmsapi.document.Program;
+import com.hcmute.lms.lmsapi.document.User;
 import com.hcmute.lms.lmsapi.document.UserScope;
 import com.hcmute.lms.lmsapi.dto.SyllabusStatusUpdateRequest;
 import com.hcmute.lms.lmsapi.enums.Role;
@@ -33,11 +35,28 @@ class ProgramAndSyllabusImportIntegrationTest extends IntegrationTestBase {
 
   @BeforeEach
   void setUpUsersAndFixtures() {
+    Faculty faculty =
+        mongo()
+            .save(
+                Faculty.builder()
+                    .code(fixtures.code("FAC"))
+                    .name("Khoa Import Test")
+                    .isActive(true)
+                    .build());
     program = fixtures.program();
-    course = fixtures.course();
+    program.setFacultyId(faculty.getId());
+    program = mongo().save(program);
 
-    UserScope pmScope = UserScope.builder().programIds(List.of(program.getId())).build();
-    pmToken = fixtures.bearerFor(Role.PROGRAM_MANAGER, pmScope);
+    course = fixtures.course();
+    course.setFacultyId(faculty.getId());
+    course = mongo().save(course);
+
+    User pmUser =
+        fixtures.user(
+            Role.PROGRAM_MANAGER, UserScope.builder().programIds(List.of(program.getId())).build());
+    pmUser.setFacultyId(faculty.getId());
+    pmUser = mongo().save(pmUser);
+    pmToken = fixtures.bearer(pmUser);
 
     UserScope lecturerScope = UserScope.builder().courseIds(List.of(course.getId())).build();
     lecturerToken = fixtures.bearerFor(Role.LECTURER, lecturerScope);

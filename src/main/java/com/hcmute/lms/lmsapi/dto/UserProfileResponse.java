@@ -25,6 +25,7 @@ public class UserProfileResponse {
   private String email;
   private String fullName;
   private UserStatus status;
+  private String facultyId;
 
   @Builder.Default private List<RoleAssignment> roleAssignments = new ArrayList<>();
 
@@ -38,6 +39,7 @@ public class UserProfileResponse {
         .email(user.getEmail())
         .fullName(user.getFullName())
         .status(user.getStatus())
+        .facultyId(user.getFacultyId())
         .roleAssignments(
             user.getRoleAssignments() != null
                 ? new ArrayList<>(user.getRoleAssignments())
@@ -55,6 +57,7 @@ public class UserProfileResponse {
         .email(principal.getEmail())
         .fullName(principal.getFullName())
         .status(principal.getStatus())
+        .facultyId(principal.getFacultyId())
         .roleAssignments(
             principal.getRoleAssignments() != null
                 ? new ArrayList<>(principal.getRoleAssignments())

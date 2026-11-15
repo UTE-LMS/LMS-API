@@ -29,6 +29,7 @@ public class UserMapperImpl implements UserMapper {
         .email(user.getEmail())
         .fullName(user.getFullName())
         .status(user.getStatus())
+        .facultyId(user.getFacultyId())
         .roleAssignments(
             user.getRoleAssignments() != null
                 ? new ArrayList<>(user.getRoleAssignments())

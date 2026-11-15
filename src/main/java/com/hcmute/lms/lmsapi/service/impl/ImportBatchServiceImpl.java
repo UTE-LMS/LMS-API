@@ -10,7 +10,10 @@ import com.hcmute.lms.lmsapi.document.ImportColumnMapping;
 import com.hcmute.lms.lmsapi.document.ImportRowError;
 import com.hcmute.lms.lmsapi.document.ImportStats;
 import com.hcmute.lms.lmsapi.document.OutcomeMapping;
+import com.hcmute.lms.lmsapi.document.ProgramCourse;
+import com.hcmute.lms.lmsapi.document.ProgramVersion;
 import com.hcmute.lms.lmsapi.document.Score;
+import com.hcmute.lms.lmsapi.document.Syllabus;
 import com.hcmute.lms.lmsapi.document.Term;
 import com.hcmute.lms.lmsapi.dto.ImportBatchCreateRequest;
 import com.hcmute.lms.lmsapi.dto.ImportBatchResponse;
@@ -24,8 +27,10 @@ import com.hcmute.lms.lmsapi.enums.AuditAction;
 import com.hcmute.lms.lmsapi.enums.EnrollmentStatus;
 import com.hcmute.lms.lmsapi.enums.ImportBatchStatus;
 import com.hcmute.lms.lmsapi.enums.ImportSourceSystem;
+import com.hcmute.lms.lmsapi.enums.ProgramVersionStatus;
 import com.hcmute.lms.lmsapi.enums.ReimportPolicy;
 import com.hcmute.lms.lmsapi.enums.SectionStatus;
+import com.hcmute.lms.lmsapi.enums.SyllabusStatus;
 import com.hcmute.lms.lmsapi.enums.TermStatus;
 import com.hcmute.lms.lmsapi.exception.AppException;
 import com.hcmute.lms.lmsapi.exception.BusinessRuleViolationException;
@@ -37,8 +42,11 @@ import com.hcmute.lms.lmsapi.repository.CourseSectionRepository;
 import com.hcmute.lms.lmsapi.repository.EnrollmentRepository;
 import com.hcmute.lms.lmsapi.repository.ImportBatchRepository;
 import com.hcmute.lms.lmsapi.repository.ImportRowErrorRepository;
+import com.hcmute.lms.lmsapi.repository.ProgramCourseRepository;
+import com.hcmute.lms.lmsapi.repository.ProgramVersionRepository;
 import com.hcmute.lms.lmsapi.repository.ScoreRepository;
 import com.hcmute.lms.lmsapi.repository.StudentRepository;
+import com.hcmute.lms.lmsapi.repository.SyllabusRepository;
 import com.hcmute.lms.lmsapi.repository.TermRepository;
 import com.hcmute.lms.lmsapi.service.AuditService;
 import com.hcmute.lms.lmsapi.service.ImportBatchService;
@@ -81,6 +89,9 @@ public class ImportBatchServiceImpl implements ImportBatchService {
   private final ImportBatchRepository batchRepository;
   private final ImportRowErrorRepository rowErrorRepository;
   private final ScoreRepository scoreRepository;
+  private final SyllabusRepository syllabusRepository;
+  private final ProgramCourseRepository programCourseRepository;
+  private final ProgramVersionRepository programVersionRepository;
   private final AssessmentItemValidator assessmentItemValidator;
   private final ImportFileStorage fileStorage;
   private final ScoreRowValidator rowValidator;
@@ -713,6 +724,30 @@ public class ImportBatchServiceImpl implements ImportBatchService {
     if (section.getStatus() == SectionStatus.LOCKED) {
       throw new BusinessRuleViolationException(
           "Lớp [" + section.getCode() + "] đang LOCKED, không nhập điểm");
+    }
+    if (section.getSyllabusId() != null) {
+      Syllabus syllabus = syllabusRepository.findById(section.getSyllabusId()).orElse(null);
+      if (syllabus != null && syllabus.getStatus() == SyllabusStatus.ARCHIVED) {
+        throw new BusinessRuleViolationException(
+            "SYLLABUS_LOCKED",
+            "Đề cương của lớp [" + section.getCode() + "] đã bị khóa, không cho phép import điểm");
+      }
+    }
+    if (section.getCourseId() != null) {
+      List<ProgramCourse> links = programCourseRepository.findByCourseId(section.getCourseId());
+      if (!links.isEmpty()) {
+        Set<String> pvIds =
+            links.stream().map(ProgramCourse::getProgramVersionId).collect(Collectors.toSet());
+        List<ProgramVersion> versions = programVersionRepository.findAllById(pvIds);
+        if (!versions.isEmpty()
+            && versions.stream().allMatch(pv -> pv.getStatus() == ProgramVersionStatus.ARCHIVED)) {
+          throw new BusinessRuleViolationException(
+              "PROGRAM_VERSION_LOCKED",
+              "Chương trình đào tạo của học phần ["
+                  + section.getCode()
+                  + "] đã bị khóa, không cho phép import điểm");
+        }
+      }
     }
     Term term =
         termRepository

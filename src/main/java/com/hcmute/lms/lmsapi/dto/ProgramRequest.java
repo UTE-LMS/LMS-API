@@ -1,6 +1,7 @@
 package com.hcmute.lms.lmsapi.dto;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -12,6 +13,11 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ProgramRequest {
+
+  @Pattern(
+      regexp = "^[0-9a-fA-F]{24}$",
+      message = "ID Khoa phải là ObjectId 24 ký tự hex")
+  private String facultyId;
 
   @NotBlank(message = "Mã chương trình đào tạo không được để trống")
   @Size(max = 64, message = "Mã chương trình đào tạo tối đa 64 ký tự")

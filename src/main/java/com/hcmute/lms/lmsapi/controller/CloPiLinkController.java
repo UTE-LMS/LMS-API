@@ -24,7 +24,6 @@ public class CloPiLinkController {
   private final CloPiLinkService cloPiLinkService;
 
   @GetMapping("/syllabi/{syllabusId}/clo-pi-links")
-  @PreAuthorize("isAuthenticated()")
   public ResponseEntity<List<CloPiLinkResponse>> getLinks(
       @PathVariable("syllabusId")
           @Pattern(
@@ -35,7 +34,6 @@ public class CloPiLinkController {
   }
 
   @GetMapping("/syllabi/{syllabusId}/clo-pi-matrix")
-  @PreAuthorize("isAuthenticated()")
   public ResponseEntity<CloPiMatrixResponse> getMatrix(
       @PathVariable("syllabusId")
           @Pattern(

@@ -13,8 +13,10 @@ import lombok.NoArgsConstructor;
 public class CourseResponse {
 
   private String id;
+  private String facultyId;
   private String code;
   private String name;
   private Integer credits;
+  private boolean isActive;
   private Map<String, Object> extra;
 }

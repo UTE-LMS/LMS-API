@@ -14,6 +14,7 @@ import org.springframework.data.mongodb.core.index.CompoundIndexes;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.mongodb.core.mapping.Field;
+import org.springframework.data.mongodb.core.mapping.FieldType;
 
 /**
  * Document đại diện cho người dùng và thông tin phân quyền trong collection users (F01). Tuân thủ
@@ -63,6 +64,14 @@ public class User {
   @Builder.Default
   @Field("tokenVersion")
   private long tokenVersion = 0L;
+
+  /**
+   * Định danh Khoa quản lý trực tiếp của người dùng (bắt buộc cho PROGRAM_MANAGER; mỗi PM chỉ
+   * thuộc tối đa 1 Khoa).
+   */
+  @Indexed
+  @Field(name = "facultyId", targetType = FieldType.OBJECT_ID)
+  private String facultyId;
 
   /** Danh sách phân công vai trò và phạm vi phụ trách của người dùng. */
   @Builder.Default

@@ -2,6 +2,7 @@ package com.hcmute.lms.lmsapi.repository;
 
 import com.hcmute.lms.lmsapi.document.Syllabus;
 import com.hcmute.lms.lmsapi.enums.SyllabusStatus;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.mongodb.repository.MongoRepository;
@@ -19,6 +20,8 @@ public interface SyllabusRepository extends MongoRepository<Syllabus, String> {
   List<Syllabus> findByCourseIdAndStatus(String courseId, SyllabusStatus status);
 
   List<Syllabus> findByCourseIdOrderByVersionAsc(String courseId);
+
+  List<Syllabus> findByCourseIdInOrderByCourseIdAscVersionAsc(Collection<String> courseIds);
 
   boolean existsByCourseId(String courseId);
 

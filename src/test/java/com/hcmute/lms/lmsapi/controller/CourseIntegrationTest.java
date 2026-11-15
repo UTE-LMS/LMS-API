@@ -106,8 +106,11 @@ class CourseIntegrationTest extends IntegrationTestBase {
         .andExpect(status().isForbidden());
 
     // 3. PM ngoài scope gán học phần vào programVersion -> 403
-    // 3. Unauthenticated GET /api/v1/courses -> 401
-    mockMvc.perform(getAs(null, "/api/v1/courses")).andExpect(status().isUnauthorized());
+    // 3. Public GET /api/v1/courses -> 200; Unauthenticated POST /api/v1/courses -> 401
+    mockMvc.perform(getAs(null, "/api/v1/courses")).andExpect(status().isOk());
+    mockMvc
+        .perform(postAs(null, "/api/v1/courses", courseReq))
+        .andExpect(status().isUnauthorized());
   }
 
   @Test

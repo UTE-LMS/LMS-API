@@ -5,6 +5,7 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 import com.hcmute.lms.lmsapi.document.Assessment;
+import com.hcmute.lms.lmsapi.document.Course;
 import com.hcmute.lms.lmsapi.document.CourseSection;
 import com.hcmute.lms.lmsapi.document.RoleAssignment;
 import com.hcmute.lms.lmsapi.document.Syllabus;
@@ -81,7 +82,9 @@ class AssessmentScopeAuthorizationTest {
     lenient()
         .when(syllabusRepository.findById(SYLLABUS_ID))
         .thenReturn(Optional.of(Syllabus.builder().id(SYLLABUS_ID).courseId(COURSE_ID).build()));
-    lenient().when(courseRepository.existsById(COURSE_ID)).thenReturn(true);
+    lenient()
+        .when(courseRepository.findById(COURSE_ID))
+        .thenReturn(Optional.of(Course.builder().id(COURSE_ID).build()));
     lenient()
         .when(courseSectionRepository.findById(SECTION_ID))
         .thenReturn(

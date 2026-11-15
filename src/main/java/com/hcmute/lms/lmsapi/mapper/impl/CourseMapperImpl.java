@@ -17,9 +17,11 @@ public class CourseMapperImpl implements CourseMapper {
     }
     return CourseResponse.builder()
         .id(course.getId())
+        .facultyId(course.getFacultyId())
         .code(course.getCode())
         .name(course.getName())
         .credits(course.getCredits())
+        .isActive(course.isActive())
         .extra(course.getExtra())
         .build();
   }

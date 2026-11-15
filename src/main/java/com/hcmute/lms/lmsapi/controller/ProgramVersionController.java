@@ -6,6 +6,7 @@ import com.hcmute.lms.lmsapi.dto.ProgramCsvImportResponse;
 import com.hcmute.lms.lmsapi.dto.ProgramVersionResponse;
 import com.hcmute.lms.lmsapi.dto.ProgramVersionStatusUpdateRequest;
 import com.hcmute.lms.lmsapi.dto.UserPrincipal;
+import com.hcmute.lms.lmsapi.enums.ProgramVersionStatus;
 import com.hcmute.lms.lmsapi.service.ProgramImportService;
 import com.hcmute.lms.lmsapi.service.ProgramVersionService;
 import com.hcmute.lms.lmsapi.util.PageableValidationUtils;
@@ -52,13 +53,21 @@ public class ProgramVersionController {
           @Min(value = 1, message = "Kích thước trang phải lớn hơn hoặc bằng 1")
           @Max(value = 100, message = "Kích thước trang tối đa 100")
           Integer size,
-      @RequestParam(required = false) String programId) {
+      @RequestParam(required = false) String programId,
+      @RequestParam(required = false) String facultyId,
+      @RequestParam(required = false) String cohort,
+      @RequestParam(required = false) ProgramVersionStatus status,
+      @RequestParam(required = false) String search) {
     PageableValidationUtils.validate(page, size);
     return ResponseEntity.ok(
         programVersionService.getProgramVersions(
             page != null ? page : PageableValidationUtils.DEFAULT_PAGE,
             size != null ? size : PageableValidationUtils.DEFAULT_SIZE,
-            programId));
+            programId,
+            facultyId,
+            cohort,
+            status,
+            search));
   }
 
   @GetMapping("/{id}")
@@ -81,6 +90,22 @@ public class ProgramVersionController {
             HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + template.fileName() + "\"")
         .contentType(MediaType.parseMediaType("text/csv; charset=UTF-8"))
         .body(template.content());
+  }
+
+  @PostMapping(value = "/import/preview", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+  @PreAuthorize(
+      "hasRole('ADMIN') or (hasRole('PROGRAM_MANAGER') and @scopeAuthorizationService.canAccessProgram(authentication.principal, #programId, T(com.hcmute.lms.lmsapi.enums.AccessType).WRITE))")
+  public ResponseEntity<ProgramCsvImportResponse> previewImportProgramCsv(
+      @RequestParam("programId")
+          @Pattern(
+              regexp = "^[0-9a-fA-F]{24}$",
+              message = "ID ngành đào tạo phải là ObjectId 24 ký tự hex")
+          String programId,
+      @RequestParam("version") @NotBlank(message = "Phiên bản CTĐT không được để trống")
+          String version,
+      @RequestPart("file") MultipartFile file,
+      @AuthenticationPrincipal UserPrincipal principal) {
+    return importProgramCsv(programId, version, file, principal);
   }
 
   @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -120,9 +145,27 @@ public class ProgramVersionController {
     return ResponseEntity.ok(programImportService.confirmImport(id, actorId));
   }
 
+  @PutMapping("/{id}/lock")
+  @PreAuthorize(
+      "hasRole('ADMIN') or (hasRole('PROGRAM_MANAGER') and @scopeAuthorizationService.canAccessProgramVersion(authentication.principal, #id, T(com.hcmute.lms.lmsapi.enums.AccessType).WRITE))")
+  public ResponseEntity<ProgramVersionResponse> lockProgramVersion(
+      @PathVariable("id")
+          @Pattern(
+              regexp = "^[0-9a-fA-F]{24}$",
+              message = "ID phiên bản phải là ObjectId 24 ký tự hex")
+          String id) {
+    log.info("API request: PUT /api/v1/program-versions/{}/lock", id);
+    return ResponseEntity.ok(
+        programVersionService.updateProgramVersionStatus(
+            id,
+            ProgramVersionStatusUpdateRequest.builder()
+                .status(com.hcmute.lms.lmsapi.enums.ProgramVersionStatus.ARCHIVED)
+                .build()));
+  }
+
   @PutMapping("/{id}/status")
   @PreAuthorize(
-      "hasRole('PROGRAM_MANAGER') and @scopeAuthorizationService.canAccessProgramVersion(authentication.principal, #id, T(com.hcmute.lms.lmsapi.enums.AccessType).WRITE)")
+      "hasRole('ADMIN') or (hasRole('PROGRAM_MANAGER') and @scopeAuthorizationService.canAccessProgramVersion(authentication.principal, #id, T(com.hcmute.lms.lmsapi.enums.AccessType).WRITE))")
   public ResponseEntity<ProgramVersionResponse> updateProgramVersionStatus(
       @PathVariable("id")
           @Pattern(
