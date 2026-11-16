@@ -10,6 +10,7 @@ import com.hcmute.lms.lmsapi.dto.CourseRequest;
 import com.hcmute.lms.lmsapi.dto.CourseResponse;
 import com.hcmute.lms.lmsapi.dto.CourseUpdateRequest;
 import com.hcmute.lms.lmsapi.dto.PageResponse;
+import com.hcmute.lms.lmsapi.enums.AuditAction;
 import com.hcmute.lms.lmsapi.enums.ProgramVersionStatus;
 import com.hcmute.lms.lmsapi.exception.AppException;
 import com.hcmute.lms.lmsapi.exception.BusinessRuleViolationException;
@@ -20,6 +21,7 @@ import com.hcmute.lms.lmsapi.repository.CourseRepository;
 import com.hcmute.lms.lmsapi.repository.FacultyRepository;
 import com.hcmute.lms.lmsapi.repository.ProgramCourseRepository;
 import com.hcmute.lms.lmsapi.repository.ProgramVersionRepository;
+import com.hcmute.lms.lmsapi.service.AuditService;
 import com.hcmute.lms.lmsapi.service.CourseService;
 import com.hcmute.lms.lmsapi.util.CsvUtils;
 import com.hcmute.lms.lmsapi.util.ObjectIdUtils;
@@ -38,6 +40,7 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.bson.types.ObjectId;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -61,6 +64,9 @@ public class CourseServiceImpl implements CourseService {
   private final ProgramVersionRepository programVersionRepository;
   private final CourseMapper courseMapper;
   private final MongoTemplate mongoTemplate;
+
+  @Autowired(required = false)
+  private AuditService auditService;
 
   @Override
   public PageResponse<CourseResponse> getCourses(
@@ -172,6 +178,8 @@ public class CourseServiceImpl implements CourseService {
     }
 
     log.info("Course created successfully: id={}, code={}", course.getId(), course.getCode());
+    AuditLogHelper.record(
+        auditService, AuditAction.CREATE, "courses", course.getId(), null, course, null);
     return courseMapper.toResponse(course);
   }
 
@@ -211,6 +219,8 @@ public class CourseServiceImpl implements CourseService {
 
     course = courseRepository.save(course);
     log.info("Course updated successfully: id={}, code={}", course.getId(), course.getCode());
+    AuditLogHelper.record(
+        auditService, AuditAction.UPDATE, "courses", course.getId(), null, course, null);
     return courseMapper.toResponse(course);
   }
 
@@ -229,6 +239,7 @@ public class CourseServiceImpl implements CourseService {
 
     courseRepository.deleteById(id);
     log.info("Course deleted successfully: id={}", id);
+    AuditLogHelper.record(auditService, AuditAction.DELETE, "courses", id, null, null, null);
   }
 
   private void ensureCourseNotInActiveProgramVersions(String courseId) {
@@ -544,11 +555,15 @@ public class CourseServiceImpl implements CourseService {
         successCount,
         errors.size());
 
-    return CourseImportResultResponse.builder()
-        .totalRows(totalRows)
-        .successCount(successCount)
-        .failureCount(errors.size())
-        .errors(errors)
-        .build();
+    CourseImportResultResponse result =
+        CourseImportResultResponse.builder()
+            .totalRows(totalRows)
+            .successCount(successCount)
+            .failureCount(errors.size())
+            .errors(errors)
+            .build();
+    AuditLogHelper.record(
+        auditService, AuditAction.IMPORT, "courses", "batch", null, result, "Import CSV học phần");
+    return result;
   }
 }

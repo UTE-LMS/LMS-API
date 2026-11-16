@@ -317,4 +317,50 @@ class AuditLogApiIntegrationTest extends IntegrationTestBase {
         .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
         .andExpect(jsonPath("$.fieldErrors[0].field").value("from"));
   }
+
+  @Test
+  @DisplayName(
+      "CRUD Course tự động điền createdAt/updatedAt và ghi audit_logs CREATE/UPDATE/DELETE")
+  void crudRecordsAuditLogsAndMongoTimestamps() throws Exception {
+    String courseCode = fixtures.code("AUD");
+    var createReq =
+        com.hcmute.lms.lmsapi.dto.CourseRequest.builder()
+            .code(courseCode)
+            .name("Học phần kiểm toán")
+            .credits(3)
+            .build();
+    var createdRes =
+        mockMvc
+            .perform(postAs(adminBearer, "/api/v1/courses", createReq))
+            .andExpect(status().isCreated())
+            .andReturn();
+    String courseId = read(createdRes, "$.id");
+
+    var savedCourse = mongo().findById(courseId, com.hcmute.lms.lmsapi.document.Course.class);
+    org.assertj.core.api.Assertions.assertThat(savedCourse).isNotNull();
+    org.assertj.core.api.Assertions.assertThat(savedCourse.getCreatedAt()).isNotNull();
+    org.assertj.core.api.Assertions.assertThat(savedCourse.getUpdatedAt()).isNotNull();
+
+    var updateReq =
+        com.hcmute.lms.lmsapi.dto.CourseUpdateRequest.builder()
+            .name("Học phần kiểm toán sửa")
+            .credits(4)
+            .build();
+    mockMvc
+        .perform(putAs(adminBearer, "/api/v1/courses/{id}", updateReq, courseId))
+        .andExpect(status().isOk());
+
+    mockMvc
+        .perform(deleteAs(adminBearer, "/api/v1/courses/{id}", courseId))
+        .andExpect(status().isNoContent());
+
+    mockMvc
+        .perform(getAs(adminBearer, URL).param("entity", "courses").param("entityId", courseId))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalElements").value(3))
+        .andExpect(
+            jsonPath(
+                "$.content[*].action",
+                org.hamcrest.Matchers.hasItems("CREATE", "UPDATE", "DELETE")));
+  }
 }

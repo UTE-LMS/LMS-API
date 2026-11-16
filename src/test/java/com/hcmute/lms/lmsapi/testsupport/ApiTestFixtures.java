@@ -336,7 +336,7 @@ public final class ApiTestFixtures {
 
   /** Tạo sinh viên giả với mã thay thế mang tiền tố của test này (không phải mã sinh viên thật). */
   public Student student() {
-    return mongo.save(Student.builder().studentRef(code("STU")).build());
+    return mongo.save(Student.builder().studentCode(code("STU")).build());
   }
 
   /** Ghi danh một sinh viên vào lớp với trạng thái cho trước (không đụng tới sĩ số của lớp). */
@@ -405,7 +405,7 @@ public final class ApiTestFixtures {
     removeIn("scores", "sectionId", sectionOids);
     removeIn("import_batches", "sectionId", sectionOids);
     removeIn("enrollments", "sectionId", sectionOids);
-    mongo.remove(query(Criteria.where("studentRef").regex(codePrefix)), "students");
+    mongo.remove(query(Criteria.where("studentCode").regex(codePrefix)), "students");
     mongo.remove(query(Criteria.where("code").regex(codePrefix)), "course_sections");
 
     List<String> userIds = ids("users", Criteria.where("username").regex("^itest_" + runId + "_"));

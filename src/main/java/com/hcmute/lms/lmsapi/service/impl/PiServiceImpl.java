@@ -5,6 +5,7 @@ import com.hcmute.lms.lmsapi.document.ProgramVersion;
 import com.hcmute.lms.lmsapi.document.Verification;
 import com.hcmute.lms.lmsapi.dto.PiRequest;
 import com.hcmute.lms.lmsapi.dto.PiResponse;
+import com.hcmute.lms.lmsapi.enums.AuditAction;
 import com.hcmute.lms.lmsapi.enums.ProgramVersionStatus;
 import com.hcmute.lms.lmsapi.enums.VerificationStatus;
 import com.hcmute.lms.lmsapi.exception.AppException;
@@ -16,11 +17,13 @@ import com.hcmute.lms.lmsapi.repository.PiRepository;
 import com.hcmute.lms.lmsapi.repository.PloRepository;
 import com.hcmute.lms.lmsapi.repository.ProgramReferenceRepository;
 import com.hcmute.lms.lmsapi.repository.ProgramVersionRepository;
+import com.hcmute.lms.lmsapi.service.AuditService;
 import com.hcmute.lms.lmsapi.service.PiService;
 import com.hcmute.lms.lmsapi.util.ObjectIdUtils;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -35,6 +38,9 @@ public class PiServiceImpl implements PiService {
   private final ProgramVersionRepository programVersionRepository;
   private final ProgramReferenceRepository programReferenceRepository;
   private final PiMapper piMapper;
+
+  @Autowired(required = false)
+  private AuditService auditService;
 
   @Override
   public List<PiResponse> getPis(String programVersionId) {
@@ -82,6 +88,7 @@ public class PiServiceImpl implements PiService {
       log.warn("Duplicate PI code on create: {} - {}", programVersionId, code);
       throw conflict(code);
     }
+    AuditLogHelper.record(auditService, AuditAction.CREATE, "pis", pi.getId(), null, pi, null);
     return piMapper.toResponse(pi);
   }
 
@@ -115,6 +122,7 @@ public class PiServiceImpl implements PiService {
       log.warn("Duplicate PI code on update: {} - {}", programVersionId, code);
       throw conflict(code);
     }
+    AuditLogHelper.record(auditService, AuditAction.UPDATE, "pis", pi.getId(), null, pi, null);
     return piMapper.toResponse(pi);
   }
 
@@ -129,6 +137,7 @@ public class PiServiceImpl implements PiService {
           "Không thể xóa PI khi vẫn còn học phần, CLO hoặc câu hỏi/đề đánh giá tham chiếu");
     }
     piRepository.delete(pi);
+    AuditLogHelper.record(auditService, AuditAction.DELETE, "pis", id, pi, null, null);
   }
 
   private ProgramVersion requireDraftableVersion(String programVersionId, boolean requireDraft) {

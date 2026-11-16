@@ -703,8 +703,8 @@ class AssessmentIntegrationTest extends IntegrationTestBase {
     assertThat(content.charAt(0)).isEqualTo('\uFEFF');
     assertThat(content)
         .contains("MaSV,HoTen,Q1 - CLO1 (Max: 4),Q2 - CLO1 (Max: 3),Q2 - CLO2 (Max: 3)");
-    assertThat(content).contains(s1.getStudentRef() + ",Nguyen Van A,,,");
-    assertThat(content).contains(s2.getStudentRef() + ",Tran Thi B,,,");
+    assertThat(content).contains(s1.getStudentCode() + ",Nguyen Van A,,,");
+    assertThat(content).contains(s2.getStudentCode() + ",Tran Thi B,,,");
   }
 
   @Test

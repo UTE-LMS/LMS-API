@@ -33,23 +33,23 @@ class ScoreCsvParserTest {
   void emptyOrHeaderOnlyFilesAreRejected() {
     assertFileError("", "rỗng");
     assertFileError("\n\n", "rỗng");
-    assertFileError("studentRef,Q1\n", "không có dòng dữ liệu");
-    assertFileError("studentRef,Q1\n\n   \n", "không có dòng dữ liệu");
+    assertFileError("studentCode,Q1\n", "không có dòng dữ liệu");
+    assertFileError("studentCode,Q1\n\n   \n", "không có dòng dữ liệu");
   }
 
   @Test
   @DisplayName("US-22/AC-4: tiêu đề trùng (không phân biệt hoa thường) bị từ chối")
   void duplicateHeadersAreRejected() {
-    assertFileError("studentRef,Q1,q1\nA,1,2\n", "xuất hiện nhiều lần");
+    assertFileError("studentCode,Q1,q1\nA,1,2\n", "xuất hiện nhiều lần");
   }
 
   @Test
   @DisplayName("US-21: số dòng là dòng vật lý (tiêu đề = 1), dòng trống bị bỏ nhưng vẫn được đếm")
   void lineNumbersArePhysicalLines() {
     // dòng 1: tiêu đề; dòng 2: A; dòng 3: trống; dòng 4: B
-    ScoreCsvParser.Table table = ScoreCsvParser.parse(bytes("studentRef,Q1\nA,1\n\nB,2\n"));
+    ScoreCsvParser.Table table = ScoreCsvParser.parse(bytes("studentCode,Q1\nA,1\n\nB,2\n"));
 
-    assertThat(table.headers()).containsExactly("studentRef", "Q1");
+    assertThat(table.headers()).containsExactly("studentCode", "Q1");
     assertThat(table.rows()).hasSize(2);
     assertThat(table.rows().get(0).lineNumber()).isEqualTo(2);
     assertThat(table.rows().get(1).lineNumber()).isEqualTo(4);
@@ -60,9 +60,9 @@ class ScoreCsvParserTest {
   @DisplayName("US-21: chấp nhận BOM, CRLF, chấm phẩy, nháy kép và bỏ khoảng trắng hai đầu ô")
   void acceptsBomSemicolonQuotesAndTrims() {
     ScoreCsvParser.Table table =
-        ScoreCsvParser.parse(bytes("﻿studentRef;\"Câu 1.5\"; Q2 \r\n A1 ;\"8,5\";\r\n"));
+        ScoreCsvParser.parse(bytes("﻿studentCode;\"Câu 1.5\"; Q2 \r\n A1 ;\"8,5\";\r\n"));
 
-    assertThat(table.headers()).containsExactly("studentRef", "Câu 1.5", "Q2");
+    assertThat(table.headers()).containsExactly("studentCode", "Câu 1.5", "Q2");
     // Ô cuối để trống vẫn là một ô (rỗng), không bị coi là thiếu ô.
     assertThat(table.rows().get(0).cells()).containsExactly("A1", "8,5", "");
   }
@@ -70,7 +70,7 @@ class ScoreCsvParserTest {
   @Test
   @DisplayName("US-21: dòng thừa/thiếu ô vẫn đọc được nguyên số ô để service báo lỗi theo dòng")
   void rowsKeepTheirOwnCellCount() {
-    ScoreCsvParser.Table table = ScoreCsvParser.parse(bytes("studentRef,Q1\nA\nB,1,2,3\n"));
+    ScoreCsvParser.Table table = ScoreCsvParser.parse(bytes("studentCode,Q1\nA\nB,1,2,3\n"));
 
     assertThat(table.rows().get(0).cells()).hasSize(1);
     assertThat(table.rows().get(1).cells()).hasSize(4);
@@ -79,9 +79,9 @@ class ScoreCsvParserTest {
   @Test
   @DisplayName("US-21: indexOf tìm cột không phân biệt hoa thường, -1 khi không có hoặc null")
   void indexOfIsCaseInsensitive() {
-    ScoreCsvParser.Table table = ScoreCsvParser.parse(bytes("StudentRef,Q1\nA,1\n"));
+    ScoreCsvParser.Table table = ScoreCsvParser.parse(bytes("StudentCode,Q1\nA,1\n"));
 
-    assertThat(table.indexOf("studentref")).isZero();
+    assertThat(table.indexOf("studentcode")).isZero();
     assertThat(table.indexOf(" Q1 ")).isEqualTo(1);
     assertThat(table.indexOf("Q9")).isEqualTo(-1);
     assertThat(table.indexOf(null)).isEqualTo(-1);
@@ -90,7 +90,7 @@ class ScoreCsvParserTest {
   @Test
   @DisplayName("US-22/AC-4 (biên): đúng 5.000 dòng dữ liệu được nhận, 5.001 dòng bị từ chối")
   void rowLimitBoundary() {
-    StringBuilder atLimit = new StringBuilder("studentRef,Q1\n");
+    StringBuilder atLimit = new StringBuilder("studentCode,Q1\n");
     for (int i = 0; i < EnrollmentCsvParser.MAX_DATA_ROWS; i++) {
       atLimit.append("S").append(i).append(",1\n");
     }
@@ -103,7 +103,7 @@ class ScoreCsvParserTest {
   @Test
   @DisplayName("Table và Row trả danh sách bất biến: không sửa được dữ liệu bên trong")
   void resultsAreImmutable() {
-    ScoreCsvParser.Table table = ScoreCsvParser.parse(bytes("studentRef,Q1\nA,1\n"));
+    ScoreCsvParser.Table table = ScoreCsvParser.parse(bytes("studentCode,Q1\nA,1\n"));
 
     List<String> headers = table.headers();
     assertThatThrownBy(() -> headers.add("x")).isInstanceOf(UnsupportedOperationException.class);

@@ -10,6 +10,7 @@ import com.hcmute.lms.lmsapi.dto.CloPiLinkResponse;
 import com.hcmute.lms.lmsapi.dto.CloPiMatrixResponse;
 import com.hcmute.lms.lmsapi.dto.CloResponse;
 import com.hcmute.lms.lmsapi.dto.PiResponse;
+import com.hcmute.lms.lmsapi.enums.AuditAction;
 import com.hcmute.lms.lmsapi.exception.AppException;
 import com.hcmute.lms.lmsapi.exception.BusinessRuleViolationException;
 import com.hcmute.lms.lmsapi.exception.ErrorCode;
@@ -23,12 +24,14 @@ import com.hcmute.lms.lmsapi.repository.PiRepository;
 import com.hcmute.lms.lmsapi.repository.ProgramCourseRepository;
 import com.hcmute.lms.lmsapi.repository.ProgramVersionRepository;
 import com.hcmute.lms.lmsapi.repository.SyllabusRepository;
+import com.hcmute.lms.lmsapi.service.AuditService;
 import com.hcmute.lms.lmsapi.service.CloPiLinkService;
 import com.hcmute.lms.lmsapi.util.ObjectIdUtils;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -43,6 +46,10 @@ public class CloPiLinkServiceImpl implements CloPiLinkService {
   private final CloRepository cloRepository;
   private final PiRepository piRepository;
   private final ProgramVersionRepository programVersionRepository;
+
+  @Autowired(required = false)
+  private AuditService auditService;
+
   private final ProgramCourseRepository programCourseRepository;
   private final CloPiLinkMapper cloPiLinkMapper;
   private final CloMapper cloMapper;
@@ -107,6 +114,8 @@ public class CloPiLinkServiceImpl implements CloPiLinkService {
           saved.getId(),
           request.getCloId(),
           request.getPiId());
+      AuditLogHelper.record(
+          auditService, AuditAction.CREATE, "clo_pi_links", saved.getId(), null, saved, null);
       return cloPiLinkMapper.toResponse(saved);
     } catch (DuplicateKeyException ex) {
       throw conflict(
@@ -124,6 +133,7 @@ public class CloPiLinkServiceImpl implements CloPiLinkService {
     }
     cloPiLinkRepository.deleteById(id);
     log.info("Đã xóa liên kết CLO-PI id=[{}]", id);
+    AuditLogHelper.record(auditService, AuditAction.DELETE, "clo_pi_links", id, null, null, null);
   }
 
   @Override

@@ -1,5 +1,7 @@
 package com.hcmute.lms.lmsapi.controller;
 
+import com.hcmute.lms.lmsapi.dto.AssessmentScoreTemplate;
+import com.hcmute.lms.lmsapi.dto.CsvImportResultResponse;
 import com.hcmute.lms.lmsapi.dto.EnrollmentImportResponse;
 import com.hcmute.lms.lmsapi.dto.EnrollmentListResponse;
 import com.hcmute.lms.lmsapi.dto.EnrollmentResponse;
@@ -13,6 +15,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -95,5 +98,44 @@ public class EnrollmentController {
         request.getStatus(),
         actor);
     return ResponseEntity.ok(enrollmentService.updateStatus(id, request, actor));
+  }
+
+  @GetMapping(
+      value = "/sections/{sectionId}/enrollments/import-template",
+      produces = "text/csv; charset=UTF-8")
+  @PreAuthorize(
+      "@scopeAuthorizationService.canAccessSection(authentication.principal, #sectionId, T(com.hcmute.lms.lmsapi.enums.AccessType).READ)"
+          + " or @scopeAuthorizationService.canManageSection(authentication.principal, #sectionId)")
+  public ResponseEntity<byte[]> getSectionEnrollmentTemplate(
+      @PathVariable("sectionId")
+          @Pattern(
+              regexp = "^[0-9a-fA-F]{24}$",
+              message = "ID lớp học phần phải là ObjectId 24 ký tự hex")
+          String sectionId) {
+    AssessmentScoreTemplate template = enrollmentService.generateTemplateCsv();
+    return ResponseEntity.ok()
+        .header(
+            HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + template.fileName() + "\"")
+        .contentType(MediaType.parseMediaType("text/csv; charset=UTF-8"))
+        .body(template.content());
+  }
+
+  @GetMapping(value = "/enrollments/import-template", produces = "text/csv; charset=UTF-8")
+  @PreAuthorize("hasAnyRole('ADMIN', 'PROGRAM_MANAGER', 'LECTURER')")
+  public ResponseEntity<byte[]> getBulkEnrollmentTemplate() {
+    AssessmentScoreTemplate template = enrollmentService.generateBulkTemplateCsv();
+    return ResponseEntity.ok()
+        .header(
+            HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + template.fileName() + "\"")
+        .contentType(MediaType.parseMediaType("text/csv; charset=UTF-8"))
+        .body(template.content());
+  }
+
+  @PostMapping(value = "/enrollments/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+  @PreAuthorize("hasAnyRole('ADMIN', 'PROGRAM_MANAGER', 'LECTURER')")
+  public ResponseEntity<CsvImportResultResponse> importEnrollmentsBulk(
+      @RequestPart("file") MultipartFile file, @AuthenticationPrincipal UserPrincipal principal) {
+    log.info("API request: POST /api/v1/enrollments/import file=[{}]", file.getOriginalFilename());
+    return ResponseEntity.ok(enrollmentService.importEnrollmentsBulk(file, principal));
   }
 }

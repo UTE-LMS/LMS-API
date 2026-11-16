@@ -1,15 +1,19 @@
 package com.hcmute.lms.lmsapi.service.impl;
 
+import com.hcmute.lms.lmsapi.document.Course;
 import com.hcmute.lms.lmsapi.document.CourseSection;
 import com.hcmute.lms.lmsapi.document.Syllabus;
 import com.hcmute.lms.lmsapi.document.Term;
 import com.hcmute.lms.lmsapi.document.User;
+import com.hcmute.lms.lmsapi.dto.AssessmentScoreTemplate;
+import com.hcmute.lms.lmsapi.dto.CsvImportResultResponse;
 import com.hcmute.lms.lmsapi.dto.SectionRequest;
 import com.hcmute.lms.lmsapi.dto.SectionResponse;
 import com.hcmute.lms.lmsapi.dto.SectionStatusUpdateRequest;
 import com.hcmute.lms.lmsapi.dto.SectionUpdateRequest;
 import com.hcmute.lms.lmsapi.dto.UserPrincipal;
 import com.hcmute.lms.lmsapi.enums.AccessType;
+import com.hcmute.lms.lmsapi.enums.AuditAction;
 import com.hcmute.lms.lmsapi.enums.Role;
 import com.hcmute.lms.lmsapi.enums.SectionStatus;
 import com.hcmute.lms.lmsapi.enums.SyllabusStatus;
@@ -25,21 +29,29 @@ import com.hcmute.lms.lmsapi.repository.CourseSectionRepository;
 import com.hcmute.lms.lmsapi.repository.SyllabusRepository;
 import com.hcmute.lms.lmsapi.repository.TermRepository;
 import com.hcmute.lms.lmsapi.repository.UserRepository;
+import com.hcmute.lms.lmsapi.service.AuditService;
 import com.hcmute.lms.lmsapi.service.ScopeAuthorizationService;
 import com.hcmute.lms.lmsapi.service.SectionService;
 import com.hcmute.lms.lmsapi.util.ObjectIdUtils;
+import com.hcmute.lms.lmsapi.util.StringNormalizationUtils;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 @Slf4j
 @Service
@@ -53,6 +65,9 @@ public class SectionServiceImpl implements SectionService {
   private final UserRepository userRepository;
   private final ScopeAuthorizationService scopeAuthorizationService;
   private final SectionMapper sectionMapper;
+
+  @Autowired(required = false)
+  private AuditService auditService;
 
   @Override
   public List<SectionResponse> getSections(
@@ -108,6 +123,8 @@ public class SectionServiceImpl implements SectionService {
     try {
       CourseSection saved = sectionRepository.save(section);
       log.info("Mở lớp học phần id=[{}] mã [{}]", saved.getId(), saved.getCode());
+      AuditLogHelper.record(
+          auditService, AuditAction.CREATE, "course_sections", saved.getId(), null, saved, null);
       return sectionMapper.toResponse(saved);
     } catch (DuplicateKeyException ex) {
       throw conflict(String.format("Mã lớp học phần [%s] đã tồn tại trong hệ thống", code));
@@ -120,6 +137,8 @@ public class SectionServiceImpl implements SectionService {
     section.setLecturerIds(validateLecturers(request.getLecturerIds()));
     CourseSection saved = sectionRepository.save(section);
     log.info("Cập nhật giảng viên phụ trách lớp id=[{}] mã [{}]", saved.getId(), saved.getCode());
+    AuditLogHelper.record(
+        auditService, AuditAction.UPDATE, "course_sections", saved.getId(), null, saved, null);
     return sectionMapper.toResponse(saved);
   }
 
@@ -149,6 +168,14 @@ public class SectionServiceImpl implements SectionService {
         current,
         target,
         actorUsername,
+        request.getReason());
+    AuditLogHelper.record(
+        auditService,
+        AuditAction.STATUS_CHANGE,
+        "course_sections",
+        saved.getId(),
+        Map.of("status", current),
+        Map.of("status", target),
         request.getReason());
     return sectionMapper.toResponse(saved);
   }
@@ -231,5 +258,167 @@ public class SectionServiceImpl implements SectionService {
 
   private AppException conflict(String message) {
     return new AppException(ErrorCode.CONFLICT, HttpStatus.CONFLICT, message);
+  }
+
+  @Override
+  public AssessmentScoreTemplate generateTemplateCsv() {
+    String csv =
+        "\uFEFF"
+            + "code,courseCode,syllabusVersion,termCode,lecturerUsernames\r\n"
+            + "OOPR230279_01,OOPR230279,2026.1,2026-HK1,gv_an;gv_binh\r\n";
+    return new AssessmentScoreTemplate(
+        "sections-template.csv", csv.getBytes(StandardCharsets.UTF_8));
+  }
+
+  @Override
+  public CsvImportResultResponse importSections(MultipartFile file, UserPrincipal principal) {
+    CsvTextParser.ParsedCsv parsed = CsvTextParser.read(file);
+    CsvTextParser.requireColumns(
+        parsed.headerIndex(),
+        "code",
+        "courseCode",
+        "syllabusVersion",
+        "termCode",
+        "lecturerUsernames");
+
+    int totalRows = parsed.rows().size();
+    int successCount = 0;
+    List<CsvImportResultResponse.RowError> errors = new ArrayList<>();
+    Set<String> seenCodes = new HashSet<>();
+    Map<String, Course> courseCache = new HashMap<>();
+    Map<String, Term> termCache = new HashMap<>();
+    Map<String, User> userCache = new HashMap<>();
+
+    for (int i = 0; i < totalRows; i++) {
+      int rowNum = i + 2;
+      List<String> row = parsed.rows().get(i);
+      String code = CsvTextParser.cell(parsed.headerIndex(), row, "code");
+      String courseCode = CsvTextParser.cell(parsed.headerIndex(), row, "courseCode");
+      String syllabusVersion = CsvTextParser.cell(parsed.headerIndex(), row, "syllabusVersion");
+      String termCode = CsvTextParser.cell(parsed.headerIndex(), row, "termCode");
+      String rawLecturers = CsvTextParser.cell(parsed.headerIndex(), row, "lecturerUsernames");
+
+      if (code.isEmpty()) {
+        errors.add(
+            new CsvImportResultResponse.RowError(rowNum, "", "Thiếu mã lớp học phần (code)"));
+        continue;
+      }
+      if (!seenCodes.add(code) || sectionRepository.existsByCode(code)) {
+        errors.add(
+            new CsvImportResultResponse.RowError(
+                rowNum, code, "Mã lớp học phần đã tồn tại: " + code));
+        continue;
+      }
+      if (courseCode.isEmpty() || syllabusVersion.isEmpty() || termCode.isEmpty()) {
+        errors.add(
+            new CsvImportResultResponse.RowError(
+                rowNum, code, "Thiếu courseCode, syllabusVersion hoặc termCode"));
+        continue;
+      }
+
+      Course course =
+          courseCache.computeIfAbsent(courseCode, k -> courseRepository.findByCode(k).orElse(null));
+      if (course == null) {
+        errors.add(
+            new CsvImportResultResponse.RowError(
+                rowNum, code, "Không tìm thấy học phần: " + courseCode));
+        continue;
+      }
+      if (!scopeAuthorizationService.canManageCourseSections(principal, course.getId())) {
+        errors.add(
+            new CsvImportResultResponse.RowError(
+                rowNum, code, "Không có quyền mở lớp cho học phần thuộc khoa khác: " + courseCode));
+        continue;
+      }
+
+      Syllabus syllabus =
+          syllabusRepository.findByCourseIdAndVersion(course.getId(), syllabusVersion).orElse(null);
+      if (syllabus == null || syllabus.getStatus() != SyllabusStatus.CONFIRMED) {
+        errors.add(
+            new CsvImportResultResponse.RowError(
+                rowNum,
+                code,
+                "Đề cương không tồn tại hoặc chưa CONFIRMED: "
+                    + courseCode
+                    + " / "
+                    + syllabusVersion));
+        continue;
+      }
+
+      Term term =
+          termCache.computeIfAbsent(termCode, k -> termRepository.findByCode(k).orElse(null));
+      if (term == null || term.getStatus() != TermStatus.OPEN) {
+        errors.add(
+            new CsvImportResultResponse.RowError(
+                rowNum, code, "Học kỳ không tồn tại hoặc không ở trạng thái OPEN: " + termCode));
+        continue;
+      }
+
+      List<String> lecturerIds = resolveLecturersByUsernames(rawLecturers, userCache);
+      if (lecturerIds == null || lecturerIds.isEmpty()) {
+        errors.add(
+            new CsvImportResultResponse.RowError(
+                rowNum, code, "Danh sách giảng viên không hợp lệ hoặc không có role LECTURER"));
+        continue;
+      }
+
+      CourseSection section =
+          CourseSection.builder()
+              .code(code)
+              .courseId(course.getId())
+              .syllabusId(syllabus.getId())
+              .termId(term.getId())
+              .lecturerIds(lecturerIds)
+              .enrolledCount(0)
+              .status(SectionStatus.OPEN)
+              .build();
+      try {
+        sectionRepository.save(section);
+        successCount++;
+      } catch (DuplicateKeyException ex) {
+        errors.add(
+            new CsvImportResultResponse.RowError(
+                rowNum, code, "Mã lớp học phần đã tồn tại: " + code));
+      }
+    }
+
+    CsvImportResultResponse result =
+        CsvImportResultResponse.builder()
+            .totalRows(totalRows)
+            .successCount(successCount)
+            .failureCount(errors.size())
+            .errors(errors)
+            .build();
+    AuditLogHelper.record(
+        auditService,
+        AuditAction.IMPORT,
+        "course_sections",
+        "batch",
+        null,
+        result,
+        "Import CSV lớp học phần");
+    return result;
+  }
+
+  private List<String> resolveLecturersByUsernames(
+      String rawLecturers, Map<String, User> userCache) {
+    if (rawLecturers == null || rawLecturers.isBlank()) {
+      return List.of();
+    }
+    Set<String> ids = new LinkedHashSet<>();
+    for (String token : rawLecturers.split("[;|]")) {
+      String trimmed = token.trim();
+      if (trimmed.isEmpty()) {
+        continue;
+      }
+      String username = StringNormalizationUtils.normalizeUsername(trimmed);
+      User user =
+          userCache.computeIfAbsent(username, k -> userRepository.findByUsername(k).orElse(null));
+      if (user == null || user.getStatus() != UserStatus.ACTIVE || !hasLecturerRole(user)) {
+        return null;
+      }
+      ids.add(user.getId());
+    }
+    return new ArrayList<>(ids);
   }
 }

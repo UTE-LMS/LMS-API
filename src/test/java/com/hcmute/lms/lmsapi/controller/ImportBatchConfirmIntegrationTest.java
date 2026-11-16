@@ -30,9 +30,9 @@ class ImportBatchConfirmIntegrationTest extends ScoreImportIntegrationBase {
   /** Ba sinh viên, hai câu: Q1 tối đa 4, Q2 tối đa 6 (ví dụ minh họa). */
   private String threeStudentsCsv() {
     return csv(
-        s1.getStudentRef() + ",3,6", // dòng 2
-        s2.getStudentRef() + ",4,0", // dòng 3: 0 gõ rõ ràng là SCORED 0
-        s3.getStudentRef() + ",0,2.5"); // dòng 4
+        s1.getStudentCode() + ",3,6", // dòng 2
+        s2.getStudentCode() + ",4,0", // dòng 3: 0 gõ rõ ràng là SCORED 0
+        s3.getStudentCode() + ",0,2.5"); // dòng 4
   }
 
   private Document scoreOf(Student student, int itemIndex) {
@@ -119,8 +119,8 @@ class ImportBatchConfirmIntegrationTest extends ScoreImportIntegrationBase {
       "US-24/AC-1: chỉ lô đầu chuyển bài sang SCORE_ENTERED; lô thứ hai giữ nguyên và cộng thêm điểm")
   void us24_ac1_onlyFirstBatchChangesAssessmentStatus() throws Exception {
     Student s4 = enroll(com.hcmute.lms.lmsapi.enums.EnrollmentStatus.ENROLLED);
-    String first = uploadAndValidate(csv(s1.getStudentRef() + ",3,6"), "BLANK");
-    String second = uploadAndValidate(csv(s4.getStudentRef() + ",1,2"), "BLANK");
+    String first = uploadAndValidate(csv(s1.getStudentCode() + ",3,6"), "BLANK");
+    String second = uploadAndValidate(csv(s4.getStudentCode() + ",1,2"), "BLANK");
 
     mockMvc.perform(postAction(lecturerToken, first, "confirm")).andExpect(status().isOk());
     assertThat(assessmentStatus()).isEqualTo("SCORE_ENTERED");
@@ -145,13 +145,13 @@ class ImportBatchConfirmIntegrationTest extends ScoreImportIntegrationBase {
         .andExpect(jsonPath("$.code").value("BUSINESS_RULE_VIOLATION"))
         .andExpect(jsonPath("$.message").value(containsString("HAS_ERRORS")));
 
-    String uploaded = uploadOk(csv(s1.getStudentRef() + ",3,6"), "BLANK");
+    String uploaded = uploadOk(csv(s1.getStudentCode() + ",3,6"), "BLANK");
     mockMvc
         .perform(postAction(lecturerToken, uploaded, "confirm"))
         .andExpect(status().isUnprocessableEntity())
         .andExpect(jsonPath("$.message").value(containsString("UPLOADED")));
 
-    String rolledBack = uploadOk(csv(s2.getStudentRef() + ",3,6"), "BLANK");
+    String rolledBack = uploadOk(csv(s2.getStudentCode() + ",3,6"), "BLANK");
     mockMvc.perform(postAction(lecturerToken, rolledBack, "rollback")).andExpect(status().isOk());
     mockMvc
         .perform(postAction(lecturerToken, rolledBack, "confirm"))
@@ -161,7 +161,7 @@ class ImportBatchConfirmIntegrationTest extends ScoreImportIntegrationBase {
     assertThat(scoresOfSection()).isEmpty();
     assertThat(assessmentStatus()).isEqualTo("LOCKED");
 
-    String ok = uploadAndValidate(csv(s3.getStudentRef() + ",3,6"), "BLANK");
+    String ok = uploadAndValidate(csv(s3.getStudentCode() + ",3,6"), "BLANK");
     mockMvc.perform(postAction(lecturerToken, ok, "confirm")).andExpect(status().isOk());
     mockMvc
         .perform(postAction(lecturerToken, ok, "confirm"))
@@ -197,9 +197,9 @@ class ImportBatchConfirmIntegrationTest extends ScoreImportIntegrationBase {
   @DisplayName(
       "US-24: hai lô cùng VALIDATED trùng một (sinh viên, câu): xác nhận lô A xong thì lô B bị từ chối, điểm của A giữ nguyên")
   void us24_secondBatchWithSameKeysIsRejectedAfterFirstConfirm() throws Exception {
-    String a = uploadAndValidate(csv(s1.getStudentRef() + ",3,6"), "BLANK");
+    String a = uploadAndValidate(csv(s1.getStudentCode() + ",3,6"), "BLANK");
     String b =
-        uploadAndValidate(csv(s1.getStudentRef() + ",1,1", s2.getStudentRef() + ",2,2"), "BLANK");
+        uploadAndValidate(csv(s1.getStudentCode() + ",1,1", s2.getStudentCode() + ",2,2"), "BLANK");
 
     mockMvc.perform(postAction(lecturerToken, a, "confirm")).andExpect(status().isOk());
     mockMvc
@@ -283,7 +283,7 @@ class ImportBatchConfirmIntegrationTest extends ScoreImportIntegrationBase {
         .andExpect(status().isUnprocessableEntity())
         .andExpect(jsonPath("$.message").value(containsString("đã bị hủy")));
 
-    String validated = uploadAndValidate(csv(s1.getStudentRef() + ",3,6"), "BLANK");
+    String validated = uploadAndValidate(csv(s1.getStudentCode() + ",3,6"), "BLANK");
     mockMvc
         .perform(postAction(lecturerToken, validated, "rollback"))
         .andExpect(jsonPath("$.status").value("ROLLED_BACK"));
@@ -294,7 +294,7 @@ class ImportBatchConfirmIntegrationTest extends ScoreImportIntegrationBase {
         .perform(postAction(lecturerToken, erroneous, "rollback"))
         .andExpect(jsonPath("$.status").value("ROLLED_BACK"));
 
-    String confirmed = uploadAndValidate(csv(s2.getStudentRef() + ",3,6"), "BLANK");
+    String confirmed = uploadAndValidate(csv(s2.getStudentCode() + ",3,6"), "BLANK");
     mockMvc.perform(postAction(lecturerToken, confirmed, "confirm")).andExpect(status().isOk());
     mockMvc
         .perform(postAction(lecturerToken, confirmed, "rollback"))

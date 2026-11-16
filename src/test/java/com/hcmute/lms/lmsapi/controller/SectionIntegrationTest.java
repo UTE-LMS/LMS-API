@@ -402,4 +402,54 @@ class SectionIntegrationTest extends IntegrationTestBase {
         .perform(getAs(adminToken, "/api/v1/sections/{id}", missing))
         .andExpect(status().isForbidden());
   }
+
+  @Test
+  @DisplayName("Tải template và import danh sách lớp học phần qua CSV (ADMIN và PM theo khoa)")
+  void importSectionsCsv_templateAndBestEffort() throws Exception {
+    mockMvc
+        .perform(getAs(pmInScopeToken, "/api/v1/sections/import-template"))
+        .andExpect(status().isOk())
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.content()
+                .string(
+                    org.hamcrest.Matchers.containsString(
+                        "code,courseCode,syllabusVersion,termCode,lecturerUsernames")));
+
+    String secCode1 = fixtures.code("SECIMP");
+    String secCode2 = fixtures.code("SECIMP");
+    var file =
+        new org.springframework.mock.web.MockMultipartFile(
+            "file",
+            "sections.csv",
+            "text/csv",
+            ("code,courseCode,syllabusVersion,termCode,lecturerUsernames\n"
+                    + secCode1
+                    + ","
+                    + course.getCode()
+                    + ","
+                    + confirmedSyllabus.getVersion()
+                    + ","
+                    + openTerm.getCode()
+                    + ","
+                    + lecturerA.getUsername()
+                    + "\n"
+                    + secCode2
+                    + ",UNKNOWN_COURSE,v1,"
+                    + openTerm.getCode()
+                    + ","
+                    + lecturerA.getUsername()
+                    + "\n")
+                .getBytes(java.nio.charset.StandardCharsets.UTF_8));
+
+    mockMvc
+        .perform(
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart(
+                    "/api/v1/sections/import")
+                .file(file)
+                .header(org.springframework.http.HttpHeaders.AUTHORIZATION, pmInScopeToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalRows").value(2))
+        .andExpect(jsonPath("$.successCount").value(1))
+        .andExpect(jsonPath("$.failureCount").value(1));
+  }
 }

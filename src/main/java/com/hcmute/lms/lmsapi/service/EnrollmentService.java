@@ -1,11 +1,15 @@
 package com.hcmute.lms.lmsapi.service;
 
+import com.hcmute.lms.lmsapi.dto.AssessmentScoreTemplate;
+import com.hcmute.lms.lmsapi.dto.CsvImportResultResponse;
 import com.hcmute.lms.lmsapi.dto.EnrollmentImportResponse;
 import com.hcmute.lms.lmsapi.dto.EnrollmentListResponse;
 import com.hcmute.lms.lmsapi.dto.EnrollmentResponse;
 import com.hcmute.lms.lmsapi.dto.EnrollmentStatusUpdateRequest;
+import com.hcmute.lms.lmsapi.dto.UserPrincipal;
 import com.hcmute.lms.lmsapi.enums.EnrollmentStatus;
 import java.io.InputStream;
+import org.springframework.web.multipart.MultipartFile;
 
 /** Ghi danh sinh viên vào lớp học phần (F05a / US-20). */
 public interface EnrollmentService {
@@ -33,4 +37,10 @@ public interface EnrollmentService {
    */
   EnrollmentResponse updateStatus(
       String enrollmentId, EnrollmentStatusUpdateRequest request, String actorUsername);
+
+  AssessmentScoreTemplate generateTemplateCsv();
+
+  AssessmentScoreTemplate generateBulkTemplateCsv();
+
+  CsvImportResultResponse importEnrollmentsBulk(MultipartFile file, UserPrincipal principal);
 }

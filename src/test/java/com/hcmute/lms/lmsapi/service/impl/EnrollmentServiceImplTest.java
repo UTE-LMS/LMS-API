@@ -101,7 +101,7 @@ class EnrollmentServiceImplTest {
     when(enrollmentRepository.findById(ENROLLMENT_ID)).thenReturn(Optional.of(enrollment));
     when(sectionRepository.findById(SECTION_ID)).thenReturn(Optional.of(section));
     when(studentRepository.findById(STUDENT_ID))
-        .thenReturn(Optional.of(Student.builder().id(STUDENT_ID).studentRef("SV-1").build()));
+        .thenReturn(Optional.of(Student.builder().id(STUDENT_ID).studentCode("SV-1").build()));
     stubOpenTerm();
     when(enrollmentRepository.save(any(Enrollment.class))).thenAnswer(i -> i.getArgument(0));
     when(enrollmentRepository.countBySectionIdAndStatus(SECTION_ID, EnrollmentStatus.ENROLLED))
@@ -111,7 +111,7 @@ class EnrollmentServiceImplTest {
         service.updateStatus(ENROLLMENT_ID, request(EnrollmentStatus.WITHDRAWN), "actor");
 
     assertThat(response.getStatus()).isEqualTo(EnrollmentStatus.WITHDRAWN);
-    assertThat(response.getStudentRef()).isEqualTo("SV-1");
+    assertThat(response.getStudentCode()).isEqualTo("SV-1");
     ArgumentCaptor<CourseSection> saved = ArgumentCaptor.forClass(CourseSection.class);
     verify(sectionRepository).save(saved.capture());
     assertThat(saved.getValue().getEnrolledCount()).isEqualTo(1);
@@ -223,8 +223,8 @@ class EnrollmentServiceImplTest {
             List.of("671dcba5f123456789abc701", "671dcba5f123456789abc702")))
         .thenReturn(
             List.of(
-                Student.builder().id("671dcba5f123456789abc702").studentRef("SV-A").build(),
-                Student.builder().id("671dcba5f123456789abc701").studentRef("SV-B").build()));
+                Student.builder().id("671dcba5f123456789abc702").studentCode("SV-A").build(),
+                Student.builder().id("671dcba5f123456789abc701").studentCode("SV-B").build()));
     when(enrollmentRepository.countBySectionIdAndStatus(SECTION_ID, EnrollmentStatus.ENROLLED))
         .thenReturn(2L);
     when(enrollmentRepository.countBySectionIdAndStatus(SECTION_ID, EnrollmentStatus.WITHDRAWN))
@@ -235,7 +235,7 @@ class EnrollmentServiceImplTest {
     assertThat(response.getEnrolled()).isEqualTo(2);
     assertThat(response.getWithdrawn()).isEqualTo(1);
     assertThat(response.getEnrollments())
-        .extracting(EnrollmentResponse::getStudentRef)
+        .extracting(EnrollmentResponse::getStudentCode)
         .containsExactly("SV-A", "SV-B");
   }
 
@@ -251,8 +251,8 @@ class EnrollmentServiceImplTest {
     CourseSection section = section(SectionStatus.OPEN);
     when(sectionRepository.findById(SECTION_ID)).thenReturn(Optional.of(section));
     stubOpenTerm();
-    Student existing = Student.builder().id(STUDENT_ID).studentRef("SV-OLD").build();
-    when(studentRepository.findByStudentRefIn(List.of("SV-OLD", "SV-NEW")))
+    Student existing = Student.builder().id(STUDENT_ID).studentCode("SV-OLD").build();
+    when(studentRepository.findByStudentCodeIn(List.of("SV-OLD", "SV-NEW")))
         .thenReturn(List.of(existing));
     when(enrollmentRepository.findBySectionId(SECTION_ID)).thenReturn(List.of());
     when(studentRepository.saveAll(any()))
@@ -268,7 +268,7 @@ class EnrollmentServiceImplTest {
 
     EnrollmentImportResponse response =
         service.importEnrollments(
-            SECTION_ID, csv("studentRef,cohort\nSV-OLD,K22\nSV-NEW,K23\n"), "a");
+            SECTION_ID, csv("studentCode,cohort\nSV-OLD,K22\nSV-NEW,K23\n"), "a");
 
     assertThat(response.getTotalRows()).isEqualTo(2);
     assertThat(response.getNewStudents()).isEqualTo(1);
@@ -276,7 +276,7 @@ class EnrollmentServiceImplTest {
     assertThat(response.getSectionEnrolledCount()).isEqualTo(2);
     ArgumentCaptor<List<Student>> saved = ArgumentCaptor.captor();
     verify(studentRepository).saveAll(saved.capture());
-    assertThat(saved.getValue()).extracting(Student::getStudentRef).containsExactly("SV-NEW");
+    assertThat(saved.getValue()).extracting(Student::getStudentCode).containsExactly("SV-NEW");
     assertThat(saved.getValue().get(0).getCohort()).isEqualTo("K23");
   }
 
@@ -287,9 +287,9 @@ class EnrollmentServiceImplTest {
     when(sectionRepository.findById(SECTION_ID))
         .thenReturn(Optional.of(section(SectionStatus.OPEN)));
     stubOpenTerm();
-    Student enrolledStudent = Student.builder().id("s1").studentRef("SV-IN").build();
-    Student withdrawnStudent = Student.builder().id("s2").studentRef("SV-OUT").build();
-    when(studentRepository.findByStudentRefIn(any()))
+    Student enrolledStudent = Student.builder().id("s1").studentCode("SV-IN").build();
+    Student withdrawnStudent = Student.builder().id("s2").studentCode("SV-OUT").build();
+    when(studentRepository.findByStudentCodeIn(any()))
         .thenReturn(List.of(enrolledStudent, withdrawnStudent));
     when(enrollmentRepository.findBySectionId(SECTION_ID))
         .thenReturn(
@@ -307,7 +307,7 @@ class EnrollmentServiceImplTest {
     String tooLong = "x".repeat(51);
 
     String content =
-        "studentRef,cohort\n"
+        "studentCode,cohort\n"
             + "\"\",K22\n" // line 2: thiếu
             + "BAD REF,K22\n" // line 3: sai mẫu
             + "SV-1,"
@@ -335,14 +335,14 @@ class EnrollmentServiceImplTest {
   @DisplayName("US-20: lớp không tồn tại -> 404; lớp đóng băng -> 422 trước khi đọc tệp")
   void importEnrollments_sectionRules() {
     when(sectionRepository.findById(SECTION_ID)).thenReturn(Optional.empty());
-    assertThatThrownBy(() -> service.importEnrollments(SECTION_ID, csv("studentRef\nSV-1\n"), "a"))
+    assertThatThrownBy(() -> service.importEnrollments(SECTION_ID, csv("studentCode\nSV-1\n"), "a"))
         .isInstanceOf(ResourceNotFoundException.class);
 
     when(sectionRepository.findById(SECTION_ID))
         .thenReturn(Optional.of(section(SectionStatus.LOCKED)));
     assertThatThrownBy(() -> service.importEnrollments(SECTION_ID, csv("not even a csv"), "a"))
         .isInstanceOf(BusinessRuleViolationException.class);
-    verify(studentRepository, never()).findByStudentRefIn(any());
+    verify(studentRepository, never()).findByStudentCodeIn(any());
   }
 
   @Test

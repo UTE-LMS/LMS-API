@@ -151,6 +151,8 @@ public class AssessmentServiceImpl implements AssessmentService {
 
     Assessment saved = assessmentRepository.save(assessment);
     log.info("Cập nhật bài đánh giá id=[{}] mã [{}]", saved.getId(), saved.getCode());
+    AuditLogHelper.record(
+        auditService, AuditAction.UPDATE, "assessments", saved.getId(), null, saved, null);
     return assessmentMapper.toResponse(saved);
   }
 
@@ -179,6 +181,8 @@ public class AssessmentServiceImpl implements AssessmentService {
         saved.getId(),
         saved.getCode(),
         items.size());
+    AuditLogHelper.record(
+        auditService, AuditAction.UPDATE, "assessments", saved.getId(), null, saved, null);
     return assessmentMapper.toResponse(saved);
   }
 
@@ -288,6 +292,8 @@ public class AssessmentServiceImpl implements AssessmentService {
         assessment.getId(),
         assessment.getCode(),
         actorId);
+    AuditLogHelper.record(
+        auditService, AuditAction.DELETE, "assessments", id, assessment, null, null);
   }
 
   private Assessment newAssessment(
@@ -338,6 +344,8 @@ public class AssessmentServiceImpl implements AssessmentService {
           saved.getId(),
           saved.getCode(),
           saved.getScope());
+      AuditLogHelper.record(
+          auditService, AuditAction.CREATE, "assessments", saved.getId(), null, saved, null);
       return assessmentMapper.toResponse(saved);
     } catch (DuplicateKeyException ex) {
       throw duplicateCode(code);
@@ -436,7 +444,7 @@ public class AssessmentServiceImpl implements AssessmentService {
         enrollments.stream().map(Enrollment::getStudentId).collect(Collectors.toSet());
     List<Student> students = new ArrayList<>(studentRepository.findAllById(studentIds));
     students.sort(
-        Comparator.comparing(Student::getStudentRef, Comparator.nullsLast(String::compareTo)));
+        Comparator.comparing(Student::getStudentCode, Comparator.nullsLast(String::compareTo)));
 
     StringBuilder sb = new StringBuilder();
     sb.append('\uFEFF'); // UTF-8 BOM
@@ -456,7 +464,7 @@ public class AssessmentServiceImpl implements AssessmentService {
 
     int scoreColCount = (int) totalMappings;
     for (Student student : students) {
-      sb.append(escapeCsv(student.getStudentRef() != null ? student.getStudentRef() : ""));
+      sb.append(escapeCsv(student.getStudentCode() != null ? student.getStudentCode() : ""));
       sb.append(',');
       sb.append(escapeCsv(student.getFullName() != null ? student.getFullName() : ""));
       for (int i = 0; i < scoreColCount; i++) {

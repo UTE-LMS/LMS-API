@@ -391,7 +391,7 @@ class FacultyAndDecentralizedRbacIntegrationTest extends IntegrationTestBase {
     // Giảng viên cố import điểm vào lớp thuộc đề cương đã khóa -> bị chặn 422
     MockMultipartFile scoreFile =
         new MockMultipartFile(
-            "file", "scores.csv", "text/csv", "studentRef,Q1\n20110001,8\n".getBytes());
+            "file", "scores.csv", "text/csv", "studentCode,Q1\n20110001,8\n".getBytes());
     mockMvc
         .perform(
             multipart(

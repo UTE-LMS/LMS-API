@@ -117,7 +117,8 @@ const COLLECTIONS = {
   // ----- CTĐT -----
   programs: {
     validator: schema(['code', 'name'], {
-      facultyId: OID_N, code: STR, name: STR, level: STR_N, degree: STR_N, extra: OBJ_N
+      facultyId: OID_N, code: STR, name: STR, level: STR_N, degree: STR_N, extra: OBJ_N,
+      createdAt: DATE_N, updatedAt: DATE_N
     }),
     indexes: [[{ code: 1 }, { unique: true }], [{ facultyId: 1 }]]
   },
@@ -128,7 +129,8 @@ const COLLECTIONS = {
       totalCredits: INT_N,
       durationYears: NUM_N,
       status: en('ACTIVE', 'ARCHIVED'),
-      verification: VERIFICATION, extra: OBJ_N
+      verification: VERIFICATION, extra: OBJ_N,
+      createdAt: DATE_N, updatedAt: DATE_N
     }),
     indexes: [[{ programId: 1, version: 1 }, { unique: true }]]
   },
@@ -143,7 +145,8 @@ const COLLECTIONS = {
       contentSummary: STR_N,
       capabilityLevelRaw: level16,
       passThreshold: weight01,           // Ngưỡng đạt bắt buộc của PLO thuộc (0, 1]
-      verification: VERIFICATION, reviewNote: STR_N
+      verification: VERIFICATION, reviewNote: STR_N,
+      createdAt: DATE_N, updatedAt: DATE_N
     }),
     indexes: [[{ programVersionId: 1, code: 1 }, { unique: true }]]
   },
@@ -158,7 +161,8 @@ const COLLECTIONS = {
       capabilityLevelRaw: level16,
       weight: weight01,                  // Trọng số đóng góp W_{PI -> PLO} thuộc (0, 1] (tổng các PI trong cùng PLO = 1.0)
       passThreshold: weight01,           // Ngưỡng đạt bắt buộc của PI thuộc (0, 1]
-      verification: VERIFICATION, reviewNote: STR_N
+      verification: VERIFICATION, reviewNote: STR_N,
+      createdAt: DATE_N, updatedAt: DATE_N
     }),
     indexes: [[{ programVersionId: 1, code: 1 }, { unique: true }], [{ ploId: 1 }]]
   },
@@ -166,7 +170,8 @@ const COLLECTIONS = {
   courses: {
     validator: schema(['code', 'name'], {
       facultyId: OID_N, code: STR, name: STR, credits: INT_N, isActive: BOOL,
-      extra: OBJ_N
+      extra: OBJ_N,
+      createdAt: DATE_N, updatedAt: DATE_N
     }),
     indexes: [[{ code: 1 }, { unique: true }], [{ facultyId: 1 }]]
   },
@@ -177,7 +182,8 @@ const COLLECTIONS = {
       type: { enum: ['COMPULSORY', 'ELECTIVE', null] },
       category: { enum: ['FOUNDATION', 'MAJOR_FOUNDATION', 'SPECIALIZED', 'CAPSTONE_PROJECT', 'THESIS', null] },
       prerequisiteCourseIds: arr(OID),
-      previousCourseIds: arr(OID)
+      previousCourseIds: arr(OID),
+      createdAt: DATE_N, updatedAt: DATE_N
     }),
     indexes: [[{ programVersionId: 1, courseId: 1 }, { unique: true }]]
   },
@@ -188,7 +194,8 @@ const COLLECTIONS = {
       courseId: OID, version: STR,
       effectiveFromTermId: OID_N, effectiveToTermId: OID_N,
       status: en('CONFIRMED', 'ARCHIVED'),
-      verification: VERIFICATION, extra: OBJ_N
+      verification: VERIFICATION, extra: OBJ_N,
+      createdAt: DATE_N, updatedAt: DATE_N
     }),
     indexes: [[{ courseId: 1, version: 1 }, { unique: true }]]
   },
@@ -202,7 +209,8 @@ const COLLECTIONS = {
         bsonType: 'object', required: ['defaultPassThreshold'],
         properties: { defaultPassThreshold: weight01 } // Ngưỡng đạt bắt buộc của CLO thuộc (0, 1] (đã bỏ defaultWeight)
       },
-      verification: VERIFICATION, extra: OBJ_N
+      verification: VERIFICATION, extra: OBJ_N,
+      createdAt: DATE_N, updatedAt: DATE_N
     }),
     indexes: [[{ syllabusId: 1, code: 1 }, { unique: true }]]
   },
@@ -212,7 +220,8 @@ const COLLECTIONS = {
       programVersionId: OID, syllabusId: OID, cloId: OID, piId: OID,
       // Trọng số đóng góp W_{CLO -> PI} thuộc (0, 1] (bắt buộc không để trống; không ép tổng qua các học phần = 1.0)
       weight: weight01,
-      verification: VERIFICATION
+      verification: VERIFICATION,
+      createdAt: DATE_N, updatedAt: DATE_N
     }),
     indexes: [[{ cloId: 1, piId: 1 }, { unique: true }], [{ piId: 1 }], [{ programVersionId: 1 }]]
   },
@@ -248,7 +257,8 @@ const COLLECTIONS = {
               outcomeMappings: { bsonType: 'array', minItems: 1, items: OUTCOME_MAPPING }
             }
           }),
-          source: OBJ_N, verification: VERIFICATION, extra: OBJ_N
+          source: OBJ_N, verification: VERIFICATION, extra: OBJ_N,
+          createdAt: DATE_N, updatedAt: DATE_N
         }),
         { $expr: { $or: [ { $ne: ['$scope', 'SECTION'] }, { $eq: [{ $type: '$sectionId' }, 'objectId'] } ] } },
         { $expr: { $or: [ { $not: [{ $in: ['$status', ASSESSMENT_NEED_ITEMS_STATUSES] }] },
@@ -269,7 +279,8 @@ const COLLECTIONS = {
   terms: {
     validator: schema(['code', 'status'], {
       code: STR, academicYear: STR_N, startDate: DATE_N, endDate: DATE_N,
-      status: en('OPEN', 'SCORE_LOCKED', 'CLOSED')
+      status: en('OPEN', 'SCORE_LOCKED', 'CLOSED'),
+      createdAt: DATE_N, updatedAt: DATE_N
     }),
     indexes: [[{ code: 1 }, { unique: true }]]
   },
@@ -277,25 +288,28 @@ const COLLECTIONS = {
   course_sections: {
     validator: schema(['code', 'courseId', 'syllabusId', 'termId', 'status'], {
       code: STR, courseId: OID, syllabusId: OID, termId: OID, lecturerIds: arr(OID),
-      enrolledCount: INT_N, status: en('OPEN', 'CLOSED', 'LOCKED')
+      enrolledCount: INT_N, status: en('OPEN', 'CLOSED', 'LOCKED'),
+      createdAt: DATE_N, updatedAt: DATE_N
     }),
     indexes: [[{ code: 1 }, { unique: true }], [{ courseId: 1, termId: 1 }], [{ lecturerIds: 1 }]]
   },
 
   students: {
-    validator: schema(['studentRef'], {
-      studentRef: STR,
+    validator: schema(['studentCode'], {
+      studentCode: STR,
       userId: OID_N,
-      cohort: STR_N, majorCode: STR_N, programVersionId: OID_N,
+      cohort: STR_N, programVersionId: OID_N,
       fullName: STR_N, email: STR_N,
-      status: { enum: ['ACTIVE', 'SUSPENDED', 'GRADUATED', 'DROPPED_OUT', null] }
+      status: { enum: ['ACTIVE', 'SUSPENDED', 'GRADUATED', 'DROPPED_OUT', null] },
+      createdAt: DATE_N, updatedAt: DATE_N
     }),
-    indexes: [[{ studentRef: 1 }, { unique: true }], [{ programVersionId: 1, cohort: 1 }], [{ userId: 1 }]]
+    indexes: [[{ studentCode: 1 }, { unique: true }], [{ programVersionId: 1, cohort: 1 }], [{ userId: 1 }]]
   },
 
   enrollments: {
     validator: schema(['sectionId', 'studentId', 'status'], {
-      sectionId: OID, studentId: OID, status: en('ENROLLED', 'WITHDRAWN'), enrolledAt: DATE_N
+      sectionId: OID, studentId: OID, status: en('ENROLLED', 'WITHDRAWN'), enrolledAt: DATE_N,
+      createdAt: DATE_N, updatedAt: DATE_N
     }),
     indexes: [[{ sectionId: 1, studentId: 1 }, { unique: true }]]
   },
@@ -329,7 +343,7 @@ const COLLECTIONS = {
           rawScore: { bsonType: ['double', 'int', 'long', 'decimal'], minimum: 0 },
           maxScore: { bsonType: ['double', 'int', 'long', 'decimal'], minimum: 0, exclusiveMinimum: true },
           importBatchId: OID_N, sourceRow: INT_N,
-          updatedBy: OID_N, updatedAt: DATE_N
+          updatedBy: OID_N, createdAt: DATE_N, updatedAt: DATE_N
         }),
         { $expr: { $lte: ['$rawScore', '$maxScore'] } }
       ]
@@ -460,7 +474,8 @@ const COLLECTIONS = {
   audit_logs: {
     validator: schema(['at', 'action', 'entity'], {
       at: DATE, userId: OID_N,
-      action: en('SCORE_UPDATE', 'IMPORT_CONFIRM', 'ASSESSMENT_LOCK', 'ASSESSMENT_UNLOCK',
+      action: en('CREATE', 'UPDATE', 'DELETE', 'STATUS_CHANGE', 'IMPORT',
+                 'SCORE_UPDATE', 'IMPORT_CONFIRM', 'ASSESSMENT_LOCK', 'ASSESSMENT_UNLOCK',
                  'RUN_CALCULATION', 'LOGIN'),
       entity: OBJ, before: OBJ_N, after: OBJ_N, reason: STR_N, ip: STR_N
     }),

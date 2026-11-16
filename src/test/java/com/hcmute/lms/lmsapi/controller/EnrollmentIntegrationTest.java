@@ -88,20 +88,20 @@ class EnrollmentIntegrationTest extends IntegrationTestBase {
   }
 
   @Test
-  @DisplayName("US-20: danh sách ghi danh trả mã thay thế và sắp theo studentRef")
+  @DisplayName("US-20: danh sách ghi danh trả mã thay thế và sắp theo studentCode")
   void listIsSortedAndExposesOnlySurrogateRef() throws Exception {
     Student studentB = fixtures.student();
     Student studentA = fixtures.student();
     fixtures.enrollment(section, studentB, EnrollmentStatus.ENROLLED);
     fixtures.enrollment(section, studentA, EnrollmentStatus.ENROLLED);
     List<String> sorted =
-        List.of(studentA.getStudentRef(), studentB.getStudentRef()).stream().sorted().toList();
+        List.of(studentA.getStudentCode(), studentB.getStudentCode()).stream().sorted().toList();
 
     mockMvc
         .perform(getAs(adminToken, "/api/v1/sections/{id}/enrollments", section.getId()))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.enrollments[0].studentRef").value(sorted.get(0)))
-        .andExpect(jsonPath("$.enrollments[1].studentRef").value(sorted.get(1)))
+        .andExpect(jsonPath("$.enrollments[0].studentCode").value(sorted.get(0)))
+        .andExpect(jsonPath("$.enrollments[1].studentCode").value(sorted.get(1)))
         .andExpect(jsonPath("$.enrollments[0].fullName").doesNotExist())
         .andExpect(jsonPath("$.enrollments[0].email").doesNotExist());
   }

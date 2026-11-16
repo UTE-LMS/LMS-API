@@ -4,6 +4,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.mongodb.MongoDatabaseFactory;
 import org.springframework.data.mongodb.MongoTransactionManager;
+import org.springframework.data.mongodb.config.EnableMongoAuditing;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 
 /**
@@ -13,6 +14,7 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
  * <p>Đáp ứng yêu cầu US-39/AC-2 và quy chuẩn thiết kế §3.1 của Bước 00.
  */
 @Configuration
+@EnableMongoAuditing
 @EnableTransactionManagement
 public class MongoConfig {
 

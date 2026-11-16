@@ -16,9 +16,8 @@ public class EnrollmentResponse {
   private String id;
   private String sectionId;
   private String studentId;
-  private String studentRef;
+  private String studentCode;
   private String cohort;
-  private String majorCode;
   private EnrollmentStatus status;
   private Instant enrolledAt;
 }

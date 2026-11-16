@@ -96,9 +96,9 @@ public abstract class ScoreImportIntegrationBase extends IntegrationTestBase {
         + "\"}]}";
   }
 
-  /** Tệp CSV: dòng tiêu đề {@code studentRef,Q1,Q2} rồi các dòng cho trước (đã nối bằng \n). */
+  /** Tệp CSV: dòng tiêu đề {@code studentCode,Q1,Q2} rồi các dòng cho trước (đã nối bằng \n). */
   protected static String csv(String... rows) {
-    return "studentRef,Q1,Q2\n" + String.join("\n", rows) + "\n";
+    return "studentCode,Q1,Q2\n" + String.join("\n", rows) + "\n";
   }
 
   protected MockMultipartHttpServletRequestBuilder upload(

@@ -33,7 +33,7 @@ class ImportBatchUploadIntegrationTest extends ScoreImportIntegrationBase {
   @Autowired private ImportFileStorage fileStorage;
 
   private String goodCsv() {
-    return csv(s1.getStudentRef() + ",3,6", s2.getStudentRef() + ",4,0");
+    return csv(s1.getStudentCode() + ",3,6", s2.getStudentCode() + ",4,0");
   }
 
   private static String sha256(String text) throws Exception {
@@ -81,7 +81,7 @@ class ImportBatchUploadIntegrationTest extends ScoreImportIntegrationBase {
         mockMvc
             .perform(upload(lecturerToken, goodCsv(), "BLANK", defaultMapping()))
             .andExpect(status().isCreated())
-            .andExpect(jsonPath("$.columnMapping.studentColumn").value("studentRef"))
+            .andExpect(jsonPath("$.columnMapping.studentColumn").value("studentCode"))
             .andExpect(jsonPath("$.columnMapping.items", hasSize(2)))
             .andExpect(jsonPath("$.columnMapping.items[0].column").value("Q1"))
             .andExpect(jsonPath("$.columnMapping.items[0].item").value(itemId(0)))
@@ -93,7 +93,7 @@ class ImportBatchUploadIntegrationTest extends ScoreImportIntegrationBase {
 
     // Lô sau: tệp khác, không gửi columnMapping -> dùng lại ánh xạ của lô trước.
     mockMvc
-        .perform(upload(lecturerToken, csv(s3.getStudentRef() + ",1,1"), "BLANK", null))
+        .perform(upload(lecturerToken, csv(s3.getStudentCode() + ",1,1"), "BLANK", null))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.id").value(org.hamcrest.Matchers.not(firstId)))
         .andExpect(jsonPath("$.columnMapping.items[0].item").value(itemId(0)))
@@ -104,7 +104,7 @@ class ImportBatchUploadIntegrationTest extends ScoreImportIntegrationBase {
   @DisplayName(
       "US-21/AC-2: tên cột tùy ý và cột sinh viên đặt tên khác được ánh xạ theo cấu hình, không cần tên Q1/Q2")
   void us21_ac2_customColumnNames() throws Exception {
-    String csv = "Mã SV;Câu 1.5;Điểm câu 2\n" + s1.getStudentRef() + ";3;6\n";
+    String csv = "Mã SV;Câu 1.5;Điểm câu 2\n" + s1.getStudentCode() + ";3;6\n";
     String mapping =
         "{\"studentColumn\":\"Mã SV\",\"items\":[{\"column\":\"Câu 1.5\",\"item\":\""
             + itemId(0)
@@ -233,7 +233,7 @@ class ImportBatchUploadIntegrationTest extends ScoreImportIntegrationBase {
     setSectionStatus(SectionStatus.LOCKED);
     mockMvc
         .perform(
-            upload(lecturerToken, csv(s3.getStudentRef() + ",1,1"), "MISSING", defaultMapping()))
+            upload(lecturerToken, csv(s3.getStudentCode() + ",1,1"), "MISSING", defaultMapping()))
         .andExpect(status().isUnprocessableEntity())
         .andExpect(jsonPath("$.message").value(containsString("LOCKED")));
     assertThat(countBatches()).isEqualTo(1);
@@ -332,7 +332,7 @@ class ImportBatchUploadIntegrationTest extends ScoreImportIntegrationBase {
   void us22_ac4_fileLevelErrorsCreateNoBatch() throws Exception {
     assertRejected(upload(lecturerToken, "", "BLANK", defaultMapping()), 400, "rỗng");
     assertRejected(
-        upload(lecturerToken, "studentRef,Q1,Q2\n", "BLANK", defaultMapping()),
+        upload(lecturerToken, "studentCode,Q1,Q2\n", "BLANK", defaultMapping()),
         400,
         "không có dòng dữ liệu");
     assertRejected(
@@ -340,11 +340,11 @@ class ImportBatchUploadIntegrationTest extends ScoreImportIntegrationBase {
         400,
         "thiếu cột mã sinh viên");
     assertRejected(
-        upload(lecturerToken, "studentRef,Q1\nA,1\n", "BLANK", defaultMapping()),
+        upload(lecturerToken, "studentCode,Q1\nA,1\n", "BLANK", defaultMapping()),
         400,
         "thiếu cột [Q2]");
     assertRejected(
-        upload(lecturerToken, "studentRef,Q1,q1\nA,1,2\n", "BLANK", defaultMapping()),
+        upload(lecturerToken, "studentCode,Q1,q1\nA,1,2\n", "BLANK", defaultMapping()),
         400,
         "nhiều lần");
     assertRejected(upload(lecturerToken, goodCsv(), "BLANK", "{không phải json"), 400, "JSON");
@@ -447,7 +447,7 @@ class ImportBatchUploadIntegrationTest extends ScoreImportIntegrationBase {
   void us21_autoDetectMappingFromTemplateCsvHeaders() throws Exception {
     String csv =
         "MaSV,HoTen,Q1 - CLO1 (Max: 4.0),Q2 - CLO1 (Max: 6.0)\n"
-            + s1.getStudentRef()
+            + s1.getStudentCode()
             + ",Nguyen Van A,3.5,5.5\n";
 
     MvcResult uploadRes =

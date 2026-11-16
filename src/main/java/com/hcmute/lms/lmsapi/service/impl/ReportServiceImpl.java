@@ -278,7 +278,7 @@ public class ReportServiceImpl implements ReportService {
             .findAllById(
                 studentResults.stream().map(StudentResult::getStudentId).distinct().toList())
             .stream()
-            .collect(Collectors.toMap(Student::getId, Student::getStudentRef, (a, b) -> a));
+            .collect(Collectors.toMap(Student::getId, Student::getStudentCode, (a, b) -> a));
 
     List<Map<String, Object>> missingList = new ArrayList<>();
     long total = studentResults.size();
@@ -291,7 +291,7 @@ public class ReportServiceImpl implements ReportService {
         Map<String, Object> item = new LinkedHashMap<>();
         item.put("studentResultId", sr.getId());
         item.put("studentId", sr.getStudentId());
-        item.put("studentRef", studentRefs.get(sr.getStudentId()));
+        item.put("studentCode", studentRefs.get(sr.getStudentId()));
         item.put("level", sr.getLevel().name());
         item.put("subjectId", sr.getSubjectId());
         item.put("sectionId", sr.getSectionId());

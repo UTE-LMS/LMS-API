@@ -1,5 +1,7 @@
 package com.hcmute.lms.lmsapi.controller;
 
+import com.hcmute.lms.lmsapi.dto.AssessmentScoreTemplate;
+import com.hcmute.lms.lmsapi.dto.CsvImportResultResponse;
 import com.hcmute.lms.lmsapi.dto.SectionRequest;
 import com.hcmute.lms.lmsapi.dto.SectionResponse;
 import com.hcmute.lms.lmsapi.dto.SectionStatusUpdateRequest;
@@ -11,7 +13,9 @@ import jakarta.validation.constraints.Pattern;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -23,7 +27,9 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 /** API lớp học phần (F05a / US-19). */
 @Slf4j
@@ -95,5 +101,25 @@ public class SectionController {
         request.getStatus(),
         actor);
     return ResponseEntity.ok(sectionService.updateStatus(id, request, actor));
+  }
+
+  @GetMapping(value = "/import-template", produces = "text/csv; charset=UTF-8")
+  @PreAuthorize("hasAnyRole('ADMIN', 'PROGRAM_MANAGER')")
+  public ResponseEntity<byte[]> getImportTemplate() {
+    log.info("API request: GET /api/v1/sections/import-template");
+    AssessmentScoreTemplate template = sectionService.generateTemplateCsv();
+    return ResponseEntity.ok()
+        .header(
+            HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + template.fileName() + "\"")
+        .contentType(MediaType.parseMediaType("text/csv; charset=UTF-8"))
+        .body(template.content());
+  }
+
+  @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+  @PreAuthorize("hasAnyRole('ADMIN', 'PROGRAM_MANAGER')")
+  public ResponseEntity<CsvImportResultResponse> importSections(
+      @RequestPart("file") MultipartFile file, @AuthenticationPrincipal UserPrincipal principal) {
+    log.info("API request: POST /api/v1/sections/import file=[{}]", file.getOriginalFilename());
+    return ResponseEntity.ok(sectionService.importSections(file, principal));
   }
 }

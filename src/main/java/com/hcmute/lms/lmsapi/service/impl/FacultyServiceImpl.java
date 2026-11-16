@@ -13,6 +13,7 @@ import com.hcmute.lms.lmsapi.dto.FacultyTransferPmRequest;
 import com.hcmute.lms.lmsapi.dto.FacultyUpdateRequest;
 import com.hcmute.lms.lmsapi.dto.PageResponse;
 import com.hcmute.lms.lmsapi.dto.UserResponse;
+import com.hcmute.lms.lmsapi.enums.AuditAction;
 import com.hcmute.lms.lmsapi.enums.ProgramVersionStatus;
 import com.hcmute.lms.lmsapi.enums.Role;
 import com.hcmute.lms.lmsapi.enums.UserStatus;
@@ -25,6 +26,7 @@ import com.hcmute.lms.lmsapi.repository.FacultyRepository;
 import com.hcmute.lms.lmsapi.repository.ProgramRepository;
 import com.hcmute.lms.lmsapi.repository.ProgramVersionRepository;
 import com.hcmute.lms.lmsapi.repository.UserRepository;
+import com.hcmute.lms.lmsapi.service.AuditService;
 import com.hcmute.lms.lmsapi.service.FacultyService;
 import com.hcmute.lms.lmsapi.util.ObjectIdUtils;
 import com.hcmute.lms.lmsapi.util.PageableValidationUtils;
@@ -38,6 +40,7 @@ import java.util.Objects;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -57,6 +60,9 @@ public class FacultyServiceImpl implements FacultyService {
   private final ProgramRepository programRepository;
   private final ProgramVersionRepository programVersionRepository;
   private final UserMapper userMapper;
+
+  @Autowired(required = false)
+  private AuditService auditService;
 
   @Override
   public FacultyResponse createFaculty(FacultyRequest request) {
@@ -86,6 +92,8 @@ public class FacultyServiceImpl implements FacultyService {
     } catch (DuplicateKeyException ex) {
       throw conflict("Mã hoặc tên khoa đã tồn tại: " + code);
     }
+    AuditLogHelper.record(
+        auditService, AuditAction.CREATE, "faculties", faculty.getId(), null, faculty, null);
     return toResponse(faculty);
   }
 
@@ -155,6 +163,8 @@ public class FacultyServiceImpl implements FacultyService {
     } catch (DuplicateKeyException ex) {
       throw conflict("Tên khoa đã tồn tại: " + name);
     }
+    AuditLogHelper.record(
+        auditService, AuditAction.UPDATE, "faculties", faculty.getId(), null, faculty, null);
     return toResponse(faculty);
   }
 
@@ -203,6 +213,14 @@ public class FacultyServiceImpl implements FacultyService {
     user.setUpdatedAt(Instant.now());
     user = userRepository.save(user);
     log.info("Gán Program Manager [{}] vào Khoa [{}]", userId, facultyId);
+    AuditLogHelper.record(
+        auditService,
+        AuditAction.UPDATE,
+        "users",
+        user.getId(),
+        null,
+        user,
+        "Gán Program Manager vào Khoa " + facultyId);
     return userMapper.toResponse(user);
   }
 
@@ -228,6 +246,14 @@ public class FacultyServiceImpl implements FacultyService {
     // Thu hồi tức thì toàn bộ JWT access token đang hoạt động của PM
     userRepository.incrementTokenVersion(userId);
     log.info("Hủy gán Program Manager [{}] khỏi Khoa [{}] và thu hồi token", userId, facultyId);
+    AuditLogHelper.record(
+        auditService,
+        AuditAction.UPDATE,
+        "users",
+        userId,
+        null,
+        user,
+        "Hủy gán Program Manager khỏi Khoa " + facultyId);
   }
 
   @Override
@@ -259,6 +285,8 @@ public class FacultyServiceImpl implements FacultyService {
         userId,
         targetFacultyId,
         request.getTransferReason());
+    AuditLogHelper.record(
+        auditService, AuditAction.UPDATE, "users", userId, null, user, request.getTransferReason());
     return userMapper.toResponse(user);
   }
 
@@ -408,12 +436,16 @@ public class FacultyServiceImpl implements FacultyService {
       }
     }
 
-    return CsvImportResultResponse.builder()
-        .totalRows(totalRows)
-        .successCount(successCount)
-        .failureCount(errors.size())
-        .errors(errors)
-        .build();
+    CsvImportResultResponse result =
+        CsvImportResultResponse.builder()
+            .totalRows(totalRows)
+            .successCount(successCount)
+            .failureCount(errors.size())
+            .errors(errors)
+            .build();
+    AuditLogHelper.record(
+        auditService, AuditAction.IMPORT, "faculties", "batch", null, result, "Import CSV khoa");
+    return result;
   }
 
   private AppException conflict(String message) {

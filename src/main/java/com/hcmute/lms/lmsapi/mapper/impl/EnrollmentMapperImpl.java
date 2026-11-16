@@ -18,9 +18,8 @@ public class EnrollmentMapperImpl implements EnrollmentMapper {
         .id(enrollment.getId())
         .sectionId(enrollment.getSectionId())
         .studentId(enrollment.getStudentId())
-        .studentRef(student != null ? student.getStudentRef() : null)
+        .studentCode(student != null ? student.getStudentCode() : null)
         .cohort(student != null ? student.getCohort() : null)
-        .majorCode(student != null ? student.getMajorCode() : null)
         .status(enrollment.getStatus())
         .enrolledAt(enrollment.getEnrolledAt())
         .build();
