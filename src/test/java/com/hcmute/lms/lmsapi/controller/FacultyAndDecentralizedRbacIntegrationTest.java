@@ -367,7 +367,6 @@ class FacultyAndDecentralizedRbacIntegrationTest extends IntegrationTestBase {
                 .name("Giữa kỳ")
                 .type(AssessmentType.MIDTERM)
                 .status(AssessmentStatus.LOCKED)
-                .locked(true)
                 .items(
                     List.of(
                         AssessmentItem.builder()

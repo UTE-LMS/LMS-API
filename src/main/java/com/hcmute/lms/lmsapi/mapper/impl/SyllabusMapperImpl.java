@@ -25,8 +25,8 @@ public class SyllabusMapperImpl implements SyllabusMapper {
         .version(request.getVersion() != null ? request.getVersion().trim() : null)
         .effectiveFromTermId(request.getEffectiveFromTermId())
         .effectiveToTermId(request.getEffectiveToTermId())
-        .status(SyllabusStatus.DRAFT)
-        .verification(Verification.builder().status(VerificationStatus.UNVERIFIED).build())
+        .status(SyllabusStatus.CONFIRMED)
+        .verification(Verification.builder().status(VerificationStatus.VERIFIED).build())
         .extra(request.getExtra())
         .build();
   }

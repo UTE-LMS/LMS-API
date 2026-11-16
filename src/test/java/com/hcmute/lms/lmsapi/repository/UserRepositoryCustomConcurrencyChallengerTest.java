@@ -2,7 +2,6 @@ package com.hcmute.lms.lmsapi.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.hcmute.lms.lmsapi.document.RoleAssignment;
 import com.hcmute.lms.lmsapi.document.User;
 import com.hcmute.lms.lmsapi.enums.Role;
 import com.hcmute.lms.lmsapi.enums.UserStatus;
@@ -79,8 +78,7 @@ public class UserRepositoryCustomConcurrencyChallengerTest {
             .fullName(FIXTURE_LABEL + " Challenger Test User")
             .status(UserStatus.ACTIVE)
             .tokenVersion(initialTokenVersion)
-            .roleAssignments(
-                List.of(RoleAssignment.builder().role(Role.LECTURER).scope(null).build()))
+            .roles(List.of(Role.LECTURER))
             .createdAt(Instant.now())
             .updatedAt(Instant.now())
             .build();
@@ -185,7 +183,7 @@ public class UserRepositoryCustomConcurrencyChallengerTest {
             .append("passwordHash", "$2a$10$legacyDummyHashedPassword1234567890")
             .append("fullName", FIXTURE_LABEL + " Legacy User")
             .append("status", "ACTIVE")
-            .append("roleAssignments", List.of())
+            .append("roles", List.of())
             .append("createdAt", Instant.now())
             .append("updatedAt", Instant.now());
     // Lưu ý: HOÀN TOÀN KHÔNG có trường tokenVersion

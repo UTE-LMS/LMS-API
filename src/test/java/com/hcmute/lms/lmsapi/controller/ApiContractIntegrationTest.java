@@ -148,7 +148,7 @@ class ApiContractIntegrationTest extends IntegrationTestBase {
   void f02ResponsesMatchDocumentedFields() throws Exception {
     String bearer = fixtures.bearerFor(Role.QA, null);
     Program program = fixtures.program();
-    ProgramVersion version = fixtures.programVersion(program, ProgramVersionStatus.DRAFT);
+    ProgramVersion version = fixtures.programVersion(program, ProgramVersionStatus.ACTIVE);
     Plo plo = fixtures.plo(version, "PLO1", 1);
     Pi pi = fixtures.pi(version, plo, "PI1.1", 1);
     String pv = version.getId();
@@ -165,7 +165,7 @@ class ApiContractIntegrationTest extends IntegrationTestBase {
             "version",
             "totalCredits",
             "durationYears",
-            "applicableCohorts",
+            "applicableCohort",
             "status",
             "verification");
     assertThat(topKeys(mockMvc.perform(getAs(bearer, ploUrl, pv, plo.getId()))))

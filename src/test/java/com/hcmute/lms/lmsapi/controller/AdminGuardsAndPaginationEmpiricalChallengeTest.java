@@ -8,7 +8,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.hcmute.lms.lmsapi.document.RoleAssignment;
 import com.hcmute.lms.lmsapi.document.User;
 import com.hcmute.lms.lmsapi.dto.UpdateUserRequest;
 import com.hcmute.lms.lmsapi.dto.UpdateUserStatusRequest;
@@ -117,7 +116,7 @@ public class AdminGuardsAndPaginationEmpiricalChallengeTest {
             .fullName(FIXTURE_LABEL + "User " + suffix)
             .status(status)
             .tokenVersion(0L)
-            .roleAssignments(List.of(RoleAssignment.builder().role(role).build()))
+            .roles(List.of(role))
             .createdAt(Instant.now())
             .updatedAt(Instant.now())
             .build();
@@ -175,7 +174,7 @@ public class AdminGuardsAndPaginationEmpiricalChallengeTest {
           UpdateUserRequest.builder()
               .email(primaryAdmin.getEmail())
               .fullName("Admin Self Demoted")
-              .roleAssignments(List.of(RoleAssignment.builder().role(Role.LECTURER).build()))
+              .roles(List.of(Role.LECTURER))
               .build();
 
       ApiTestSupport.performJson(
@@ -193,8 +192,7 @@ public class AdminGuardsAndPaginationEmpiricalChallengeTest {
       // Kiểm chứng thực nghiệm: Vai trò trong DB vẫn giữ nguyên Role.ADMIN
       User reloadedAdmin = userRepository.findById(primaryAdmin.getId()).orElseThrow();
       boolean stillAdmin =
-          reloadedAdmin.getRoleAssignments().stream()
-              .anyMatch(ra -> Role.ADMIN.equals(ra.getRole()));
+          reloadedAdmin.getRoles() != null && reloadedAdmin.getRoles().contains(Role.ADMIN);
       assertThat(stillAdmin).isTrue();
     }
 
@@ -205,10 +203,7 @@ public class AdminGuardsAndPaginationEmpiricalChallengeTest {
           UpdateUserRequest.builder()
               .email(primaryAdmin.getEmail())
               .fullName("Updated Admin FullName")
-              .roleAssignments(
-                  List.of(
-                      RoleAssignment.builder().role(Role.ADMIN).build(),
-                      RoleAssignment.builder().role(Role.QA).build()))
+              .roles(List.of(Role.ADMIN, Role.QA))
               .build();
 
       ApiTestSupport.performJson(
@@ -219,7 +214,7 @@ public class AdminGuardsAndPaginationEmpiricalChallengeTest {
               updateRequest)
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.fullName").value("Updated Admin FullName"))
-          .andExpect(jsonPath("$.roleAssignments", hasSize(2)));
+          .andExpect(jsonPath("$.roles", hasSize(2)));
 
       User reloadedAdmin = userRepository.findById(primaryAdmin.getId()).orElseThrow();
       assertThat(reloadedAdmin.getFullName()).isEqualTo("Updated Admin FullName");

@@ -1,7 +1,6 @@
 package com.hcmute.lms.lmsapi.service.impl;
 
 import com.hcmute.lms.lmsapi.document.CourseSection;
-import com.hcmute.lms.lmsapi.document.RoleAssignment;
 import com.hcmute.lms.lmsapi.document.Syllabus;
 import com.hcmute.lms.lmsapi.document.Term;
 import com.hcmute.lms.lmsapi.document.User;
@@ -211,10 +210,7 @@ public class SectionServiceImpl implements SectionService {
   }
 
   private boolean hasLecturerRole(User user) {
-    return user.getRoleAssignments() != null
-        && user.getRoleAssignments().stream()
-            .map(RoleAssignment::getRole)
-            .anyMatch(role -> role == Role.LECTURER);
+    return user.getRoles() != null && user.getRoles().contains(Role.LECTURER);
   }
 
   private CourseSection requireSection(String id) {

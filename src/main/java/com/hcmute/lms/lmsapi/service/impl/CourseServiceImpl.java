@@ -1,7 +1,9 @@
 package com.hcmute.lms.lmsapi.service.impl;
 
 import com.hcmute.lms.lmsapi.document.Course;
+import com.hcmute.lms.lmsapi.document.Faculty;
 import com.hcmute.lms.lmsapi.document.ProgramCourse;
+import com.hcmute.lms.lmsapi.dto.AssessmentScoreTemplate;
 import com.hcmute.lms.lmsapi.dto.CourseImportResultResponse;
 import com.hcmute.lms.lmsapi.dto.CourseImportRowError;
 import com.hcmute.lms.lmsapi.dto.CourseRequest;
@@ -23,9 +25,13 @@ import com.hcmute.lms.lmsapi.util.CsvUtils;
 import com.hcmute.lms.lmsapi.util.ObjectIdUtils;
 import com.hcmute.lms.lmsapi.util.PageableValidationUtils;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -273,7 +279,19 @@ public class CourseServiceImpl implements CourseService {
   private static final Pattern COURSE_CODE_PATTERN = Pattern.compile("^[A-Za-z0-9_.-]+$");
 
   @Override
-  public CourseImportResultResponse importCourses(MultipartFile file, String facultyId) {
+  public AssessmentScoreTemplate generateTemplateCsv() {
+    String csv =
+        "\uFEFF"
+            + "code,name,credits,facultyCode\r\n"
+            + "OOPR230279,Lập trình hướng đối tượng,3,FIT\r\n"
+            + "INFI130110,Nhập môn ngành Công nghệ Tài chính,3,FIT\r\n";
+    return new AssessmentScoreTemplate(
+        "courses-template.csv", csv.getBytes(StandardCharsets.UTF_8));
+  }
+
+  @Override
+  public CourseImportResultResponse importCourses(
+      MultipartFile file, String facultyId, boolean allowRowFacultyCode) {
     String cleanFacultyId = (facultyId != null && !facultyId.isBlank()) ? facultyId.trim() : null;
     if (cleanFacultyId != null) {
       validateActiveFaculty(cleanFacultyId);
@@ -313,6 +331,7 @@ public class CourseServiceImpl implements CourseService {
     int codeCol = -1;
     int nameCol = -1;
     int creditsCol = -1;
+    int facultyCodeCol = -1;
 
     for (int i = 0; i < header.size(); i++) {
       String col = header.get(i).trim().toLowerCase();
@@ -322,6 +341,8 @@ public class CourseServiceImpl implements CourseService {
         nameCol = i;
       } else if ("credits".equals(col) || "số tín chỉ".equals(col) || "tín chỉ".equals(col)) {
         creditsCol = i;
+      } else if ("facultycode".equals(col) || "mã khoa".equals(col)) {
+        facultyCodeCol = i;
       }
     }
 
@@ -343,6 +364,7 @@ public class CourseServiceImpl implements CourseService {
     int successCount = 0;
     List<CourseImportRowError> errors = new ArrayList<>();
     Set<String> seenCodesInFile = new HashSet<>();
+    Map<String, Faculty> facultyCache = new HashMap<>();
 
     for (int i = 1; i < records.size(); i++) {
       int rowNumber = i + 1; // Dòng 1 là header, nên dữ liệu bắt đầu từ dòng 2
@@ -461,11 +483,43 @@ public class CourseServiceImpl implements CourseService {
         continue;
       }
 
+      // Xác định Khoa cho học phần: PM luôn ép theo Khoa của PM; ADMIN ưu tiên facultyCode trên
+      // dòng CSV (nếu có), sau đó fallback về facultyId truyền vào trên API
+      String rowFacultyId = cleanFacultyId;
+      if (allowRowFacultyCode
+          && facultyCodeCol != -1
+          && row.size() > facultyCodeCol
+          && !row.get(facultyCodeCol).trim().isEmpty()) {
+        String facultyCode = row.get(facultyCodeCol).trim().toUpperCase(Locale.ROOT);
+        Faculty faculty =
+            facultyCache.computeIfAbsent(
+                facultyCode, k -> facultyRepository.findByCode(k).orElse(null));
+        if (faculty == null) {
+          errors.add(
+              CourseImportRowError.builder()
+                  .row(rowNumber)
+                  .code(code)
+                  .message("Không tìm thấy Khoa với mã: " + facultyCode)
+                  .build());
+          continue;
+        }
+        if (!faculty.isActive()) {
+          errors.add(
+              CourseImportRowError.builder()
+                  .row(rowNumber)
+                  .code(code)
+                  .message("Khoa đang bị khóa, không thể gán học phần: " + facultyCode)
+                  .build());
+          continue;
+        }
+        rowFacultyId = faculty.getId();
+      }
+
       // Thêm vào danh sách đã gặp và lưu CSDL (Best effort)
       seenCodesInFile.add(code);
       Course course =
           Course.builder()
-              .facultyId(cleanFacultyId)
+              .facultyId(rowFacultyId)
               .code(code)
               .name(name)
               .credits(credits)

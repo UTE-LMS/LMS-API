@@ -12,9 +12,7 @@ import com.hcmute.lms.lmsapi.document.Pi;
 import com.hcmute.lms.lmsapi.document.Plo;
 import com.hcmute.lms.lmsapi.document.Program;
 import com.hcmute.lms.lmsapi.document.ProgramVersion;
-import com.hcmute.lms.lmsapi.document.RoleAssignment;
 import com.hcmute.lms.lmsapi.document.User;
-import com.hcmute.lms.lmsapi.document.UserScope;
 import com.hcmute.lms.lmsapi.document.Verification;
 import com.hcmute.lms.lmsapi.dto.LoginRequest;
 import com.hcmute.lms.lmsapi.dto.ProgramRequest;
@@ -106,7 +104,7 @@ class ProgramIntegrationTest {
             ProgramVersion.builder()
                 .programId(program.getId())
                 .version("DRAFT-" + SUFFIX)
-                .status(ProgramVersionStatus.DRAFT)
+                .status(ProgramVersionStatus.ACTIVE)
                 .build());
 
     activeVersion =
@@ -114,7 +112,7 @@ class ProgramIntegrationTest {
             ProgramVersion.builder()
                 .programId(program.getId())
                 .version("ACTIVE-" + SUFFIX)
-                .status(ProgramVersionStatus.ACTIVE)
+                .status(ProgramVersionStatus.ARCHIVED)
                 .build());
 
     course =
@@ -125,21 +123,15 @@ class ProgramIntegrationTest {
                 .credits(3)
                 .build());
 
-    managerUser =
-        createUser(
-            "f02_manager_" + SUFFIX,
-            Role.PROGRAM_MANAGER,
-            UserScope.builder()
-                .programIds(List.of(program.getId(), "671dcba5f123456789abc777"))
-                .build());
-    qaUser =
-        createUser(
-            "f02_qa_" + SUFFIX,
-            Role.QA,
-            UserScope.builder().programIds(List.of(program.getId())).build());
-    qaOutOfScopeUser = createUser("f02_qa_out_" + SUFFIX, Role.QA, UserScope.builder().build());
-    adminUser = createUser("f02_admin_" + SUFFIX, Role.ADMIN, UserScope.builder().build());
-    lecturerUser = createUser("f02_lecturer_" + SUFFIX, Role.LECTURER, UserScope.builder().build());
+    String facultyId = new org.bson.types.ObjectId().toHexString();
+    program.setFacultyId(facultyId);
+    program = programRepository.save(program);
+
+    managerUser = createUser("f02_manager_" + SUFFIX, Role.PROGRAM_MANAGER, facultyId);
+    qaUser = createUser("f02_qa_" + SUFFIX, Role.QA, null);
+    qaOutOfScopeUser = createUser("f02_qa_out_" + SUFFIX, Role.QA, null);
+    adminUser = createUser("f02_admin_" + SUFFIX, Role.ADMIN, null);
+    lecturerUser = createUser("f02_lecturer_" + SUFFIX, Role.LECTURER, null);
 
     managerToken = obtainAccessToken(managerUser.getUsername());
     adminToken = obtainAccessToken(adminUser.getUsername());
@@ -166,16 +158,17 @@ class ProgramIntegrationTest {
         List.of(managerUser, qaUser, qaOutOfScopeUser, adminUser, lecturerUser));
   }
 
-  private User createUser(String username, Role role, UserScope scope) {
+  private User createUser(String username, Role role, String facultyId) {
     return userRepository.save(
         User.builder()
             .username(username)
             .email(username + "@hcmute.edu.vn")
             .passwordHash(passwordEncoder.encode(RAW_PASSWORD))
             .fullName("[F02 TEST] " + role.name())
+            .facultyId(facultyId)
             .status(UserStatus.ACTIVE)
             .tokenVersion(0L)
-            .roleAssignments(List.of(RoleAssignment.builder().role(role).scope(scope).build()))
+            .roles(List.of(role))
             .createdAt(Instant.now())
             .updatedAt(Instant.now())
             .build());
@@ -213,7 +206,15 @@ class ProgramIntegrationTest {
         .andExpect(status().isForbidden());
 
     ApiTestSupport.performJson(
-            mockMvc, objectMapper, post("/api/v1/programs"), managerToken, request)
+            mockMvc,
+            objectMapper,
+            post("/api/v1/programs"),
+            managerToken,
+            ProgramRequest.builder()
+                .code("F02_NEW_" + SUFFIX)
+                .name("Chương trình mới")
+                .facultyId(new org.bson.types.ObjectId().toHexString())
+                .build())
         .andExpect(status().isForbidden());
 
     ApiTestSupport.performJson(mockMvc, objectMapper, post("/api/v1/programs"), adminToken, request)
@@ -232,7 +233,7 @@ class ProgramIntegrationTest {
         .andExpect(jsonPath("$.content", hasSize(2)));
 
     ProgramVersionStatusUpdateRequest backward =
-        ProgramVersionStatusUpdateRequest.builder().status(ProgramVersionStatus.DRAFT).build();
+        ProgramVersionStatusUpdateRequest.builder().status(ProgramVersionStatus.ACTIVE).build();
     ApiTestSupport.performJson(
             mockMvc,
             objectMapper,
@@ -242,7 +243,7 @@ class ProgramIntegrationTest {
         .andExpect(status().isUnprocessableEntity());
 
     ProgramVersionStatusUpdateRequest forward =
-        ProgramVersionStatusUpdateRequest.builder().status(ProgramVersionStatus.ACTIVE).build();
+        ProgramVersionStatusUpdateRequest.builder().status(ProgramVersionStatus.ARCHIVED).build();
     ApiTestSupport.performJson(
             mockMvc,
             objectMapper,
@@ -250,7 +251,7 @@ class ProgramIntegrationTest {
             managerToken,
             forward)
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.status").value("ACTIVE"));
+        .andExpect(jsonPath("$.status").value("ARCHIVED"));
   }
 
   @Test

@@ -104,7 +104,7 @@ class CsvUtilsTest {
       try (java.io.InputStream is = new java.io.FileInputStream(cnttFile)) {
         List<List<String>> records = CsvUtils.parse(is);
         assertThat(records).hasSize(94);
-        assertThat(records.get(0)).containsExactly("code", "name", "credits");
+        assertThat(records.get(0)).containsExactly("code", "name", "credits", "facultyCode");
         for (int i = 1; i < records.size(); i++) {
           List<String> row = records.get(i);
           assertThat(row.get(0)).matches("^[A-Za-z0-9_.-]+$");
@@ -119,7 +119,7 @@ class CsvUtilsTest {
       try (java.io.InputStream is = new java.io.FileInputStream(fintechFile)) {
         List<List<String>> records = CsvUtils.parse(is);
         assertThat(records).hasSize(78);
-        assertThat(records.get(0)).containsExactly("code", "name", "credits");
+        assertThat(records.get(0)).containsExactly("code", "name", "credits", "facultyCode");
         for (int i = 1; i < records.size(); i++) {
           List<String> row = records.get(i);
           assertThat(row.get(0)).matches("^[A-Za-z0-9_.-]+$");

@@ -3,6 +3,8 @@ package com.hcmute.lms.lmsapi.service.impl;
 import com.hcmute.lms.lmsapi.document.Faculty;
 import com.hcmute.lms.lmsapi.document.Program;
 import com.hcmute.lms.lmsapi.document.User;
+import com.hcmute.lms.lmsapi.dto.AssessmentScoreTemplate;
+import com.hcmute.lms.lmsapi.dto.CsvImportResultResponse;
 import com.hcmute.lms.lmsapi.dto.FacultyAssignPmRequest;
 import com.hcmute.lms.lmsapi.dto.FacultyRequest;
 import com.hcmute.lms.lmsapi.dto.FacultyResponse;
@@ -26,9 +28,14 @@ import com.hcmute.lms.lmsapi.repository.UserRepository;
 import com.hcmute.lms.lmsapi.service.FacultyService;
 import com.hcmute.lms.lmsapi.util.ObjectIdUtils;
 import com.hcmute.lms.lmsapi.util.PageableValidationUtils;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
@@ -38,6 +45,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 @Slf4j
 @Service
@@ -169,7 +177,7 @@ public class FacultyServiceImpl implements FacultyService {
   public List<UserResponse> getProgramManagers(String facultyId) {
     requireFaculty(facultyId);
     List<User> pms =
-        userRepository.findByFacultyIdAndRoleAssignmentsRole(facultyId, Role.PROGRAM_MANAGER);
+        userRepository.findByFacultyIdAndRolesContaining(facultyId, Role.PROGRAM_MANAGER);
     return userMapper.toResponseList(pms);
   }
 
@@ -274,10 +282,7 @@ public class FacultyServiceImpl implements FacultyService {
           "USER_NOT_ACTIVE", "Tài khoản người dùng chưa kích hoạt hoặc đang bị khóa: " + userId);
     }
 
-    boolean hasPmRole =
-        user.getRoleAssignments() != null
-            && user.getRoleAssignments().stream()
-                .anyMatch(ra -> ra != null && ra.getRole() == Role.PROGRAM_MANAGER);
+    boolean hasPmRole = user.getRoles() != null && user.getRoles().contains(Role.PROGRAM_MANAGER);
     if (!hasPmRole) {
       throw new BusinessRuleViolationException(
           "USER_NOT_PROGRAM_MANAGER",
@@ -308,8 +313,7 @@ public class FacultyServiceImpl implements FacultyService {
 
   private FacultyResponse toResponse(Faculty faculty) {
     long pmCount =
-        userRepository.countByFacultyIdAndRoleAssignmentsRole(
-            faculty.getId(), Role.PROGRAM_MANAGER);
+        userRepository.countByFacultyIdAndRolesContaining(faculty.getId(), Role.PROGRAM_MANAGER);
     return FacultyResponse.builder()
         .id(faculty.getId())
         .code(faculty.getCode())
@@ -319,6 +323,96 @@ public class FacultyServiceImpl implements FacultyService {
         .programManagerCount(pmCount)
         .createdAt(faculty.getCreatedAt())
         .updatedAt(faculty.getUpdatedAt())
+        .build();
+  }
+
+  @Override
+  public AssessmentScoreTemplate generateTemplateCsv() {
+    String csv =
+        "\uFEFF"
+            + "code,name,description,isActive\r\n"
+            + "FIT,Khoa Công nghệ Thông tin,Đào tạo ngành CNTT và Kỹ thuật phần mềm,true\r\n"
+            + "FE,Khoa Kinh tế,Đào tạo ngành Công nghệ Tài chính và Quản trị,true\r\n";
+    return new AssessmentScoreTemplate(
+        "faculties-template.csv", csv.getBytes(StandardCharsets.UTF_8));
+  }
+
+  @Override
+  public CsvImportResultResponse importFaculties(MultipartFile file) {
+    CsvTextParser.ParsedCsv parsed = CsvTextParser.read(file);
+    CsvTextParser.requireColumns(parsed.headerIndex(), "code", "name");
+
+    int totalRows = parsed.rows().size();
+    int successCount = 0;
+    List<CsvImportResultResponse.RowError> errors = new ArrayList<>();
+    Set<String> seenCodes = new HashSet<>();
+    Set<String> seenNames = new HashSet<>();
+
+    for (int i = 0; i < totalRows; i++) {
+      int rowNum = i + 2;
+      List<String> row = parsed.rows().get(i);
+      String rawCode = CsvTextParser.cell(parsed.headerIndex(), row, "code");
+      String name = CsvTextParser.cell(parsed.headerIndex(), row, "name");
+      String description = CsvTextParser.cell(parsed.headerIndex(), row, "description");
+      String activeStr = CsvTextParser.cell(parsed.headerIndex(), row, "isActive");
+
+      if (rawCode.isEmpty()) {
+        errors.add(new CsvImportResultResponse.RowError(rowNum, "", "Mã khoa không được để trống"));
+        continue;
+      }
+      String code = rawCode.toUpperCase(Locale.ROOT);
+      if (name.isEmpty()) {
+        errors.add(
+            new CsvImportResultResponse.RowError(rowNum, code, "Tên khoa không được để trống"));
+        continue;
+      }
+      boolean isActive = true;
+      if (!activeStr.isEmpty()) {
+        if (!"true".equalsIgnoreCase(activeStr) && !"false".equalsIgnoreCase(activeStr)) {
+          errors.add(
+              new CsvImportResultResponse.RowError(
+                  rowNum, code, "isActive chỉ chấp nhận true hoặc false"));
+          continue;
+        }
+        isActive = Boolean.parseBoolean(activeStr);
+      }
+
+      if (!seenCodes.add(code) || facultyRepository.existsByCode(code)) {
+        errors.add(
+            new CsvImportResultResponse.RowError(rowNum, code, "Mã khoa đã tồn tại: " + code));
+        continue;
+      }
+      if (!seenNames.add(name.toLowerCase(Locale.ROOT)) || facultyRepository.existsByName(name)) {
+        errors.add(
+            new CsvImportResultResponse.RowError(rowNum, code, "Tên khoa đã tồn tại: " + name));
+        continue;
+      }
+
+      Instant now = Instant.now();
+      Faculty faculty =
+          Faculty.builder()
+              .code(code)
+              .name(name)
+              .description(description.isEmpty() ? null : description)
+              .isActive(isActive)
+              .createdAt(now)
+              .updatedAt(now)
+              .build();
+      try {
+        facultyRepository.save(faculty);
+        successCount++;
+      } catch (DuplicateKeyException ex) {
+        errors.add(
+            new CsvImportResultResponse.RowError(
+                rowNum, code, "Mã hoặc tên khoa bị trùng: " + code));
+      }
+    }
+
+    return CsvImportResultResponse.builder()
+        .totalRows(totalRows)
+        .successCount(successCount)
+        .failureCount(errors.size())
+        .errors(errors)
         .build();
   }
 

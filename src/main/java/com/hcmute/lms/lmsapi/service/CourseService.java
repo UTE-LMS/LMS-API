@@ -1,5 +1,6 @@
 package com.hcmute.lms.lmsapi.service;
 
+import com.hcmute.lms.lmsapi.dto.AssessmentScoreTemplate;
 import com.hcmute.lms.lmsapi.dto.CourseImportResultResponse;
 import com.hcmute.lms.lmsapi.dto.CourseRequest;
 import com.hcmute.lms.lmsapi.dto.CourseResponse;
@@ -32,5 +33,12 @@ public interface CourseService {
     return importCourses(file, null);
   }
 
-  CourseImportResultResponse importCourses(MultipartFile file, String facultyId);
+  default CourseImportResultResponse importCourses(MultipartFile file, String facultyId) {
+    return importCourses(file, facultyId, false);
+  }
+
+  CourseImportResultResponse importCourses(
+      MultipartFile file, String facultyId, boolean allowRowFacultyCode);
+
+  AssessmentScoreTemplate generateTemplateCsv();
 }

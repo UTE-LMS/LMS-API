@@ -61,7 +61,7 @@ class CloServiceImplTest {
         Syllabus.builder()
             .id(syllabusId)
             .courseId(courseId)
-            .status(SyllabusStatus.DRAFT)
+            .status(SyllabusStatus.CONFIRMED)
             .version("2024.1")
             .build();
 
@@ -114,14 +114,14 @@ class CloServiceImplTest {
   }
 
   @Test
-  @DisplayName("createClo: Chặn thêm CLO khi đề cương đã CONFIRMED (US-10/AC-3)")
+  @DisplayName("createClo: Chặn thêm CLO khi đề cương đã ARCHIVED")
   void createClo_WhenSyllabusConfirmed_ThrowsBusinessRuleViolation() {
-    syllabus.setStatus(SyllabusStatus.CONFIRMED);
+    syllabus.setStatus(SyllabusStatus.ARCHIVED);
     when(syllabusRepository.findById(syllabusId)).thenReturn(Optional.of(syllabus));
 
     assertThatThrownBy(() -> cloService.createClo(syllabusId, request))
         .isInstanceOf(BusinessRuleViolationException.class)
-        .hasMessageContaining("không cho phép thêm CLO mới");
+        .hasMessageContaining("ARCHIVED");
   }
 
   @Test
@@ -132,7 +132,7 @@ class CloServiceImplTest {
 
     assertThatThrownBy(() -> cloService.createClo(syllabusId, request))
         .isInstanceOf(BusinessRuleViolationException.class)
-        .hasMessageContaining("không cho phép thêm CLO mới");
+        .hasMessageContaining("ARCHIVED");
   }
 
   @Test
@@ -175,9 +175,9 @@ class CloServiceImplTest {
   }
 
   @Test
-  @DisplayName("updateClo: Chặn sửa CLO khi đề cương đã CONFIRMED (US-10/AC-3)")
+  @DisplayName("updateClo: Chặn sửa CLO khi đề cương đã ARCHIVED")
   void updateClo_WhenSyllabusConfirmed_ThrowsBusinessRuleViolation() {
-    syllabus.setStatus(SyllabusStatus.CONFIRMED);
+    syllabus.setStatus(SyllabusStatus.ARCHIVED);
     when(cloRepository.findById(cloId)).thenReturn(Optional.of(clo));
     when(syllabusRepository.findById(syllabusId)).thenReturn(Optional.of(syllabus));
 
@@ -185,7 +185,7 @@ class CloServiceImplTest {
 
     assertThatThrownBy(() -> cloService.updateClo(cloId, updateReq))
         .isInstanceOf(BusinessRuleViolationException.class)
-        .hasMessageContaining("không cho phép sửa nội dung CLO");
+        .hasMessageContaining("ARCHIVED");
   }
 
   @Test

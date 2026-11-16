@@ -7,9 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.hcmute.lms.lmsapi.document.RoleAssignment;
 import com.hcmute.lms.lmsapi.document.User;
-import com.hcmute.lms.lmsapi.document.UserScope;
 import com.hcmute.lms.lmsapi.dto.ErrorResponse;
 import com.hcmute.lms.lmsapi.dto.LoginRequest;
 import com.hcmute.lms.lmsapi.enums.Role;
@@ -95,12 +93,7 @@ public class BearerTokenResolverAndSecurityChallengerTest {
             .fullName("[DỮ LIỆU THỬ NGHIỆM] Challenger Active User")
             .status(UserStatus.ACTIVE)
             .tokenVersion(0L)
-            .roleAssignments(
-                List.of(
-                    RoleAssignment.builder()
-                        .role(Role.LECTURER)
-                        .scope(UserScope.builder().build())
-                        .build()))
+            .roles(List.of(Role.LECTURER))
             .createdAt(Instant.now())
             .updatedAt(Instant.now())
             .build());
@@ -113,7 +106,7 @@ public class BearerTokenResolverAndSecurityChallengerTest {
             .fullName("[DỮ LIỆU THỬ NGHIỆM] Challenger Locked User")
             .status(UserStatus.LOCKED)
             .tokenVersion(0L)
-            .roleAssignments(List.of(RoleAssignment.builder().role(Role.QA).build()))
+            .roles(List.of(Role.QA))
             .createdAt(Instant.now())
             .updatedAt(Instant.now())
             .build());

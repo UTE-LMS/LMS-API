@@ -4,7 +4,6 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.hcmute.lms.lmsapi.document.UserScope;
 import com.hcmute.lms.lmsapi.dto.TermRequest;
 import com.hcmute.lms.lmsapi.dto.TermStatusUpdateRequest;
 import com.hcmute.lms.lmsapi.enums.Role;
@@ -30,9 +29,9 @@ class TermIntegrationTest extends IntegrationTestBase {
 
   @BeforeEach
   void setUpTokens() {
-    adminToken = fixtures.bearerFor(Role.ADMIN, UserScope.builder().build());
-    pmToken = fixtures.bearerFor(Role.PROGRAM_MANAGER, UserScope.builder().build());
-    lecturerToken = fixtures.bearerFor(Role.LECTURER, UserScope.builder().build());
+    adminToken = fixtures.bearerFor(Role.ADMIN);
+    pmToken = fixtures.bearerFor(Role.PROGRAM_MANAGER);
+    lecturerToken = fixtures.bearerFor(Role.LECTURER);
   }
 
   @AfterEach

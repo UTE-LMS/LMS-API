@@ -12,11 +12,11 @@ import com.hcmute.lms.lmsapi.document.Assessment;
 import com.hcmute.lms.lmsapi.document.Clo;
 import com.hcmute.lms.lmsapi.document.Course;
 import com.hcmute.lms.lmsapi.document.CourseSection;
+import com.hcmute.lms.lmsapi.document.Faculty;
 import com.hcmute.lms.lmsapi.document.Score;
 import com.hcmute.lms.lmsapi.document.Student;
 import com.hcmute.lms.lmsapi.document.Syllabus;
 import com.hcmute.lms.lmsapi.document.User;
-import com.hcmute.lms.lmsapi.document.UserScope;
 import com.hcmute.lms.lmsapi.dto.AssessmentCloWeightDto;
 import com.hcmute.lms.lmsapi.dto.AssessmentItemDto;
 import com.hcmute.lms.lmsapi.dto.AssessmentItemsRequest;
@@ -30,7 +30,6 @@ import com.hcmute.lms.lmsapi.enums.SyllabusStatus;
 import com.hcmute.lms.lmsapi.testsupport.ApiTestFixtures;
 import com.hcmute.lms.lmsapi.testsupport.IntegrationTestBase;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -67,24 +66,25 @@ class AssessmentIntegrationTest extends IntegrationTestBase {
     Syllabus otherSyllabus = fixtures.syllabus(fixtures.course(), SyllabusStatus.CONFIRMED);
     foreignClo = fixtures.clo(otherSyllabus, "CLO1");
 
-    UserScope courseScope =
-        UserScope.builder().courseIds(new ArrayList<>(List.of(course.getId()))).build();
-    lecturer = fixtures.user(Role.LECTURER, courseScope);
-    departmentHead = fixtures.user(Role.PROGRAM_MANAGER, courseScope);
-    User otherLecturer = fixtures.user(Role.LECTURER, UserScope.builder().build());
+    Faculty faculty = fixtures.faculty();
+    course.setFacultyId(faculty.getId());
+    course = mongo().save(course);
+
+    lecturer = fixtures.user(Role.LECTURER);
+    departmentHead = fixtures.user(Role.PROGRAM_MANAGER);
+    departmentHead.setFacultyId(faculty.getId());
+    departmentHead = mongo().save(departmentHead);
+    User otherLecturer = fixtures.user(Role.LECTURER);
 
     section = fixtures.section(course.getId(), List.of(lecturer.getId()));
     section.setSyllabusId(syllabus.getId());
     section = mongo().save(section);
 
-    adminToken = fixtures.bearerFor(Role.ADMIN, UserScope.builder().build());
+    adminToken = fixtures.bearerFor(Role.ADMIN);
     lecturerToken = fixtures.bearer(lecturer);
     otherLecturerToken = fixtures.bearer(otherLecturer);
     deptHeadToken = fixtures.bearer(departmentHead);
-    pmToken =
-        fixtures.bearerFor(
-            Role.PROGRAM_MANAGER,
-            UserScope.builder().courseIds(new ArrayList<>(List.of(course.getId()))).build());
+    pmToken = deptHeadToken;
   }
 
   // ------------------------------------------------------------------ dựng dữ liệu
@@ -478,7 +478,6 @@ class AssessmentIntegrationTest extends IntegrationTestBase {
 
     Assessment locked = stored(id);
     assertThat(locked.getStatus()).isEqualTo(AssessmentStatus.LOCKED);
-    assertThat(locked.isLocked()).isTrue();
 
     // Kiểm tra audit log cho lock
     assertThat(
@@ -506,7 +505,6 @@ class AssessmentIntegrationTest extends IntegrationTestBase {
 
     Assessment unlocked = stored(id);
     assertThat(unlocked.getStatus()).isEqualTo(AssessmentStatus.DRAFT);
-    assertThat(unlocked.isLocked()).isFalse();
 
     assertThat(
             mongo()

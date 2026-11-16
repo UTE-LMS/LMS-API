@@ -10,6 +10,7 @@ import com.hcmute.lms.lmsapi.document.Verification;
 import com.hcmute.lms.lmsapi.dto.AssessmentScoreTemplate;
 import com.hcmute.lms.lmsapi.dto.ProgramCsvImportResponse;
 import com.hcmute.lms.lmsapi.enums.AuditAction;
+import com.hcmute.lms.lmsapi.enums.PloCategory;
 import com.hcmute.lms.lmsapi.enums.ProgramVersionStatus;
 import com.hcmute.lms.lmsapi.enums.VerificationStatus;
 import com.hcmute.lms.lmsapi.exception.BusinessRuleViolationException;
@@ -58,9 +59,9 @@ public class ProgramImportServiceImpl implements ProgramImportService {
   public AssessmentScoreTemplate generateTemplateCsv() {
     String csv =
         "\uFEFF"
-            + "ploCode,ploName,ploPassThreshold,ploDisplayOrder,piCode,piName,piWeight,piPassThreshold,courseCodes\r\n"
-            + "PLO1,Kiến thức nền tảng,0.6,1,PI1.1,Vận dụng toán học,0.5,0.6,OOPR230279;PRPR130179\r\n"
-            + "PLO1,Kiến thức nền tảng,0.6,1,PI1.2,Vận dụng cơ sở ngành,0.5,0.6,OOPR230279\r\n";
+            + "ploCode,ploName,ploPassThreshold,ploDisplayOrder,ploCapabilityLevel,ploCategory,piCode,piName,piWeight,piPassThreshold,piCapabilityLevel,courseCodes\r\n"
+            + "PLO1,Kiến thức nền tảng,0.6,1,3,GENERAL,PI1.1,Vận dụng toán học,0.5,0.6,3,OOPR230279;PRPR130179\r\n"
+            + "PLO1,Kiến thức nền tảng,0.6,1,3,GENERAL,PI1.2,Vận dụng cơ sở ngành,0.5,0.6,3,OOPR230279\r\n";
     return new AssessmentScoreTemplate(
         "program-version-template.csv", csv.getBytes(StandardCharsets.UTF_8));
   }
@@ -68,7 +69,13 @@ public class ProgramImportServiceImpl implements ProgramImportService {
   @Override
   @Transactional
   public ProgramCsvImportResponse importProgramCsv(
-      String programId, String version, MultipartFile file, String actorId) {
+      String programId,
+      String version,
+      Integer totalCredits,
+      Double durationYears,
+      String applicableCohort,
+      MultipartFile file,
+      String actorId) {
     if (!programRepository.existsById(programId)) {
       throw new ResourceNotFoundException("Không tìm thấy CTĐT với id: " + programId);
     }
@@ -87,7 +94,13 @@ public class ProgramImportServiceImpl implements ProgramImportService {
         "piPassThreshold");
 
     ParsedProgramData data = parseProgramRows(parsed);
-    ProgramVersion pv = resolveOrResetDraftVersion(programId, trimmedVersion);
+    String cleanCohort =
+        applicableCohort != null && !applicableCohort.trim().isEmpty()
+            ? applicableCohort.trim()
+            : null;
+    ProgramVersion pv =
+        resolveOrResetDraftVersion(
+            programId, trimmedVersion, totalCredits, durationYears, cleanCohort);
 
     Verification verified = Verification.builder().status(VerificationStatus.VERIFIED).build();
 
@@ -104,6 +117,9 @@ public class ProgramImportServiceImpl implements ProgramImportService {
         .programVersionId(pv.getId())
         .programId(programId)
         .version(pv.getVersion())
+        .totalCredits(pv.getTotalCredits())
+        .durationYears(pv.getDurationYears())
+        .applicableCohort(pv.getApplicableCohort())
         .status(pv.getStatus())
         .verificationStatus(VerificationStatus.VERIFIED)
         .ploCount(savedPlos.size())
@@ -177,6 +193,9 @@ public class ProgramImportServiceImpl implements ProgramImportService {
         .programVersionId(savedPv.getId())
         .programId(savedPv.getProgramId())
         .version(savedPv.getVersion())
+        .totalCredits(savedPv.getTotalCredits())
+        .durationYears(savedPv.getDurationYears())
+        .applicableCohort(savedPv.getApplicableCohort())
         .status(savedPv.getStatus())
         .verificationStatus(VerificationStatus.VERIFIED)
         .ploCount(plos.size())
@@ -188,18 +207,32 @@ public class ProgramImportServiceImpl implements ProgramImportService {
         .build();
   }
 
-  private ProgramVersion resolveOrResetDraftVersion(String programId, String version) {
+  private ProgramVersion resolveOrResetDraftVersion(
+      String programId,
+      String version,
+      Integer totalCredits,
+      Double durationYears,
+      String applicableCohort) {
     Optional<ProgramVersion> existing =
         programVersionRepository.findByProgramIdAndVersion(programId, version);
     if (existing.isPresent()) {
       ProgramVersion pv = existing.get();
-      if (pv.getStatus() != ProgramVersionStatus.DRAFT) {
+      if (pv.getStatus() == ProgramVersionStatus.ARCHIVED) {
         throw new BusinessRuleViolationException(
-            "Phiên bản " + version + " đã được xác nhận, hãy nhập với mã phiên bản mới");
+            "Phiên bản " + version + " đã được lưu trữ (ARCHIVED), hãy nhập với mã phiên bản mới");
       }
       piRepository.deleteByProgramVersionId(pv.getId());
       ploRepository.deleteByProgramVersionId(pv.getId());
       programCourseRepository.deleteByProgramVersionId(pv.getId());
+      if (totalCredits != null) {
+        pv.setTotalCredits(totalCredits);
+      }
+      if (durationYears != null) {
+        pv.setDurationYears(durationYears);
+      }
+      if (applicableCohort != null) {
+        pv.setApplicableCohort(applicableCohort);
+      }
       pv.setVerification(Verification.builder().status(VerificationStatus.VERIFIED).build());
       return programVersionRepository.save(pv);
     }
@@ -207,7 +240,10 @@ public class ProgramImportServiceImpl implements ProgramImportService {
         ProgramVersion.builder()
             .programId(programId)
             .version(version)
-            .status(ProgramVersionStatus.DRAFT)
+            .totalCredits(totalCredits)
+            .durationYears(durationYears)
+            .applicableCohort(applicableCohort)
+            .status(ProgramVersionStatus.ACTIVE)
             .verification(Verification.builder().status(VerificationStatus.VERIFIED).build())
             .build());
   }
@@ -246,14 +282,29 @@ public class ProgramImportServiceImpl implements ProgramImportService {
       int ploOrder =
           CsvTextParser.parseIntOrDefault(
               CsvTextParser.cell(parsed.headerIndex(), row, "ploDisplayOrder"), plos.size() + 1);
-      plos.putIfAbsent(ploCode, new PloDraft(ploCode, ploName, ploThreshold, ploOrder));
+      Integer ploCapabilityLevel =
+          parseCapabilityLevel(
+              CsvTextParser.cell(parsed.headerIndex(), row, "ploCapabilityLevel"),
+              "ploCapabilityLevel",
+              rowNum);
+      PloCategory ploCategory =
+          parsePloCategory(CsvTextParser.cell(parsed.headerIndex(), row, "ploCategory"), rowNum);
+      plos.putIfAbsent(
+          ploCode,
+          new PloDraft(ploCode, ploName, ploThreshold, ploOrder, ploCapabilityLevel, ploCategory));
 
       if (!seenPiCodes.add(piCode)) {
         throw new BusinessRuleViolationException(
             "Dòng " + rowNum + ": mã PI bị trùng trong tệp: " + piCode);
       }
       String piName = CsvTextParser.cell(parsed.headerIndex(), row, "piName");
-      pis.add(new PiDraft(ploCode, piCode, piName, piWeight, piThreshold, i + 1));
+      Integer piCapabilityLevel =
+          parseCapabilityLevel(
+              CsvTextParser.cell(parsed.headerIndex(), row, "piCapabilityLevel"),
+              "piCapabilityLevel",
+              rowNum);
+      pis.add(
+          new PiDraft(ploCode, piCode, piName, piWeight, piThreshold, piCapabilityLevel, i + 1));
 
       String rawCourses = CsvTextParser.cell(parsed.headerIndex(), row, "courseCodes");
       if (!rawCourses.isEmpty()) {
@@ -297,8 +348,10 @@ public class ProgramImportServiceImpl implements ProgramImportService {
               .programVersionId(pvId)
               .code(d.code())
               .displayOrder(d.displayOrder())
+              .category(d.category())
               .contentOriginal(d.name().isEmpty() ? null : d.name())
               .contentSummary(d.name().isEmpty() ? d.code() : d.name())
+              .capabilityLevelRaw(d.capabilityLevelRaw())
               .passThreshold(d.passThreshold())
               .verification(verification)
               .build());
@@ -319,6 +372,7 @@ public class ProgramImportServiceImpl implements ProgramImportService {
               .displayOrder(d.displayOrder())
               .contentOriginal(d.name().isEmpty() ? null : d.name())
               .contentShort(d.name().isEmpty() ? d.code() : d.name())
+              .capabilityLevelRaw(d.capabilityLevelRaw())
               .weight(d.weight())
               .passThreshold(d.passThreshold())
               .verification(verification)
@@ -341,7 +395,46 @@ public class ProgramImportServiceImpl implements ProgramImportService {
     return programCourseRepository.saveAll(list).size();
   }
 
-  private record PloDraft(String code, String name, double passThreshold, int displayOrder) {}
+  private Integer parseCapabilityLevel(String raw, String fieldLabel, int rowNum) {
+    if (raw == null || raw.isEmpty()) {
+      return null;
+    }
+    try {
+      int level = Integer.parseInt(raw);
+      if (level < 1 || level > 6) {
+        throw new BusinessRuleViolationException(
+            "Dòng " + rowNum + ": " + fieldLabel + " phải nằm trong [1, 6], nhận được " + raw);
+      }
+      return level;
+    } catch (NumberFormatException ex) {
+      throw new BusinessRuleViolationException(
+          "Dòng " + rowNum + ": giá trị số nguyên không hợp lệ cho " + fieldLabel + ": " + raw);
+    }
+  }
+
+  private PloCategory parsePloCategory(String raw, int rowNum) {
+    if (raw == null || raw.isEmpty()) {
+      return null;
+    }
+    try {
+      return PloCategory.valueOf(raw.trim().toUpperCase(java.util.Locale.ROOT));
+    } catch (IllegalArgumentException ex) {
+      throw new BusinessRuleViolationException(
+          "Dòng "
+              + rowNum
+              + ": ploCategory không hợp lệ ("
+              + raw
+              + "), chỉ chấp nhận GENERAL, SPECIALIZED hoặc UNSPECIFIED");
+    }
+  }
+
+  private record PloDraft(
+      String code,
+      String name,
+      double passThreshold,
+      int displayOrder,
+      Integer capabilityLevelRaw,
+      PloCategory category) {}
 
   private record PiDraft(
       String ploCode,
@@ -349,6 +442,7 @@ public class ProgramImportServiceImpl implements ProgramImportService {
       String name,
       double weight,
       double passThreshold,
+      Integer capabilityLevelRaw,
       int displayOrder) {}
 
   private record ParsedProgramData(

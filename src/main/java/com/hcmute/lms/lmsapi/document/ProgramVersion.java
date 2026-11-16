@@ -1,8 +1,6 @@
 package com.hcmute.lms.lmsapi.document;
 
 import com.hcmute.lms.lmsapi.enums.ProgramVersionStatus;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -36,9 +34,8 @@ public class ProgramVersion {
   @Field("version")
   private String version;
 
-  @Builder.Default
-  @Field("applicableCohorts")
-  private List<String> applicableCohorts = new ArrayList<>();
+  @Field("applicableCohort")
+  private String applicableCohort;
 
   @Field("totalCredits")
   private Integer totalCredits;

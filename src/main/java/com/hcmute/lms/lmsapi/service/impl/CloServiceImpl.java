@@ -51,11 +51,9 @@ public class CloServiceImpl implements CloService {
 
     // TD-27 / US-10/AC-3: Chỉ đề cương DRAFT mới cho phép thêm CLO (khóa cứng khi CONFIRMED hoặc
     // ARCHIVED)
-    if (syllabus.getStatus() != SyllabusStatus.DRAFT) {
+    if (syllabus.getStatus() == SyllabusStatus.ARCHIVED) {
       throw new BusinessRuleViolationException(
-          "Chỉ đề cương ở trạng thái DRAFT mới cho phép thêm CLO mới; đề cương đã "
-              + syllabus.getStatus()
-              + " không cho phép thêm CLO mới");
+          "Không thể thêm CLO mới khi đề cương đã ở trạng thái ARCHIVED");
     }
 
     String code = request.getCode().trim();
@@ -86,11 +84,9 @@ public class CloServiceImpl implements CloService {
     Syllabus syllabus = requireSyllabus(clo.getSyllabusId());
 
     // TD-27 / US-10/AC-3: Chỉ đề cương DRAFT mới cho phép sửa CLO
-    if (syllabus.getStatus() != SyllabusStatus.DRAFT) {
+    if (syllabus.getStatus() == SyllabusStatus.ARCHIVED) {
       throw new BusinessRuleViolationException(
-          "Chỉ đề cương ở trạng thái DRAFT mới cho phép sửa nội dung CLO; đề cương đã "
-              + syllabus.getStatus()
-              + " không cho phép sửa nội dung CLO");
+          "Không thể sửa nội dung CLO khi đề cương đã ở trạng thái ARCHIVED");
     }
 
     String newCode = request.getCode().trim();
@@ -135,11 +131,9 @@ public class CloServiceImpl implements CloService {
     Syllabus syllabus = requireSyllabus(clo.getSyllabusId());
 
     // TD-27 / US-10/AC-3: Chỉ đề cương DRAFT mới cho phép xóa CLO
-    if (syllabus.getStatus() != SyllabusStatus.DRAFT) {
+    if (syllabus.getStatus() == SyllabusStatus.ARCHIVED) {
       throw new BusinessRuleViolationException(
-          "Chỉ đề cương ở trạng thái DRAFT mới cho phép xóa CLO; đề cương đã "
-              + syllabus.getStatus()
-              + " không cho phép xóa CLO");
+          "Không thể xóa CLO khi đề cương đã ở trạng thái ARCHIVED");
     }
 
     // Restrict delete: Không xóa CLO nếu đã có liên kết CLO-PI

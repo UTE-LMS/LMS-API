@@ -62,7 +62,7 @@ class PloServiceImplTest {
   @DisplayName("Tạo PLO mặc định UNSPECIFIED và NEEDS_CLARIFICATION")
   void create_success_defaults() {
     when(programVersionRepository.findById(VERSION_ID))
-        .thenReturn(Optional.of(version(ProgramVersionStatus.DRAFT)));
+        .thenReturn(Optional.of(version(ProgramVersionStatus.ACTIVE)));
     when(ploRepository.existsByProgramVersionIdAndCode(VERSION_ID, "PLO1")).thenReturn(false);
     when(ploRepository.save(any(Plo.class)))
         .thenAnswer(
@@ -92,7 +92,7 @@ class PloServiceImplTest {
   @DisplayName("Tạo PLO trùng mã trả 409")
   void create_duplicate_conflict() {
     when(programVersionRepository.findById(VERSION_ID))
-        .thenReturn(Optional.of(version(ProgramVersionStatus.DRAFT)));
+        .thenReturn(Optional.of(version(ProgramVersionStatus.ACTIVE)));
     when(ploRepository.existsByProgramVersionIdAndCode(VERSION_ID, "PLO1")).thenReturn(true);
 
     assertThatThrownBy(() -> service.createPlo(VERSION_ID, request("PLO1")))
@@ -102,10 +102,10 @@ class PloServiceImplTest {
   }
 
   @Test
-  @DisplayName("Sửa PLO khi phiên bản ACTIVE trả 422")
-  void update_activeVersion_businessRule() {
+  @DisplayName("Sửa PLO khi phiên bản ARCHIVED trả 422")
+  void update_archivedVersion_businessRule() {
     when(programVersionRepository.findById(VERSION_ID))
-        .thenReturn(Optional.of(version(ProgramVersionStatus.ACTIVE)));
+        .thenReturn(Optional.of(version(ProgramVersionStatus.ARCHIVED)));
 
     assertThatThrownBy(() -> service.updatePlo(VERSION_ID, PLO_ID, request("PLO1")))
         .isInstanceOf(BusinessRuleViolationException.class);
@@ -117,7 +117,7 @@ class PloServiceImplTest {
   void delete_hasPis_businessRule() {
     Plo plo = Plo.builder().id(PLO_ID).programVersionId(VERSION_ID).code("PLO1").build();
     when(programVersionRepository.findById(VERSION_ID))
-        .thenReturn(Optional.of(version(ProgramVersionStatus.DRAFT)));
+        .thenReturn(Optional.of(version(ProgramVersionStatus.ACTIVE)));
     when(ploRepository.findByIdAndProgramVersionId(PLO_ID, VERSION_ID))
         .thenReturn(Optional.of(plo));
     when(piRepository.countByPloId(PLO_ID)).thenReturn(1L);
@@ -132,7 +132,7 @@ class PloServiceImplTest {
   void delete_success() {
     Plo plo = Plo.builder().id(PLO_ID).programVersionId(VERSION_ID).code("PLO1").build();
     when(programVersionRepository.findById(VERSION_ID))
-        .thenReturn(Optional.of(version(ProgramVersionStatus.DRAFT)));
+        .thenReturn(Optional.of(version(ProgramVersionStatus.ACTIVE)));
     when(ploRepository.findByIdAndProgramVersionId(PLO_ID, VERSION_ID))
         .thenReturn(Optional.of(plo));
     when(piRepository.countByPloId(PLO_ID)).thenReturn(0L);

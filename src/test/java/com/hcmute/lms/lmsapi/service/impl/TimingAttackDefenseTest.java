@@ -10,7 +10,6 @@ import static org.mockito.Mockito.when;
 
 import com.hcmute.lms.lmsapi.config.JwtConfig;
 import com.hcmute.lms.lmsapi.document.AuditEntity;
-import com.hcmute.lms.lmsapi.document.RoleAssignment;
 import com.hcmute.lms.lmsapi.document.User;
 import com.hcmute.lms.lmsapi.dto.LoginRequest;
 import com.hcmute.lms.lmsapi.dto.LoginResponse;
@@ -73,7 +72,7 @@ class TimingAttackDefenseTest {
             .passwordHash("$2a$10$realHashForExistingUserPassword123")
             .status(UserStatus.ACTIVE)
             .tokenVersion(0L)
-            .roleAssignments(List.of(RoleAssignment.builder().role(Role.LECTURER).build()))
+            .roles(List.of(Role.LECTURER))
             .build();
   }
 

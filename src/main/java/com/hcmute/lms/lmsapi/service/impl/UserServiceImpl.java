@@ -1,8 +1,10 @@
 package com.hcmute.lms.lmsapi.service.impl;
 
-import com.hcmute.lms.lmsapi.document.RoleAssignment;
+import com.hcmute.lms.lmsapi.document.Faculty;
 import com.hcmute.lms.lmsapi.document.User;
+import com.hcmute.lms.lmsapi.dto.AssessmentScoreTemplate;
 import com.hcmute.lms.lmsapi.dto.CreateUserRequest;
+import com.hcmute.lms.lmsapi.dto.CsvImportResultResponse;
 import com.hcmute.lms.lmsapi.dto.PageResponse;
 import com.hcmute.lms.lmsapi.dto.UpdateUserRequest;
 import com.hcmute.lms.lmsapi.dto.UpdateUserStatusRequest;
@@ -14,17 +16,25 @@ import com.hcmute.lms.lmsapi.exception.BusinessRuleViolationException;
 import com.hcmute.lms.lmsapi.exception.ErrorCode;
 import com.hcmute.lms.lmsapi.exception.ResourceNotFoundException;
 import com.hcmute.lms.lmsapi.mapper.UserMapper;
+import com.hcmute.lms.lmsapi.repository.FacultyRepository;
 import com.hcmute.lms.lmsapi.repository.UserRepository;
 import com.hcmute.lms.lmsapi.repository.UserRepositoryCustom;
-import com.hcmute.lms.lmsapi.service.ScopeValidationService;
 import com.hcmute.lms.lmsapi.service.UserService;
 import com.hcmute.lms.lmsapi.util.PageableValidationUtils;
 import com.hcmute.lms.lmsapi.util.StringNormalizationUtils;
 import com.hcmute.lms.lmsapi.validator.PasswordPolicyValidator;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.bson.types.ObjectId;
@@ -34,6 +44,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
  * Hiện thực dịch vụ quản lý người dùng {@link UserService} (F01 / US-02). Tuân thủ nghiêm ngặt ADR
@@ -48,10 +59,14 @@ import org.springframework.stereotype.Service;
 public class UserServiceImpl implements UserService {
 
   private final UserRepository userRepository;
+  private final FacultyRepository facultyRepository;
   private final UserMapper userMapper;
   private final PasswordEncoder passwordEncoder;
   private final PasswordPolicyValidator passwordPolicyValidator;
-  private final ScopeValidationService scopeValidationService;
+
+  private static final Pattern USERNAME_PATTERN = Pattern.compile("^[a-zA-Z0-9._-]+$");
+  private static final Pattern EMAIL_PATTERN =
+      Pattern.compile("^[a-zA-Z0-9_!#$%&'*+/=?`{|}~^.-]+@[a-zA-Z0-9.-]+$");
 
   @Override
   public UserResponse createUser(CreateUserRequest request) {
@@ -78,10 +93,7 @@ public class UserServiceImpl implements UserService {
           "Địa chỉ email đã tồn tại trong hệ thống: " + normalizedEmail);
     }
 
-    // 4. Kiểm tra tính hợp lệ của phạm vi phụ trách (Scope Validation)
-    scopeValidationService.validateRoleAssignments(request.getRoleAssignments());
-
-    // 5. Băm mật khẩu bằng BCrypt
+    // 4. Băm mật khẩu bằng BCrypt
     String passwordHash = passwordEncoder.encode(request.getPassword());
 
     // 6. Khởi tạo User entity
@@ -94,9 +106,9 @@ public class UserServiceImpl implements UserService {
             .fullName(request.getFullName().trim())
             .status(UserStatus.ACTIVE)
             .tokenVersion(0L)
-            .roleAssignments(
-                request.getRoleAssignments() != null
-                    ? new ArrayList<>(request.getRoleAssignments())
+            .roles(
+                request.getRoles() != null
+                    ? new ArrayList<>(request.getRoles())
                     : new ArrayList<>())
             .createdAt(now)
             .updatedAt(now)
@@ -166,12 +178,9 @@ public class UserServiceImpl implements UserService {
       }
     }
 
-    // 3. Kiểm tra tính hợp lệ của phạm vi phụ trách (Scope Validation)
-    scopeValidationService.validateRoleAssignments(request.getRoleAssignments());
-
-    // 4. ADMIN Guards: Kiểm tra bảo vệ tài khoản quản trị viên tối cao
-    boolean targetHasAdmin = hasAdminRole(user.getRoleAssignments());
-    boolean newRolesHaveAdmin = hasAdminRole(request.getRoleAssignments());
+    // 3. ADMIN Guards: Kiểm tra bảo vệ tài khoản quản trị viên tối cao
+    boolean targetHasAdmin = hasAdminRole(user.getRoles());
+    boolean newRolesHaveAdmin = hasAdminRole(request.getRoles());
 
     // Nếu người dùng mục tiêu đang có quyền ADMIN và thao tác này gỡ bỏ quyền ADMIN:
     if (targetHasAdmin && !newRolesHaveAdmin) {
@@ -186,7 +195,7 @@ public class UserServiceImpl implements UserService {
       // còn lại
       if (user.getStatus() == UserStatus.ACTIVE) {
         long activeAdminCount =
-            userRepository.countByRoleAssignmentsRoleAndStatus(Role.ADMIN, UserStatus.ACTIVE);
+            userRepository.countByRolesContainingAndStatus(Role.ADMIN, UserStatus.ACTIVE);
         if (activeAdminCount <= 1) {
           log.warn("ADMIN Guard triggered: Attempted to demote the last active ADMIN [{}]", id);
           throw new BusinessRuleViolationException(
@@ -200,10 +209,8 @@ public class UserServiceImpl implements UserService {
     // tokenVersion được giữ nguyên)
     user.setEmail(normalizedEmail);
     user.setFullName(request.getFullName().trim());
-    user.setRoleAssignments(
-        request.getRoleAssignments() != null
-            ? new ArrayList<>(request.getRoleAssignments())
-            : new ArrayList<>());
+    user.setRoles(
+        request.getRoles() != null ? new ArrayList<>(request.getRoles()) : new ArrayList<>());
     user.setUpdatedAt(Instant.now());
 
     try {
@@ -244,10 +251,10 @@ public class UserServiceImpl implements UserService {
       }
 
       // Guard 3A: Chặn khóa tài khoản ADMIN ở trạng thái ACTIVE duy nhất còn lại trong hệ thống
-      boolean targetHasAdmin = hasAdminRole(user.getRoleAssignments());
+      boolean targetHasAdmin = hasAdminRole(user.getRoles());
       if (targetHasAdmin && user.getStatus() == UserStatus.ACTIVE) {
         long activeAdminCount =
-            userRepository.countByRoleAssignmentsRoleAndStatus(Role.ADMIN, UserStatus.ACTIVE);
+            userRepository.countByRolesContainingAndStatus(Role.ADMIN, UserStatus.ACTIVE);
         if (activeAdminCount <= 1) {
           log.warn("ADMIN Guard triggered: Attempted to lock the last active ADMIN [{}]", id);
           throw new BusinessRuleViolationException(
@@ -287,10 +294,170 @@ public class UserServiceImpl implements UserService {
     }
   }
 
-  private boolean hasAdminRole(List<RoleAssignment> assignments) {
-    if (assignments == null) {
-      return false;
+  @Override
+  public AssessmentScoreTemplate generateTemplateCsv() {
+    String csv =
+        "\uFEFF"
+            + "username,email,password,fullName,roles,facultyCode,status\r\n"
+            + "pm_fit,pm_fit@hcmute.edu.vn,Password123!,Trưởng ngành CNTT,PROGRAM_MANAGER,FIT,ACTIVE\r\n"
+            + "gv_an,gv_an@hcmute.edu.vn,Password123!,Nguyễn Văn An,LECTURER,,ACTIVE\r\n";
+    return new AssessmentScoreTemplate("users-template.csv", csv.getBytes(StandardCharsets.UTF_8));
+  }
+
+  @Override
+  public CsvImportResultResponse importUsers(MultipartFile file) {
+    CsvTextParser.ParsedCsv parsed = CsvTextParser.read(file);
+    CsvTextParser.requireColumns(
+        parsed.headerIndex(), "username", "email", "password", "fullName", "roles");
+
+    int totalRows = parsed.rows().size();
+    int successCount = 0;
+    List<CsvImportResultResponse.RowError> errors = new ArrayList<>();
+    Set<String> seenUsernames = new HashSet<>();
+    Set<String> seenEmails = new HashSet<>();
+    Map<String, Faculty> facultyCache = new HashMap<>();
+
+    for (int i = 0; i < totalRows; i++) {
+      int rowNum = i + 2;
+      List<String> row = parsed.rows().get(i);
+      String rawUsername = CsvTextParser.cell(parsed.headerIndex(), row, "username");
+      String rawEmail = CsvTextParser.cell(parsed.headerIndex(), row, "email");
+      String password = CsvTextParser.cell(parsed.headerIndex(), row, "password");
+      String fullName = CsvTextParser.cell(parsed.headerIndex(), row, "fullName");
+      String rawRoles = CsvTextParser.cell(parsed.headerIndex(), row, "roles");
+      String rawFacultyCode = CsvTextParser.cell(parsed.headerIndex(), row, "facultyCode");
+      String rawStatus = CsvTextParser.cell(parsed.headerIndex(), row, "status");
+
+      String username = StringNormalizationUtils.normalizeUsername(rawUsername);
+      String email = StringNormalizationUtils.normalizeEmail(rawEmail);
+
+      if (username == null
+          || username.length() < 3
+          || username.length() > 50
+          || !USERNAME_PATTERN.matcher(username).matches()) {
+        errors.add(
+            new CsvImportResultResponse.RowError(
+                rowNum, rawUsername, "Tên đăng nhập phải 3-50 ký tự hợp lệ"));
+        continue;
+      }
+      if (email == null || !EMAIL_PATTERN.matcher(email).matches()) {
+        errors.add(
+            new CsvImportResultResponse.RowError(
+                rowNum, username, "Địa chỉ email không đúng định dạng"));
+        continue;
+      }
+      if (fullName.isEmpty()) {
+        errors.add(
+            new CsvImportResultResponse.RowError(
+                rowNum, username, "Họ và tên không được để trống"));
+        continue;
+      }
+      try {
+        passwordPolicyValidator.validate(password);
+      } catch (RuntimeException ex) {
+        errors.add(new CsvImportResultResponse.RowError(rowNum, username, ex.getMessage()));
+        continue;
+      }
+
+      List<Role> parsedRoles = parseUserRoles(rawRoles);
+      if (parsedRoles == null || parsedRoles.isEmpty()) {
+        errors.add(
+            new CsvImportResultResponse.RowError(
+                rowNum, username, "Danh sách roles không hợp lệ hoặc bị trống"));
+        continue;
+      }
+
+      UserStatus status = UserStatus.ACTIVE;
+      if (!rawStatus.isEmpty()) {
+        try {
+          status = UserStatus.valueOf(rawStatus.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException ex) {
+          errors.add(
+              new CsvImportResultResponse.RowError(
+                  rowNum, username, "Trạng thái không hợp lệ (chỉ ACTIVE hoặc LOCKED)"));
+          continue;
+        }
+      }
+
+      String facultyId = null;
+      if (!rawFacultyCode.isEmpty()) {
+        String facultyCode = rawFacultyCode.trim().toUpperCase(Locale.ROOT);
+        Faculty faculty =
+            facultyCache.computeIfAbsent(
+                facultyCode, k -> facultyRepository.findByCode(k).orElse(null));
+        if (faculty == null || !faculty.isActive()) {
+          errors.add(
+              new CsvImportResultResponse.RowError(
+                  rowNum, username, "Không tìm thấy Khoa đang hoạt động với mã: " + facultyCode));
+          continue;
+        }
+        facultyId = faculty.getId();
+      }
+
+      if (!seenUsernames.add(username) || userRepository.existsByUsername(username)) {
+        errors.add(
+            new CsvImportResultResponse.RowError(
+                rowNum, username, "Tên đăng nhập đã tồn tại: " + username));
+        continue;
+      }
+      if (!seenEmails.add(email) || userRepository.existsByEmail(email)) {
+        errors.add(
+            new CsvImportResultResponse.RowError(rowNum, username, "Email đã tồn tại: " + email));
+        continue;
+      }
+
+      Instant now = Instant.now();
+      User user =
+          User.builder()
+              .username(username)
+              .email(email)
+              .passwordHash(passwordEncoder.encode(password))
+              .fullName(fullName.trim())
+              .facultyId(facultyId)
+              .status(status)
+              .tokenVersion(0L)
+              .roles(parsedRoles)
+              .createdAt(now)
+              .updatedAt(now)
+              .build();
+      try {
+        userRepository.save(user);
+        successCount++;
+      } catch (DuplicateKeyException ex) {
+        errors.add(
+            new CsvImportResultResponse.RowError(
+                rowNum, username, "Tên đăng nhập hoặc email bị trùng trong CSDL"));
+      }
     }
-    return assignments.stream().anyMatch(ra -> ra != null && Role.ADMIN.equals(ra.getRole()));
+
+    return CsvImportResultResponse.builder()
+        .totalRows(totalRows)
+        .successCount(successCount)
+        .failureCount(errors.size())
+        .errors(errors)
+        .build();
+  }
+
+  private List<Role> parseUserRoles(String rawRoles) {
+    if (rawRoles == null || rawRoles.isBlank()) {
+      return List.of();
+    }
+    Set<Role> distinct = new LinkedHashSet<>();
+    for (String token : rawRoles.split("[;|]")) {
+      String trimmed = token.trim();
+      if (trimmed.isEmpty()) {
+        continue;
+      }
+      try {
+        distinct.add(Role.valueOf(trimmed.toUpperCase(Locale.ROOT)));
+      } catch (IllegalArgumentException ex) {
+        return null;
+      }
+    }
+    return new ArrayList<>(distinct);
+  }
+
+  private boolean hasAdminRole(List<Role> roles) {
+    return roles != null && roles.contains(Role.ADMIN);
   }
 }

@@ -10,14 +10,12 @@ import com.hcmute.lms.lmsapi.document.Course;
 import com.hcmute.lms.lmsapi.document.Faculty;
 import com.hcmute.lms.lmsapi.document.Program;
 import com.hcmute.lms.lmsapi.document.User;
-import com.hcmute.lms.lmsapi.document.UserScope;
 import com.hcmute.lms.lmsapi.dto.SyllabusStatusUpdateRequest;
 import com.hcmute.lms.lmsapi.enums.Role;
 import com.hcmute.lms.lmsapi.enums.SyllabusStatus;
 import com.hcmute.lms.lmsapi.testsupport.IntegrationTestBase;
 import com.jayway.jsonpath.JsonPath;
 import java.nio.charset.StandardCharsets;
-import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -35,14 +33,7 @@ class ProgramAndSyllabusImportIntegrationTest extends IntegrationTestBase {
 
   @BeforeEach
   void setUpUsersAndFixtures() {
-    Faculty faculty =
-        mongo()
-            .save(
-                Faculty.builder()
-                    .code(fixtures.code("FAC"))
-                    .name("Khoa Import Test")
-                    .isActive(true)
-                    .build());
+    Faculty faculty = fixtures.faculty();
     program = fixtures.program();
     program.setFacultyId(faculty.getId());
     program = mongo().save(program);
@@ -51,15 +42,12 @@ class ProgramAndSyllabusImportIntegrationTest extends IntegrationTestBase {
     course.setFacultyId(faculty.getId());
     course = mongo().save(course);
 
-    User pmUser =
-        fixtures.user(
-            Role.PROGRAM_MANAGER, UserScope.builder().programIds(List.of(program.getId())).build());
+    User pmUser = fixtures.user(Role.PROGRAM_MANAGER);
     pmUser.setFacultyId(faculty.getId());
     pmUser = mongo().save(pmUser);
     pmToken = fixtures.bearer(pmUser);
 
-    UserScope lecturerScope = UserScope.builder().courseIds(List.of(course.getId())).build();
-    lecturerToken = fixtures.bearerFor(Role.LECTURER, lecturerScope);
+    lecturerToken = fixtures.bearerFor(Role.LECTURER);
   }
 
   @Test
@@ -131,7 +119,7 @@ class ProgramAndSyllabusImportIntegrationTest extends IntegrationTestBase {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.verificationStatus").value("VERIFIED"));
 
-    // Phiên bản đã ACTIVE thì không được import đè nữa (422)
+    // Phiên bản đang ACTIVE vẫn cho phép import đè (chỉ ARCHIVED mới bị khóa 422)
     mockMvc
         .perform(
             multipart("/api/v1/program-versions/import")
@@ -139,7 +127,7 @@ class ProgramAndSyllabusImportIntegrationTest extends IntegrationTestBase {
                 .param("programId", program.getId())
                 .param("version", "2026.1")
                 .header(HttpHeaders.AUTHORIZATION, pmToken))
-        .andExpect(status().isUnprocessableEntity());
+        .andExpect(status().isOk());
 
     // 4. Đọc dữ liệu đã import qua GET API
     mockMvc
@@ -237,5 +225,109 @@ class ProgramAndSyllabusImportIntegrationTest extends IntegrationTestBase {
                 syllabusId))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.status").value("CONFIRMED"));
+  }
+
+  @Test
+  @DisplayName(
+      "Import PLO/PI kèm trình độ năng lực & category + Import khung học phần theo học kỳ/tiên quyết")
+  void importEnrichedPloPiAndProgramCoursesCurriculum() throws Exception {
+    Course prereqCourse = fixtures.course();
+    Course prevCourse = fixtures.course();
+
+    // 1. Import PLO/PI có ploCapabilityLevel, ploCategory, piCapabilityLevel
+    String enrichedProgramCsv =
+        "ploCode,ploName,ploPassThreshold,ploDisplayOrder,ploCapabilityLevel,ploCategory,piCode,piName,piWeight,piPassThreshold,piCapabilityLevel,courseCodes\n"
+            + "PLO1,Kiến thức nền tảng,0.6,1,4,SPECIALIZED,PI1.1,Phân tích hệ thống,1.0,0.6,4,"
+            + course.getCode()
+            + "\n";
+    MockMultipartFile programFile =
+        new MockMultipartFile(
+            "file",
+            "ctdt-enriched.csv",
+            "text/csv",
+            enrichedProgramCsv.getBytes(StandardCharsets.UTF_8));
+
+    MvcResult pvRes =
+        mockMvc
+            .perform(
+                multipart("/api/v1/program-versions/import")
+                    .file(programFile)
+                    .param("programId", program.getId())
+                    .param("version", "2026.2")
+                    .param("totalCredits", "126")
+                    .param("durationYears", "4.0")
+                    .param("applicableCohort", "K2024")
+                    .header(HttpHeaders.AUTHORIZATION, pmToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.totalCredits").value(126))
+            .andExpect(jsonPath("$.durationYears").value(4.0))
+            .andExpect(jsonPath("$.applicableCohort").value("K2024"))
+            .andExpect(jsonPath("$.plos[0].capabilityLevelRaw").value(4))
+            .andExpect(jsonPath("$.plos[0].category").value("SPECIALIZED"))
+            .andExpect(jsonPath("$.pis[0].capabilityLevelRaw").value(4))
+            .andReturn();
+
+    String pvId = JsonPath.read(pvRes.getResponse().getContentAsString(), "$.programVersionId");
+
+    // 2. Tải template khung học phần
+    mockMvc
+        .perform(getAs(pmToken, "/api/v1/program-versions/{id}/courses/import-template", pvId))
+        .andExpect(status().isOk())
+        .andExpect(
+            header()
+                .string(
+                    HttpHeaders.CONTENT_DISPOSITION,
+                    org.hamcrest.Matchers.containsString("program-courses-template.csv")));
+
+    // 3. Import khung học phần theo học kỳ, môn học trước & tiên quyết
+    String coursesCsv =
+        "courseCode,semester,credits,type,category,previousCourseCodes,prerequisiteCourseCodes\n"
+            + prevCourse.getCode()
+            + ",1,3,COMPULSORY,FOUNDATION,,\n"
+            + prereqCourse.getCode()
+            + ",2,3,COMPULSORY,MAJOR_FOUNDATION,,\n"
+            + course.getCode()
+            + ",4,4,ELECTIVE,SPECIALIZED,"
+            + prevCourse.getCode()
+            + ","
+            + prereqCourse.getCode()
+            + "\n";
+    MockMultipartFile coursesFile =
+        new MockMultipartFile(
+            "file", "program-courses.csv", "text/csv", coursesCsv.getBytes(StandardCharsets.UTF_8));
+
+    // LECTURER bị 403
+    mockMvc
+        .perform(
+            multipart("/api/v1/program-versions/{id}/courses/import", pvId)
+                .file(coursesFile)
+                .header(HttpHeaders.AUTHORIZATION, lecturerToken))
+        .andExpect(status().isForbidden());
+
+    mockMvc
+        .perform(
+            multipart("/api/v1/program-versions/{id}/courses/import", pvId)
+                .file(coursesFile)
+                .header(HttpHeaders.AUTHORIZATION, pmToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.importedCount").value(2))
+        .andExpect(jsonPath("$.updatedCount").value(1))
+        .andExpect(jsonPath("$.courses", hasSize(3)));
+
+    // Kiểm tra chi tiết học phần đã cập nhật semester, type, category, previous, prerequisite
+    mockMvc
+        .perform(
+            getAs(
+                lecturerToken,
+                "/api/v1/program-versions/{pvId}/courses/{courseId}",
+                pvId,
+                course.getId()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.semester").value(4))
+        .andExpect(jsonPath("$.credits").value(4))
+        .andExpect(jsonPath("$.type").value("ELECTIVE"))
+        .andExpect(jsonPath("$.category").value("SPECIALIZED"))
+        .andExpect(jsonPath("$.previousCourseIds[0]").value(prevCourse.getId()))
+        .andExpect(jsonPath("$.prerequisiteCourseIds[0]").value(prereqCourse.getId()));
   }
 }

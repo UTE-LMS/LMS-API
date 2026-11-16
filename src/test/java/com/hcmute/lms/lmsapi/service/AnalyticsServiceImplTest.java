@@ -15,12 +15,10 @@ import com.hcmute.lms.lmsapi.document.CourseSection;
 import com.hcmute.lms.lmsapi.document.Enrollment;
 import com.hcmute.lms.lmsapi.document.Plo;
 import com.hcmute.lms.lmsapi.document.ProgramCourse;
-import com.hcmute.lms.lmsapi.document.RoleAssignment;
 import com.hcmute.lms.lmsapi.document.Student;
 import com.hcmute.lms.lmsapi.document.StudentResult;
 import com.hcmute.lms.lmsapi.document.Term;
 import com.hcmute.lms.lmsapi.document.User;
-import com.hcmute.lms.lmsapi.document.UserScope;
 import com.hcmute.lms.lmsapi.dto.UserPrincipal;
 import com.hcmute.lms.lmsapi.dto.analytics.AnalyticsMatrixResponse;
 import com.hcmute.lms.lmsapi.dto.analytics.AnalyticsQueryRequest;
@@ -107,52 +105,25 @@ class AnalyticsServiceImplTest {
         UserPrincipal.builder()
             .id("user_admin")
             .username("admin")
-            .roleAssignments(
-                List.of(
-                    RoleAssignment.builder()
-                        .role(Role.ADMIN)
-                        .scope(UserScope.builder().build())
-                        .build()))
+            .roles(List.of(Role.ADMIN))
             .build();
 
     qaPrincipal =
-        UserPrincipal.builder()
-            .id("user_qa")
-            .username("qa")
-            .roleAssignments(
-                List.of(
-                    RoleAssignment.builder()
-                        .role(Role.QA)
-                        .scope(UserScope.builder().build())
-                        .build()))
-            .build();
+        UserPrincipal.builder().id("user_qa").username("qa").roles(List.of(Role.QA)).build();
 
     pmPrincipal =
         UserPrincipal.builder()
             .id("user_pm")
             .username("pm")
-            .roleAssignments(
-                List.of(
-                    RoleAssignment.builder()
-                        .role(Role.PROGRAM_MANAGER)
-                        .scope(
-                            UserScope.builder()
-                                .programIds(List.of("prog_1"))
-                                .courseIds(List.of("course_1"))
-                                .build())
-                        .build()))
+            .facultyId("fac_1")
+            .roles(List.of(Role.PROGRAM_MANAGER))
             .build();
 
     lecturerPrincipal =
         UserPrincipal.builder()
             .id("user_lecturer")
             .username("lecturer")
-            .roleAssignments(
-                List.of(
-                    RoleAssignment.builder()
-                        .role(Role.LECTURER)
-                        .scope(UserScope.builder().sectionIds(List.of("sec_1")).build())
-                        .build()))
+            .roles(List.of(Role.LECTURER))
             .build();
 
     successRun =

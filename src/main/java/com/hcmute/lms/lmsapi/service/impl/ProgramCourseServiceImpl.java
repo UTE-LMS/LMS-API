@@ -2,11 +2,15 @@ package com.hcmute.lms.lmsapi.service.impl;
 
 import com.hcmute.lms.lmsapi.document.Course;
 import com.hcmute.lms.lmsapi.document.ProgramCourse;
+import com.hcmute.lms.lmsapi.document.ProgramVersion;
+import com.hcmute.lms.lmsapi.dto.AssessmentScoreTemplate;
+import com.hcmute.lms.lmsapi.dto.ProgramCourseCsvImportResponse;
 import com.hcmute.lms.lmsapi.dto.ProgramCourseRequest;
 import com.hcmute.lms.lmsapi.dto.ProgramCourseResponse;
 import com.hcmute.lms.lmsapi.dto.ProgramCourseUpdateRequest;
 import com.hcmute.lms.lmsapi.enums.CourseCategory;
 import com.hcmute.lms.lmsapi.enums.CourseType;
+import com.hcmute.lms.lmsapi.enums.ProgramVersionStatus;
 import com.hcmute.lms.lmsapi.exception.AppException;
 import com.hcmute.lms.lmsapi.exception.BusinessRuleViolationException;
 import com.hcmute.lms.lmsapi.exception.ErrorCode;
@@ -17,10 +21,14 @@ import com.hcmute.lms.lmsapi.repository.ProgramCourseRepository;
 import com.hcmute.lms.lmsapi.repository.ProgramVersionRepository;
 import com.hcmute.lms.lmsapi.service.ProgramCourseService;
 import com.hcmute.lms.lmsapi.util.ObjectIdUtils;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +36,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 @Slf4j
 @Service
@@ -276,6 +285,223 @@ public class ProgramCourseServiceImpl implements ProgramCourseService {
             "Học phần không thể đồng thời vừa là học phần tiên quyết vừa là học phần học trước: "
                 + prereqId);
       }
+    }
+  }
+
+  @Override
+  public AssessmentScoreTemplate generateTemplateCsv() {
+    String csv =
+        "\uFEFF"
+            + "courseCode,semester,credits,type,category,previousCourseCodes,prerequisiteCourseCodes\r\n"
+            + "INFI130110,1,3,COMPULSORY,MAJOR_FOUNDATION,,\r\n"
+            + "DANA230410,3,3,COMPULSORY,SPECIALIZED,FUBY323808;DMSY233208,\r\n";
+    return new AssessmentScoreTemplate(
+        "program-courses-template.csv", csv.getBytes(StandardCharsets.UTF_8));
+  }
+
+  @Override
+  public ProgramCourseCsvImportResponse importProgramCoursesCsv(
+      String programVersionId, MultipartFile file) {
+    ObjectIdUtils.requireValid(programVersionId, "programVersionId");
+    ProgramVersion pv =
+        programVersionRepository
+            .findById(programVersionId)
+            .orElseThrow(
+                () -> new ResourceNotFoundException("ProgramVersion", "id", programVersionId));
+    if (pv.getStatus() == ProgramVersionStatus.ARCHIVED) {
+      throw new BusinessRuleViolationException(
+          "Không thể import khung học phần khi phiên bản CTĐT đã lưu trữ (ARCHIVED)");
+    }
+
+    CsvTextParser.ParsedCsv parsed = CsvTextParser.read(file);
+    CsvTextParser.requireColumns(parsed.headerIndex(), "courseCode");
+
+    Map<String, ProgramCourse> existingByCourseId =
+        programCourseRepository
+            .findByProgramVersionIdOrderBySemesterAscCourseIdAsc(programVersionId)
+            .stream()
+            .collect(
+                Collectors.toMap(ProgramCourse::getCourseId, Function.identity(), (a, b) -> a));
+    Map<String, Course> courseCache = new LinkedHashMap<>();
+    List<String> warnings = new ArrayList<>();
+    List<ProgramCourse> toSave = new ArrayList<>();
+    List<Course> savedCourses = new ArrayList<>();
+    int importedCount = 0;
+    int updatedCount = 0;
+
+    for (int i = 0; i < parsed.rows().size(); i++) {
+      int rowNum = i + 2;
+      List<String> row = parsed.rows().get(i);
+      String courseCode = CsvTextParser.cell(parsed.headerIndex(), row, "courseCode");
+      if (courseCode.isEmpty()) {
+        throw new BusinessRuleViolationException(
+            "Dòng " + rowNum + ": courseCode không được để trống");
+      }
+
+      Course course = resolveCourseByCode(courseCode, courseCache);
+      if (course == null) {
+        warnings.add(
+            "Dòng " + rowNum + ": Không tìm thấy học phần mã " + courseCode + "; đã bỏ qua.");
+        continue;
+      }
+
+      Integer semester =
+          parsePositiveInt(
+              CsvTextParser.cell(parsed.headerIndex(), row, "semester"), "semester", rowNum);
+      Integer credits =
+          parsePositiveInt(
+              CsvTextParser.cell(parsed.headerIndex(), row, "credits"), "credits", rowNum);
+      if (credits == null) {
+        credits = course.getCredits();
+      }
+      CourseType type =
+          parseEnum(
+              CsvTextParser.cell(parsed.headerIndex(), row, "type"),
+              CourseType.class,
+              "type",
+              rowNum);
+      CourseCategory category =
+          parseEnum(
+              CsvTextParser.cell(parsed.headerIndex(), row, "category"),
+              CourseCategory.class,
+              "category",
+              rowNum);
+
+      List<String> previousIds =
+          resolveRelatedCourseIds(
+              CsvTextParser.cell(parsed.headerIndex(), row, "previousCourseCodes"),
+              course.getId(),
+              "học trước",
+              rowNum,
+              courseCache,
+              warnings);
+      List<String> prerequisiteIds =
+          resolveRelatedCourseIds(
+              CsvTextParser.cell(parsed.headerIndex(), row, "prerequisiteCourseCodes"),
+              course.getId(),
+              "tiên quyết",
+              rowNum,
+              courseCache,
+              warnings);
+      validateNoPrerequisiteAndPreviousConflict(prerequisiteIds, previousIds);
+
+      ProgramCourse pc = existingByCourseId.get(course.getId());
+      if (pc == null) {
+        pc =
+            ProgramCourse.builder()
+                .programVersionId(programVersionId)
+                .courseId(course.getId())
+                .build();
+        importedCount++;
+      } else {
+        updatedCount++;
+      }
+      pc.setSemester(semester);
+      pc.setCredits(credits);
+      pc.setType(type);
+      pc.setCategory(category);
+      pc.setPreviousCourseIds(previousIds);
+      pc.setPrerequisiteCourseIds(prerequisiteIds);
+      existingByCourseId.put(course.getId(), pc);
+      toSave.add(pc);
+      savedCourses.add(course);
+    }
+
+    List<ProgramCourse> saved = programCourseRepository.saveAll(toSave);
+    List<ProgramCourseResponse> responses = new ArrayList<>();
+    for (int i = 0; i < saved.size(); i++) {
+      responses.add(programCourseMapper.toResponse(saved.get(i), savedCourses.get(i)));
+    }
+
+    return ProgramCourseCsvImportResponse.builder()
+        .programVersionId(programVersionId)
+        .importedCount(importedCount)
+        .updatedCount(updatedCount)
+        .warnings(warnings)
+        .courses(responses)
+        .build();
+  }
+
+  private Course resolveCourseByCode(String code, Map<String, Course> cache) {
+    if (cache.containsKey(code)) {
+      return cache.get(code);
+    }
+    Optional<Course> found = courseRepository.findByCode(code);
+    Course resolved = found.orElse(null);
+    cache.put(code, resolved);
+    return resolved;
+  }
+
+  private List<String> resolveRelatedCourseIds(
+      String rawCodes,
+      String selfCourseId,
+      String relationLabel,
+      int rowNum,
+      Map<String, Course> cache,
+      List<String> warnings) {
+    if (rawCodes == null || rawCodes.isEmpty()) {
+      return new ArrayList<>();
+    }
+    List<String> ids = new ArrayList<>();
+    LinkedHashSet<String> seen = new LinkedHashSet<>();
+    for (String token : rawCodes.split("[;|]")) {
+      String code = token.trim();
+      if (code.isEmpty()) {
+        continue;
+      }
+      Course related = resolveCourseByCode(code, cache);
+      if (related == null) {
+        warnings.add(
+            "Dòng "
+                + rowNum
+                + ": Không tìm thấy học phần "
+                + relationLabel
+                + " mã "
+                + code
+                + "; đã bỏ qua.");
+        continue;
+      }
+      if (related.getId().equals(selfCourseId)) {
+        throw new BusinessRuleViolationException(
+            "Dòng "
+                + rowNum
+                + ": Học phần không thể tự tham chiếu chính nó làm môn "
+                + relationLabel);
+      }
+      if (seen.add(related.getId())) {
+        ids.add(related.getId());
+      }
+    }
+    return ids;
+  }
+
+  private Integer parsePositiveInt(String raw, String fieldLabel, int rowNum) {
+    if (raw == null || raw.isEmpty()) {
+      return null;
+    }
+    try {
+      int val = Integer.parseInt(raw);
+      if (val < 1) {
+        throw new BusinessRuleViolationException(
+            "Dòng " + rowNum + ": " + fieldLabel + " phải >= 1, nhận được " + raw);
+      }
+      return val;
+    } catch (NumberFormatException ex) {
+      throw new BusinessRuleViolationException(
+          "Dòng " + rowNum + ": giá trị số nguyên không hợp lệ cho " + fieldLabel + ": " + raw);
+    }
+  }
+
+  private <E extends Enum<E>> E parseEnum(
+      String raw, Class<E> enumType, String fieldLabel, int rowNum) {
+    if (raw == null || raw.isEmpty()) {
+      return null;
+    }
+    try {
+      return Enum.valueOf(enumType, raw.trim().toUpperCase(Locale.ROOT));
+    } catch (IllegalArgumentException ex) {
+      throw new BusinessRuleViolationException(
+          "Dòng " + rowNum + ": giá trị không hợp lệ cho " + fieldLabel + ": " + raw);
     }
   }
 

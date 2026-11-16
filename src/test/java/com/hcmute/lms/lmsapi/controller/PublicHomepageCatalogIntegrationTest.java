@@ -22,7 +22,6 @@ import com.hcmute.lms.lmsapi.enums.CourseType;
 import com.hcmute.lms.lmsapi.enums.ProgramVersionStatus;
 import com.hcmute.lms.lmsapi.enums.SyllabusStatus;
 import com.hcmute.lms.lmsapi.testsupport.IntegrationTestBase;
-import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -33,22 +32,8 @@ class PublicHomepageCatalogIntegrationTest extends IntegrationTestBase {
   @Test
   @DisplayName("Người dùng chưa đăng nhập xem được danh mục công khai và lọc đa chiều chính xác")
   void anonymousUserCanBrowseAndFilterPublicCatalog() throws Exception {
-    Faculty fit =
-        mongo()
-            .save(
-                Faculty.builder()
-                    .code(fixtures.code("FIT"))
-                    .name("Khoa CNTT")
-                    .isActive(true)
-                    .build());
-    Faculty math =
-        mongo()
-            .save(
-                Faculty.builder()
-                    .code(fixtures.code("MATH"))
-                    .name("Khoa Toan")
-                    .isActive(true)
-                    .build());
+    Faculty fit = fixtures.faculty();
+    Faculty math = fixtures.faculty();
 
     Program itProg = fixtures.program();
     itProg.setFacultyId(fit.getId());
@@ -65,12 +50,12 @@ class PublicHomepageCatalogIntegrationTest extends IntegrationTestBase {
 
     ProgramVersion itV2025 = fixtures.programVersion(itProg, ProgramVersionStatus.ACTIVE);
     itV2025.setVersion("2025.1");
-    itV2025.setApplicableCohorts(List.of("K2025", "K2026"));
+    itV2025.setApplicableCohort("K2025");
     itV2025 = mongo().save(itV2025);
 
     ProgramVersion itV2020 = fixtures.programVersion(itProg, ProgramVersionStatus.ARCHIVED);
     itV2020.setVersion("2020.1");
-    itV2020.setApplicableCohorts(List.of("K2020"));
+    itV2020.setApplicableCohort("K2020");
     mongo().save(itV2020);
 
     Course javaCourse = fixtures.course();
@@ -205,14 +190,7 @@ class PublicHomepageCatalogIntegrationTest extends IntegrationTestBase {
   @Test
   @DisplayName("Endpoint nhạy cảm và thao tác ghi vẫn yêu cầu xác thực (401)")
   void protectedEndpointsStillRequireAuthentication() throws Exception {
-    Faculty faculty =
-        mongo()
-            .save(
-                Faculty.builder()
-                    .code(fixtures.code("PROT"))
-                    .name("Khoa Bảo vệ")
-                    .isActive(true)
-                    .build());
+    Faculty faculty = fixtures.faculty();
     Course course = fixtures.course();
 
     mockMvc

@@ -11,7 +11,6 @@ import com.hcmute.lms.lmsapi.document.CourseSection;
 import com.hcmute.lms.lmsapi.document.Student;
 import com.hcmute.lms.lmsapi.document.Term;
 import com.hcmute.lms.lmsapi.document.User;
-import com.hcmute.lms.lmsapi.document.UserScope;
 import com.hcmute.lms.lmsapi.enums.EnrollmentStatus;
 import com.hcmute.lms.lmsapi.enums.Role;
 import com.hcmute.lms.lmsapi.enums.SectionStatus;
@@ -44,11 +43,11 @@ class EnrollmentImportIntegrationTest extends IntegrationTestBase {
   void setUpFixtures() {
     course = fixtures.course();
     term = fixtures.term();
-    User lecturer = fixtures.user(Role.LECTURER, UserScope.builder().build());
-    User otherLecturer = fixtures.user(Role.LECTURER, UserScope.builder().build());
+    User lecturer = fixtures.user(Role.LECTURER);
+    User otherLecturer = fixtures.user(Role.LECTURER);
     section = newSection(lecturer);
 
-    adminToken = fixtures.bearerFor(Role.ADMIN, UserScope.builder().build());
+    adminToken = fixtures.bearerFor(Role.ADMIN);
     lecturerToken = fixtures.bearer(lecturer);
     otherLecturerToken = fixtures.bearer(otherLecturer);
   }
@@ -166,7 +165,7 @@ class EnrollmentImportIntegrationTest extends IntegrationTestBase {
   void us20_ac1_existingStudentIsReusedAcrossSections() throws Exception {
     String shared = fixtures.code("STU");
     String onlyInSecond = fixtures.code("STU");
-    User lecturer2 = fixtures.user(Role.LECTURER, UserScope.builder().build());
+    User lecturer2 = fixtures.user(Role.LECTURER);
     CourseSection second = newSection(lecturer2);
 
     mockMvc
@@ -292,15 +291,7 @@ class EnrollmentImportIntegrationTest extends IntegrationTestBase {
         .andExpect(status().isForbidden());
     // PROGRAM_MANAGER chỉ xem, không nhập danh sách lớp
     mockMvc
-        .perform(
-            importAs(
-                fixtures.bearerFor(
-                    Role.PROGRAM_MANAGER,
-                    UserScope.builder()
-                        .sectionIds(new java.util.ArrayList<>(List.of(section.getId())))
-                        .build()),
-                section.getId(),
-                csv))
+        .perform(importAs(fixtures.bearerFor(Role.PROGRAM_MANAGER), section.getId(), csv))
         .andExpect(status().isForbidden());
 
     mockMvc

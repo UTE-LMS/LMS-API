@@ -5,7 +5,6 @@ import static org.hamcrest.Matchers.hasItem;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.hcmute.lms.lmsapi.document.RoleAssignment;
 import com.hcmute.lms.lmsapi.document.User;
 import com.hcmute.lms.lmsapi.dto.CreateUserRequest;
 import com.hcmute.lms.lmsapi.dto.LoginRequest;
@@ -59,7 +58,7 @@ class UserApiBoundaryIntegrationTest extends IntegrationTestBase {
         .email(username + "@itest.invalid")
         .password(VALID_PASSWORD)
         .fullName(ApiTestFixtures.LABEL + " " + username)
-        .roleAssignments(List.of(RoleAssignment.builder().role(Role.QA).build()))
+        .roles(List.of(Role.QA))
         .build();
   }
 
@@ -110,7 +109,7 @@ class UserApiBoundaryIntegrationTest extends IntegrationTestBase {
         UpdateUserRequest.builder()
             .email("changed@itest.invalid")
             .fullName("changed")
-            .roleAssignments(List.of(RoleAssignment.builder().role(Role.ADMIN).build()))
+            .roles(List.of(Role.ADMIN))
             .build();
 
     mockMvc.perform(getAs(bearer, USERS)).andExpect(status().isForbidden());
@@ -129,9 +128,7 @@ class UserApiBoundaryIntegrationTest extends IntegrationTestBase {
     User stored = mongo().findById(target.getId(), User.class);
     assertThat(stored.getStatus()).isEqualTo(UserStatus.ACTIVE);
     assertThat(stored.getTokenVersion()).isZero();
-    assertThat(stored.getRoleAssignments())
-        .extracting(RoleAssignment::getRole)
-        .containsExactly(Role.LECTURER);
+    assertThat(stored.getRoles()).containsExactly(Role.LECTURER);
   }
 
   // ------------------------------------------------------------------ US-02/AC-1: ranh giới
@@ -237,7 +234,7 @@ class UserApiBoundaryIntegrationTest extends IntegrationTestBase {
             + username
             + "@itest.invalid\",\"password\":\""
             + VALID_PASSWORD
-            + "\",\"fullName\":\"x\",\"roleAssignments\":[{\"role\":\"QA\"}],"
+            + "\",\"fullName\":\"x\",\"roles\":[\"QA\"],"
             + "\"status\":\"LOCKED\",\"tokenVersion\":99,\"passwordHash\":\"chu-nghia-gia\","
             + "\"id\":\""
             + forgedId
@@ -261,15 +258,14 @@ class UserApiBoundaryIntegrationTest extends IntegrationTestBase {
   }
 
   @Test
-  @DisplayName(
-      "US-02/AC-1 (âm): roleAssignments rỗng/null, vai trò lạ, email sai, thiếu họ tên -> 400")
+  @DisplayName("US-02/AC-1 (âm): roles rỗng/null, vai trò lạ, email sai, thiếu họ tên -> 400")
   void createUserValidation() throws Exception {
     CreateUserRequest noRoles = createRequest(fixtures.username("v"));
-    noRoles.setRoleAssignments(List.of());
+    noRoles.setRoles(List.of());
     mockMvc
         .perform(postAs(admin, USERS, noRoles))
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.fieldErrors[*].field", hasItem("roleAssignments")));
+        .andExpect(jsonPath("$.fieldErrors[*].field", hasItem("roles")));
 
     String name = fixtures.username("v");
     String unknownRole =
@@ -281,7 +277,7 @@ class UserApiBoundaryIntegrationTest extends IntegrationTestBase {
             + "\"password\":\""
             + VALID_PASSWORD
             + "\",\"fullName\":\"x\","
-            + "\"roleAssignments\":[{\"role\":\"SUPERUSER\"}]}";
+            + "\"roles\":[\"SUPERUSER\"]}";
     mockMvc.perform(postAs(admin, USERS, unknownRole)).andExpect(status().isBadRequest());
 
     for (String badEmail : new String[] {"khong-co-a-cong", "a b@c.d", "a@"}) {
@@ -330,7 +326,7 @@ class UserApiBoundaryIntegrationTest extends IntegrationTestBase {
         UpdateUserRequest.builder()
             .email("a@itest.invalid")
             .fullName("x")
-            .roleAssignments(List.of(RoleAssignment.builder().role(Role.QA).build()))
+            .roles(List.of(Role.QA))
             .build();
     mockMvc
         .perform(getAs(admin, USER_BY_ID, id))

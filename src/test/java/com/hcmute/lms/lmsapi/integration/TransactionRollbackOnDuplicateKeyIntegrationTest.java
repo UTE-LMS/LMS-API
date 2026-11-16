@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.hcmute.lms.lmsapi.document.AuditEntity;
 import com.hcmute.lms.lmsapi.document.AuditLog;
-import com.hcmute.lms.lmsapi.document.RoleAssignment;
 import com.hcmute.lms.lmsapi.document.User;
 import com.hcmute.lms.lmsapi.enums.AuditAction;
 import com.hcmute.lms.lmsapi.enums.Role;
@@ -106,7 +105,7 @@ class TransactionRollbackOnDuplicateKeyIntegrationTest extends IntegrationTestBa
           .passwordHash("not-a-real-hash")
           .fullName("[DỮ LIỆU THỬ NGHIỆM] " + username)
           .status(UserStatus.ACTIVE)
-          .roleAssignments(List.of(RoleAssignment.builder().role(Role.QA).build()))
+          .roles(List.of(Role.QA))
           .createdAt(now)
           .updatedAt(now)
           .build();

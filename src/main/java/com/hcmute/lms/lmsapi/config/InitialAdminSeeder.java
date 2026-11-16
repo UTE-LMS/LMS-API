@@ -1,6 +1,5 @@
 package com.hcmute.lms.lmsapi.config;
 
-import com.hcmute.lms.lmsapi.document.RoleAssignment;
 import com.hcmute.lms.lmsapi.document.User;
 import com.hcmute.lms.lmsapi.enums.Role;
 import com.hcmute.lms.lmsapi.enums.UserStatus;
@@ -97,7 +96,7 @@ public class InitialAdminSeeder implements ApplicationRunner {
             .fullName("System Administrator")
             .status(UserStatus.ACTIVE)
             .tokenVersion(0L)
-            .roleAssignments(List.of(RoleAssignment.builder().role(Role.ADMIN).scope(null).build()))
+            .roles(List.of(Role.ADMIN))
             .createdAt(now)
             .updatedAt(now)
             .build();

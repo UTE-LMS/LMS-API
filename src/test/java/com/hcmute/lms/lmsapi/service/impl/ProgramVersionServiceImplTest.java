@@ -19,7 +19,6 @@ import com.hcmute.lms.lmsapi.exception.ErrorCode;
 import com.hcmute.lms.lmsapi.mapper.ProgramVersionMapper;
 import com.hcmute.lms.lmsapi.repository.ProgramRepository;
 import com.hcmute.lms.lmsapi.repository.ProgramVersionRepository;
-import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -47,7 +46,7 @@ class ProgramVersionServiceImplTest {
         .version("2026")
         .totalCredits(130)
         .durationYears(4.0)
-        .applicableCohorts(List.of("K26"))
+        .applicableCohort("K26")
         .build();
   }
 
@@ -82,8 +81,8 @@ class ProgramVersionServiceImplTest {
   }
 
   @Test
-  @DisplayName("Tạo phiên bản luôn ở DRAFT và chờ xác nhận")
-  void create_success_defaultsDraft() {
+  @DisplayName("Tạo phiên bản mặc định ở ACTIVE và đã xác nhận")
+  void create_success_defaultsActive() {
     when(programRepository.existsById(PROGRAM_ID)).thenReturn(true);
     when(programVersionRepository.existsByProgramIdAndVersion(PROGRAM_ID, "2026"))
         .thenReturn(false);
@@ -98,19 +97,19 @@ class ProgramVersionServiceImplTest {
         .thenReturn(
             ProgramVersionResponse.builder()
                 .id(VERSION_ID)
-                .status(ProgramVersionStatus.DRAFT)
+                .status(ProgramVersionStatus.ACTIVE)
                 .build());
 
     ProgramVersionResponse response = service.createProgramVersion(createRequest());
 
-    assertThat(response.getStatus()).isEqualTo(ProgramVersionStatus.DRAFT);
+    assertThat(response.getStatus()).isEqualTo(ProgramVersionStatus.ACTIVE);
     verify(programVersionRepository).save(any(ProgramVersion.class));
   }
 
   @Test
   @DisplayName("Cập nhật thông tin phiên bản thành công")
   void update_metadata_success() {
-    ProgramVersion version = existing(ProgramVersionStatus.DRAFT);
+    ProgramVersion version = existing(ProgramVersionStatus.ACTIVE);
     when(programVersionRepository.findById(VERSION_ID)).thenReturn(Optional.of(version));
     when(programVersionRepository.save(any(ProgramVersion.class)))
         .thenAnswer(invocation -> invocation.getArgument(0));
@@ -121,7 +120,7 @@ class ProgramVersionServiceImplTest {
                 .version("2026-v2")
                 .totalCredits(135)
                 .durationYears(4.0)
-                .status(ProgramVersionStatus.DRAFT)
+                .status(ProgramVersionStatus.ACTIVE)
                 .build());
 
     ProgramVersionUpdateRequest request =
@@ -129,20 +128,20 @@ class ProgramVersionServiceImplTest {
             .version("2026-v2")
             .totalCredits(135)
             .durationYears(4.0)
-            .applicableCohorts(List.of("K26"))
+            .applicableCohort("K26")
             .build();
 
     ProgramVersionResponse response = service.updateProgramVersion(VERSION_ID, request);
 
     assertThat(response.getVersion()).isEqualTo("2026-v2");
     assertThat(response.getTotalCredits()).isEqualTo(135);
-    assertThat(response.getStatus()).isEqualTo(ProgramVersionStatus.DRAFT);
+    assertThat(response.getStatus()).isEqualTo(ProgramVersionStatus.ACTIVE);
   }
 
   @Test
-  @DisplayName("Chuyển DRAFT sang ACTIVE thành công qua updateProgramVersionStatus")
-  void updateStatus_draftToActive_success() {
-    ProgramVersion version = existing(ProgramVersionStatus.DRAFT);
+  @DisplayName("Chuyển ACTIVE sang ARCHIVED thành công qua updateProgramVersionStatus")
+  void updateStatus_activeToArchived_success() {
+    ProgramVersion version = existing(ProgramVersionStatus.ACTIVE);
     when(programVersionRepository.findById(VERSION_ID)).thenReturn(Optional.of(version));
     when(programVersionRepository.save(any(ProgramVersion.class)))
         .thenAnswer(invocation -> invocation.getArgument(0));
@@ -150,41 +149,28 @@ class ProgramVersionServiceImplTest {
         .thenReturn(
             ProgramVersionResponse.builder()
                 .id(VERSION_ID)
-                .status(ProgramVersionStatus.ACTIVE)
+                .status(ProgramVersionStatus.ARCHIVED)
                 .build());
-
-    ProgramVersionStatusUpdateRequest request =
-        ProgramVersionStatusUpdateRequest.builder().status(ProgramVersionStatus.ACTIVE).build();
-
-    ProgramVersionResponse response = service.updateProgramVersionStatus(VERSION_ID, request);
-
-    assertThat(response.getStatus()).isEqualTo(ProgramVersionStatus.ACTIVE);
-  }
-
-  @Test
-  @DisplayName("Chuyển ACTIVE lùi về DRAFT trả 422")
-  void updateStatus_activeToDraft_businessRule() {
-    when(programVersionRepository.findById(VERSION_ID))
-        .thenReturn(Optional.of(existing(ProgramVersionStatus.ACTIVE)));
-
-    ProgramVersionStatusUpdateRequest request =
-        ProgramVersionStatusUpdateRequest.builder().status(ProgramVersionStatus.DRAFT).build();
-
-    assertThatThrownBy(() -> service.updateProgramVersionStatus(VERSION_ID, request))
-        .isInstanceOf(BusinessRuleViolationException.class);
-    verify(programVersionRepository, never()).save(any());
-  }
-
-  @Test
-  @DisplayName("Bỏ qua ACTIVE để chuyển DRAFT sang ARCHIVED trả 422")
-  void updateStatus_skipActive_businessRule() {
-    when(programVersionRepository.findById(VERSION_ID))
-        .thenReturn(Optional.of(existing(ProgramVersionStatus.DRAFT)));
 
     ProgramVersionStatusUpdateRequest request =
         ProgramVersionStatusUpdateRequest.builder().status(ProgramVersionStatus.ARCHIVED).build();
 
+    ProgramVersionResponse response = service.updateProgramVersionStatus(VERSION_ID, request);
+
+    assertThat(response.getStatus()).isEqualTo(ProgramVersionStatus.ARCHIVED);
+  }
+
+  @Test
+  @DisplayName("Chuyển ARCHIVED lùi về ACTIVE trả 422")
+  void updateStatus_archivedToActive_businessRule() {
+    when(programVersionRepository.findById(VERSION_ID))
+        .thenReturn(Optional.of(existing(ProgramVersionStatus.ARCHIVED)));
+
+    ProgramVersionStatusUpdateRequest request =
+        ProgramVersionStatusUpdateRequest.builder().status(ProgramVersionStatus.ACTIVE).build();
+
     assertThatThrownBy(() -> service.updateProgramVersionStatus(VERSION_ID, request))
         .isInstanceOf(BusinessRuleViolationException.class);
+    verify(programVersionRepository, never()).save(any());
   }
 }

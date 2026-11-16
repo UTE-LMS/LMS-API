@@ -113,8 +113,6 @@ public class ProgramController {
   }
 
   private boolean hasRole(UserPrincipal principal, Role role) {
-    return principal.getRoleAssignments() != null
-        && principal.getRoleAssignments().stream()
-            .anyMatch(ra -> ra != null && ra.getRole() == role);
+    return principal.getRoles() != null && principal.getRoles().contains(role);
   }
 }

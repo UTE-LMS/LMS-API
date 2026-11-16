@@ -195,8 +195,6 @@ public class InitialAdminSeederIdempotencyChallengerTest {
     assertThat(admin.getEmail()).isEqualTo("superadmin@hcmute.edu.vn");
     assertThat(admin.getStatus()).isEqualTo(UserStatus.ACTIVE);
     assertThat(admin.getTokenVersion()).isEqualTo(0L);
-    assertThat(admin.getRoleAssignments()).hasSize(1);
-    assertThat(admin.getRoleAssignments().get(0).getRole()).isEqualTo(Role.ADMIN);
-    assertThat(admin.getRoleAssignments().get(0).getScope()).isNull();
+    assertThat(admin.getRoles()).containsExactly(Role.ADMIN);
   }
 }

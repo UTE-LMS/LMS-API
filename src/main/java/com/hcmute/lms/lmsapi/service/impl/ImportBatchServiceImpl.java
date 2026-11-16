@@ -618,7 +618,6 @@ public class ImportBatchServiceImpl implements ImportBatchService {
 
     if (assessmentBefore == AssessmentStatus.LOCKED) {
       assessment.setStatus(AssessmentStatus.SCORE_ENTERED);
-      assessment.setLocked(true);
       assessmentRepository.save(assessment);
     }
 

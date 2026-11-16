@@ -1,8 +1,6 @@
 package com.hcmute.lms.lmsapi.dto;
 
 import com.hcmute.lms.lmsapi.enums.ProgramVersionStatus;
-import java.util.ArrayList;
-import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -19,7 +17,7 @@ public class ProgramVersionResponse {
   private String version;
   private Integer totalCredits;
   private Double durationYears;
-  @Builder.Default private List<String> applicableCohorts = new ArrayList<>();
+  private String applicableCohort;
   private ProgramVersionStatus status;
   private VerificationResponse verification;
 }

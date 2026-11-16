@@ -9,9 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.hcmute.lms.lmsapi.document.AuditLog;
-import com.hcmute.lms.lmsapi.document.RoleAssignment;
 import com.hcmute.lms.lmsapi.document.User;
-import com.hcmute.lms.lmsapi.document.UserScope;
 import com.hcmute.lms.lmsapi.dto.LoginRequest;
 import com.hcmute.lms.lmsapi.enums.AuditAction;
 import com.hcmute.lms.lmsapi.enums.Role;
@@ -86,15 +84,7 @@ class AuthIntegrationTest {
                 .fullName("[DỮ LIỆU THỬ NGHIỆM] Giảng viên kiểm thử")
                 .status(UserStatus.ACTIVE)
                 .tokenVersion(0L)
-                .roleAssignments(
-                    List.of(
-                        RoleAssignment.builder()
-                            .role(Role.LECTURER)
-                            .scope(
-                                UserScope.builder()
-                                    .sectionIds(List.of("671dcba5f123456789abcdef"))
-                                    .build())
-                            .build()))
+                .roles(List.of(Role.LECTURER))
                 .createdAt(Instant.now())
                 .updatedAt(Instant.now())
                 .build());
@@ -108,7 +98,7 @@ class AuthIntegrationTest {
             .fullName("[DỮ LIỆU THỬ NGHIỆM] Tài khoản bị khóa")
             .status(UserStatus.LOCKED)
             .tokenVersion(0L)
-            .roleAssignments(List.of(RoleAssignment.builder().role(Role.QA).build()))
+            .roles(List.of(Role.QA))
             .createdAt(Instant.now())
             .updatedAt(Instant.now())
             .build());
@@ -159,7 +149,7 @@ class AuthIntegrationTest {
               .andExpect(jsonPath("$.user.username").value(ACTIVE_USERNAME))
               .andExpect(jsonPath("$.user.email").value("test_active@hcmute.edu.vn"))
               .andExpect(jsonPath("$.user.status").value("ACTIVE"))
-              .andExpect(jsonPath("$.user.roleAssignments[0].role").value("LECTURER"))
+              .andExpect(jsonPath("$.user.roles[0]").value("LECTURER"))
               .andReturn();
 
       String token = JsonPath.read(result.getResponse().getContentAsString(), "$.accessToken");
@@ -396,10 +386,7 @@ class AuthIntegrationTest {
           .andExpect(jsonPath("$.username").value(ACTIVE_USERNAME))
           .andExpect(jsonPath("$.email").value("test_active@hcmute.edu.vn"))
           .andExpect(jsonPath("$.status").value("ACTIVE"))
-          .andExpect(jsonPath("$.roleAssignments[0].role").value("LECTURER"))
-          .andExpect(
-              jsonPath("$.roleAssignments[0].scope.sectionIds[0]")
-                  .value("671dcba5f123456789abcdef"));
+          .andExpect(jsonPath("$.roles[0]").value("LECTURER"));
     }
 
     @Test

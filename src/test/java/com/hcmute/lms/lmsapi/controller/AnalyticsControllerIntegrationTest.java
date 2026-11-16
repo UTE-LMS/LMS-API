@@ -14,11 +14,12 @@ import com.hcmute.lms.lmsapi.document.Clo;
 import com.hcmute.lms.lmsapi.document.CloMeasurement;
 import com.hcmute.lms.lmsapi.document.Course;
 import com.hcmute.lms.lmsapi.document.CourseSection;
+import com.hcmute.lms.lmsapi.document.Faculty;
 import com.hcmute.lms.lmsapi.document.Program;
 import com.hcmute.lms.lmsapi.document.ProgramVersion;
 import com.hcmute.lms.lmsapi.document.Syllabus;
 import com.hcmute.lms.lmsapi.document.Term;
-import com.hcmute.lms.lmsapi.document.UserScope;
+import com.hcmute.lms.lmsapi.document.User;
 import com.hcmute.lms.lmsapi.document.Verification;
 import com.hcmute.lms.lmsapi.enums.AggregateScopeType;
 import com.hcmute.lms.lmsapi.enums.CalculationScope;
@@ -139,30 +140,31 @@ class AnalyticsControllerIntegrationTest extends IntegrationTestBase {
                     .build());
     createdAggIds.add(agg1.getId());
 
-    // 6. Tạo tokens cho 4 vai trò
-    adminToken = fixtures.bearerFor(Role.ADMIN, UserScope.builder().build());
-    qaToken = fixtures.bearerFor(Role.QA, UserScope.builder().build());
+    // 6. Tạo tokens cho 4 vai trò (PM phân quyền theo facultyId, LECTURER theo section.lecturerIds)
+    Faculty faculty = fixtures.faculty();
+    program.setFacultyId(faculty.getId());
+    program = mongo().save(program);
+    course.setFacultyId(faculty.getId());
+    course = mongo().save(course);
 
-    // PM được phân công programId của program này
-    pmToken =
-        fixtures.bearerFor(
-            Role.PROGRAM_MANAGER,
-            UserScope.builder()
-                .programIds(List.of(program.getId()))
-                .courseIds(List.of(course.getId()))
-                .build());
+    adminToken = fixtures.bearerFor(Role.ADMIN);
+    qaToken = fixtures.bearerFor(Role.QA);
 
-    // PM khác không có quyền trên program này
-    Program otherProgram = fixtures.program();
-    otherPmToken =
-        fixtures.bearerFor(
-            Role.PROGRAM_MANAGER,
-            UserScope.builder().programIds(List.of(otherProgram.getId())).build());
+    User pmUser = fixtures.user(Role.PROGRAM_MANAGER);
+    pmUser.setFacultyId(faculty.getId());
+    pmUser = mongo().save(pmUser);
+    pmToken = fixtures.bearer(pmUser);
 
-    // Giảng viên phụ trách section1
-    lecturerToken =
-        fixtures.bearerFor(
-            Role.LECTURER, UserScope.builder().sectionIds(List.of(section1.getId())).build());
+    Faculty otherFaculty = fixtures.faculty();
+    User otherPmUser = fixtures.user(Role.PROGRAM_MANAGER);
+    otherPmUser.setFacultyId(otherFaculty.getId());
+    otherPmUser = mongo().save(otherPmUser);
+    otherPmToken = fixtures.bearer(otherPmUser);
+
+    User lecturerUser = fixtures.user(Role.LECTURER);
+    section1.setLecturerIds(List.of(lecturerUser.getId()));
+    section1 = mongo().save(section1);
+    lecturerToken = fixtures.bearer(lecturerUser);
   }
 
   @AfterEach

@@ -122,9 +122,7 @@ public class InitialAdminSeederTest {
     assertThat(created.getStatus()).isEqualTo(UserStatus.ACTIVE);
     assertThat(created.getTokenVersion()).isEqualTo(0L);
     assertThat(created.getFullName()).isEqualTo("System Administrator");
-    assertThat(created.getRoleAssignments()).hasSize(1);
-    assertThat(created.getRoleAssignments().get(0).getRole()).isEqualTo(Role.ADMIN);
-    assertThat(created.getRoleAssignments().get(0).getScope()).isNull();
+    assertThat(created.getRoles()).containsExactly(Role.ADMIN);
     assertThat(created.getCreatedAt()).isNotNull();
     assertThat(created.getUpdatedAt()).isNotNull();
   }

@@ -156,8 +156,7 @@ public class SyllabusServiceImpl implements SyllabusService {
     }
 
     boolean validTransition =
-        (currentStatus == SyllabusStatus.DRAFT && newStatus == SyllabusStatus.CONFIRMED)
-            || (currentStatus == SyllabusStatus.CONFIRMED && newStatus == SyllabusStatus.ARCHIVED);
+        currentStatus == SyllabusStatus.CONFIRMED && newStatus == SyllabusStatus.ARCHIVED;
 
     if (!validTransition) {
       throw new BusinessRuleViolationException(

@@ -7,13 +7,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.hcmute.lms.lmsapi.document.Student;
-import com.hcmute.lms.lmsapi.document.UserScope;
 import com.hcmute.lms.lmsapi.enums.EnrollmentStatus;
 import com.hcmute.lms.lmsapi.enums.Role;
 import com.hcmute.lms.lmsapi.enums.TermStatus;
 import com.hcmute.lms.lmsapi.testsupport.ApiTestFixtures;
 import com.hcmute.lms.lmsapi.testsupport.ScoreImportIntegrationBase;
-import java.util.ArrayList;
 import java.util.List;
 import org.bson.Document;
 import org.junit.jupiter.api.DisplayName;
@@ -284,10 +282,7 @@ class ImportBatchValidateIntegrationTest extends ScoreImportIntegrationBase {
       "Chung: người ngoài lớp không kiểm tra/xem lỗi lô; QA trong phạm vi lớp xem được nhưng không kiểm tra; id lạ -> 403/400")
   void authorizationOnBatchEndpoints() throws Exception {
     String id = uploadAndValidateAllowErrors(csv("NOPE,1,1"));
-    String qa =
-        fixtures.bearerFor(
-            Role.QA,
-            UserScope.builder().sectionIds(new ArrayList<>(List.of(section.getId()))).build());
+    String qa = fixtures.bearerFor(Role.QA);
 
     mockMvc
         .perform(postAction(otherLecturerToken, id, "validate"))

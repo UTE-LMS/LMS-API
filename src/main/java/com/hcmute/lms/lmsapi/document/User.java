@@ -1,5 +1,6 @@
 package com.hcmute.lms.lmsapi.document;
 
+import com.hcmute.lms.lmsapi.enums.Role;
 import com.hcmute.lms.lmsapi.enums.UserStatus;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -73,10 +74,10 @@ public class User {
   @Field(name = "facultyId", targetType = FieldType.OBJECT_ID)
   private String facultyId;
 
-  /** Danh sách phân công vai trò và phạm vi phụ trách của người dùng. */
+  /** Danh sách vai trò của người dùng. */
   @Builder.Default
-  @Field("roleAssignments")
-  private List<RoleAssignment> roleAssignments = new ArrayList<>();
+  @Field("roles")
+  private List<Role> roles = new ArrayList<>();
 
   /** Thời điểm tạo tài khoản. */
   @Field("createdAt")

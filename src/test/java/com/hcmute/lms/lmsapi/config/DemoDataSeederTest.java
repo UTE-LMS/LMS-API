@@ -240,10 +240,10 @@ class DemoDataSeederTest {
 
     ProgramVersion version = findVersion(program);
     assertThat(version.getVersion()).isEqualTo(seeder.versionCode());
-    assertThat(version.getStatus()).isEqualTo(ProgramVersionStatus.DRAFT);
+    assertThat(version.getStatus()).isEqualTo(ProgramVersionStatus.ACTIVE);
     assertThat(version.getTotalCredits()).as("số tín chỉ chưa được cung cấp").isNull();
     assertThat(version.getDurationYears()).isNull();
-    assertThat(version.getApplicableCohorts()).as("Q01 chưa trả lời").isEmpty();
+    assertThat(version.getApplicableCohort()).as("Q01 chưa trả lời").isNull();
     assertThat(version.getVerification().getStatus())
         .isEqualTo(VerificationStatus.NEEDS_CLARIFICATION);
     assertThat(version.getVerification().getNote()).contains(LABEL);
@@ -301,8 +301,7 @@ class DemoDataSeederTest {
           User user = userRepository.findByUsername(seeder.username(suffix)).orElseThrow();
           assertThat(user.getFullName()).startsWith(LABEL);
           assertThat(user.getEmail()).endsWith("@demo.invalid");
-          assertThat(user.getRoleAssignments()).hasSize(1);
-          assertThat(user.getRoleAssignments().get(0).getRole()).isEqualTo(role);
+          assertThat(user.getRoles()).containsExactly(role);
         });
     assertThat(
             mongo.count(

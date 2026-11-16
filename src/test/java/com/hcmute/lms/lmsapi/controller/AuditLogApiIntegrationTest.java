@@ -9,7 +9,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.hcmute.lms.lmsapi.document.AuditEntity;
 import com.hcmute.lms.lmsapi.document.AuditLog;
-import com.hcmute.lms.lmsapi.document.UserScope;
 import com.hcmute.lms.lmsapi.enums.AuditAction;
 import com.hcmute.lms.lmsapi.enums.Role;
 import com.hcmute.lms.lmsapi.support.ApiTestSupport;
@@ -239,7 +238,7 @@ class AuditLogApiIntegrationTest extends IntegrationTestBase {
   @DisplayName("US-04/AC-3: vai trò không phải ADMIN nhận 403")
   void nonAdminRolesAreForbidden() throws Exception {
     for (Role role : new Role[] {Role.PROGRAM_MANAGER, Role.LECTURER, Role.QA}) {
-      String bearer = fixtures.bearerFor(role, UserScope.builder().build());
+      String bearer = fixtures.bearerFor(role);
       ApiTestSupport.expectForbidden(mockMvc, getAs(bearer, URL));
     }
   }

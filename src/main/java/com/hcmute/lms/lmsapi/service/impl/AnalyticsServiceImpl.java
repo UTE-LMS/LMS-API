@@ -9,7 +9,6 @@ import com.hcmute.lms.lmsapi.document.Enrollment;
 import com.hcmute.lms.lmsapi.document.Plo;
 import com.hcmute.lms.lmsapi.document.ProgramCourse;
 import com.hcmute.lms.lmsapi.document.ProgramVersion;
-import com.hcmute.lms.lmsapi.document.RoleAssignment;
 import com.hcmute.lms.lmsapi.document.Student;
 import com.hcmute.lms.lmsapi.document.StudentResult;
 import com.hcmute.lms.lmsapi.document.Term;
@@ -151,19 +150,12 @@ public class AnalyticsServiceImpl implements AnalyticsService {
     if (principal == null) {
       throw new AccessDeniedException("Người dùng chưa được xác thực");
     }
-    List<RoleAssignment> assignments =
-        principal.getRoleAssignments() != null ? principal.getRoleAssignments() : List.of();
-    boolean isAdmin = assignments.stream().anyMatch(ra -> ra != null && ra.getRole() == Role.ADMIN);
-    boolean isQa = assignments.stream().anyMatch(ra -> ra != null && ra.getRole() == Role.QA);
-    boolean hasStrictEmptyQa =
-        assignments.stream()
-            .filter(ra -> ra != null && ra.getRole() == Role.QA)
-            .anyMatch(ra -> ra.getScope() == null || ra.getScope().isEmpty());
-    boolean isPm =
-        assignments.stream().anyMatch(ra -> ra != null && ra.getRole() == Role.PROGRAM_MANAGER);
-    boolean isLecturer =
-        assignments.stream().anyMatch(ra -> ra != null && ra.getRole() == Role.LECTURER);
-    return new RoleFlags(isAdmin, isQa, isAdmin || hasStrictEmptyQa, isPm, isLecturer);
+    List<Role> roles = principal.getRoles() != null ? principal.getRoles() : List.of();
+    boolean isAdmin = roles.contains(Role.ADMIN);
+    boolean isQa = roles.contains(Role.QA);
+    boolean isPm = roles.contains(Role.PROGRAM_MANAGER);
+    boolean isLecturer = roles.contains(Role.LECTURER);
+    return new RoleFlags(isAdmin, isQa, isAdmin || isQa, isPm, isLecturer);
   }
 
   private void verifyScope(AnalyticsQueryRequest request, UserPrincipal principal) {
@@ -379,32 +371,7 @@ public class AnalyticsServiceImpl implements AnalyticsService {
             authorized = true;
           }
         } catch (Exception ignored) {
-          // Tiếp tục kiểm tra đối sánh trực tiếp scope
-        }
-        if (!authorized) {
-          List<String> userProgramIds =
-              principal.getRoleAssignments().stream()
-                  .filter(
-                      ra ->
-                          ra != null
-                              && ra.getRole() == Role.PROGRAM_MANAGER
-                              && ra.getScope() != null)
-                  .map(RoleAssignment::getScope)
-                  .filter(Objects::nonNull)
-                  .flatMap(
-                      s ->
-                          s.getProgramIds() != null
-                              ? s.getProgramIds().stream()
-                              : java.util.stream.Stream.empty())
-                  .filter(Objects::nonNull)
-                  .toList();
-          if (!userProgramIds.isEmpty()) {
-            authorized =
-                programVersionRepository
-                    .findById(pvId)
-                    .map(pv -> userProgramIds.contains(pv.getProgramId()))
-                    .orElse(false);
-          }
+          // Tiếp tục kiểm tra phạm vi học phần nếu có
         }
       }
       if (!authorized && run.getScopeRef() != null && run.getScopeRef().getCourseIds() != null) {
@@ -660,8 +627,8 @@ public class AnalyticsServiceImpl implements AnalyticsService {
     List<String> cohorts = request.getCohorts();
     if (cohorts == null || cohorts.isEmpty()) {
       ProgramVersion pv = programVersionRepository.findById(programVersionId).orElse(null);
-      if (pv != null && pv.getApplicableCohorts() != null && !pv.getApplicableCohorts().isEmpty()) {
-        cohorts = pv.getApplicableCohorts();
+      if (pv != null && pv.getApplicableCohort() != null && !pv.getApplicableCohort().isBlank()) {
+        cohorts = List.of(pv.getApplicableCohort().trim());
       } else {
         cohorts = List.of("K21", "K22", "K23", "K24", "K25");
       }

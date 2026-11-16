@@ -1,5 +1,7 @@
 package com.hcmute.lms.lmsapi.service;
 
+import com.hcmute.lms.lmsapi.dto.AssessmentScoreTemplate;
+import com.hcmute.lms.lmsapi.dto.CsvImportResultResponse;
 import com.hcmute.lms.lmsapi.dto.FacultyAssignPmRequest;
 import com.hcmute.lms.lmsapi.dto.FacultyRequest;
 import com.hcmute.lms.lmsapi.dto.FacultyResponse;
@@ -9,6 +11,7 @@ import com.hcmute.lms.lmsapi.dto.FacultyUpdateRequest;
 import com.hcmute.lms.lmsapi.dto.PageResponse;
 import com.hcmute.lms.lmsapi.dto.UserResponse;
 import java.util.List;
+import org.springframework.web.multipart.MultipartFile;
 
 public interface FacultyService {
 
@@ -29,4 +32,8 @@ public interface FacultyService {
   void unassignProgramManager(String facultyId, String userId);
 
   UserResponse transferProgramManager(FacultyTransferPmRequest request);
+
+  AssessmentScoreTemplate generateTemplateCsv();
+
+  CsvImportResultResponse importFaculties(MultipartFile file);
 }

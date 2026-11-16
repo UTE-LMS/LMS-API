@@ -5,8 +5,6 @@ import static org.mockito.Mockito.when;
 
 import com.hcmute.lms.lmsapi.document.CourseSection;
 import com.hcmute.lms.lmsapi.document.ImportBatch;
-import com.hcmute.lms.lmsapi.document.RoleAssignment;
-import com.hcmute.lms.lmsapi.document.UserScope;
 import com.hcmute.lms.lmsapi.dto.UserPrincipal;
 import com.hcmute.lms.lmsapi.enums.AccessType;
 import com.hcmute.lms.lmsapi.enums.Role;
@@ -31,12 +29,7 @@ class ImportBatchScopeAuthorizationTest {
   @InjectMocks private ScopeAuthorizationServiceImpl service;
 
   private static UserPrincipal principal(String id, Role role) {
-    return UserPrincipal.builder()
-        .id(id)
-        .username("u-" + id)
-        .roleAssignments(
-            List.of(RoleAssignment.builder().role(role).scope(UserScope.builder().build()).build()))
-        .build();
+    return UserPrincipal.builder().id(id).username("u-" + id).roles(List.of(role)).build();
   }
 
   @Test

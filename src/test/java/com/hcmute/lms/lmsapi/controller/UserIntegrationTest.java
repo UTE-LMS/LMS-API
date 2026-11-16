@@ -7,9 +7,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.hcmute.lms.lmsapi.document.RoleAssignment;
 import com.hcmute.lms.lmsapi.document.User;
-import com.hcmute.lms.lmsapi.document.UserScope;
 import com.hcmute.lms.lmsapi.dto.CreateUserRequest;
 import com.hcmute.lms.lmsapi.dto.UpdateUserRequest;
 import com.hcmute.lms.lmsapi.dto.UpdateUserStatusRequest;
@@ -87,7 +85,7 @@ class UserIntegrationTest {
                 .fullName("[DỮ LIỆU THỬ NGHIỆM] Quản Trị Viên")
                 .status(UserStatus.ACTIVE)
                 .tokenVersion(0L)
-                .roleAssignments(List.of(RoleAssignment.builder().role(Role.ADMIN).build()))
+                .roles(List.of(Role.ADMIN))
                 .createdAt(Instant.now())
                 .updatedAt(Instant.now())
                 .build());
@@ -101,7 +99,7 @@ class UserIntegrationTest {
             .fullName("[DỮ LIỆU THỬ NGHIỆM] Giảng Viên")
             .status(UserStatus.ACTIVE)
             .tokenVersion(0L)
-            .roleAssignments(List.of(RoleAssignment.builder().role(Role.LECTURER).build()))
+            .roles(List.of(Role.LECTURER))
             .createdAt(Instant.now())
             .updatedAt(Instant.now())
             .build());
@@ -116,7 +114,7 @@ class UserIntegrationTest {
                 .fullName("[DỮ LIỆU THỬ NGHIỆM] Người Dùng Mục Tiêu")
                 .status(UserStatus.ACTIVE)
                 .tokenVersion(0L)
-                .roleAssignments(List.of(RoleAssignment.builder().role(Role.LECTURER).build()))
+                .roles(List.of(Role.LECTURER))
                 .createdAt(Instant.now())
                 .updatedAt(Instant.now())
                 .build());
@@ -181,7 +179,7 @@ class UserIntegrationTest {
               .email("new_test@hcmute.edu.vn")
               .password(RAW_PASSWORD)
               .fullName("New Test User")
-              .roleAssignments(List.of(RoleAssignment.builder().role(Role.QA).build()))
+              .roles(List.of(Role.QA))
               .build();
 
       ApiTestSupport.performJson(
@@ -199,7 +197,7 @@ class UserIntegrationTest {
           UpdateUserRequest.builder()
               .email("updated@hcmute.edu.vn")
               .fullName("Updated Name")
-              .roleAssignments(List.of(RoleAssignment.builder().role(Role.LECTURER).build()))
+              .roles(List.of(Role.LECTURER))
               .build();
 
       ApiTestSupport.performJson(
@@ -316,7 +314,7 @@ class UserIntegrationTest {
               .email("created_test@hcmute.edu.vn")
               .password(RAW_PASSWORD)
               .fullName("[DỮ LIỆU THỬ NGHIỆM] Người dùng mới tạo")
-              .roleAssignments(List.of(RoleAssignment.builder().role(Role.LECTURER).build()))
+              .roles(List.of(Role.LECTURER))
               .build();
 
       ApiTestSupport.performJson(mockMvc, objectMapper, post("/api/v1/users"), adminToken, request)
@@ -338,7 +336,7 @@ class UserIntegrationTest {
               .email("unique_email@hcmute.edu.vn")
               .password(RAW_PASSWORD)
               .fullName("Duplicate User")
-              .roleAssignments(List.of(RoleAssignment.builder().role(Role.QA).build()))
+              .roles(List.of(Role.QA))
               .build();
 
       ApiTestSupport.expectConflict(
@@ -355,7 +353,7 @@ class UserIntegrationTest {
               .email("target_user@hcmute.edu.vn") // đã tồn tại
               .password(RAW_PASSWORD)
               .fullName("Duplicate Email User")
-              .roleAssignments(List.of(RoleAssignment.builder().role(Role.QA).build()))
+              .roles(List.of(Role.QA))
               .build();
 
       ApiTestSupport.expectConflict(
@@ -394,7 +392,7 @@ class UserIntegrationTest {
           UpdateUserRequest.builder()
               .email("target_new_email@hcmute.edu.vn")
               .fullName("Tên Đã Cập Nhật")
-              .roleAssignments(List.of(RoleAssignment.builder().role(Role.LECTURER).build()))
+              .roles(List.of(Role.LECTURER))
               .build();
 
       ApiTestSupport.performJson(
@@ -407,35 +405,6 @@ class UserIntegrationTest {
           .andExpect(jsonPath("$.username").value(TARGET_USERNAME)) // username giữ nguyên
           .andExpect(jsonPath("$.email").value("target_new_email@hcmute.edu.vn"))
           .andExpect(jsonPath("$.fullName").value("Tên Đã Cập Nhật"));
-    }
-
-    @Test
-    @DisplayName(
-        "Scope chứa courseId không tồn tại trong CSDL: từ chối với HTTP 422 BUSINESS_RULE_VIOLATION")
-    void createUser_NonExistentScopeId_Returns422() throws Exception {
-      CreateUserRequest request =
-          CreateUserRequest.builder()
-              .username("scope_test_user")
-              .email("scope_test@hcmute.edu.vn")
-              .password(RAW_PASSWORD)
-              .fullName("Scope User")
-              .roleAssignments(
-                  List.of(
-                      RoleAssignment.builder()
-                          .role(Role.LECTURER)
-                          .scope(
-                              UserScope.builder()
-                                  .courseIds(
-                                      List.of("671dcba5f123456789abc999")) // ID không có trong
-                                  // collection courses
-                                  .build())
-                          .build()))
-              .build();
-
-      ApiTestSupport.expectBusinessRuleViolation(
-          ApiTestSupport.performJson(
-              mockMvc, objectMapper, post("/api/v1/users"), adminToken, request),
-          "SCOPE_NOT_FOUND");
     }
   }
 
@@ -472,8 +441,7 @@ class UserIntegrationTest {
           UpdateUserRequest.builder()
               .email("admin_user@hcmute.edu.vn")
               .fullName("Admin User")
-              .roleAssignments(
-                  List.of(RoleAssignment.builder().role(Role.LECTURER).build())) // gỡ ADMIN
+              .roles(List.of(Role.LECTURER)) // gỡ ADMIN
               .build();
 
       ApiTestSupport.performJson(

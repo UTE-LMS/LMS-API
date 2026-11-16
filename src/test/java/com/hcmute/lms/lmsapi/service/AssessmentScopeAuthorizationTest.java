@@ -7,9 +7,7 @@ import static org.mockito.Mockito.when;
 import com.hcmute.lms.lmsapi.document.Assessment;
 import com.hcmute.lms.lmsapi.document.Course;
 import com.hcmute.lms.lmsapi.document.CourseSection;
-import com.hcmute.lms.lmsapi.document.RoleAssignment;
 import com.hcmute.lms.lmsapi.document.Syllabus;
-import com.hcmute.lms.lmsapi.document.UserScope;
 import com.hcmute.lms.lmsapi.dto.UserPrincipal;
 import com.hcmute.lms.lmsapi.enums.AccessType;
 import com.hcmute.lms.lmsapi.enums.AssessmentScope;
@@ -84,7 +82,7 @@ class AssessmentScopeAuthorizationTest {
         .thenReturn(Optional.of(Syllabus.builder().id(SYLLABUS_ID).courseId(COURSE_ID).build()));
     lenient()
         .when(courseRepository.findById(COURSE_ID))
-        .thenReturn(Optional.of(Course.builder().id(COURSE_ID).build()));
+        .thenReturn(Optional.of(Course.builder().id(COURSE_ID).facultyId("fac_1").build()));
     lenient()
         .when(courseSectionRepository.findById(SECTION_ID))
         .thenReturn(
@@ -96,13 +94,12 @@ class AssessmentScopeAuthorizationTest {
                     .build()));
   }
 
-  private UserPrincipal principal(Role role, String... courseIds) {
-    UserScope scope = UserScope.builder().courseIds(new ArrayList<>(List.of(courseIds))).build();
+  private UserPrincipal principal(Role role, String... ignored) {
     return UserPrincipal.builder()
         .id(USER_ID)
         .username("user")
-        .roleAssignments(
-            new ArrayList<>(List.of(RoleAssignment.builder().role(role).scope(scope).build())))
+        .facultyId("fac_1")
+        .roles(new ArrayList<>(List.of(role)))
         .build();
   }
 
@@ -120,13 +117,7 @@ class AssessmentScopeAuthorizationTest {
         UserPrincipal.builder()
             .id("671dcba5f123456789abc0ff")
             .username("stranger")
-            .roleAssignments(
-                new ArrayList<>(
-                    List.of(
-                        RoleAssignment.builder()
-                            .role(Role.LECTURER)
-                            .scope(UserScope.builder().build())
-                            .build())))
+            .roles(new ArrayList<>(List.of(Role.LECTURER)))
             .build();
     assertThat(service.canAccessAssessment(stranger, SECTION_ASSESSMENT_ID, AccessType.READ))
         .isFalse();

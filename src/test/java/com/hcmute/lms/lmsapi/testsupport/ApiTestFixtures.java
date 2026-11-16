@@ -9,18 +9,17 @@ import com.hcmute.lms.lmsapi.document.CloMeasurement;
 import com.hcmute.lms.lmsapi.document.Course;
 import com.hcmute.lms.lmsapi.document.CourseSection;
 import com.hcmute.lms.lmsapi.document.Enrollment;
+import com.hcmute.lms.lmsapi.document.Faculty;
 import com.hcmute.lms.lmsapi.document.OutcomeMapping;
 import com.hcmute.lms.lmsapi.document.Pi;
 import com.hcmute.lms.lmsapi.document.Plo;
 import com.hcmute.lms.lmsapi.document.Program;
 import com.hcmute.lms.lmsapi.document.ProgramCourse;
 import com.hcmute.lms.lmsapi.document.ProgramVersion;
-import com.hcmute.lms.lmsapi.document.RoleAssignment;
 import com.hcmute.lms.lmsapi.document.Student;
 import com.hcmute.lms.lmsapi.document.Syllabus;
 import com.hcmute.lms.lmsapi.document.Term;
 import com.hcmute.lms.lmsapi.document.User;
-import com.hcmute.lms.lmsapi.document.UserScope;
 import com.hcmute.lms.lmsapi.document.Verification;
 import com.hcmute.lms.lmsapi.enums.AssessmentScope;
 import com.hcmute.lms.lmsapi.enums.AssessmentStatus;
@@ -111,20 +110,25 @@ public final class ApiTestFixtures {
 
   // ---------------------------------------------------------------- người dùng và token
 
-  /** Tạo người dùng ACTIVE với đúng một phân công vai trò. */
-  public User user(Role role, UserScope scope) {
-    return user(List.of(RoleAssignment.builder().role(role).scope(scope).build()));
+  /** Tạo người dùng ACTIVE với đúng một vai trò. */
+  public User user(Role role) {
+    return user(List.of(role));
+  }
+
+  /** Tạo người dùng ACTIVE với đúng một vai trò (tương thích chữ ký cũ). */
+  public User user(Role role, Object ignored) {
+    return user(role);
   }
 
   /** Tạo người dùng ACTIVE có mật khẩu biết trước, dùng cho test đăng nhập. */
-  public User userWithPassword(Role role, UserScope scope, String rawPassword) {
-    User user = user(role, scope);
+  public User userWithPassword(Role role, Object ignored, String rawPassword) {
+    User user = user(role);
     user.setPasswordHash(passwordEncoder.encode(rawPassword));
     return mongo.save(user);
   }
 
-  /** Tạo người dùng ACTIVE với nhiều phân công vai trò (quyền là phép hợp). */
-  public User user(List<RoleAssignment> assignments) {
+  /** Tạo người dùng ACTIVE với nhiều vai trò (quyền là phép hợp). */
+  public User user(List<Role> roles) {
     String username = username("user");
     Instant now = Instant.now();
     return mongo.save(
@@ -135,7 +139,7 @@ public final class ApiTestFixtures {
             .fullName(LABEL + " " + username)
             .status(UserStatus.ACTIVE)
             .tokenVersion(0L)
-            .roleAssignments(new ArrayList<>(assignments))
+            .roles(new ArrayList<>(roles))
             .createdAt(now)
             .updatedAt(now)
             .build());
@@ -160,11 +164,23 @@ public final class ApiTestFixtures {
   }
 
   /** Tạo người dùng rồi trả luôn token Bearer của họ. */
-  public String bearerFor(Role role, UserScope scope) {
-    return bearer(user(role, scope));
+  public String bearerFor(Role role) {
+    return bearer(user(role));
+  }
+
+  /** Tạo người dùng rồi trả luôn token Bearer của họ (tương thích chữ ký cũ). */
+  public String bearerFor(Role role, Object ignored) {
+    return bearer(user(role));
   }
 
   // ---------------------------------------------------------------- CTĐT (F02)
+
+  /** Tạo Khoa giả với mã và tên duy nhất. */
+  public Faculty faculty() {
+    String facCode = code("FAC");
+    return mongo.save(
+        Faculty.builder().code(facCode).name(LABEL + " Khoa " + facCode).isActive(true).build());
+  }
 
   /** Tạo chương trình đào tạo giả. */
   public Program program() {
@@ -312,7 +328,6 @@ public final class ApiTestFixtures {
             .name(LABEL + " Bài đánh giá giả")
             .scope(AssessmentScope.SECTION)
             .status(status)
-            .locked(status.locksStructure())
             .cloWeights(
                 List.of(AssessmentCloWeight.builder().cloId(dummyCloId).weight(1.0).build()))
             .items(items)
@@ -364,6 +379,7 @@ public final class ApiTestFixtures {
     removeIn("plos", "programVersionId", versionOids);
     removeIn("program_versions", "programId", programOids);
     mongo.remove(query(Criteria.where("code").regex(codePrefix)), "programs");
+    mongo.remove(query(Criteria.where("code").regex(codePrefix)), "faculties");
     List<ObjectId> courseOids =
         ids("courses", Criteria.where("code").regex(codePrefix)).stream()
             .map(ObjectId::new)

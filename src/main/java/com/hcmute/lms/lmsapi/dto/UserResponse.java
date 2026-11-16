@@ -1,6 +1,6 @@
 package com.hcmute.lms.lmsapi.dto;
 
-import com.hcmute.lms.lmsapi.document.RoleAssignment;
+import com.hcmute.lms.lmsapi.enums.Role;
 import com.hcmute.lms.lmsapi.enums.UserStatus;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -38,8 +38,8 @@ public class UserResponse {
   /** Định danh Khoa quản lý (dành cho PROGRAM_MANAGER). */
   private String facultyId;
 
-  /** Danh sách các phân công vai trò và phạm vi phụ trách. */
-  @Builder.Default private List<RoleAssignment> roleAssignments = new ArrayList<>();
+  /** Danh sách vai trò của người dùng. */
+  @Builder.Default private List<Role> roles = new ArrayList<>();
 
   /** Thời điểm tạo tài khoản (ISO-8601 UTC). */
   private Instant createdAt;

@@ -8,7 +8,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.hcmute.lms.lmsapi.document.CourseSection;
-import com.hcmute.lms.lmsapi.document.RoleAssignment;
 import com.hcmute.lms.lmsapi.document.Syllabus;
 import com.hcmute.lms.lmsapi.document.Term;
 import com.hcmute.lms.lmsapi.document.User;
@@ -90,7 +89,7 @@ class SectionServiceImplTest {
         .id(LECTURER_ID)
         .username("lecturer")
         .status(status)
-        .roleAssignments(new ArrayList<>(List.of(RoleAssignment.builder().role(role).build())))
+        .roles(new ArrayList<>(List.of(role)))
         .build();
   }
 
@@ -192,7 +191,7 @@ class SectionServiceImplTest {
     when(syllabusRepository.findById(SYLLABUS_ID))
         .thenReturn(
             Optional.of(
-                Syllabus.builder().courseId(COURSE_ID).status(SyllabusStatus.DRAFT).build()));
+                Syllabus.builder().courseId(COURSE_ID).status(SyllabusStatus.ARCHIVED).build()));
     assertThatThrownBy(() -> service.createSection(request()))
         .isInstanceOf(BusinessRuleViolationException.class)
         .hasMessageContaining("đã chốt");
