@@ -1,11 +1,14 @@
 package com.hcmute.lms.lmsapi.service;
 
+import com.hcmute.lms.lmsapi.dto.AssessmentScoreTemplate;
+import com.hcmute.lms.lmsapi.dto.CsvImportResultResponse;
 import com.hcmute.lms.lmsapi.dto.SectionRequest;
 import com.hcmute.lms.lmsapi.dto.SectionResponse;
 import com.hcmute.lms.lmsapi.dto.SectionStatusUpdateRequest;
 import com.hcmute.lms.lmsapi.dto.SectionUpdateRequest;
 import com.hcmute.lms.lmsapi.dto.UserPrincipal;
 import java.util.List;
+import org.springframework.web.multipart.MultipartFile;
 
 /** Quản lý lớp học phần (F05a / US-19). */
 public interface SectionService {
@@ -26,4 +29,8 @@ public interface SectionService {
   SectionResponse updateLecturers(String id, SectionUpdateRequest request);
 
   SectionResponse updateStatus(String id, SectionStatusUpdateRequest request, String actorUsername);
+
+  AssessmentScoreTemplate generateTemplateCsv();
+
+  CsvImportResultResponse importSections(MultipartFile file, UserPrincipal principal);
 }

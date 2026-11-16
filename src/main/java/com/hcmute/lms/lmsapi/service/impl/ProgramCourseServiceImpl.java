@@ -8,6 +8,7 @@ import com.hcmute.lms.lmsapi.dto.ProgramCourseCsvImportResponse;
 import com.hcmute.lms.lmsapi.dto.ProgramCourseRequest;
 import com.hcmute.lms.lmsapi.dto.ProgramCourseResponse;
 import com.hcmute.lms.lmsapi.dto.ProgramCourseUpdateRequest;
+import com.hcmute.lms.lmsapi.enums.AuditAction;
 import com.hcmute.lms.lmsapi.enums.CourseCategory;
 import com.hcmute.lms.lmsapi.enums.CourseType;
 import com.hcmute.lms.lmsapi.enums.ProgramVersionStatus;
@@ -19,6 +20,7 @@ import com.hcmute.lms.lmsapi.mapper.ProgramCourseMapper;
 import com.hcmute.lms.lmsapi.repository.CourseRepository;
 import com.hcmute.lms.lmsapi.repository.ProgramCourseRepository;
 import com.hcmute.lms.lmsapi.repository.ProgramVersionRepository;
+import com.hcmute.lms.lmsapi.service.AuditService;
 import com.hcmute.lms.lmsapi.service.ProgramCourseService;
 import com.hcmute.lms.lmsapi.util.ObjectIdUtils;
 import java.nio.charset.StandardCharsets;
@@ -33,6 +35,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -47,6 +50,9 @@ public class ProgramCourseServiceImpl implements ProgramCourseService {
   private final ProgramVersionRepository programVersionRepository;
   private final CourseRepository courseRepository;
   private final ProgramCourseMapper programCourseMapper;
+
+  @Autowired(required = false)
+  private AuditService auditService;
 
   @Override
   public List<ProgramCourseResponse> getCoursesByProgramVersion(String programVersionId) {
@@ -162,6 +168,14 @@ public class ProgramCourseServiceImpl implements ProgramCourseService {
         "Course {} assigned to ProgramVersion {} successfully",
         request.getCourseId(),
         programVersionId);
+    AuditLogHelper.record(
+        auditService,
+        AuditAction.CREATE,
+        "program_courses",
+        programCourse.getId(),
+        null,
+        programCourse,
+        null);
     return programCourseMapper.toResponse(programCourse, course);
   }
 
@@ -196,6 +210,14 @@ public class ProgramCourseServiceImpl implements ProgramCourseService {
     Course course = courseRepository.findById(courseId).orElse(null);
 
     log.info("ProgramCourse mapping updated for pvId={} courseId={}", programVersionId, courseId);
+    AuditLogHelper.record(
+        auditService,
+        AuditAction.UPDATE,
+        "program_courses",
+        programCourse.getId(),
+        null,
+        programCourse,
+        null);
     return programCourseMapper.toResponse(programCourse, course);
   }
 
@@ -211,6 +233,14 @@ public class ProgramCourseServiceImpl implements ProgramCourseService {
 
     programCourseRepository.deleteByProgramVersionIdAndCourseId(programVersionId, courseId);
     log.info("Course {} removed from ProgramVersion {}", courseId, programVersionId);
+    AuditLogHelper.record(
+        auditService,
+        AuditAction.DELETE,
+        "program_courses",
+        programVersionId + ":" + courseId,
+        null,
+        null,
+        null);
   }
 
   private void requireProgramVersion(String programVersionId) {
@@ -413,13 +443,23 @@ public class ProgramCourseServiceImpl implements ProgramCourseService {
       responses.add(programCourseMapper.toResponse(saved.get(i), savedCourses.get(i)));
     }
 
-    return ProgramCourseCsvImportResponse.builder()
-        .programVersionId(programVersionId)
-        .importedCount(importedCount)
-        .updatedCount(updatedCount)
-        .warnings(warnings)
-        .courses(responses)
-        .build();
+    ProgramCourseCsvImportResponse response =
+        ProgramCourseCsvImportResponse.builder()
+            .programVersionId(programVersionId)
+            .importedCount(importedCount)
+            .updatedCount(updatedCount)
+            .warnings(warnings)
+            .courses(responses)
+            .build();
+    AuditLogHelper.record(
+        auditService,
+        AuditAction.IMPORT,
+        "program_courses",
+        programVersionId,
+        null,
+        Map.of("importedCount", importedCount, "updatedCount", updatedCount),
+        "Import CSV khung học phần CTĐT");
+    return response;
   }
 
   private Course resolveCourseByCode(String code, Map<String, Course> cache) {

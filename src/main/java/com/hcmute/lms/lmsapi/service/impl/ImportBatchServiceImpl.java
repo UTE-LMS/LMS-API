@@ -78,7 +78,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class ImportBatchServiceImpl implements ImportBatchService {
 
-  public static final String DEFAULT_STUDENT_COLUMN = "studentRef";
+  public static final String DEFAULT_STUDENT_COLUMN = "studentCode";
   private static final String BATCH_COLLECTION = "import_batches";
 
   private final CourseSectionRepository sectionRepository;
@@ -572,7 +572,7 @@ public class ImportBatchServiceImpl implements ImportBatchService {
     Map<String, String> refToId = new HashMap<>();
     studentRepository
         .findAllById(studentIds)
-        .forEach(student -> refToId.put(student.getStudentRef(), student.getId()));
+        .forEach(student -> refToId.put(student.getStudentCode(), student.getId()));
     return refToId;
   }
 
@@ -691,6 +691,14 @@ public class ImportBatchServiceImpl implements ImportBatchService {
     batch.setStatus(ImportBatchStatus.ROLLED_BACK);
     ImportBatch saved = batchRepository.save(batch);
     log.info("Hủy lô nhập điểm id=[{}] bởi user=[{}]", saved.getId(), actor.getUsername());
+    AuditLogHelper.record(
+        auditService,
+        AuditAction.STATUS_CHANGE,
+        "import_batches",
+        saved.getId(),
+        null,
+        Map.of("status", ImportBatchStatus.ROLLED_BACK),
+        "Hủy lô nhập điểm");
     return batchMapper.toResponse(saved);
   }
 

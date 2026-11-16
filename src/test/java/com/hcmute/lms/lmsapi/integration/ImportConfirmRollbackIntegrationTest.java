@@ -37,9 +37,9 @@ class ImportConfirmRollbackIntegrationTest extends ScoreImportIntegrationBase {
   private String validatedBatch() throws Exception {
     return uploadAndValidate(
         csv(
-            s1.getStudentRef() + ",3,6",
-            s2.getStudentRef() + ",4,0",
-            s3.getStudentRef() + ",0,2.5"),
+            s1.getStudentCode() + ",3,6",
+            s2.getStudentCode() + ",4,0",
+            s3.getStudentCode() + ",0,2.5"),
         "BLANK");
   }
 

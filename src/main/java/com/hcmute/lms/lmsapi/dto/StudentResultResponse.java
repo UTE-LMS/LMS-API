@@ -23,7 +23,7 @@ public class StudentResultResponse {
   private String sectionId;
   private String assessmentId;
   private String studentId;
-  private String studentRef;
+  private String studentCode;
   private String termId;
   private ResultStatus status;
   private Double value;

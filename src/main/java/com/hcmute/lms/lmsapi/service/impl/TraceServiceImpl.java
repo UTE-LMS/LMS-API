@@ -62,7 +62,7 @@ public class TraceServiceImpl implements TraceService {
     String studentRef =
         studentRepository
             .findById(result.getStudentId())
-            .map(Student::getStudentRef)
+            .map(Student::getStudentCode)
             .orElse(result.getStudentId());
     String subjectCode = resolveSubjectCode(result.getLevel(), result.getSubjectId());
 
@@ -86,7 +86,7 @@ public class TraceServiceImpl implements TraceService {
         .subjectId(result.getSubjectId())
         .subjectCode(subjectCode)
         .studentId(result.getStudentId())
-        .studentRef(studentRef)
+        .studentCode(studentRef)
         .status(result.getStatus())
         .value(result.getValue())
         .passThreshold(result.getPassThreshold())
@@ -108,7 +108,7 @@ public class TraceServiceImpl implements TraceService {
     String studentRef =
         studentRepository
             .findById(score.getStudentId())
-            .map(Student::getStudentRef)
+            .map(Student::getStudentCode)
             .orElse(score.getStudentId());
     String cloCode =
         cloRepository.findById(score.getCloId()).map(Clo::getCode).orElse(score.getCloId());
@@ -127,7 +127,7 @@ public class TraceServiceImpl implements TraceService {
         .cloId(score.getCloId())
         .cloCode(cloCode)
         .studentId(score.getStudentId())
-        .studentRef(studentRef)
+        .studentCode(studentRef)
         .rawScore(score.getRawScore())
         .maxScore(score.getMaxScore())
         .importBatchId(score.getImportBatchId())

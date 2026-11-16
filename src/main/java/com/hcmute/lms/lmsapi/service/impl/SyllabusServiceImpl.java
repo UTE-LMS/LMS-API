@@ -5,6 +5,7 @@ import com.hcmute.lms.lmsapi.document.Syllabus;
 import com.hcmute.lms.lmsapi.document.Term;
 import com.hcmute.lms.lmsapi.dto.SyllabusRequest;
 import com.hcmute.lms.lmsapi.dto.SyllabusResponse;
+import com.hcmute.lms.lmsapi.enums.AuditAction;
 import com.hcmute.lms.lmsapi.enums.SyllabusStatus;
 import com.hcmute.lms.lmsapi.exception.AppException;
 import com.hcmute.lms.lmsapi.exception.BusinessRuleViolationException;
@@ -16,11 +17,14 @@ import com.hcmute.lms.lmsapi.repository.ProgramCourseRepository;
 import com.hcmute.lms.lmsapi.repository.ProgramVersionRepository;
 import com.hcmute.lms.lmsapi.repository.SyllabusRepository;
 import com.hcmute.lms.lmsapi.repository.TermRepository;
+import com.hcmute.lms.lmsapi.service.AuditService;
 import com.hcmute.lms.lmsapi.service.SyllabusService;
 import com.hcmute.lms.lmsapi.util.ObjectIdUtils;
 import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -36,6 +40,9 @@ public class SyllabusServiceImpl implements SyllabusService {
   private final ProgramCourseRepository programCourseRepository;
   private final TermRepository termRepository;
   private final SyllabusMapper syllabusMapper;
+
+  @Autowired(required = false)
+  private AuditService auditService;
 
   @Override
   public List<SyllabusResponse> getSyllabi(String courseId) {
@@ -138,6 +145,8 @@ public class SyllabusServiceImpl implements SyllabusService {
           saved.getId(),
           saved.getVersion(),
           courseId);
+      AuditLogHelper.record(
+          auditService, AuditAction.CREATE, "syllabi", saved.getId(), null, saved, null);
       return syllabusMapper.toResponse(saved);
     } catch (DuplicateKeyException ex) {
       throw conflict(
@@ -168,6 +177,14 @@ public class SyllabusServiceImpl implements SyllabusService {
     Syllabus updated = syllabusRepository.save(syllabus);
     log.info(
         "Cập nhật trạng thái đề cương id=[{}] từ [{}] sang [{}]", id, currentStatus, newStatus);
+    AuditLogHelper.record(
+        auditService,
+        AuditAction.STATUS_CHANGE,
+        "syllabi",
+        updated.getId(),
+        Map.of("status", currentStatus),
+        Map.of("status", newStatus),
+        null);
     return syllabusMapper.toResponse(updated);
   }
 

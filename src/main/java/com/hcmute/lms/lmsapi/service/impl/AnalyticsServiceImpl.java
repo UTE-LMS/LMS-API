@@ -1220,8 +1220,8 @@ public class AnalyticsServiceImpl implements AnalyticsService {
                 s ->
                     MatrixHeader.builder()
                         .id(s.getId())
-                        .code(s.getStudentRef())
-                        .name(s.getFullName() != null ? s.getFullName() : s.getStudentRef())
+                        .code(s.getStudentCode())
+                        .name(s.getFullName() != null ? s.getFullName() : s.getStudentCode())
                         .build())
             .toList();
 
@@ -1300,7 +1300,7 @@ public class AnalyticsServiceImpl implements AnalyticsService {
       List<Student> list = studentRepository.findAllById(request.getStudentIds());
       list = new ArrayList<>(list);
       list.sort(
-          Comparator.comparing(Student::getStudentRef, Comparator.nullsLast(String::compareTo)));
+          Comparator.comparing(Student::getStudentCode, Comparator.nullsLast(String::compareTo)));
       return list;
     }
     if (request.getStudentId() != null && !request.getStudentId().isBlank()) {
@@ -1387,7 +1387,7 @@ public class AnalyticsServiceImpl implements AnalyticsService {
     }
     list = new ArrayList<>(list);
     list.sort(
-        Comparator.comparing(Student::getStudentRef, Comparator.nullsLast(String::compareTo)));
+        Comparator.comparing(Student::getStudentCode, Comparator.nullsLast(String::compareTo)));
     return list;
   }
 

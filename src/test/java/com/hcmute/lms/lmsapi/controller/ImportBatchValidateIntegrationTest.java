@@ -38,14 +38,14 @@ class ImportBatchValidateIntegrationTest extends ScoreImportIntegrationBase {
    */
   private String errorCsv(Student s4) {
     return csv(
-        s1.getStudentRef() + ",3,6",
-        s2.getStudentRef() + ",4.01,6",
+        s1.getStudentCode() + ",3,6",
+        s2.getStudentCode() + ",4.01,6",
         "NOPE,1,1",
-        withdrawn.getStudentRef() + ",1,1",
-        s1.getStudentRef() + ",2,2",
-        s3.getStudentRef() + ",x,7",
+        withdrawn.getStudentCode() + ",1,1",
+        s1.getStudentCode() + ",2,2",
+        s3.getStudentCode() + ",x,7",
         ",1,1",
-        s4.getStudentRef() + ",1");
+        s4.getStudentCode() + ",1");
   }
 
   @Test
@@ -76,15 +76,15 @@ class ImportBatchValidateIntegrationTest extends ScoreImportIntegrationBase {
         .andExpect(jsonPath("$.content[0].errorType").value("SCORE_OUT_OF_RANGE"))
         .andExpect(jsonPath("$.content[0].rawValue").value("4.01"))
         .andExpect(jsonPath("$.content[1].rowNumber").value(4))
-        .andExpect(jsonPath("$.content[1].column").value("studentRef"))
+        .andExpect(jsonPath("$.content[1].column").value("studentCode"))
         .andExpect(jsonPath("$.content[1].errorType").value("INVALID_STUDENT_CODE"))
         .andExpect(jsonPath("$.content[1].rawValue").value("NOPE"))
         .andExpect(jsonPath("$.content[2].rowNumber").value(5))
         .andExpect(jsonPath("$.content[2].errorType").value("INVALID_STUDENT_CODE"))
-        .andExpect(jsonPath("$.content[2].rawValue").value(withdrawn.getStudentRef()))
+        .andExpect(jsonPath("$.content[2].rawValue").value(withdrawn.getStudentCode()))
         .andExpect(jsonPath("$.content[3].rowNumber").value(6))
         .andExpect(jsonPath("$.content[3].errorType").value("DUPLICATE_RECORD"))
-        .andExpect(jsonPath("$.content[3].rawValue").value(s1.getStudentRef()))
+        .andExpect(jsonPath("$.content[3].rawValue").value(s1.getStudentCode()))
         .andExpect(jsonPath("$.content[4].rowNumber").value(7))
         .andExpect(jsonPath("$.content[4].column").value("Q1"))
         .andExpect(jsonPath("$.content[4].errorType").value("SCORE_OUT_OF_RANGE"))
@@ -94,7 +94,7 @@ class ImportBatchValidateIntegrationTest extends ScoreImportIntegrationBase {
         .andExpect(jsonPath("$.content[5].rawValue").value("7"))
         .andExpect(jsonPath("$.content[6].rowNumber").value(8))
         .andExpect(jsonPath("$.content[6].errorType").value("MISSING_FIELD"))
-        .andExpect(jsonPath("$.content[6].column").value("studentRef"))
+        .andExpect(jsonPath("$.content[6].column").value("studentCode"))
         .andExpect(jsonPath("$.content[7].rowNumber").value(9))
         .andExpect(jsonPath("$.content[7].errorType").value("MISSING_FIELD"))
         .andExpect(jsonPath("$.content[7].column").value("Q2"));
@@ -146,7 +146,7 @@ class ImportBatchValidateIntegrationTest extends ScoreImportIntegrationBase {
   @DisplayName(
       "US-22: tệp hợp lệ -> VALIDATED, không có lỗi; kiểm tra lại nhiều lần không nhân đôi lỗi")
   void us22_validFileAndRevalidateIsIdempotent() throws Exception {
-    String good = uploadOk(csv(s1.getStudentRef() + ",3,6"), "BLANK");
+    String good = uploadOk(csv(s1.getStudentCode() + ",3,6"), "BLANK");
     mockMvc
         .perform(postAction(lecturerToken, good, "validate"))
         .andExpect(jsonPath("$.status").value("VALIDATED"))
@@ -170,7 +170,7 @@ class ImportBatchValidateIntegrationTest extends ScoreImportIntegrationBase {
   @DisplayName(
       "US-22: sau khi sửa ghi danh, kiểm tra lại cùng lô đổi kết quả (sinh viên ghi danh lại -> hết lỗi)")
   void us22_revalidateSeesNewEnrollment() throws Exception {
-    String id = uploadAndValidateAllowErrors(csv(withdrawn.getStudentRef() + ",1,1"));
+    String id = uploadAndValidateAllowErrors(csv(withdrawn.getStudentCode() + ",1,1"));
     assertThat(batchDocument(id).getString("status")).isEqualTo("HAS_ERRORS");
 
     mongo()
@@ -192,20 +192,20 @@ class ImportBatchValidateIntegrationTest extends ScoreImportIntegrationBase {
   @DisplayName(
       "US-22: kiểm tra lô đã CONFIRMED/ROLLED_BACK -> 422; học kỳ khóa điểm sau khi tải -> 422")
   void us22_validateRespectsStateAndLocks() throws Exception {
-    String confirmed = uploadAndValidate(csv(s1.getStudentRef() + ",3,6"), "BLANK");
+    String confirmed = uploadAndValidate(csv(s1.getStudentCode() + ",3,6"), "BLANK");
     mockMvc.perform(postAction(lecturerToken, confirmed, "confirm")).andExpect(status().isOk());
     mockMvc
         .perform(postAction(lecturerToken, confirmed, "validate"))
         .andExpect(status().isUnprocessableEntity())
         .andExpect(jsonPath("$.message").value(containsString("CONFIRMED")));
 
-    String rolledBack = uploadOk(csv(s2.getStudentRef() + ",3,6"), "BLANK");
+    String rolledBack = uploadOk(csv(s2.getStudentCode() + ",3,6"), "BLANK");
     mockMvc.perform(postAction(lecturerToken, rolledBack, "rollback")).andExpect(status().isOk());
     mockMvc
         .perform(postAction(lecturerToken, rolledBack, "validate"))
         .andExpect(status().isUnprocessableEntity());
 
-    String open = uploadOk(csv(s3.getStudentRef() + ",3,6"), "BLANK");
+    String open = uploadOk(csv(s3.getStudentCode() + ",3,6"), "BLANK");
     setTermStatus(TermStatus.SCORE_LOCKED);
     mockMvc
         .perform(postAction(lecturerToken, open, "validate"))
@@ -217,7 +217,7 @@ class ImportBatchValidateIntegrationTest extends ScoreImportIntegrationBase {
   @DisplayName("US-23/AC-1: ô trống tự động thành điểm 0.0 sau khi xác nhận")
   void us23_ac1_emptyCellAssignedZero() throws Exception {
     String id =
-        uploadAndValidate(csv(s1.getStudentRef() + ",,6", s2.getStudentRef() + ",4,"), "BLANK");
+        uploadAndValidate(csv(s1.getStudentCode() + ",,6", s2.getStudentCode() + ",4,"), "BLANK");
     mockMvc.perform(postAction(lecturerToken, id, "confirm")).andExpect(status().isOk());
 
     Document s1q1 = scoreOf(s1, 0);
@@ -232,7 +232,7 @@ class ImportBatchValidateIntegrationTest extends ScoreImportIntegrationBase {
   @Test
   @DisplayName("US-23/AC-1: điểm 0 gõ rõ ràng hay ô trống đều lưu rawScore = 0.0 hợp lệ")
   void us23_ac1_explicitZeroAndBlankBothZero() throws Exception {
-    String id = uploadAndValidate(csv(s1.getStudentRef() + ",0,"), "BLANK");
+    String id = uploadAndValidate(csv(s1.getStudentCode() + ",0,"), "BLANK");
     mockMvc.perform(postAction(lecturerToken, id, "confirm")).andExpect(status().isOk());
 
     assertThat(((Number) scoreOf(s1, 0).get("rawScore")).doubleValue()).isEqualTo(0.0);
@@ -244,12 +244,12 @@ class ImportBatchValidateIntegrationTest extends ScoreImportIntegrationBase {
       "US-23/AC-2: REJECT_ON_CONFLICT - lô sau trùng (sinh viên, câu) đã có điểm -> HAS_ERRORS, không xác nhận được, điểm cũ giữ nguyên")
   void us23_ac2_conflictIsRejectedAndOldScoresStay() throws Exception {
     String first =
-        uploadAndValidate(csv(s1.getStudentRef() + ",3,6", s2.getStudentRef() + ",4,0"), "BLANK");
+        uploadAndValidate(csv(s1.getStudentCode() + ",3,6", s2.getStudentCode() + ",4,0"), "BLANK");
     mockMvc.perform(postAction(lecturerToken, first, "confirm")).andExpect(status().isOk());
 
     // Lô 2: s1 đã có điểm cả hai câu (dòng 2 lỗi kép); s3 chưa có (dòng 3 hợp lệ).
     String second =
-        uploadOk(csv(s1.getStudentRef() + ",1,1", s3.getStudentRef() + ",2,2"), "BLANK");
+        uploadOk(csv(s1.getStudentCode() + ",1,1", s3.getStudentCode() + ",2,2"), "BLANK");
     mockMvc
         .perform(postAction(lecturerToken, second, "validate"))
         .andExpect(jsonPath("$.status").value("HAS_ERRORS"))

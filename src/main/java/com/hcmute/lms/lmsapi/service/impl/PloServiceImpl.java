@@ -5,6 +5,7 @@ import com.hcmute.lms.lmsapi.document.ProgramVersion;
 import com.hcmute.lms.lmsapi.document.Verification;
 import com.hcmute.lms.lmsapi.dto.PloRequest;
 import com.hcmute.lms.lmsapi.dto.PloResponse;
+import com.hcmute.lms.lmsapi.enums.AuditAction;
 import com.hcmute.lms.lmsapi.enums.PloCategory;
 import com.hcmute.lms.lmsapi.enums.ProgramVersionStatus;
 import com.hcmute.lms.lmsapi.enums.VerificationStatus;
@@ -16,11 +17,13 @@ import com.hcmute.lms.lmsapi.mapper.PloMapper;
 import com.hcmute.lms.lmsapi.repository.PiRepository;
 import com.hcmute.lms.lmsapi.repository.PloRepository;
 import com.hcmute.lms.lmsapi.repository.ProgramVersionRepository;
+import com.hcmute.lms.lmsapi.service.AuditService;
 import com.hcmute.lms.lmsapi.service.PloService;
 import com.hcmute.lms.lmsapi.util.ObjectIdUtils;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -34,6 +37,9 @@ public class PloServiceImpl implements PloService {
   private final PiRepository piRepository;
   private final ProgramVersionRepository programVersionRepository;
   private final PloMapper ploMapper;
+
+  @Autowired(required = false)
+  private AuditService auditService;
 
   @Override
   public List<PloResponse> getPlos(String programVersionId) {
@@ -78,6 +84,7 @@ public class PloServiceImpl implements PloService {
       log.warn("Duplicate PLO code on create: {} - {}", programVersionId, code);
       throw conflict(code);
     }
+    AuditLogHelper.record(auditService, AuditAction.CREATE, "plos", plo.getId(), null, plo, null);
     return ploMapper.toResponse(plo);
   }
 
@@ -108,6 +115,7 @@ public class PloServiceImpl implements PloService {
       log.warn("Duplicate PLO code on update: {} - {}", programVersionId, code);
       throw conflict(code);
     }
+    AuditLogHelper.record(auditService, AuditAction.UPDATE, "plos", plo.getId(), null, plo, null);
     return ploMapper.toResponse(plo);
   }
 
@@ -121,6 +129,7 @@ public class PloServiceImpl implements PloService {
           "PLO_HAS_PIS", "Không thể xóa PLO khi vẫn còn PI trực thuộc");
     }
     ploRepository.delete(plo);
+    AuditLogHelper.record(auditService, AuditAction.DELETE, "plos", id, plo, null, null);
   }
 
   private ProgramVersion requireDraftableVersion(String programVersionId, boolean requireDraft) {

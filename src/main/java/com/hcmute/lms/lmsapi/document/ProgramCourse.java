@@ -2,13 +2,16 @@ package com.hcmute.lms.lmsapi.document;
 
 import com.hcmute.lms.lmsapi.enums.CourseCategory;
 import com.hcmute.lms.lmsapi.enums.CourseType;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.index.CompoundIndexes;
 import org.springframework.data.mongodb.core.mapping.Document;
@@ -56,4 +59,12 @@ public class ProgramCourse {
   @Builder.Default
   @Field(name = "previousCourseIds", targetType = FieldType.OBJECT_ID)
   private List<String> previousCourseIds = new ArrayList<>();
+
+  @CreatedDate
+  @Field("createdAt")
+  private Instant createdAt;
+
+  @LastModifiedDate
+  @Field("updatedAt")
+  private Instant updatedAt;
 }

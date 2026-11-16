@@ -1280,9 +1280,9 @@ class AnalyticsServiceImplTest {
               .build();
 
       Student s1 =
-          Student.builder().id("st_1").studentRef("21110001").fullName("Nguyễn Văn A").build();
+          Student.builder().id("st_1").studentCode("21110001").fullName("Nguyễn Văn A").build();
       Student s2 =
-          Student.builder().id("st_2").studentRef("21110002").fullName("Trần Thị B").build();
+          Student.builder().id("st_2").studentCode("21110002").fullName("Trần Thị B").build();
 
       Enrollment e1 =
           Enrollment.builder()
@@ -1395,7 +1395,7 @@ class AnalyticsServiceImplTest {
               .build();
 
       Student s1 =
-          Student.builder().id("st_1").studentRef("21110001").fullName("Nguyễn Văn A").build();
+          Student.builder().id("st_1").studentCode("21110001").fullName("Nguyễn Văn A").build();
       Plo plo1 =
           Plo.builder().id("plo_1").code("PLO1").contentOriginal("Áp dụng kiến thức").build();
 

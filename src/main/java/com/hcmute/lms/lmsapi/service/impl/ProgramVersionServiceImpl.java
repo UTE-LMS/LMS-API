@@ -8,6 +8,7 @@ import com.hcmute.lms.lmsapi.dto.ProgramVersionRequest;
 import com.hcmute.lms.lmsapi.dto.ProgramVersionResponse;
 import com.hcmute.lms.lmsapi.dto.ProgramVersionStatusUpdateRequest;
 import com.hcmute.lms.lmsapi.dto.ProgramVersionUpdateRequest;
+import com.hcmute.lms.lmsapi.enums.AuditAction;
 import com.hcmute.lms.lmsapi.enums.ProgramVersionStatus;
 import com.hcmute.lms.lmsapi.enums.VerificationStatus;
 import com.hcmute.lms.lmsapi.exception.AppException;
@@ -17,6 +18,7 @@ import com.hcmute.lms.lmsapi.exception.ResourceNotFoundException;
 import com.hcmute.lms.lmsapi.mapper.ProgramVersionMapper;
 import com.hcmute.lms.lmsapi.repository.ProgramRepository;
 import com.hcmute.lms.lmsapi.repository.ProgramVersionRepository;
+import com.hcmute.lms.lmsapi.service.AuditService;
 import com.hcmute.lms.lmsapi.service.ProgramVersionService;
 import com.hcmute.lms.lmsapi.util.ObjectIdUtils;
 import com.hcmute.lms.lmsapi.util.PageableValidationUtils;
@@ -26,6 +28,7 @@ import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.bson.types.ObjectId;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -46,6 +49,9 @@ public class ProgramVersionServiceImpl implements ProgramVersionService {
   private final ProgramRepository programRepository;
   private final ProgramVersionMapper programVersionMapper;
   private final MongoTemplate mongoTemplate;
+
+  @Autowired(required = false)
+  private AuditService auditService;
 
   @Override
   public PageResponse<ProgramVersionResponse> getProgramVersions(
@@ -166,6 +172,14 @@ public class ProgramVersionServiceImpl implements ProgramVersionService {
       log.warn("Duplicate program version on create: {} - {}", request.getProgramId(), version);
       throw conflict(version);
     }
+    AuditLogHelper.record(
+        auditService,
+        AuditAction.CREATE,
+        "program_versions",
+        programVersion.getId(),
+        null,
+        programVersion,
+        null);
     return programVersionMapper.toResponse(programVersion);
   }
 
@@ -193,6 +207,14 @@ public class ProgramVersionServiceImpl implements ProgramVersionService {
           "Duplicate program version on update: {} - {}", programVersion.getProgramId(), version);
       throw conflict(version);
     }
+    AuditLogHelper.record(
+        auditService,
+        AuditAction.UPDATE,
+        "program_versions",
+        programVersion.getId(),
+        null,
+        programVersion,
+        null);
     return programVersionMapper.toResponse(programVersion);
   }
 
@@ -205,6 +227,14 @@ public class ProgramVersionServiceImpl implements ProgramVersionService {
     programVersion.setStatus(request.getStatus());
 
     programVersion = programVersionRepository.save(programVersion);
+    AuditLogHelper.record(
+        auditService,
+        AuditAction.STATUS_CHANGE,
+        "program_versions",
+        programVersion.getId(),
+        null,
+        programVersion,
+        null);
     return programVersionMapper.toResponse(programVersion);
   }
 

@@ -21,7 +21,7 @@ public class StudentResultTraceResponse {
   private String subjectId;
   private String subjectCode;
   private String studentId;
-  private String studentRef;
+  private String studentCode;
   private ResultStatus status;
   private Double value;
   private Double passThreshold;

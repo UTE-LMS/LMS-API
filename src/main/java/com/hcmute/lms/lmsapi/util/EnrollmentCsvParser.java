@@ -31,13 +31,12 @@ public final class EnrollmentCsvParser {
   /** Số dòng dữ liệu tối đa trong một tệp, để một lần nhập không chiếm quá nhiều tài nguyên. */
   public static final int MAX_DATA_ROWS = 5000;
 
-  private static final String COLUMN_STUDENT_REF = "studentref";
+  private static final String COLUMN_STUDENT_CODE = "studentcode";
   private static final String COLUMN_COHORT = "cohort";
-  private static final String COLUMN_MAJOR_CODE = "majorcode";
   private static final char BOM = '﻿';
 
   /** Một dòng dữ liệu; {@code lineNumber} là số dòng trong tệp (dòng tiêu đề là dòng 1). */
-  public record Row(int lineNumber, String studentRef, String cohort, String majorCode) {}
+  public record Row(int lineNumber, String studentCode, String cohort) {}
 
   /** Kết quả đọc: các dòng dữ liệu và tên các cột bị bỏ qua. */
   public record Result(List<Row> rows, List<String> ignoredColumns) {
@@ -85,8 +84,8 @@ public final class EnrollmentCsvParser {
           ignored.add(name);
         }
       }
-      if (!columnIndex.containsKey(COLUMN_STUDENT_REF)) {
-        throw invalid("Dòng tiêu đề phải có cột studentRef");
+      if (!columnIndex.containsKey(COLUMN_STUDENT_CODE)) {
+        throw invalid("Dòng tiêu đề phải có cột studentCode");
       }
 
       List<Row> rows = new ArrayList<>();
@@ -104,9 +103,8 @@ public final class EnrollmentCsvParser {
         rows.add(
             new Row(
                 lineNumber,
-                cell(cells, columnIndex.get(COLUMN_STUDENT_REF)),
-                cell(cells, columnIndex.get(COLUMN_COHORT)),
-                cell(cells, columnIndex.get(COLUMN_MAJOR_CODE))));
+                cell(cells, columnIndex.get(COLUMN_STUDENT_CODE)),
+                cell(cells, columnIndex.get(COLUMN_COHORT))));
       }
       if (rows.isEmpty()) {
         throw invalid("Tệp không có dòng dữ liệu nào");
@@ -128,9 +126,7 @@ public final class EnrollmentCsvParser {
   }
 
   private static boolean isKnownColumn(String key) {
-    return COLUMN_STUDENT_REF.equals(key)
-        || COLUMN_COHORT.equals(key)
-        || COLUMN_MAJOR_CODE.equals(key);
+    return COLUMN_STUDENT_CODE.equals(key) || COLUMN_COHORT.equals(key);
   }
 
   /** Giá trị ô đã bỏ khoảng trắng; cột không có trong tệp hoặc ô thiếu thì là chuỗi rỗng. */

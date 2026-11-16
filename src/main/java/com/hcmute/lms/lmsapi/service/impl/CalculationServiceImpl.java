@@ -220,7 +220,7 @@ public class CalculationServiceImpl implements CalculationService {
                     .sectionId(r.getSectionId())
                     .assessmentId(r.getAssessmentId())
                     .studentId(r.getStudentId())
-                    .studentRef(studentRefs.get(r.getStudentId()))
+                    .studentCode(studentRefs.get(r.getStudentId()))
                     .termId(r.getTermId())
                     .status(r.getStatus())
                     .value(r.getValue())
@@ -1134,7 +1134,7 @@ public class CalculationServiceImpl implements CalculationService {
   private Map<String, String> loadStudentRefs(List<StudentResult> results) {
     List<String> ids = results.stream().map(StudentResult::getStudentId).distinct().toList();
     return studentRepository.findAllById(ids).stream()
-        .collect(Collectors.toMap(Student::getId, Student::getStudentRef, (a, b) -> a));
+        .collect(Collectors.toMap(Student::getId, Student::getStudentCode, (a, b) -> a));
   }
 
   private Map<String, String> loadSubjectCodes(Collection<String> subjectIds) {

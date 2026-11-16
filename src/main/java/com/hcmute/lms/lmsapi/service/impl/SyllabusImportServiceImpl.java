@@ -99,6 +99,15 @@ public class SyllabusImportServiceImpl implements SyllabusImportService {
     List<CloPiLink> savedLinks =
         saveLinks(syllabus.getId(), programVersionId, data.links(), cloByCode, piByCode, verified);
 
+    AuditLogHelper.record(
+        auditService,
+        AuditAction.IMPORT,
+        "syllabi",
+        syllabus.getId(),
+        null,
+        Map.of("cloCount", savedClos.size(), "linkCount", savedLinks.size()),
+        "Import CSV đề cương");
+
     return SyllabusCsvImportResponse.builder()
         .syllabusId(syllabus.getId())
         .courseId(courseId)

@@ -5,6 +5,7 @@ import com.hcmute.lms.lmsapi.dto.TermRequest;
 import com.hcmute.lms.lmsapi.dto.TermResponse;
 import com.hcmute.lms.lmsapi.dto.TermStatusUpdateRequest;
 import com.hcmute.lms.lmsapi.dto.TermUpdateRequest;
+import com.hcmute.lms.lmsapi.enums.AuditAction;
 import com.hcmute.lms.lmsapi.enums.TermStatus;
 import com.hcmute.lms.lmsapi.exception.AppException;
 import com.hcmute.lms.lmsapi.exception.BusinessRuleViolationException;
@@ -14,12 +15,15 @@ import com.hcmute.lms.lmsapi.mapper.TermMapper;
 import com.hcmute.lms.lmsapi.repository.CourseSectionRepository;
 import com.hcmute.lms.lmsapi.repository.SyllabusRepository;
 import com.hcmute.lms.lmsapi.repository.TermRepository;
+import com.hcmute.lms.lmsapi.service.AuditService;
 import com.hcmute.lms.lmsapi.service.TermService;
 import com.hcmute.lms.lmsapi.util.ObjectIdUtils;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -33,6 +37,9 @@ public class TermServiceImpl implements TermService {
   private final SyllabusRepository syllabusRepository;
   private final CourseSectionRepository courseSectionRepository;
   private final TermMapper termMapper;
+
+  @Autowired(required = false)
+  private AuditService auditService;
 
   @Override
   public List<TermResponse> getTerms() {
@@ -57,6 +64,8 @@ public class TermServiceImpl implements TermService {
     try {
       Term saved = termRepository.save(term);
       log.info("Tạo thành công học kỳ id=[{}] mã [{}]", saved.getId(), saved.getCode());
+      AuditLogHelper.record(
+          auditService, AuditAction.CREATE, "terms", saved.getId(), null, saved, null);
       return termMapper.toResponse(saved);
     } catch (DuplicateKeyException ex) {
       throw conflict(String.format("Mã học kỳ [%s] đã tồn tại trong hệ thống", code));
@@ -80,6 +89,8 @@ public class TermServiceImpl implements TermService {
 
     Term saved = termRepository.save(term);
     log.info("Cập nhật thông tin học kỳ id=[{}] mã [{}]", saved.getId(), saved.getCode());
+    AuditLogHelper.record(
+        auditService, AuditAction.UPDATE, "terms", saved.getId(), null, saved, null);
     return termMapper.toResponse(saved);
   }
 
@@ -111,6 +122,14 @@ public class TermServiceImpl implements TermService {
         newStatus,
         actorUsername,
         request.getReason());
+    AuditLogHelper.record(
+        auditService,
+        AuditAction.STATUS_CHANGE,
+        "terms",
+        saved.getId(),
+        Map.of("status", currentStatus),
+        Map.of("status", newStatus),
+        request.getReason());
     return termMapper.toResponse(saved);
   }
 
@@ -134,6 +153,7 @@ public class TermServiceImpl implements TermService {
 
     termRepository.delete(term);
     log.info("Xóa thành công học kỳ id=[{}] mã [{}]", id, term.getCode());
+    AuditLogHelper.record(auditService, AuditAction.DELETE, "terms", id, term, null, null);
   }
 
   private Term requireTerm(String id) {

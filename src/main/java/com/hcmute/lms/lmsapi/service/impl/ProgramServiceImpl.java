@@ -4,6 +4,7 @@ import com.hcmute.lms.lmsapi.document.Program;
 import com.hcmute.lms.lmsapi.dto.PageResponse;
 import com.hcmute.lms.lmsapi.dto.ProgramRequest;
 import com.hcmute.lms.lmsapi.dto.ProgramResponse;
+import com.hcmute.lms.lmsapi.enums.AuditAction;
 import com.hcmute.lms.lmsapi.enums.ProgramVersionStatus;
 import com.hcmute.lms.lmsapi.exception.AppException;
 import com.hcmute.lms.lmsapi.exception.BusinessRuleViolationException;
@@ -13,6 +14,7 @@ import com.hcmute.lms.lmsapi.mapper.ProgramMapper;
 import com.hcmute.lms.lmsapi.repository.FacultyRepository;
 import com.hcmute.lms.lmsapi.repository.ProgramRepository;
 import com.hcmute.lms.lmsapi.repository.ProgramVersionRepository;
+import com.hcmute.lms.lmsapi.service.AuditService;
 import com.hcmute.lms.lmsapi.service.ProgramService;
 import com.hcmute.lms.lmsapi.util.ObjectIdUtils;
 import com.hcmute.lms.lmsapi.util.PageableValidationUtils;
@@ -23,6 +25,7 @@ import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.bson.types.ObjectId;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -44,6 +47,9 @@ public class ProgramServiceImpl implements ProgramService {
   private final ProgramVersionRepository programVersionRepository;
   private final ProgramMapper programMapper;
   private final MongoTemplate mongoTemplate;
+
+  @Autowired(required = false)
+  private AuditService auditService;
 
   @Override
   public PageResponse<ProgramResponse> getPrograms(int page, int size) {
@@ -150,6 +156,8 @@ public class ProgramServiceImpl implements ProgramService {
       log.warn("Duplicate program code on create: {}", code);
       throw conflict(code);
     }
+    AuditLogHelper.record(
+        auditService, AuditAction.CREATE, "programs", program.getId(), null, program, null);
     return programMapper.toResponse(program);
   }
 
@@ -214,6 +222,8 @@ public class ProgramServiceImpl implements ProgramService {
       log.warn("Duplicate program code on update: {}", code);
       throw conflict(code);
     }
+    AuditLogHelper.record(
+        auditService, AuditAction.UPDATE, "programs", program.getId(), null, program, null);
     return programMapper.toResponse(program);
   }
 

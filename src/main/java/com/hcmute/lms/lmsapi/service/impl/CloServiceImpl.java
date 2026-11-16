@@ -6,6 +6,7 @@ import com.hcmute.lms.lmsapi.document.Syllabus;
 import com.hcmute.lms.lmsapi.dto.CloRequest;
 import com.hcmute.lms.lmsapi.dto.CloResponse;
 import com.hcmute.lms.lmsapi.dto.CloUpdateRequest;
+import com.hcmute.lms.lmsapi.enums.AuditAction;
 import com.hcmute.lms.lmsapi.enums.SyllabusStatus;
 import com.hcmute.lms.lmsapi.exception.AppException;
 import com.hcmute.lms.lmsapi.exception.BusinessRuleViolationException;
@@ -15,11 +16,13 @@ import com.hcmute.lms.lmsapi.mapper.CloMapper;
 import com.hcmute.lms.lmsapi.repository.CloPiLinkRepository;
 import com.hcmute.lms.lmsapi.repository.CloRepository;
 import com.hcmute.lms.lmsapi.repository.SyllabusRepository;
+import com.hcmute.lms.lmsapi.service.AuditService;
 import com.hcmute.lms.lmsapi.service.CloService;
 import com.hcmute.lms.lmsapi.util.ObjectIdUtils;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -33,6 +36,9 @@ public class CloServiceImpl implements CloService {
   private final SyllabusRepository syllabusRepository;
   private final CloPiLinkRepository cloPiLinkRepository;
   private final CloMapper cloMapper;
+
+  @Autowired(required = false)
+  private AuditService auditService;
 
   @Override
   public List<CloResponse> getClos(String syllabusId) {
@@ -71,6 +77,8 @@ public class CloServiceImpl implements CloService {
           saved.getId(),
           saved.getCode(),
           syllabusId);
+      AuditLogHelper.record(
+          auditService, AuditAction.CREATE, "clos", saved.getId(), null, saved, null);
       return cloMapper.toResponse(saved);
     } catch (DuplicateKeyException ex) {
       throw conflict(
@@ -117,6 +125,8 @@ public class CloServiceImpl implements CloService {
     try {
       Clo updated = cloRepository.save(clo);
       log.info("Cập nhật thành công CLO id=[{}] mã [{}]", updated.getId(), updated.getCode());
+      AuditLogHelper.record(
+          auditService, AuditAction.UPDATE, "clos", updated.getId(), null, updated, null);
       return cloMapper.toResponse(updated);
     } catch (DuplicateKeyException ex) {
       throw conflict(
@@ -144,6 +154,7 @@ public class CloServiceImpl implements CloService {
 
     cloRepository.deleteById(id);
     log.info("Đã xóa CLO id=[{}] khỏi đề cương id=[{}]", id, clo.getSyllabusId());
+    AuditLogHelper.record(auditService, AuditAction.DELETE, "clos", id, clo, null, null);
   }
 
   private Syllabus requireSyllabus(String syllabusId) {

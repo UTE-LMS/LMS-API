@@ -113,6 +113,16 @@ public class ProgramImportServiceImpl implements ProgramImportService {
     List<Pi> savedPis = savePis(pv.getId(), data, ploByCode, verified);
     int courseCount = saveProgramCourses(pv.getId(), data.courseCodes(), data.warnings());
 
+    AuditLogHelper.record(
+        auditService,
+        AuditAction.IMPORT,
+        "program_versions",
+        pv.getId(),
+        null,
+        Map.of(
+            "ploCount", savedPlos.size(), "piCount", savedPis.size(), "courseCount", courseCount),
+        "Import CSV CTĐT");
+
     return ProgramCsvImportResponse.builder()
         .programVersionId(pv.getId())
         .programId(programId)

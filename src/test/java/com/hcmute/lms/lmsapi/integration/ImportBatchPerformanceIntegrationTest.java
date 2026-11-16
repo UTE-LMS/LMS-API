@@ -34,7 +34,7 @@ class ImportBatchPerformanceIntegrationTest extends ScoreImportIntegrationBase {
   void fiveThousandRowsWithinTenSeconds() throws Exception {
     List<Student> students = new ArrayList<>(ROWS);
     for (int i = 0; i < ROWS; i++) {
-      students.add(Student.builder().studentRef(fixtures.code("STU")).build());
+      students.add(Student.builder().studentCode(fixtures.code("STU")).build());
     }
     List<Student> saved = new ArrayList<>(mongo().insert(students, Student.class));
     List<Enrollment> enrollments = new ArrayList<>(ROWS);
@@ -48,9 +48,9 @@ class ImportBatchPerformanceIntegrationTest extends ScoreImportIntegrationBase {
               .build());
     }
     mongo().insert(enrollments, Enrollment.class);
-    StringBuilder rows = new StringBuilder("studentRef,Q1,Q2\n");
+    StringBuilder rows = new StringBuilder("studentCode,Q1,Q2\n");
     for (Student student : saved) {
-      rows.append(student.getStudentRef()).append(",3,5\n");
+      rows.append(student.getStudentCode()).append(",3,5\n");
     }
 
     Instant start = Instant.now();

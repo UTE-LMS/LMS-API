@@ -28,7 +28,7 @@ class ScoreRowValidatorTest {
   private final Set<String> existing = new HashSet<>();
 
   private final ImportColumnMapping mapping =
-      ImportColumnMapping.builder().studentColumn("studentRef").build();
+      ImportColumnMapping.builder().studentColumn("studentCode").build();
   private final List<ScoreRowValidator.Column> columns =
       List.of(
           new ScoreRowValidator.Column(1, "Q1", ITEM_Q1, CLO_1, 4.0),
@@ -53,7 +53,7 @@ class ScoreRowValidatorTest {
   @Test
   @DisplayName("US-22: điểm đúng bằng maxScore là hợp lệ; 0 gõ rõ ràng là 0.0")
   void scoresAtBoundaryAreValid() {
-    ScoreRowValidator.Result result = run("studentRef,Q1,Q2\nS1,4,6\nS2,0,5.5\n");
+    ScoreRowValidator.Result result = run("studentCode,Q1,Q2\nS1,4,6\nS2,0,5.5\n");
 
     assertThat(result.errors()).isEmpty();
     assertThat(result.totalRows()).isEqualTo(2);
@@ -70,7 +70,7 @@ class ScoreRowValidatorTest {
   @DisplayName(
       "US-22/AC-1: maxScore + 0,01 là SCORE_OUT_OF_RANGE đúng dòng 2, cột Q1, kèm giá trị gốc")
   void scoreJustAboveMaxIsReported() {
-    ScoreRowValidator.Result result = run("studentRef,Q1,Q2\nS1,4.01,6\nS2,4,6\n");
+    ScoreRowValidator.Result result = run("studentCode,Q1,Q2\nS1,4.01,6\nS2,4,6\n");
 
     assertThat(result.errors())
         .containsExactly(
@@ -85,7 +85,7 @@ class ScoreRowValidatorTest {
       "US-22/AC-1: điểm âm, chữ, NaN, ký hiệu khoa học, nhiều dấu thập phân đều lỗi; dấu phẩy thập phân hợp lệ")
   void invalidNumbersAreRejected() {
     for (String bad : new String[] {"-0.5", "abc", "NaN", "Infinity", "1e1", "1.2.3", "1 2"}) {
-      ScoreRowValidator.Result result = run("studentRef,Q1,Q2\nS1," + bad + ",6\n");
+      ScoreRowValidator.Result result = run("studentCode,Q1,Q2\nS1," + bad + ",6\n");
       assertThat(result.errors())
           .as("giá trị %s", bad)
           .singleElement()
@@ -96,10 +96,10 @@ class ScoreRowValidatorTest {
                 assertThat(error.rawValue()).isEqualTo(bad);
               });
     }
-    ScoreRowValidator.Result comma = run("studentRef;Q1;Q2\nS1;3,5;6\n");
+    ScoreRowValidator.Result comma = run("studentCode;Q1;Q2\nS1;3,5;6\n");
     assertThat(comma.errors()).isEmpty();
     assertThat(comma.drafts().get(0).rawScore()).isEqualTo(3.5);
-    assertThat(run("studentRef;Q1;Q2\nS1;4,01;6\n").errors())
+    assertThat(run("studentCode;Q1;Q2\nS1;4,01;6\n").errors())
         .singleElement()
         .extracting("errorType")
         .isEqualTo(ImportErrorType.SCORE_OUT_OF_RANGE);
@@ -108,7 +108,7 @@ class ScoreRowValidatorTest {
   @Test
   @DisplayName("US-23/AC-1: ô trống tự động gán rawScore = 0.0 theo chuẩn v0.7")
   void emptyCellFollowsChosenPolicy() {
-    String csv = "studentRef,Q1,Q2\nS1,,6\n";
+    String csv = "studentCode,Q1,Q2\nS1,,6\n";
 
     ScoreRowValidator.Draft asBlank = run(csv).drafts().get(0);
     assertThat(asBlank.rawScore()).isEqualTo(0.0);
@@ -120,7 +120,7 @@ class ScoreRowValidatorTest {
   @DisplayName(
       "US-22/AC-2: dòng ngắn hơn tiêu đề là MISSING_FIELD (khác ô trống); dòng thừa ô là lỗi cả dòng")
   void shortAndLongRowsAreMissingField() {
-    ScoreRowValidator.Result shortRow = run("studentRef,Q1,Q2\nS1,4\n");
+    ScoreRowValidator.Result shortRow = run("studentCode,Q1,Q2\nS1,4\n");
     assertThat(shortRow.errors())
         .containsExactly(
             new ScoreRowValidator.RowError(
@@ -130,7 +130,7 @@ class ScoreRowValidatorTest {
                 null,
                 "Dòng ngắn hơn dòng tiêu đề, thiếu ô điểm của cột này"));
 
-    ScoreRowValidator.Result longRow = run("studentRef,Q1,Q2\nS1,4,6,7\n");
+    ScoreRowValidator.Result longRow = run("studentCode,Q1,Q2\nS1,4,6,7\n");
     assertThat(longRow.errors())
         .singleElement()
         .satisfies(
@@ -146,7 +146,7 @@ class ScoreRowValidatorTest {
   @DisplayName(
       "US-22/AC-2: mã sinh viên trống, lạ/không ghi danh, trùng trong tệp -> đúng loại lỗi")
   void studentCodeErrors() {
-    ScoreRowValidator.Result result = run("studentRef,Q1,Q2\n,4,6\nS9,4,6\nS1,4,6\nS1,3,5\n");
+    ScoreRowValidator.Result result = run("studentCode,Q1,Q2\n,4,6\nS9,4,6\nS1,4,6\nS1,3,5\n");
 
     assertThat(result.errors())
         .extracting(
@@ -155,11 +155,12 @@ class ScoreRowValidatorTest {
             ScoreRowValidator.RowError::errorType,
             ScoreRowValidator.RowError::rawValue)
         .containsExactly(
-            org.assertj.core.groups.Tuple.tuple(2, "studentRef", ImportErrorType.MISSING_FIELD, ""),
             org.assertj.core.groups.Tuple.tuple(
-                3, "studentRef", ImportErrorType.INVALID_STUDENT_CODE, "S9"),
+                2, "studentCode", ImportErrorType.MISSING_FIELD, ""),
             org.assertj.core.groups.Tuple.tuple(
-                5, "studentRef", ImportErrorType.DUPLICATE_RECORD, "S1"));
+                3, "studentCode", ImportErrorType.INVALID_STUDENT_CODE, "S9"),
+            org.assertj.core.groups.Tuple.tuple(
+                5, "studentCode", ImportErrorType.DUPLICATE_RECORD, "S1"));
     assertThat(result.errors().get(2).message()).contains("dòng 4");
     assertThat(result.errorRows()).isEqualTo(3);
     assertThat(result.drafts()).extracting(ScoreRowValidator.Draft::sourceRow).containsOnly(4);
@@ -170,7 +171,7 @@ class ScoreRowValidatorTest {
   void existingScoreIsRejectedByPolicy() {
     existing.add(ScoreRowValidator.key("id-s1", ITEM_Q2, CLO_2));
 
-    ScoreRowValidator.Result result = run("studentRef,Q1,Q2\nS1,4,6\nS2,1,2\n");
+    ScoreRowValidator.Result result = run("studentCode,Q1,Q2\nS1,4,6\nS2,1,2\n");
 
     assertThat(result.errors())
         .singleElement()
@@ -189,7 +190,7 @@ class ScoreRowValidatorTest {
   @Test
   @DisplayName("US-22: một dòng nhiều lỗi thì báo đủ từng lỗi nhưng chỉ tính 1 dòng lỗi")
   void allErrorsOfARowAreReported() {
-    ScoreRowValidator.Result result = run("studentRef,Q1,Q2\nS9,abc,-1\n");
+    ScoreRowValidator.Result result = run("studentCode,Q1,Q2\nS9,abc,-1\n");
 
     assertThat(result.errors())
         .extracting(ScoreRowValidator.RowError::errorType)
@@ -206,7 +207,7 @@ class ScoreRowValidatorTest {
       "US-22/AC-3 (biên): 1 lỗi trong 1.000 dòng -> đúng 1 lỗi ở dòng 501, 999 dòng hợp lệ")
   void oneErrorInAThousandRows() {
     List<ScoreRowValidator.Column> single = List.of(columns.get(0));
-    StringBuilder csv = new StringBuilder("studentRef,Q1\n");
+    StringBuilder csv = new StringBuilder("studentCode,Q1\n");
     Map<String, String> many = new HashMap<>();
     for (int i = 1; i <= 1000; i++) {
       many.put("R" + i, "id-r" + i);
@@ -234,7 +235,7 @@ class ScoreRowValidatorTest {
   void enrolledStudentsAbsentFromTheFileGetNoScores() {
     List<ScoreRowValidator.Column> single = List.of(columns.get(0));
     Map<String, String> classOf45 = new HashMap<>();
-    StringBuilder csv = new StringBuilder("studentRef,Q1\n");
+    StringBuilder csv = new StringBuilder("studentCode,Q1\n");
     for (int i = 1; i <= 45; i++) {
       classOf45.put("R" + i, "id-r" + i);
       if (i <= 40) {
@@ -261,7 +262,7 @@ class ScoreRowValidatorTest {
   @Test
   @DisplayName("Result trả danh sách bất biến")
   void resultListsAreImmutable() {
-    ScoreRowValidator.Result result = run("studentRef,Q1,Q2\nS1,4,6\n");
+    ScoreRowValidator.Result result = run("studentCode,Q1,Q2\nS1,4,6\n");
 
     org.assertj.core.api.Assertions.assertThatThrownBy(() -> result.drafts().clear())
         .isInstanceOf(UnsupportedOperationException.class);

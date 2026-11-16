@@ -9,6 +9,7 @@ import com.hcmute.lms.lmsapi.dto.PageResponse;
 import com.hcmute.lms.lmsapi.dto.UpdateUserRequest;
 import com.hcmute.lms.lmsapi.dto.UpdateUserStatusRequest;
 import com.hcmute.lms.lmsapi.dto.UserResponse;
+import com.hcmute.lms.lmsapi.enums.AuditAction;
 import com.hcmute.lms.lmsapi.enums.Role;
 import com.hcmute.lms.lmsapi.enums.UserStatus;
 import com.hcmute.lms.lmsapi.exception.AppException;
@@ -19,6 +20,7 @@ import com.hcmute.lms.lmsapi.mapper.UserMapper;
 import com.hcmute.lms.lmsapi.repository.FacultyRepository;
 import com.hcmute.lms.lmsapi.repository.UserRepository;
 import com.hcmute.lms.lmsapi.repository.UserRepositoryCustom;
+import com.hcmute.lms.lmsapi.service.AuditService;
 import com.hcmute.lms.lmsapi.service.UserService;
 import com.hcmute.lms.lmsapi.util.PageableValidationUtils;
 import com.hcmute.lms.lmsapi.util.StringNormalizationUtils;
@@ -38,6 +40,7 @@ import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.bson.types.ObjectId;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -63,6 +66,9 @@ public class UserServiceImpl implements UserService {
   private final UserMapper userMapper;
   private final PasswordEncoder passwordEncoder;
   private final PasswordPolicyValidator passwordPolicyValidator;
+
+  @Autowired(required = false)
+  private AuditService auditService;
 
   private static final Pattern USERNAME_PATTERN = Pattern.compile("^[a-zA-Z0-9._-]+$");
   private static final Pattern EMAIL_PATTERN =
@@ -125,6 +131,8 @@ public class UserServiceImpl implements UserService {
     }
 
     log.info("User [{}] created successfully with ID [{}]", user.getUsername(), user.getId());
+    AuditLogHelper.record(
+        auditService, AuditAction.CREATE, "users", user.getId(), null, user, null);
     return userMapper.toResponse(user);
   }
 
@@ -224,6 +232,8 @@ public class UserServiceImpl implements UserService {
     }
 
     log.info("User [{}] updated successfully", user.getId());
+    AuditLogHelper.record(
+        auditService, AuditAction.UPDATE, "users", user.getId(), null, user, null);
     return userMapper.toResponse(user);
   }
 
@@ -282,6 +292,14 @@ public class UserServiceImpl implements UserService {
     }
 
     log.info("Status of user [{}] updated to [{}] successfully", id, newStatus);
+    AuditLogHelper.record(
+        auditService,
+        AuditAction.STATUS_CHANGE,
+        "users",
+        user.getId(),
+        null,
+        Map.of("status", newStatus),
+        null);
     return userMapper.toResponse(user);
   }
 
@@ -430,12 +448,16 @@ public class UserServiceImpl implements UserService {
       }
     }
 
-    return CsvImportResultResponse.builder()
-        .totalRows(totalRows)
-        .successCount(successCount)
-        .failureCount(errors.size())
-        .errors(errors)
-        .build();
+    CsvImportResultResponse result =
+        CsvImportResultResponse.builder()
+            .totalRows(totalRows)
+            .successCount(successCount)
+            .failureCount(errors.size())
+            .errors(errors)
+            .build();
+    AuditLogHelper.record(
+        auditService, AuditAction.IMPORT, "users", "batch", null, result, "Import CSV người dùng");
+    return result;
   }
 
   private List<Role> parseUserRoles(String rawRoles) {

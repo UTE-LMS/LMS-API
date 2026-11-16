@@ -1,12 +1,15 @@
 package com.hcmute.lms.lmsapi.document;
 
 import com.hcmute.lms.lmsapi.enums.SyllabusStatus;
+import java.time.Instant;
 import java.util.Map;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.index.CompoundIndexes;
 import org.springframework.data.mongodb.core.mapping.Document;
@@ -48,4 +51,12 @@ public class Syllabus {
 
   @Field("extra")
   private Map<String, Object> extra;
+
+  @CreatedDate
+  @Field("createdAt")
+  private Instant createdAt;
+
+  @LastModifiedDate
+  @Field("updatedAt")
+  private Instant updatedAt;
 }

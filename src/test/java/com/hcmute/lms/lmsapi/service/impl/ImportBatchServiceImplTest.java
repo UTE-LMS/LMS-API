@@ -55,7 +55,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @DisplayName("F05b: ImportBatchServiceImpl unit tests")
 class ImportBatchServiceImplTest {
 
-  private static final byte[] CSV = "studentRef,Q1\nS1,4\n".getBytes(StandardCharsets.UTF_8);
+  private static final byte[] CSV = "studentCode,Q1\nS1,4\n".getBytes(StandardCharsets.UTF_8);
 
   @Mock private CourseSectionRepository sectionRepository;
   @Mock private AssessmentRepository assessmentRepository;
@@ -152,7 +152,7 @@ class ImportBatchServiceImplTest {
         .reimportPolicy(ReimportPolicy.REJECT_ON_CONFLICT)
         .columnMapping(
             ImportColumnMappingDto.builder()
-                .studentColumn("studentRef")
+                .studentColumn("studentCode")
                 .items(
                     List.of(
                         ImportColumnMappingDto.Entry.builder()
@@ -213,7 +213,7 @@ class ImportBatchServiceImplTest {
             .status(ImportBatchStatus.UPLOADED)
             .columnMapping(
                 ImportColumnMapping.builder()
-                    .studentColumn("studentRef")
+                    .studentColumn("studentCode")
                     .items(
                         List.of(
                             ImportColumnMapping.Entry.builder()

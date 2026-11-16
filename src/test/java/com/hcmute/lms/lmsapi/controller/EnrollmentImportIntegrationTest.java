@@ -80,7 +80,8 @@ class EnrollmentImportIntegrationTest extends IntegrationTestBase {
   }
 
   private long countStudents(String... refs) {
-    return mongo().count(Query.query(Criteria.where("studentRef").in((Object[]) refs)), "students");
+    return mongo()
+        .count(Query.query(Criteria.where("studentCode").in((Object[]) refs)), "students");
   }
 
   private int enrolledCountOf(CourseSection target) {
@@ -101,13 +102,7 @@ class EnrollmentImportIntegrationTest extends IntegrationTestBase {
             importAs(
                 lecturerToken,
                 section.getId(),
-                "studentRef,cohort,majorCode\n"
-                    + refA
-                    + ",K22,FINTECH\n"
-                    + refB
-                    + ",K22,\n"
-                    + refC
-                    + "\n"))
+                "studentCode,cohort\n" + refA + ",K22\n" + refB + ",K22\n" + refC + "\n"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.sectionId").value(section.getId()))
         .andExpect(jsonPath("$.totalRows").value(3))
@@ -120,10 +115,10 @@ class EnrollmentImportIntegrationTest extends IntegrationTestBase {
     assertThat(enrolledCountOf(section)).isEqualTo(3);
     Student stored =
         mongo()
-            .findOne(Query.query(Criteria.where("studentRef").is(refA)), Student.class, "students");
+            .findOne(
+                Query.query(Criteria.where("studentCode").is(refA)), Student.class, "students");
     assertThat(stored).isNotNull();
     assertThat(stored.getCohort()).isEqualTo("K22");
-    assertThat(stored.getMajorCode()).isEqualTo("FINTECH");
 
     mockMvc
         .perform(getAs(lecturerToken, "/api/v1/sections/{id}/enrollments", section.getId()))
@@ -143,7 +138,7 @@ class EnrollmentImportIntegrationTest extends IntegrationTestBase {
             importAs(
                 lecturerToken,
                 section.getId(),
-                "studentRef,fullName,email\n" + ref + ",Ten Gia,gia@example.invalid\n"))
+                "studentCode,fullName,email\n" + ref + ",Ten Gia,gia@example.invalid\n"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.ignoredColumns[0]").value("fullName"))
         .andExpect(jsonPath("$.ignoredColumns[1]").value("email"));
@@ -151,7 +146,7 @@ class EnrollmentImportIntegrationTest extends IntegrationTestBase {
     org.bson.Document raw =
         mongo()
             .findOne(
-                Query.query(Criteria.where("studentRef").is(ref)),
+                Query.query(Criteria.where("studentCode").is(ref)),
                 org.bson.Document.class,
                 "students");
     assertThat(raw).isNotNull();
@@ -161,7 +156,7 @@ class EnrollmentImportIntegrationTest extends IntegrationTestBase {
 
   @Test
   @DisplayName(
-      "US-20/AC-1: sinh viên đã có ở lớp khác được dùng lại, không tạo trùng (studentRef trùng giữa hai tệp)")
+      "US-20/AC-1: sinh viên đã có ở lớp khác được dùng lại, không tạo trùng (studentCode trùng giữa hai tệp)")
   void us20_ac1_existingStudentIsReusedAcrossSections() throws Exception {
     String shared = fixtures.code("STU");
     String onlyInSecond = fixtures.code("STU");
@@ -169,14 +164,14 @@ class EnrollmentImportIntegrationTest extends IntegrationTestBase {
     CourseSection second = newSection(lecturer2);
 
     mockMvc
-        .perform(importAs(lecturerToken, section.getId(), "studentRef\n" + shared + "\n"))
+        .perform(importAs(lecturerToken, section.getId(), "studentCode\n" + shared + "\n"))
         .andExpect(status().isOk());
     mockMvc
         .perform(
             importAs(
                 fixtures.bearer(lecturer2),
                 second.getId(),
-                "studentRef\n" + shared + "\n" + onlyInSecond + "\n"))
+                "studentCode\n" + shared + "\n" + onlyInSecond + "\n"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.newStudents").value(1))
         .andExpect(jsonPath("$.reusedStudents").value(1))
@@ -197,7 +192,7 @@ class EnrollmentImportIntegrationTest extends IntegrationTestBase {
             importAs(
                 lecturerToken,
                 section.getId(),
-                "studentRef\n"
+                "studentCode\n"
                     + good
                     + "\n"
                     + "\n"
@@ -213,7 +208,7 @@ class EnrollmentImportIntegrationTest extends IntegrationTestBase {
         .andExpect(jsonPath("$.fieldErrors[0].field").value("line 5"))
         .andExpect(jsonPath("$.fieldErrors[1].field").value("line 6"))
         .andExpect(
-            jsonPath("$.fieldErrors[1].message").value("studentRef trùng với dòng 4 trong tệp"))
+            jsonPath("$.fieldErrors[1].message").value("studentCode trùng với dòng 4 trong tệp"))
         .andExpect(jsonPath("$.fieldErrors[2].field").value("line 7"));
 
     // Dòng hợp lệ đứng trước cũng không được ghi (một thao tác thống nhất)
@@ -227,7 +222,7 @@ class EnrollmentImportIntegrationTest extends IntegrationTestBase {
       "US-20/AC-2 & idempotent: nhập lại cùng tệp -> 422 'đã ghi danh', không nhân đôi sinh viên/ghi danh")
   void us20_ac2_reimportingTheSameFileIsRejectedWithoutDuplicates() throws Exception {
     String ref = fixtures.code("STU");
-    String csv = "studentRef\n" + ref + "\n";
+    String csv = "studentCode\n" + ref + "\n";
 
     mockMvc.perform(importAs(lecturerToken, section.getId(), csv)).andExpect(status().isOk());
     mockMvc
@@ -251,7 +246,7 @@ class EnrollmentImportIntegrationTest extends IntegrationTestBase {
     mockMvc
         .perform(
             importAs(
-                lecturerToken, section.getId(), "studentRef\n" + student.getStudentRef() + "\n"))
+                lecturerToken, section.getId(), "studentCode\n" + student.getStudentCode() + "\n"))
         .andExpect(status().isUnprocessableEntity())
         .andExpect(
             jsonPath("$.fieldErrors[0].message")
@@ -261,7 +256,7 @@ class EnrollmentImportIntegrationTest extends IntegrationTestBase {
   @Test
   @DisplayName("US-20/AC-3: tệp rỗng, sai cột, không có dòng dữ liệu, thiếu phần tệp -> 400")
   void us20_ac3_malformedFilesAreRejected() throws Exception {
-    for (String csv : List.of("", "cohort\nK22\n", "studentRef\n")) {
+    for (String csv : List.of("", "cohort\nK22\n", "studentCode\n")) {
       mockMvc
           .perform(importAs(lecturerToken, section.getId(), csv))
           .andExpect(status().isBadRequest())
@@ -280,7 +275,7 @@ class EnrollmentImportIntegrationTest extends IntegrationTestBase {
   @Test
   @DisplayName("US-20 RBAC: giảng viên ngoài lớp -> 403; chưa đăng nhập -> 401; ADMIN nhập được")
   void us20_rbac() throws Exception {
-    String csv = "studentRef\n" + fixtures.code("STU") + "\n";
+    String csv = "studentCode\n" + fixtures.code("STU") + "\n";
 
     mockMvc
         .perform(importAs(otherLecturerToken, section.getId(), csv))
@@ -305,7 +300,7 @@ class EnrollmentImportIntegrationTest extends IntegrationTestBase {
       "US-20 (khóa mẫu số): lớp CLOSED/LOCKED hoặc học kỳ khóa sổ điểm -> 422 và không ghi gì")
   void us20_frozenSectionOrTermRejectsImport() throws Exception {
     String ref = fixtures.code("STU");
-    String csv = "studentRef\n" + ref + "\n";
+    String csv = "studentCode\n" + ref + "\n";
 
     for (SectionStatus frozen : List.of(SectionStatus.CLOSED, SectionStatus.LOCKED)) {
       section.setStatus(frozen);
@@ -330,7 +325,7 @@ class EnrollmentImportIntegrationTest extends IntegrationTestBase {
   @DisplayName(
       "US-20/AC-4: sau khi nhập 5 người rồi cho 1 người rút, sĩ số còn 4 và tệp nhập mới tính tiếp từ 4")
   void us20_ac4_denominatorFollowsWithdrawals() throws Exception {
-    StringBuilder csv = new StringBuilder("studentRef\n");
+    StringBuilder csv = new StringBuilder("studentCode\n");
     for (int i = 0; i < 5; i++) {
       csv.append(fixtures.code("STU")).append('\n');
     }
@@ -363,8 +358,62 @@ class EnrollmentImportIntegrationTest extends IntegrationTestBase {
 
     mockMvc
         .perform(
-            importAs(lecturerToken, section.getId(), "studentRef\n" + fixtures.code("STU") + "\n"))
+            importAs(lecturerToken, section.getId(), "studentCode\n" + fixtures.code("STU") + "\n"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.sectionEnrolledCount").value(5));
+  }
+
+  @Test
+  @DisplayName("Tải template và import ghi danh nhiều lớp từ 1 file CSV")
+  void bulkEnrollmentTemplateAndImport() throws Exception {
+    mockMvc
+        .perform(
+            getAs(
+                lecturerToken,
+                "/api/v1/sections/{id}/enrollments/import-template",
+                section.getId()))
+        .andExpect(status().isOk())
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.content()
+                .string(org.hamcrest.Matchers.containsString("studentCode,cohort")));
+
+    mockMvc
+        .perform(getAs(lecturerToken, "/api/v1/enrollments/import-template"))
+        .andExpect(status().isOk())
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.content()
+                .string(org.hamcrest.Matchers.containsString("sectionCode,studentCode,cohort")));
+
+    String mssv1 = fixtures.code("MSSV");
+    String mssv2 = fixtures.code("MSSV");
+    var file =
+        new org.springframework.mock.web.MockMultipartFile(
+            "file",
+            "bulk.csv",
+            "text/csv",
+            ("sectionCode,studentCode,cohort\n"
+                    + section.getCode()
+                    + ","
+                    + mssv1
+                    + ",K23\n"
+                    + section.getCode()
+                    + ","
+                    + mssv2
+                    + ",K23\n"
+                    + "MISSING_SEC,"
+                    + mssv2
+                    + ",K23\n")
+                .getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    mockMvc
+        .perform(
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart(
+                    "/api/v1/enrollments/import")
+                .file(file)
+                .header(org.springframework.http.HttpHeaders.AUTHORIZATION, lecturerToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalRows").value(3))
+        .andExpect(jsonPath("$.successCount").value(2))
+        .andExpect(jsonPath("$.failureCount").value(1));
+    assertThat(enrolledCountOf(section)).isEqualTo(2);
   }
 }

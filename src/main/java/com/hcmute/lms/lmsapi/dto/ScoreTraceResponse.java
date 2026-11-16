@@ -21,7 +21,7 @@ public class ScoreTraceResponse {
   private String cloId;
   private String cloCode;
   private String studentId;
-  private String studentRef;
+  private String studentCode;
   private Double rawScore;
   private Double maxScore;
   private String importBatchId;

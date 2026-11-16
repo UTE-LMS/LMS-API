@@ -1,23 +1,18 @@
 package com.hcmute.lms.lmsapi.document;
 
 import com.hcmute.lms.lmsapi.enums.StudentStatus;
+import java.time.Instant;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.mongodb.core.mapping.Field;
 
-/**
- * Sinh viên trong collection students (§4.18 / US-20).
- *
- * <p>Riêng tư (Q09): {@code studentRef} là mã dùng để nhận diện, mã thật chỉ trên CSDL thật/staging
- * còn dữ liệu mẫu và test dùng mã giả. {@code fullName}, {@code email}, {@code userId}, {@code
- * programVersionId} của schema chưa được dùng ở F05a vì chưa có tính năng nào cần đến và dữ liệu cá
- * nhân chỉ lưu khi được phép; thêm khi có yêu cầu.
- */
 @Data
 @Builder
 @NoArgsConstructor
@@ -27,10 +22,10 @@ public class Student {
 
   @Id private String id;
 
-  /** Mã thay thế của sinh viên (duy nhất toàn hệ thống). */
+  /** Mã số sinh viên (duy nhất toàn hệ thống). */
   @Indexed(unique = true)
-  @Field("studentRef")
-  private String studentRef;
+  @Field("studentCode")
+  private String studentCode;
 
   /** Họ và tên sinh viên (tùy chọn). */
   @Field("fullName")
@@ -40,11 +35,15 @@ public class Student {
   @Field("cohort")
   private String cohort;
 
-  /** Mã ngành (tùy chọn). */
-  @Field("majorCode")
-  private String majorCode;
-
   @Builder.Default
   @Field("status")
   private StudentStatus status = StudentStatus.ACTIVE;
+
+  @CreatedDate
+  @Field("createdAt")
+  private Instant createdAt;
+
+  @LastModifiedDate
+  @Field("updatedAt")
+  private Instant updatedAt;
 }

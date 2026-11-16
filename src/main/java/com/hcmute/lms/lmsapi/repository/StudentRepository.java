@@ -9,5 +9,5 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface StudentRepository extends MongoRepository<Student, String> {
 
-  List<Student> findByStudentRefIn(Collection<String> studentRefs);
+  List<Student> findByStudentCodeIn(Collection<String> studentCodes);
 }

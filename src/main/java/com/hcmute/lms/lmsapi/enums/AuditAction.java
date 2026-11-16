@@ -5,6 +5,11 @@ package com.hcmute.lms.lmsapi.enums;
  * doc/database_import.js (v0.7).
  */
 public enum AuditAction {
+  CREATE,
+  UPDATE,
+  DELETE,
+  STATUS_CHANGE,
+  IMPORT,
   SCORE_UPDATE,
   IMPORT_CONFIRM,
   ASSESSMENT_LOCK,
