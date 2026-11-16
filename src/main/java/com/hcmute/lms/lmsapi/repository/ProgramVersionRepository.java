@@ -25,5 +25,13 @@ public interface ProgramVersionRepository extends MongoRepository<ProgramVersion
 
   boolean existsByIdInAndStatus(Collection<String> ids, ProgramVersionStatus status);
 
+  boolean existsByIdInAndStatusIn(
+      Collection<String> ids, Collection<ProgramVersionStatus> statuses);
+
+  boolean existsByProgramIdAndStatusIn(String programId, Collection<ProgramVersionStatus> statuses);
+
   boolean existsByProgramIdInAndStatus(Collection<String> programIds, ProgramVersionStatus status);
+
+  boolean existsByProgramIdInAndStatusIn(
+      Collection<String> programIds, Collection<ProgramVersionStatus> statuses);
 }

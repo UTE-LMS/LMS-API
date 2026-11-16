@@ -24,6 +24,7 @@ import com.hcmute.lms.lmsapi.dto.FacultyAssignPmRequest;
 import com.hcmute.lms.lmsapi.dto.FacultyRequest;
 import com.hcmute.lms.lmsapi.dto.FacultyStatusUpdateRequest;
 import com.hcmute.lms.lmsapi.dto.FacultyTransferPmRequest;
+import com.hcmute.lms.lmsapi.dto.FacultyUpdateRequest;
 import com.hcmute.lms.lmsapi.dto.ProgramRequest;
 import com.hcmute.lms.lmsapi.enums.AssessmentScope;
 import com.hcmute.lms.lmsapi.enums.AssessmentStatus;
@@ -278,13 +279,42 @@ class FacultyAndDecentralizedRbacIntegrationTest extends IntegrationTestBase {
 
     // Admin không được khóa Khoa 1 khi Khoa 1 vẫn còn CTĐT ACTIVE
     User admin = fixtures.user(Role.ADMIN, null);
+    String adminBearer = fixtures.bearer(admin);
     mockMvc
         .perform(
             putAs(
-                fixtures.bearer(admin),
+                adminBearer,
                 "/api/v1/faculties/" + f1.getId() + "/status",
                 FacultyStatusUpdateRequest.builder().isActive(false).reason("Test").build()))
         .andExpect(status().isUnprocessableEntity());
+
+    // Immutable Guard: Không cho đổi tên/tín chỉ học phần, CTĐT, tên Khoa đã có phiên bản ban hành
+    mockMvc
+        .perform(
+            putAs(
+                pm2Bearer,
+                "/api/v1/courses/" + course2Id,
+                CourseUpdateRequest.builder().name("Môn khác").credits(3).build()))
+        .andExpect(status().isUnprocessableEntity())
+        .andExpect(jsonPath("$.code").value("BUSINESS_RULE_VIOLATION"));
+
+    mockMvc
+        .perform(
+            putAs(
+                pm1Bearer,
+                "/api/v1/programs/" + prog1Id,
+                ProgramRequest.builder().code(prog1.getCode()).name("Ngành bị đổi").build()))
+        .andExpect(status().isUnprocessableEntity())
+        .andExpect(jsonPath("$.code").value("BUSINESS_RULE_VIOLATION"));
+
+    mockMvc
+        .perform(
+            putAs(
+                adminBearer,
+                "/api/v1/faculties/" + f1.getId(),
+                FacultyUpdateRequest.builder().name("Khoa bị đổi tên").build()))
+        .andExpect(status().isUnprocessableEntity())
+        .andExpect(jsonPath("$.code").value("BUSINESS_RULE_VIOLATION"));
   }
 
   @Test

@@ -119,8 +119,15 @@ public class FacultyServiceImpl implements FacultyService {
   public FacultyResponse updateFaculty(String id, FacultyUpdateRequest request) {
     Faculty faculty = requireFaculty(id);
     String name = request.getName().trim();
-    if (!name.equals(faculty.getName()) && facultyRepository.existsByNameAndIdNot(name, id)) {
-      throw conflict("Tên khoa đã tồn tại: " + name);
+    if (!name.equals(faculty.getName())) {
+      if (hasPublishedProgramsInFaculty(id)) {
+        throw new BusinessRuleViolationException(
+            "FACULTY_LOCKED_BY_PROGRAM_VERSION",
+            "Không thể đổi tên Khoa đã có phiên bản CTĐT ban hành (ACTIVE/ARCHIVED).");
+      }
+      if (facultyRepository.existsByNameAndIdNot(name, id)) {
+        throw conflict("Tên khoa đã tồn tại: " + name);
+      }
     }
 
     if (Boolean.FALSE.equals(request.getIsActive()) && faculty.isActive()) {
@@ -289,6 +296,14 @@ public class FacultyServiceImpl implements FacultyService {
           "FACULTY_HAS_ACTIVE_PROGRAMS",
           "Không thể khóa Khoa khi vẫn còn phiên bản CTĐT đang ở trạng thái ACTIVE.");
     }
+  }
+
+  private boolean hasPublishedProgramsInFaculty(String facultyId) {
+    List<String> programIds =
+        programRepository.findByFacultyId(facultyId).stream().map(Program::getId).toList();
+    return !programIds.isEmpty()
+        && programVersionRepository.existsByProgramIdInAndStatusIn(
+            programIds, List.of(ProgramVersionStatus.ACTIVE, ProgramVersionStatus.ARCHIVED));
   }
 
   private FacultyResponse toResponse(Faculty faculty) {

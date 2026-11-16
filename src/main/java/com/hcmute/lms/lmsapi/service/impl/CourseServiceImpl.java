@@ -177,6 +177,16 @@ public class CourseServiceImpl implements CourseService {
             .findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Course", "id", id));
 
+    String newName = request.getName().trim();
+    boolean coreContentChanged =
+        !newName.equals(course.getName())
+            || !java.util.Objects.equals(request.getCredits(), course.getCredits());
+    if (coreContentChanged && isCourseInPublishedProgramVersions(id)) {
+      throw new BusinessRuleViolationException(
+          "COURSE_LOCKED_BY_PROGRAM_VERSION",
+          "Không thể thay đổi tên hoặc số tín chỉ của học phần đã thuộc phiên bản CTĐT đã ban hành (ACTIVE/ARCHIVED).");
+    }
+
     if (Boolean.FALSE.equals(request.getIsActive()) && course.isActive()) {
       ensureCourseNotInActiveProgramVersions(id);
       course.setActive(false);
@@ -189,7 +199,7 @@ public class CourseServiceImpl implements CourseService {
       course.setFacultyId(newFacultyId);
     }
 
-    course.setName(request.getName().trim());
+    course.setName(newName);
     course.setCredits(request.getCredits());
     course.setExtra(request.getExtra());
 
@@ -227,6 +237,17 @@ public class CourseServiceImpl implements CourseService {
           "COURSE_IN_USE_IN_ACTIVE_PROGRAM_VERSION",
           "Học phần hiện đang được sử dụng trong phiên bản CTĐT đang ACTIVE. Vui lòng khóa phiên bản CTĐT liên quan trước khi vô hiệu hóa hoặc xóa học phần.");
     }
+  }
+
+  private boolean isCourseInPublishedProgramVersions(String courseId) {
+    List<ProgramCourse> links = programCourseRepository.findByCourseId(courseId);
+    if (links.isEmpty()) {
+      return false;
+    }
+    Set<String> pvIds =
+        links.stream().map(ProgramCourse::getProgramVersionId).collect(Collectors.toSet());
+    return programVersionRepository.existsByIdInAndStatusIn(
+        pvIds, List.of(ProgramVersionStatus.ACTIVE, ProgramVersionStatus.ARCHIVED));
   }
 
   private void validateActiveFaculty(String facultyId) {

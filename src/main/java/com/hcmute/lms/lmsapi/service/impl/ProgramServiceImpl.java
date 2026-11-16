@@ -4,6 +4,7 @@ import com.hcmute.lms.lmsapi.document.Program;
 import com.hcmute.lms.lmsapi.dto.PageResponse;
 import com.hcmute.lms.lmsapi.dto.ProgramRequest;
 import com.hcmute.lms.lmsapi.dto.ProgramResponse;
+import com.hcmute.lms.lmsapi.enums.ProgramVersionStatus;
 import com.hcmute.lms.lmsapi.exception.AppException;
 import com.hcmute.lms.lmsapi.exception.BusinessRuleViolationException;
 import com.hcmute.lms.lmsapi.exception.ErrorCode;
@@ -11,11 +12,13 @@ import com.hcmute.lms.lmsapi.exception.ResourceNotFoundException;
 import com.hcmute.lms.lmsapi.mapper.ProgramMapper;
 import com.hcmute.lms.lmsapi.repository.FacultyRepository;
 import com.hcmute.lms.lmsapi.repository.ProgramRepository;
+import com.hcmute.lms.lmsapi.repository.ProgramVersionRepository;
 import com.hcmute.lms.lmsapi.service.ProgramService;
 import com.hcmute.lms.lmsapi.util.ObjectIdUtils;
 import com.hcmute.lms.lmsapi.util.PageableValidationUtils;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -38,6 +41,7 @@ public class ProgramServiceImpl implements ProgramService {
 
   private final ProgramRepository programRepository;
   private final FacultyRepository facultyRepository;
+  private final ProgramVersionRepository programVersionRepository;
   private final ProgramMapper programMapper;
   private final MongoTemplate mongoTemplate;
 
@@ -158,6 +162,24 @@ public class ProgramServiceImpl implements ProgramService {
             .orElseThrow(() -> new ResourceNotFoundException("Program", "id", id));
 
     String code = request.getCode().trim();
+    String name = request.getName().trim();
+    String level = trimToNull(request.getLevel());
+    String degree = trimToNull(request.getDegree());
+
+    boolean coreContentChanged =
+        !code.equals(program.getCode())
+            || !name.equals(program.getName())
+            || !Objects.equals(level, program.getLevel())
+            || !Objects.equals(degree, program.getDegree());
+    if (coreContentChanged
+        && programVersionRepository != null
+        && programVersionRepository.existsByProgramIdAndStatusIn(
+            id, List.of(ProgramVersionStatus.ACTIVE, ProgramVersionStatus.ARCHIVED))) {
+      throw new BusinessRuleViolationException(
+          "PROGRAM_LOCKED_BY_VERSION",
+          "Không thể thay đổi thông tin gốc (mã, tên, trình độ, văn bằng) của CTĐT đã có phiên bản ban hành (ACTIVE/ARCHIVED).");
+    }
+
     if (!code.equals(program.getCode()) && programRepository.existsByCodeAndIdNot(code, id)) {
       throw conflict(code);
     }
