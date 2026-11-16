@@ -102,7 +102,7 @@ public class ProgramVersionServiceImpl implements ProgramVersionService {
       criteriaList.add(Criteria.where("programId").in(programObjectIds));
     }
     if (cleanCohort != null) {
-      criteriaList.add(Criteria.where("applicableCohorts").is(cleanCohort));
+      criteriaList.add(Criteria.where("applicableCohort").is(cleanCohort));
     }
     if (status != null) {
       criteriaList.add(Criteria.where("status").is(status));
@@ -155,11 +155,8 @@ public class ProgramVersionServiceImpl implements ProgramVersionService {
             .version(version)
             .totalCredits(request.getTotalCredits())
             .durationYears(request.getDurationYears())
-            .applicableCohorts(
-                request.getApplicableCohorts() != null
-                    ? new ArrayList<>(request.getApplicableCohorts())
-                    : new ArrayList<>())
-            .status(ProgramVersionStatus.DRAFT)
+            .applicableCohort(trimToNull(request.getApplicableCohort()))
+            .status(ProgramVersionStatus.ACTIVE)
             .verification(Verification.builder().status(VerificationStatus.VERIFIED).build())
             .build();
 
@@ -187,10 +184,7 @@ public class ProgramVersionServiceImpl implements ProgramVersionService {
     programVersion.setVersion(version);
     programVersion.setTotalCredits(request.getTotalCredits());
     programVersion.setDurationYears(request.getDurationYears());
-    programVersion.setApplicableCohorts(
-        request.getApplicableCohorts() != null
-            ? new ArrayList<>(request.getApplicableCohorts())
-            : new ArrayList<>());
+    programVersion.setApplicableCohort(trimToNull(request.getApplicableCohort()));
 
     try {
       programVersion = programVersionRepository.save(programVersion);
@@ -227,7 +221,7 @@ public class ProgramVersionServiceImpl implements ProgramVersionService {
     }
     boolean allowed =
         current == null
-            ? next == ProgramVersionStatus.DRAFT
+            ? next == ProgramVersionStatus.ACTIVE
             : next.ordinal() == current.ordinal() + 1;
     if (!allowed) {
       throw invalidTransition(current, next);

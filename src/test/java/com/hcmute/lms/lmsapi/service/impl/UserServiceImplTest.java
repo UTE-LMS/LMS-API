@@ -4,13 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.hcmute.lms.lmsapi.document.RoleAssignment;
 import com.hcmute.lms.lmsapi.document.User;
 import com.hcmute.lms.lmsapi.dto.CreateUserRequest;
 import com.hcmute.lms.lmsapi.dto.PageResponse;
@@ -25,7 +22,6 @@ import com.hcmute.lms.lmsapi.exception.ErrorCode;
 import com.hcmute.lms.lmsapi.exception.ResourceNotFoundException;
 import com.hcmute.lms.lmsapi.mapper.UserMapper;
 import com.hcmute.lms.lmsapi.repository.UserRepository;
-import com.hcmute.lms.lmsapi.service.ScopeValidationService;
 import com.hcmute.lms.lmsapi.validator.PasswordPolicyValidator;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -56,8 +52,6 @@ class UserServiceImplTest {
 
   @Spy private PasswordPolicyValidator passwordPolicyValidator = new PasswordPolicyValidator();
 
-  @Mock private ScopeValidationService scopeValidationService;
-
   private UserServiceImpl userService;
 
   private static final String ADMIN_ID = "671dcba5f123456789abcd01";
@@ -71,11 +65,7 @@ class UserServiceImplTest {
   void setUp() {
     userService =
         new UserServiceImpl(
-            userRepository,
-            userMapper,
-            passwordEncoder,
-            passwordPolicyValidator,
-            scopeValidationService);
+            userRepository, null, userMapper, passwordEncoder, passwordPolicyValidator);
 
     sampleTargetUser =
         User.builder()
@@ -85,7 +75,7 @@ class UserServiceImplTest {
             .fullName("Target User")
             .status(UserStatus.ACTIVE)
             .tokenVersion(0L)
-            .roleAssignments(List.of(RoleAssignment.builder().role(Role.LECTURER).build()))
+            .roles(List.of(Role.LECTURER))
             .createdAt(Instant.now())
             .updatedAt(Instant.now())
             .build();
@@ -113,13 +103,12 @@ class UserServiceImplTest {
               .email(" NEW_USER@HCMUTE.EDU.VN ")
               .password("ValidPassword123!")
               .fullName("New User")
-              .roleAssignments(List.of(RoleAssignment.builder().role(Role.LECTURER).build()))
+              .roles(List.of(Role.LECTURER))
               .build();
 
       when(userRepository.existsByUsername("new_user")).thenReturn(false);
       when(userRepository.existsByEmail("new_user@hcmute.edu.vn")).thenReturn(false);
       when(passwordEncoder.encode("ValidPassword123!")).thenReturn("hashed_password");
-      doNothing().when(scopeValidationService).validateRoleAssignments(any());
 
       when(userRepository.save(any(User.class)))
           .thenAnswer(
@@ -147,7 +136,7 @@ class UserServiceImplTest {
               .email("user@hcmute.edu.vn")
               .password("Password123!")
               .fullName("User")
-              .roleAssignments(List.of(RoleAssignment.builder().role(Role.QA).build()))
+              .roles(List.of(Role.QA))
               .build();
 
       when(userRepository.existsByUsername("existing_user")).thenReturn(true);
@@ -169,7 +158,7 @@ class UserServiceImplTest {
               .email("existing@hcmute.edu.vn")
               .password("Password123!")
               .fullName("User")
-              .roleAssignments(List.of(RoleAssignment.builder().role(Role.QA).build()))
+              .roles(List.of(Role.QA))
               .build();
 
       when(userRepository.existsByUsername("new_user")).thenReturn(false);
@@ -179,30 +168,6 @@ class UserServiceImplTest {
           .isInstanceOf(AppException.class)
           .satisfies(
               ex -> assertThat(((AppException) ex).getErrorCode()).isEqualTo(ErrorCode.CONFLICT));
-
-      verify(userRepository, never()).save(any());
-    }
-
-    @Test
-    @DisplayName("Should reject user creation when scope validation fails (HTTP 422)")
-    void shouldRejectInvalidScopeOnCreate() {
-      CreateUserRequest request =
-          CreateUserRequest.builder()
-              .username("new_user")
-              .email("new@hcmute.edu.vn")
-              .password("Password123!")
-              .fullName("User")
-              .roleAssignments(List.of(RoleAssignment.builder().role(Role.LECTURER).build()))
-              .build();
-
-      when(userRepository.existsByUsername("new_user")).thenReturn(false);
-      when(userRepository.existsByEmail("new@hcmute.edu.vn")).thenReturn(false);
-      doThrow(new BusinessRuleViolationException("SCOPE_NOT_FOUND", "Course not found"))
-          .when(scopeValidationService)
-          .validateRoleAssignments(any());
-
-      assertThatThrownBy(() -> userService.createUser(request))
-          .isInstanceOf(BusinessRuleViolationException.class);
 
       verify(userRepository, never()).save(any());
     }
@@ -272,12 +237,11 @@ class UserServiceImplTest {
           UpdateUserRequest.builder()
               .email("updated@hcmute.edu.vn")
               .fullName("Updated Name")
-              .roleAssignments(List.of(RoleAssignment.builder().role(Role.LECTURER).build()))
+              .roles(List.of(Role.LECTURER))
               .build();
 
       when(userRepository.findById(TARGET_USER_ID)).thenReturn(Optional.of(sampleTargetUser));
       when(userRepository.findByEmail("updated@hcmute.edu.vn")).thenReturn(Optional.empty());
-      doNothing().when(scopeValidationService).validateRoleAssignments(any());
       when(userRepository.save(any(User.class))).thenReturn(sampleTargetUser);
       when(userMapper.toResponse(sampleTargetUser)).thenReturn(sampleUserResponse);
 
@@ -296,7 +260,7 @@ class UserServiceImplTest {
               .id(ADMIN_ID)
               .username("admin")
               .email("admin@hcmute.edu.vn")
-              .roleAssignments(List.of(RoleAssignment.builder().role(Role.ADMIN).build()))
+              .roles(List.of(Role.ADMIN))
               .status(UserStatus.ACTIVE)
               .build();
 
@@ -304,12 +268,10 @@ class UserServiceImplTest {
           UpdateUserRequest.builder()
               .email("admin@hcmute.edu.vn")
               .fullName("Admin User")
-              .roleAssignments(
-                  List.of(RoleAssignment.builder().role(Role.LECTURER).build())) // no ADMIN
+              .roles(List.of(Role.LECTURER)) // no ADMIN
               .build();
 
       when(userRepository.findById(ADMIN_ID)).thenReturn(Optional.of(adminUser));
-      doNothing().when(scopeValidationService).validateRoleAssignments(any());
 
       assertThatThrownBy(() -> userService.updateUser(ADMIN_ID, demotionRequest, ADMIN_ID))
           .isInstanceOf(BusinessRuleViolationException.class)
@@ -327,7 +289,7 @@ class UserServiceImplTest {
               .id(OTHER_ADMIN_ID)
               .username("last_admin")
               .email("last_admin@hcmute.edu.vn")
-              .roleAssignments(List.of(RoleAssignment.builder().role(Role.ADMIN).build()))
+              .roles(List.of(Role.ADMIN))
               .status(UserStatus.ACTIVE)
               .build();
 
@@ -335,13 +297,11 @@ class UserServiceImplTest {
           UpdateUserRequest.builder()
               .email("last_admin@hcmute.edu.vn")
               .fullName("Last Admin")
-              .roleAssignments(
-                  List.of(RoleAssignment.builder().role(Role.LECTURER).build())) // no ADMIN
+              .roles(List.of(Role.LECTURER)) // no ADMIN
               .build();
 
       when(userRepository.findById(OTHER_ADMIN_ID)).thenReturn(Optional.of(lastAdmin));
-      doNothing().when(scopeValidationService).validateRoleAssignments(any());
-      when(userRepository.countByRoleAssignmentsRoleAndStatus(Role.ADMIN, UserStatus.ACTIVE))
+      when(userRepository.countByRolesContainingAndStatus(Role.ADMIN, UserStatus.ACTIVE))
           .thenReturn(1L);
 
       assertThatThrownBy(() -> userService.updateUser(OTHER_ADMIN_ID, demotionRequest, ADMIN_ID))
@@ -360,8 +320,7 @@ class UserServiceImplTest {
               .id(OTHER_ADMIN_ID)
               .username("admin2")
               .email("admin2@hcmute.edu.vn")
-              .roleAssignments(
-                  new ArrayList<>(List.of(RoleAssignment.builder().role(Role.ADMIN).build())))
+              .roles(new ArrayList<>(List.of(Role.ADMIN)))
               .status(UserStatus.ACTIVE)
               .build();
 
@@ -369,12 +328,11 @@ class UserServiceImplTest {
           UpdateUserRequest.builder()
               .email("admin2@hcmute.edu.vn")
               .fullName("Admin Two")
-              .roleAssignments(List.of(RoleAssignment.builder().role(Role.LECTURER).build()))
+              .roles(List.of(Role.LECTURER))
               .build();
 
       when(userRepository.findById(OTHER_ADMIN_ID)).thenReturn(Optional.of(admin2));
-      doNothing().when(scopeValidationService).validateRoleAssignments(any());
-      when(userRepository.countByRoleAssignmentsRoleAndStatus(Role.ADMIN, UserStatus.ACTIVE))
+      when(userRepository.countByRolesContainingAndStatus(Role.ADMIN, UserStatus.ACTIVE))
           .thenReturn(2L);
       when(userRepository.save(any(User.class))).thenReturn(admin2);
       when(userMapper.toResponse(admin2)).thenReturn(sampleUserResponse);
@@ -397,7 +355,7 @@ class UserServiceImplTest {
           User.builder()
               .id(ADMIN_ID)
               .username("admin")
-              .roleAssignments(List.of(RoleAssignment.builder().role(Role.ADMIN).build()))
+              .roles(List.of(Role.ADMIN))
               .status(UserStatus.ACTIVE)
               .build();
 
@@ -421,7 +379,7 @@ class UserServiceImplTest {
           User.builder()
               .id(OTHER_ADMIN_ID)
               .username("last_admin")
-              .roleAssignments(List.of(RoleAssignment.builder().role(Role.ADMIN).build()))
+              .roles(List.of(Role.ADMIN))
               .status(UserStatus.ACTIVE)
               .build();
 
@@ -429,7 +387,7 @@ class UserServiceImplTest {
           UpdateUserStatusRequest.builder().status(UserStatus.LOCKED).build();
 
       when(userRepository.findById(OTHER_ADMIN_ID)).thenReturn(Optional.of(lastAdmin));
-      when(userRepository.countByRoleAssignmentsRoleAndStatus(Role.ADMIN, UserStatus.ACTIVE))
+      when(userRepository.countByRolesContainingAndStatus(Role.ADMIN, UserStatus.ACTIVE))
           .thenReturn(1L);
 
       assertThatThrownBy(() -> userService.updateStatus(OTHER_ADMIN_ID, lockRequest, ADMIN_ID))

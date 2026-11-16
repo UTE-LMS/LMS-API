@@ -26,10 +26,7 @@ public class ProgramVersionMapperImpl implements ProgramVersionMapper {
         .version(programVersion.getVersion())
         .totalCredits(programVersion.getTotalCredits())
         .durationYears(programVersion.getDurationYears())
-        .applicableCohorts(
-            programVersion.getApplicableCohorts() != null
-                ? new ArrayList<>(programVersion.getApplicableCohorts())
-                : new ArrayList<>())
+        .applicableCohort(programVersion.getApplicableCohort())
         .status(programVersion.getStatus())
         .verification(verificationMapper.toResponse(programVersion.getVerification()))
         .build();

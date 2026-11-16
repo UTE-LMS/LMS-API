@@ -218,7 +218,6 @@ public class AssessmentServiceImpl implements AssessmentService {
         assessmentMapper.toCopyDtos(assessment.getItems()));
 
     assessment.setStatus(AssessmentStatus.LOCKED);
-    assessment.setLocked(true);
     Assessment saved = assessmentRepository.save(assessment);
     log.info(
         "Khóa bài đánh giá id=[{}] mã [{}] bởi actor=[{}]",
@@ -253,7 +252,6 @@ public class AssessmentServiceImpl implements AssessmentService {
     }
 
     assessment.setStatus(AssessmentStatus.DRAFT);
-    assessment.setLocked(false);
     Assessment saved = assessmentRepository.save(assessment);
     log.info(
         "Mở khóa bài đánh giá id=[{}] mã [{}] bởi actor=[{}]",
@@ -322,7 +320,6 @@ public class AssessmentServiceImpl implements AssessmentService {
         .phase(pick(request.getPhase(), template == null ? null : template.getPhase()))
         .scheduledAt(request.getScheduledAt())
         .status(AssessmentStatus.DRAFT)
-        .locked(false)
         .cloWeights(cloWeights != null ? cloWeights : List.of())
         .items(items)
         .coverageSummary(coverageCalculator.compute(items))
@@ -356,7 +353,7 @@ public class AssessmentServiceImpl implements AssessmentService {
       throw new BusinessRuleViolationException(
           String.format(
               "Không thể sửa bài đánh giá ở trạng thái %s%s",
-              status, assessment.isLocked() ? " (cấu trúc đã bị khóa)" : ""));
+              status, status != null && status.locksStructure() ? " (cấu trúc đã bị khóa)" : ""));
     }
   }
 

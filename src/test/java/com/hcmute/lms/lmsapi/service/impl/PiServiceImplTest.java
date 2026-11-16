@@ -69,7 +69,7 @@ class PiServiceImplTest {
   @DisplayName("Tạo PI với PLO không thuộc phiên bản trả 422")
   void create_ploNotInVersion_businessRule() {
     when(programVersionRepository.findById(VERSION_ID))
-        .thenReturn(Optional.of(version(ProgramVersionStatus.DRAFT)));
+        .thenReturn(Optional.of(version(ProgramVersionStatus.ACTIVE)));
     when(ploRepository.findByIdAndProgramVersionId(PLO_ID, VERSION_ID))
         .thenReturn(Optional.empty());
 
@@ -82,7 +82,7 @@ class PiServiceImplTest {
   @DisplayName("Tạo PI thành công")
   void create_success() {
     when(programVersionRepository.findById(VERSION_ID))
-        .thenReturn(Optional.of(version(ProgramVersionStatus.DRAFT)));
+        .thenReturn(Optional.of(version(ProgramVersionStatus.ACTIVE)));
     when(ploRepository.findByIdAndProgramVersionId(PLO_ID, VERSION_ID))
         .thenReturn(Optional.of(Plo.builder().id(PLO_ID).build()));
     when(piRepository.existsByProgramVersionIdAndCode(VERSION_ID, "PI1.1")).thenReturn(false);
@@ -106,7 +106,7 @@ class PiServiceImplTest {
   @DisplayName("Tạo PI trùng mã trả 409")
   void create_duplicate_conflict() {
     when(programVersionRepository.findById(VERSION_ID))
-        .thenReturn(Optional.of(version(ProgramVersionStatus.DRAFT)));
+        .thenReturn(Optional.of(version(ProgramVersionStatus.ACTIVE)));
     when(ploRepository.findByIdAndProgramVersionId(PLO_ID, VERSION_ID))
         .thenReturn(Optional.of(Plo.builder().id(PLO_ID).build()));
     when(piRepository.existsByProgramVersionIdAndCode(VERSION_ID, "PI1.1")).thenReturn(true);
@@ -118,10 +118,10 @@ class PiServiceImplTest {
   }
 
   @Test
-  @DisplayName("Sửa PI khi phiên bản ACTIVE trả 422")
-  void update_activeVersion_businessRule() {
+  @DisplayName("Sửa PI khi phiên bản ARCHIVED trả 422")
+  void update_archivedVersion_businessRule() {
     when(programVersionRepository.findById(VERSION_ID))
-        .thenReturn(Optional.of(version(ProgramVersionStatus.ACTIVE)));
+        .thenReturn(Optional.of(version(ProgramVersionStatus.ARCHIVED)));
 
     assertThatThrownBy(() -> service.updatePi(VERSION_ID, PI_ID, request()))
         .isInstanceOf(BusinessRuleViolationException.class);
@@ -132,7 +132,7 @@ class PiServiceImplTest {
   void delete_hasQuestionReference_businessRule() {
     Pi pi = Pi.builder().id(PI_ID).programVersionId(VERSION_ID).build();
     when(programVersionRepository.findById(VERSION_ID))
-        .thenReturn(Optional.of(version(ProgramVersionStatus.DRAFT)));
+        .thenReturn(Optional.of(version(ProgramVersionStatus.ACTIVE)));
     when(piRepository.findByIdAndProgramVersionId(PI_ID, VERSION_ID)).thenReturn(Optional.of(pi));
     when(programReferenceRepository.existsPiReference(PI_ID)).thenReturn(true);
 
@@ -145,7 +145,7 @@ class PiServiceImplTest {
   void delete_success() {
     Pi pi = Pi.builder().id(PI_ID).programVersionId(VERSION_ID).build();
     when(programVersionRepository.findById(VERSION_ID))
-        .thenReturn(Optional.of(version(ProgramVersionStatus.DRAFT)));
+        .thenReturn(Optional.of(version(ProgramVersionStatus.ACTIVE)));
     when(piRepository.findByIdAndProgramVersionId(PI_ID, VERSION_ID)).thenReturn(Optional.of(pi));
     when(programReferenceRepository.existsPiReference(PI_ID)).thenReturn(false);
 
@@ -162,7 +162,7 @@ class PiServiceImplTest {
             Optional.of(
                 ProgramVersion.builder()
                     .id(OTHER_VERSION_ID)
-                    .status(ProgramVersionStatus.DRAFT)
+                    .status(ProgramVersionStatus.ACTIVE)
                     .build()));
     when(piRepository.findByIdAndProgramVersionId(PI_ID, OTHER_VERSION_ID))
         .thenReturn(Optional.empty());

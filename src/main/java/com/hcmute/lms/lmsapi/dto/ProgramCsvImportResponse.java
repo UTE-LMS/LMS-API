@@ -17,6 +17,9 @@ public class ProgramCsvImportResponse {
   private String programVersionId;
   private String programId;
   private String version;
+  private Integer totalCredits;
+  private Double durationYears;
+  private String applicableCohort;
   private ProgramVersionStatus status;
   private VerificationStatus verificationStatus;
   private int ploCount;

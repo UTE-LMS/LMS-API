@@ -1,10 +1,13 @@
 package com.hcmute.lms.lmsapi.service;
 
+import com.hcmute.lms.lmsapi.dto.AssessmentScoreTemplate;
 import com.hcmute.lms.lmsapi.dto.CreateUserRequest;
+import com.hcmute.lms.lmsapi.dto.CsvImportResultResponse;
 import com.hcmute.lms.lmsapi.dto.PageResponse;
 import com.hcmute.lms.lmsapi.dto.UpdateUserRequest;
 import com.hcmute.lms.lmsapi.dto.UpdateUserStatusRequest;
 import com.hcmute.lms.lmsapi.dto.UserResponse;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
  * Interface nghiệp vụ cho phân hệ quản lý người dùng (F01 / US-02). Cung cấp các thao tác CRUD
@@ -58,4 +61,8 @@ public interface UserService {
    * @return UserResponse thông tin sau khi cập nhật trạng thái
    */
   UserResponse updateStatus(String id, UpdateUserStatusRequest request, String currentUserId);
+
+  AssessmentScoreTemplate generateTemplateCsv();
+
+  CsvImportResultResponse importUsers(MultipartFile file);
 }

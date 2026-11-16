@@ -56,8 +56,8 @@ public interface UserRepository extends MongoRepository<User, String>, UserRepos
    * @param status trạng thái người dùng
    * @return số lượng người dùng thỏa mãn
    */
-  @Query(value = "{ 'roleAssignments.role': ?0, 'status': ?1 }", count = true)
-  long countByRoleAssignmentsRoleAndStatus(Role role, UserStatus status);
+  @Query(value = "{ 'roles': ?0, 'status': ?1 }", count = true)
+  long countByRolesContainingAndStatus(Role role, UserStatus status);
 
   /**
    * Lấy danh sách người dùng theo vai trò và trạng thái hoạt động (phục vụ Trưởng bộ môn tra cứu
@@ -67,12 +67,12 @@ public interface UserRepository extends MongoRepository<User, String>, UserRepos
    * @param status trạng thái tài khoản (ví dụ: ACTIVE)
    * @return danh sách người dùng thỏa mãn
    */
-  @Query(value = "{ 'roleAssignments.role': ?0, 'status': ?1 }")
-  List<User> findByRoleAssignmentsRoleAndStatus(Role role, UserStatus status);
+  @Query(value = "{ 'roles': ?0, 'status': ?1 }")
+  List<User> findByRolesContainingAndStatus(Role role, UserStatus status);
 
-  @Query(value = "{ 'facultyId': ObjectId(?0), 'roleAssignments.role': ?1 }")
-  List<User> findByFacultyIdAndRoleAssignmentsRole(String facultyId, Role role);
+  @Query(value = "{ 'facultyId': ObjectId(?0), 'roles': ?1 }")
+  List<User> findByFacultyIdAndRolesContaining(String facultyId, Role role);
 
-  @Query(value = "{ 'facultyId': ObjectId(?0), 'roleAssignments.role': ?1 }", count = true)
-  long countByFacultyIdAndRoleAssignmentsRole(String facultyId, Role role);
+  @Query(value = "{ 'facultyId': ObjectId(?0), 'roles': ?1 }", count = true)
+  long countByFacultyIdAndRolesContaining(String facultyId, Role role);
 }

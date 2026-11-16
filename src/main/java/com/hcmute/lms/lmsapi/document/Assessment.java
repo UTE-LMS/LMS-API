@@ -72,10 +72,6 @@ public class Assessment {
   @Field("status")
   private AssessmentStatus status = AssessmentStatus.DRAFT;
 
-  /** true khi status thuộc LOCKED / SCORE_ENTERED. Luôn được ghi cùng lúc với status. */
-  @Field("isLocked")
-  private boolean locked;
-
   /** Tỷ lệ đóng góp W_{p,j} của bài kiểm tra cho từng CLO có mặt trong bài. */
   @Builder.Default
   @Field("cloWeights")

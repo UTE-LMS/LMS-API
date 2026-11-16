@@ -11,16 +11,15 @@
  *
  *  TÙY CHỌN (biến môi trường):
  *      LOMS_DB=ten_db        Tên cơ sở dữ liệu (mặc định: learning_outcomes)
- *      LOMS_SAMPLE=1         Nạp thêm dữ liệu MINH HỌA (CLO ví dụ của học phần OOP).
- *                            Mặc định KHÔNG nạp, để dữ liệu minh họa không lẫn với dữ liệu chính thức.
+ *      LOMS_SAMPLE=1         (Dự phòng) Trước đây dùng để nạp thêm dữ liệu minh họa.
  *
  *  Ví dụ (PowerShell):
  *      $env:LOMS_DB = "learning_outcomes"; mongosh --file database_import.js
  *
  *  SCRIPT LÀM GÌ:
  *   1. Tạo 25 collection kèm quy tắc kiểm tra cấu trúc ($jsonSchema) và index.
- *   2. Nạp dữ liệu khởi tạo: 7 PLO, 17 PI (kèm trọng số đóng góp và ngưỡng đạt mẫu) và ma trận I/R/M
- *      của học phần OOPR230279.
+ *   2. Phần nạp dữ liệu khởi tạo mẫu (mục 4) hiện đã được tắt (comment) để khi chạy Docker
+ *      chỉ khởi tạo schema/index sạch, chỉ tự động tạo tài khoản ADMIN qua InitialAdminSeeder.
  *   Lưu ý:
  *   - Đã loại bỏ 3 collection ngân hàng câu hỏi (question_banks, question_categories, questions)
  *     và 1 collection quy tắc rời rạc (measurement_rules) -> còn 25 collections.
@@ -91,7 +90,6 @@ const noDuplicateClos = (mappingsPath) => ({ $eq: [ { $size: mappingsPath },
 
 // 4 cấp độ kết quả chuẩn đầu ra (bỏ COURSE, thêm ASSESSMENT_CLO cho Cấp độ 1)
 const RESULT_LEVELS = ['ASSESSMENT_CLO', 'CLO', 'PI', 'PLO'];
-const ASSESSMENT_LOCKED_STATUSES = ['LOCKED', 'SCORE_ENTERED'];
 const ASSESSMENT_NEED_ITEMS_STATUSES = ['LOCKED', 'SCORE_ENTERED'];
 
 const COLLECTIONS = {
@@ -107,20 +105,11 @@ const COLLECTIONS = {
 
   // ----- Người dùng -----
   users: {
-    validator: schema(['username', 'email', 'passwordHash', 'status', 'roleAssignments'], {
+    validator: schema(['username', 'email', 'passwordHash', 'status', 'roles'], {
       username: STR, email: STR, passwordHash: STR, fullName: STR_N,
       facultyId: OID_N,
       status: en('ACTIVE', 'LOCKED'), tokenVersion: INT,
-      roleAssignments: arr({
-        bsonType: 'object', required: ['role'],
-        properties: {
-          role: en('ADMIN', 'PROGRAM_MANAGER', 'LECTURER', 'QA'),
-          scope: {
-            bsonType: ['object', 'null'],
-            properties: { programIds: arr(OID), courseIds: arr(OID), sectionIds: arr(OID) }
-          }
-        }
-      })
+      roles: arr(en('ADMIN', 'PROGRAM_MANAGER', 'LECTURER', 'QA'))
     }),
     indexes: [[{ username: 1 }, { unique: true }], [{ email: 1 }, { unique: true }], [{ facultyId: 1 }]]
   },
@@ -135,10 +124,10 @@ const COLLECTIONS = {
 
   program_versions: {
     validator: schema(['programId', 'version', 'status'], {
-      programId: OID, version: STR, applicableCohorts: arr(STR),
+      programId: OID, version: STR, applicableCohort: STR_N,
       totalCredits: INT_N,
       durationYears: NUM_N,
-      status: en('DRAFT', 'ACTIVE', 'ARCHIVED'),
+      status: en('ACTIVE', 'ARCHIVED'),
       verification: VERIFICATION, extra: OBJ_N
     }),
     indexes: [[{ programId: 1, version: 1 }, { unique: true }]]
@@ -193,21 +182,12 @@ const COLLECTIONS = {
     indexes: [[{ programVersionId: 1, courseId: 1 }, { unique: true }]]
   },
 
-  course_pi_contributions: {
-    validator: schema(['programVersionId', 'courseId', 'piId', 'contribution'], {
-      programVersionId: OID, courseId: OID, piId: OID,
-      contribution: en('I', 'R', 'M'),
-      verification: VERIFICATION
-    }),
-    indexes: [[{ programVersionId: 1, courseId: 1, piId: 1 }, { unique: true }], [{ piId: 1 }]]
-  },
-
   // ----- Học phần, CLO, đánh giá -----
   syllabi: {
     validator: schema(['courseId', 'version', 'status'], {
       courseId: OID, version: STR,
       effectiveFromTermId: OID_N, effectiveToTermId: OID_N,
-      status: en('DRAFT', 'CONFIRMED', 'ARCHIVED'),
+      status: en('CONFIRMED', 'ARCHIVED'),
       verification: VERIFICATION, extra: OBJ_N
     }),
     indexes: [[{ courseId: 1, version: 1 }, { unique: true }]]
@@ -241,7 +221,7 @@ const COLLECTIONS = {
   assessments: {
     validator: {
       $and: [
-        schema(['syllabusId', 'code', 'name', 'scope', 'status', 'isLocked'], {
+        schema(['syllabusId', 'code', 'name', 'scope', 'status'], {
           syllabusId: OID, code: STR, name: STR,
           scope: en('SYLLABUS_TEMPLATE', 'SECTION'),
           sectionId: OID_N, templateId: OID_N,
@@ -249,7 +229,6 @@ const COLLECTIONS = {
           phase: { enum: ['FORMATIVE', 'MIDTERM', 'SUMMATIVE', null] },
           scheduledAt: DATE_N,
           status: en('DRAFT', 'LOCKED', 'SCORE_ENTERED'),
-          isLocked: BOOL,
           // Tỷ lệ đóng góp W_{p,j} thuộc (0, 1] của bài kiểm tra cho từng CLO có mặt trong bài
           cloWeights: arr(ASSESSMENT_CLO_WEIGHT),
           coverageSummary: {
@@ -272,7 +251,6 @@ const COLLECTIONS = {
           source: OBJ_N, verification: VERIFICATION, extra: OBJ_N
         }),
         { $expr: { $or: [ { $ne: ['$scope', 'SECTION'] }, { $eq: [{ $type: '$sectionId' }, 'objectId'] } ] } },
-        { $expr: { $eq: ['$isLocked', { $in: ['$status', ASSESSMENT_LOCKED_STATUSES] }] } },
         { $expr: { $or: [ { $not: [{ $in: ['$status', ASSESSMENT_NEED_ITEMS_STATUSES] }] },
                           { $gte: [{ $size: { $ifNull: ['$items', []] } }, 1] } ] } },
         { $expr: { $allElementsTrue: [ { $map: { input: { $ifNull: ['$items', []] }, as: 'it',
@@ -518,120 +496,113 @@ Object.keys(COLLECTIONS).forEach(function (name) {
   });
 });
 print('>>> Collection: tạo mới ' + created + ', cập nhật validator ' + updated + ' · index: ' + indexCount);
-
-// ----------------------------------------------------------------------------
-// 4. Dữ liệu khởi tạo (chỉ chèn nếu chưa có; không ghi đè)
-// ----------------------------------------------------------------------------
-function seed(collName, filter, doc) {
-  const full = Object.assign({}, filter, doc, { createdAt: NOW, updatedAt: NOW });
-  d.getCollection(collName).updateOne(filter, { $setOnInsert: full }, { upsert: true });
-  return d.getCollection(collName).findOne(filter)._id;
-}
-
-// 4.1 CTĐT và phiên bản
-const programId = seed('programs', { code: 'CNTT' }, {
-  name: 'Công nghệ thông tin', level: null, degree: null,
-  extra: { note: 'Mã nội bộ của dự án; trình độ/văn bằng sẽ điền sau khi đọc thông tin chung của bản CTĐT.' }
-});
-const pvId = seed('program_versions', { programId: programId, version: 'BM7A-2.7-Updated-2026' }, {
-  applicableCohorts: ['K23', 'K24', 'K25', 'K26', 'K27'], totalCredits: null, durationYears: null, status: 'DRAFT',
-  verification: { status: 'NEEDS_CLARIFICATION', verifiedBy: null, verifiedAt: null,
-                  note: 'Q01: áp dụng cho các khóa K23, K24, K25, K26, K27 (nhóm SV xác nhận 2026-11-06).' }
-});
-
-// 4.2 Bảy PLO và 17 PI (kèm ngưỡng đạt 0.60 và trọng số PI -> PLO tổng = 1.0 cho mỗi PLO)
-const PLO_NOTE = 'Nội dung là diễn giải ngắn theo tài liệu hướng dẫn; cập nhật qua Import CSV CTĐT.';
-const PLOS = [
-  // [mã, thứ tự trình bày, mức năng lực, ngưỡng đạt passThreshold, diễn giải ngắn]
-  ['PLO1', 1, 3, 0.60, 'Vận dụng toán học, thuật toán và khoa học để xác định giải pháp CNTT'],
-  ['PLO2', 6, 4, 0.60, 'Nhận biết trách nhiệm nghề nghiệp; xem xét giải pháp trên cơ sở pháp lý và đạo đức'],
-  ['PLO3', 7, 3, 0.60, 'Tiếp thu, vận dụng kiến thức mới và sử dụng chiến lược học tập phù hợp'],
-  ['PLO4', 4, 3, 0.60, 'Làm việc nhóm hiệu quả, tổ chức công việc và đóng góp vào mục tiêu chung'],
-  ['PLO5', 5, 4, 0.60, 'Giao tiếp với nhiều đối tượng và sử dụng tiếng Anh'],
-  ['PLO6', 2, 6, 0.60, 'Thiết kế, cài đặt và đánh giá giải pháp đáp ứng yêu cầu CNTT'],
-  ['PLO7', 3, 6, 0.60, 'Sử dụng công nghệ phù hợp để tạo ra giải pháp CNTT']
-];
-const ploId = {};
-PLOS.forEach(function (p) {
-  ploId[p[0]] = seed('plos', { programVersionId: pvId, code: p[0] }, {
-    displayOrder: p[1], category: 'UNSPECIFIED', contentOriginal: null, contentSummary: p[4],
-    capabilityLevelRaw: p[2], passThreshold: p[3],
-    verification: { status: 'UNVERIFIED', verifiedBy: null, verifiedAt: null, note: PLO_NOTE },
-    reviewNote: null
-  });
-});
-
-const PIS = [
-  // [mã PLO, mã PI, thứ tự, mức năng lực, trọng số W_{PI -> PLO}, ngưỡng đạt passThreshold, nội dung rút gọn, ghi chú]
-  ['PLO1', 'PI1.1', 1, 2, 0.40, 0.60, 'Xác định vấn đề tính toán trong CNTT', null],
-  ['PLO1', 'PI1.2', 2, 3, 0.60, 0.60, 'Áp dụng toán học, thuật toán và khoa học để xác định giải pháp', null],
-  ['PLO2', 'PI2.1', 3, 2, 0.50, 0.60, 'Nhận thức trách nhiệm nghề nghiệp và đạo đức', null],
-  ['PLO2', 'PI2.2', 4, 4, 0.50, 0.60, 'Đánh giá tác động của giải pháp kỹ thuật đến cộng đồng, xã hội', null],
-  ['PLO3', 'PI3.1', 5, 3, 0.50, 0.60, 'Áp dụng kiến thức mới để giải quyết vấn đề CNTT', null],
-  ['PLO3', 'PI3.2', 6, 3, 0.50, 0.60, 'Áp dụng chiến lược học tập hiệu quả', null],
-  ['PLO4', 'PI4.1', 7, 3, 0.30, 0.60, 'Thiết lập môi trường làm việc nhóm hiệu quả', null],
-  ['PLO4', 'PI4.2', 8, 3, 0.30, 0.60, 'Vận dụng phương pháp làm việc nhóm', null],
-  ['PLO4', 'PI4.3', 9, 3, 0.40, 0.60, 'Thể hiện trách nhiệm và đóng góp vào thành công của nhóm', null],
-  ['PLO5', 'PI5.1', 10, 3, 0.30, 0.60, 'Truyền đạt nội dung công việc bằng văn bản', null],
-  ['PLO5', 'PI5.2', 11, 4, 0.30, 0.60, 'Truyền đạt hiểu biết bằng lời nói', null],
-  ['PLO5', 'PI5.3', 12, 4, 0.40, 0.60, 'Đọc, hiểu, viết bằng tiếng Anh trong CNTT', null],
-  ['PLO6', 'PI6.1', 13, 4, 0.30, 0.60, 'Thiết lập yêu cầu, xác định chức năng', null],
-  ['PLO6', 'PI6.2', 14, 6, 0.40, 0.60, 'Phân tích, thiết kế và cài đặt bài toán', null],
-  ['PLO6', 'PI6.3', 15, 5, 0.30, 0.60, 'Đánh giá giải pháp theo yêu cầu bài toán', null],
-  ['PLO7', 'PI7.1', 16, 6, 0.50, 0.60, 'Áp dụng công nghệ phần mềm, HTTT, AI để tạo giải pháp', null],
-  ['PLO7', 'PI7.2', 17, 6, 0.50, 0.60, 'Áp dụng công nghệ mạng máy tính để tạo giải pháp', null]
-];
-const piId = {};
-PIS.forEach(function (p) {
-  piId[p[1]] = seed('pis', { programVersionId: pvId, code: p[1] }, {
-    ploId: ploId[p[0]], displayOrder: p[2], nameOriginalTerm: 'Performance index',
-    contentOriginal: null, contentShort: p[6], capabilityLevelRaw: p[3],
-    weight: p[4], passThreshold: p[5],
-    verification: { status: 'UNVERIFIED', verifiedBy: null, verifiedAt: null,
-                    note: p[7] ? (p[7] + ' ' + PLO_NOTE) : PLO_NOTE },
-    reviewNote: p[7]
-  });
-});
-
-// 4.3 Học phần OOP và dòng ma trận ở trang 46 (Phụ lục II)
-const oopId = seed('courses', { code: 'OOPR230279' }, { name: 'Lập trình hướng đối tượng', credits: null });
-[['PI1.2', 'R'], ['PI6.1', 'R'], ['PI6.2', 'I'], ['PI7.1', 'R']].forEach(function (r) {
-  seed('course_pi_contributions', { programVersionId: pvId, courseId: oopId, piId: piId[r[0]] }, {
-    contribution: r[1],
-    verification: { status: 'UNVERIFIED', verifiedBy: null, verifiedAt: null,
-                    note: 'Chép theo ví dụ trong tài liệu hướng dẫn; đối chiếu bản CTĐT.' }
-  });
-});
-
-// 4.4 (Tùy chọn) Dữ liệu MINH HỌA: CLO ví dụ của học phần OOP
-if (LOAD_ILLUSTRATIVE_SAMPLE) {
-  const syl = seed('syllabi', { courseId: oopId, version: 'ILLUSTRATIVE-DRAFT' }, {
-    effectiveFromTermId: null, effectiveToTermId: null, status: 'DRAFT',
-    verification: { status: 'UNVERIFIED', verifiedBy: null, verifiedAt: null,
-                    note: 'ĐỀ CƯƠNG MINH HỌA, không phải đề cương chính thức.' }
-  });
-  [
-    ['CLO1', 'Giải thích đóng gói, kế thừa và đa hình bằng ví dụ lập trình', 2],
-    ['CLO2', 'Phân tích yêu cầu một bài toán quản lý để xác định lớp, thuộc tính, phương thức và quan hệ', 4],
-    ['CLO3', 'Xây dựng chương trình hướng đối tượng đáp ứng các chức năng được giao', 3],
-    ['CLO4', 'Đánh giá chương trình theo tiêu chí tính đúng đắn, cấu trúc thiết kế và khả năng bảo trì', 5]
-  ].forEach(function (c) {
-    seed('clos', { syllabusId: syl, code: c[0] }, {
-      courseId: oopId, contentOriginal: c[1], bloomLevel: c[2], bloomNote: 'Mức Bloom do người soạn đề xuất (minh họa).',
-      measurement: { defaultPassThreshold: 0.60 },
-      verification: { status: 'UNVERIFIED', verifiedBy: null, verifiedAt: null,
-                      note: 'CLO MINH HỌA do người hướng dẫn đề xuất, không phải CLO chính thức.' }
-    });
-  });
-  print('>>> Đã nạp dữ liệu MINH HỌA (đề cương + 4 CLO của OOP)');
-}
-
-// ----------------------------------------------------------------------------
-// 5. Tóm tắt
-// ----------------------------------------------------------------------------
-print('>>> Số document khởi tạo:');
-['programs', 'program_versions', 'plos', 'pis', 'courses',
- 'course_pi_contributions', 'syllabi', 'clos'].forEach(function (n) {
-  print('      ' + n + ': ' + d.getCollection(n).countDocuments({}));
-});
-print('>>> HOÀN TẤT. Tổng số collection: ' + d.getCollectionNames().length);
+//
+// // ----------------------------------------------------------------------------
+// // 4. Dữ liệu khởi tạo (chỉ chèn nếu chưa có; không ghi đè)
+// // ----------------------------------------------------------------------------
+// function seed(collName, filter, doc) {
+//   const full = Object.assign({}, filter, doc, { createdAt: NOW, updatedAt: NOW });
+//   d.getCollection(collName).updateOne(filter, { $setOnInsert: full }, { upsert: true });
+//   return d.getCollection(collName).findOne(filter)._id;
+// }
+//
+// // 4.1 CTĐT và phiên bản
+// const programId = seed('programs', { code: 'CNTT' }, {
+//   name: 'Công nghệ thông tin', level: null, degree: null,
+//   extra: { note: 'Mã nội bộ của dự án; trình độ/văn bằng sẽ điền sau khi đọc thông tin chung của bản CTĐT.' }
+// });
+// const pvId = seed('program_versions', { programId: programId, version: 'BM7A-2.7-Updated-2026' }, {
+//   applicableCohort: 'K23', totalCredits: null, durationYears: null, status: 'DRAFT',
+//   verification: { status: 'NEEDS_CLARIFICATION', verifiedBy: null, verifiedAt: null,
+//                   note: 'Q01: áp dụng cho các khóa K23, K24, K25, K26, K27 (nhóm SV xác nhận 2026-11-06).' }
+// });
+//
+// // 4.2 Bảy PLO và 17 PI (kèm ngưỡng đạt 0.60 và trọng số PI -> PLO tổng = 1.0 cho mỗi PLO)
+// const PLO_NOTE = 'Nội dung là diễn giải ngắn theo tài liệu hướng dẫn; cập nhật qua Import CSV CTĐT.';
+// const PLOS = [
+//   // [mã, thứ tự trình bày, mức năng lực, ngưỡng đạt passThreshold, diễn giải ngắn]
+//   ['PLO1', 1, 3, 0.60, 'Vận dụng toán học, thuật toán và khoa học để xác định giải pháp CNTT'],
+//   ['PLO2', 6, 4, 0.60, 'Nhận biết trách nhiệm nghề nghiệp; xem xét giải pháp trên cơ sở pháp lý và đạo đức'],
+//   ['PLO3', 7, 3, 0.60, 'Tiếp thu, vận dụng kiến thức mới và sử dụng chiến lược học tập phù hợp'],
+//   ['PLO4', 4, 3, 0.60, 'Làm việc nhóm hiệu quả, tổ chức công việc và đóng góp vào mục tiêu chung'],
+//   ['PLO5', 5, 4, 0.60, 'Giao tiếp với nhiều đối tượng và sử dụng tiếng Anh'],
+//   ['PLO6', 2, 6, 0.60, 'Thiết kế, cài đặt và đánh giá giải pháp đáp ứng yêu cầu CNTT'],
+//   ['PLO7', 3, 6, 0.60, 'Sử dụng công nghệ phù hợp để tạo ra giải pháp CNTT']
+// ];
+// const ploId = {};
+// PLOS.forEach(function (p) {
+//   ploId[p[0]] = seed('plos', { programVersionId: pvId, code: p[0] }, {
+//     displayOrder: p[1], category: 'UNSPECIFIED', contentOriginal: null, contentSummary: p[4],
+//     capabilityLevelRaw: p[2], passThreshold: p[3],
+//     verification: { status: 'UNVERIFIED', verifiedBy: null, verifiedAt: null, note: PLO_NOTE },
+//     reviewNote: null
+//   });
+// });
+//
+// const PIS = [
+//   // [mã PLO, mã PI, thứ tự, mức năng lực, trọng số W_{PI -> PLO}, ngưỡng đạt passThreshold, nội dung rút gọn, ghi chú]
+//   ['PLO1', 'PI1.1', 1, 2, 0.40, 0.60, 'Xác định vấn đề tính toán trong CNTT', null],
+//   ['PLO1', 'PI1.2', 2, 3, 0.60, 0.60, 'Áp dụng toán học, thuật toán và khoa học để xác định giải pháp', null],
+//   ['PLO2', 'PI2.1', 3, 2, 0.50, 0.60, 'Nhận thức trách nhiệm nghề nghiệp và đạo đức', null],
+//   ['PLO2', 'PI2.2', 4, 4, 0.50, 0.60, 'Đánh giá tác động của giải pháp kỹ thuật đến cộng đồng, xã hội', null],
+//   ['PLO3', 'PI3.1', 5, 3, 0.50, 0.60, 'Áp dụng kiến thức mới để giải quyết vấn đề CNTT', null],
+//   ['PLO3', 'PI3.2', 6, 3, 0.50, 0.60, 'Áp dụng chiến lược học tập hiệu quả', null],
+//   ['PLO4', 'PI4.1', 7, 3, 0.30, 0.60, 'Thiết lập môi trường làm việc nhóm hiệu quả', null],
+//   ['PLO4', 'PI4.2', 8, 3, 0.30, 0.60, 'Vận dụng phương pháp làm việc nhóm', null],
+//   ['PLO4', 'PI4.3', 9, 3, 0.40, 0.60, 'Thể hiện trách nhiệm và đóng góp vào thành công của nhóm', null],
+//   ['PLO5', 'PI5.1', 10, 3, 0.30, 0.60, 'Truyền đạt nội dung công việc bằng văn bản', null],
+//   ['PLO5', 'PI5.2', 11, 4, 0.30, 0.60, 'Truyền đạt hiểu biết bằng lời nói', null],
+//   ['PLO5', 'PI5.3', 12, 4, 0.40, 0.60, 'Đọc, hiểu, viết bằng tiếng Anh trong CNTT', null],
+//   ['PLO6', 'PI6.1', 13, 4, 0.30, 0.60, 'Thiết lập yêu cầu, xác định chức năng', null],
+//   ['PLO6', 'PI6.2', 14, 6, 0.40, 0.60, 'Phân tích, thiết kế và cài đặt bài toán', null],
+//   ['PLO6', 'PI6.3', 15, 5, 0.30, 0.60, 'Đánh giá giải pháp theo yêu cầu bài toán', null],
+//   ['PLO7', 'PI7.1', 16, 6, 0.50, 0.60, 'Áp dụng công nghệ phần mềm, HTTT, AI để tạo giải pháp', null],
+//   ['PLO7', 'PI7.2', 17, 6, 0.50, 0.60, 'Áp dụng công nghệ mạng máy tính để tạo giải pháp', null]
+// ];
+// const piId = {};
+// PIS.forEach(function (p) {
+//   piId[p[1]] = seed('pis', { programVersionId: pvId, code: p[1] }, {
+//     ploId: ploId[p[0]], displayOrder: p[2], nameOriginalTerm: 'Performance index',
+//     contentOriginal: null, contentShort: p[6], capabilityLevelRaw: p[3],
+//     weight: p[4], passThreshold: p[5],
+//     verification: { status: 'UNVERIFIED', verifiedBy: null, verifiedAt: null,
+//                     note: p[7] ? (p[7] + ' ' + PLO_NOTE) : PLO_NOTE },
+//     reviewNote: p[7]
+//   });
+// });
+//
+// // 4.3 Học phần OOP
+// const oopId = seed('courses', { code: 'OOPR230279' }, { name: 'Lập trình hướng đối tượng', credits: null });
+//
+// // 4.4 (Tùy chọn) Dữ liệu MINH HỌA: CLO ví dụ của học phần OOP
+// if (LOAD_ILLUSTRATIVE_SAMPLE) {
+//   const syl = seed('syllabi', { courseId: oopId, version: 'ILLUSTRATIVE-DRAFT' }, {
+//     effectiveFromTermId: null, effectiveToTermId: null, status: 'DRAFT',
+//     verification: { status: 'UNVERIFIED', verifiedBy: null, verifiedAt: null,
+//                     note: 'ĐỀ CƯƠNG MINH HỌA, không phải đề cương chính thức.' }
+//   });
+//   [
+//     ['CLO1', 'Giải thích đóng gói, kế thừa và đa hình bằng ví dụ lập trình', 2],
+//     ['CLO2', 'Phân tích yêu cầu một bài toán quản lý để xác định lớp, thuộc tính, phương thức và quan hệ', 4],
+//     ['CLO3', 'Xây dựng chương trình hướng đối tượng đáp ứng các chức năng được giao', 3],
+//     ['CLO4', 'Đánh giá chương trình theo tiêu chí tính đúng đắn, cấu trúc thiết kế và khả năng bảo trì', 5]
+//   ].forEach(function (c) {
+//     seed('clos', { syllabusId: syl, code: c[0] }, {
+//       courseId: oopId, contentOriginal: c[1], bloomLevel: c[2], bloomNote: 'Mức Bloom do người soạn đề xuất (minh họa).',
+//       measurement: { defaultPassThreshold: 0.60 },
+//       verification: { status: 'UNVERIFIED', verifiedBy: null, verifiedAt: null,
+//                       note: 'CLO MINH HỌA do người hướng dẫn đề xuất, không phải CLO chính thức.' }
+//     });
+//   });
+//   print('>>> Đã nạp dữ liệu MINH HỌA (đề cương + 4 CLO của OOP)');
+// }
+//
+// // ----------------------------------------------------------------------------
+// // 5. Tóm tắt
+// // ----------------------------------------------------------------------------
+// print('>>> Số document khởi tạo:');
+// ['programs', 'program_versions', 'plos', 'pis', 'courses',
+//  'syllabi', 'clos'].forEach(function (n) {
+//   print('      ' + n + ': ' + d.getCollection(n).countDocuments({}));
+// });
+// print('>>> HOÀN TẤT. Tổng số collection: ' + d.getCollectionNames().length);

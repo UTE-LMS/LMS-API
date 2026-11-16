@@ -26,7 +26,6 @@ import com.hcmute.lms.lmsapi.document.Score;
 import com.hcmute.lms.lmsapi.document.Student;
 import com.hcmute.lms.lmsapi.document.Syllabus;
 import com.hcmute.lms.lmsapi.document.Term;
-import com.hcmute.lms.lmsapi.document.UserScope;
 import com.hcmute.lms.lmsapi.document.Verification;
 import com.hcmute.lms.lmsapi.dto.CalculationRunRequest;
 import com.hcmute.lms.lmsapi.dto.ReportCreateRequest;
@@ -234,7 +233,6 @@ class CalculationAndReportIntegrationTest extends IntegrationTestBase {
                 .type(AssessmentType.MIDTERM)
                 .phase(AssessmentPhase.MIDTERM)
                 .status(AssessmentStatus.SCORE_ENTERED)
-                .locked(true)
                 .cloWeights(
                     List.of(AssessmentCloWeight.builder().cloId(clo.getId()).weight(1.0).build()))
                 .items(
@@ -283,14 +281,8 @@ class CalculationAndReportIntegrationTest extends IntegrationTestBase {
                 .updatedAt(Instant.now())
                 .build());
 
-    String qaToken =
-        fixtures.bearerFor(
-            Role.QA,
-            UserScope.builder()
-                .programIds(List.of(program.getId()))
-                .courseIds(List.of(course.getId()))
-                .build());
-    String otherLecturerToken = fixtures.bearerFor(Role.LECTURER, UserScope.builder().build());
+    String qaToken = fixtures.bearerFor(Role.QA);
+    String otherLecturerToken = fixtures.bearerFor(Role.LECTURER);
 
     CalculationRunRequest runReq =
         CalculationRunRequest.builder()

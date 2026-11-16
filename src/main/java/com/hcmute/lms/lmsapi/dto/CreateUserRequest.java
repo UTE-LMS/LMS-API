@@ -1,11 +1,11 @@
 package com.hcmute.lms.lmsapi.dto;
 
-import com.hcmute.lms.lmsapi.document.RoleAssignment;
+import com.hcmute.lms.lmsapi.enums.Role;
 import com.hcmute.lms.lmsapi.validator.Utf8ByteLength;
-import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.util.ArrayList;
@@ -53,9 +53,8 @@ public class CreateUserRequest {
   @NotBlank(message = "Họ và tên không được để trống")
   private String fullName;
 
-  /** Danh sách phân công vai trò và phạm vi phụ trách. Bắt buộc có ít nhất 1 phân công vai trò. */
+  /** Danh sách vai trò. Bắt buộc có ít nhất 1 vai trò. */
   @NotEmpty(message = "Danh sách phân công vai trò không được để trống")
-  @Valid
   @Builder.Default
-  private List<RoleAssignment> roleAssignments = new ArrayList<>();
+  private List<@NotNull(message = "Vai trò không được để trống") Role> roles = new ArrayList<>();
 }

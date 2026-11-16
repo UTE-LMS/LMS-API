@@ -1,10 +1,10 @@
 package com.hcmute.lms.lmsapi.dto;
 
-import com.hcmute.lms.lmsapi.document.RoleAssignment;
-import jakarta.validation.Valid;
+import com.hcmute.lms.lmsapi.enums.Role;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.AllArgsConstructor;
@@ -36,11 +36,8 @@ public class UpdateUserRequest {
   @NotBlank(message = "Họ và tên không được để trống")
   private String fullName;
 
-  /**
-   * Danh sách phân công vai trò và phạm vi phụ trách mới. Bắt buộc có ít nhất 1 phân công vai trò.
-   */
+  /** Danh sách vai trò mới. Bắt buộc có ít nhất 1 vai trò. */
   @NotEmpty(message = "Danh sách phân công vai trò không được để trống")
-  @Valid
   @Builder.Default
-  private List<RoleAssignment> roleAssignments = new ArrayList<>();
+  private List<@NotNull(message = "Vai trò không được để trống") Role> roles = new ArrayList<>();
 }

@@ -8,7 +8,6 @@ import com.hcmute.lms.lmsapi.document.Student;
 import com.hcmute.lms.lmsapi.document.Syllabus;
 import com.hcmute.lms.lmsapi.document.Term;
 import com.hcmute.lms.lmsapi.document.User;
-import com.hcmute.lms.lmsapi.document.UserScope;
 import com.hcmute.lms.lmsapi.enums.AssessmentStatus;
 import com.hcmute.lms.lmsapi.enums.EnrollmentStatus;
 import com.hcmute.lms.lmsapi.enums.Role;
@@ -57,7 +56,7 @@ public abstract class ScoreImportIntegrationBase extends IntegrationTestBase {
   void setUpScoreImportFixtures() {
     term = fixtures.term();
     Syllabus syllabus = fixtures.syllabus(fixtures.course(), SyllabusStatus.CONFIRMED);
-    lecturer = fixtures.user(Role.LECTURER, UserScope.builder().build());
+    lecturer = fixtures.user(Role.LECTURER);
     section = fixtures.section(syllabus.getCourseId(), List.of(lecturer.getId()));
     section.setSyllabusId(syllabus.getId());
     section.setTermId(term.getId());
@@ -70,8 +69,8 @@ public abstract class ScoreImportIntegrationBase extends IntegrationTestBase {
     withdrawn = enroll(EnrollmentStatus.WITHDRAWN);
 
     lecturerToken = fixtures.bearer(lecturer);
-    otherLecturerToken = fixtures.bearerFor(Role.LECTURER, UserScope.builder().build());
-    adminToken = fixtures.bearerFor(Role.ADMIN, UserScope.builder().build());
+    otherLecturerToken = fixtures.bearerFor(Role.LECTURER);
+    adminToken = fixtures.bearerFor(Role.ADMIN);
   }
 
   protected Student enroll(EnrollmentStatus status) {

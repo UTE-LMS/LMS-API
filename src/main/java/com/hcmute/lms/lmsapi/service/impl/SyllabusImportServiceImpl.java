@@ -198,9 +198,9 @@ public class SyllabusImportServiceImpl implements SyllabusImportService {
     Optional<Syllabus> existing = syllabusRepository.findByCourseIdAndVersion(courseId, version);
     if (existing.isPresent()) {
       Syllabus syl = existing.get();
-      if (syl.getStatus() != SyllabusStatus.DRAFT) {
+      if (syl.getStatus() == SyllabusStatus.ARCHIVED) {
         throw new BusinessRuleViolationException(
-            "Đề cương " + version + " đã được xác nhận/lưu trữ, hãy nhập với mã phiên bản mới");
+            "Đề cương " + version + " đã được lưu trữ (ARCHIVED), hãy nhập với mã phiên bản mới");
       }
       cloPiLinkRepository.deleteBySyllabusId(syl.getId());
       cloRepository.deleteBySyllabusId(syl.getId());
@@ -218,7 +218,7 @@ public class SyllabusImportServiceImpl implements SyllabusImportService {
                 effectiveFromTermId != null && !effectiveFromTermId.isBlank()
                     ? effectiveFromTermId.trim()
                     : null)
-            .status(SyllabusStatus.DRAFT)
+            .status(SyllabusStatus.CONFIRMED)
             .verification(Verification.builder().status(VerificationStatus.VERIFIED).build())
             .build());
   }

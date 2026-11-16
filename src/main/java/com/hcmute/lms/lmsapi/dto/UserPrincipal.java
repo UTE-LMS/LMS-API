@@ -1,12 +1,13 @@
 package com.hcmute.lms.lmsapi.dto;
 
-import com.hcmute.lms.lmsapi.document.RoleAssignment;
 import com.hcmute.lms.lmsapi.document.User;
+import com.hcmute.lms.lmsapi.enums.Role;
 import com.hcmute.lms.lmsapi.enums.UserStatus;
 import java.security.Principal;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -46,8 +47,8 @@ public class UserPrincipal implements Principal {
   /** Định danh Khoa quản lý của người dùng (dành cho PROGRAM_MANAGER). */
   private String facultyId;
 
-  /** Danh sách các cặp phân công (vai trò, phạm vi phụ trách). */
-  @Builder.Default private List<RoleAssignment> roleAssignments = new ArrayList<>();
+  /** Danh sách vai trò của người dùng. */
+  @Builder.Default private List<Role> roles = new ArrayList<>();
 
   @Override
   public String getName() {
@@ -60,12 +61,12 @@ public class UserPrincipal implements Principal {
    * @return danh sách GrantedAuthority
    */
   public Collection<? extends GrantedAuthority> getAuthorities() {
-    if (roleAssignments == null) {
+    if (roles == null) {
       return List.of();
     }
-    return roleAssignments.stream()
-        .filter(ra -> ra != null && ra.getRole() != null)
-        .map(ra -> new SimpleGrantedAuthority("ROLE_" + ra.getRole().name()))
+    return roles.stream()
+        .filter(Objects::nonNull)
+        .map(role -> new SimpleGrantedAuthority("ROLE_" + role.name()))
         .toList();
   }
 
@@ -87,10 +88,7 @@ public class UserPrincipal implements Principal {
         .status(user.getStatus())
         .tokenVersion(user.getTokenVersion())
         .facultyId(user.getFacultyId())
-        .roleAssignments(
-            user.getRoleAssignments() != null
-                ? new ArrayList<>(user.getRoleAssignments())
-                : new ArrayList<>())
+        .roles(user.getRoles() != null ? new ArrayList<>(user.getRoles()) : new ArrayList<>())
         .build();
   }
 }

@@ -1,7 +1,7 @@
 package com.hcmute.lms.lmsapi.dto;
 
-import com.hcmute.lms.lmsapi.document.RoleAssignment;
 import com.hcmute.lms.lmsapi.document.User;
+import com.hcmute.lms.lmsapi.enums.Role;
 import com.hcmute.lms.lmsapi.enums.UserStatus;
 import java.util.ArrayList;
 import java.util.List;
@@ -27,7 +27,7 @@ public class UserProfileResponse {
   private UserStatus status;
   private String facultyId;
 
-  @Builder.Default private List<RoleAssignment> roleAssignments = new ArrayList<>();
+  @Builder.Default private List<Role> roles = new ArrayList<>();
 
   public static UserProfileResponse from(User user) {
     if (user == null) {
@@ -40,10 +40,7 @@ public class UserProfileResponse {
         .fullName(user.getFullName())
         .status(user.getStatus())
         .facultyId(user.getFacultyId())
-        .roleAssignments(
-            user.getRoleAssignments() != null
-                ? new ArrayList<>(user.getRoleAssignments())
-                : new ArrayList<>())
+        .roles(user.getRoles() != null ? new ArrayList<>(user.getRoles()) : new ArrayList<>())
         .build();
   }
 
@@ -58,9 +55,9 @@ public class UserProfileResponse {
         .fullName(principal.getFullName())
         .status(principal.getStatus())
         .facultyId(principal.getFacultyId())
-        .roleAssignments(
-            principal.getRoleAssignments() != null
-                ? new ArrayList<>(principal.getRoleAssignments())
+        .roles(
+            principal.getRoles() != null
+                ? new ArrayList<>(principal.getRoles())
                 : new ArrayList<>())
         .build();
   }

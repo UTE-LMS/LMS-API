@@ -30,10 +30,7 @@ public class UserMapperImpl implements UserMapper {
         .fullName(user.getFullName())
         .status(user.getStatus())
         .facultyId(user.getFacultyId())
-        .roleAssignments(
-            user.getRoleAssignments() != null
-                ? new ArrayList<>(user.getRoleAssignments())
-                : new ArrayList<>())
+        .roles(user.getRoles() != null ? new ArrayList<>(user.getRoles()) : new ArrayList<>())
         .createdAt(user.getCreatedAt())
         .updatedAt(user.getUpdatedAt())
         .build();
@@ -61,10 +58,7 @@ public class UserMapperImpl implements UserMapper {
         .fullName(request.getFullName())
         .status(UserStatus.ACTIVE)
         .tokenVersion(0L)
-        .roleAssignments(
-            request.getRoleAssignments() != null
-                ? new ArrayList<>(request.getRoleAssignments())
-                : new ArrayList<>())
+        .roles(request.getRoles() != null ? new ArrayList<>(request.getRoles()) : new ArrayList<>())
         .createdAt(now)
         .updatedAt(now)
         .build();

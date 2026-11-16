@@ -8,7 +8,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.hcmute.lms.lmsapi.document.Assessment;
 import com.hcmute.lms.lmsapi.document.CourseSection;
-import com.hcmute.lms.lmsapi.document.UserScope;
 import com.hcmute.lms.lmsapi.enums.AssessmentStatus;
 import com.hcmute.lms.lmsapi.enums.Role;
 import com.hcmute.lms.lmsapi.enums.SectionStatus;
@@ -423,10 +422,8 @@ class ImportBatchUploadIntegrationTest extends ScoreImportIntegrationBase {
   @DisplayName(
       "Chung: người ngoài lớp (GV khác), ADMIN, vai trò khác và người chưa đăng nhập không tải được lô")
   void authorizationOnUpload() throws Exception {
-    UserScope inSection =
-        UserScope.builder().sectionIds(new java.util.ArrayList<>(List.of(section.getId()))).build();
-    String qa = fixtures.bearerFor(Role.QA, inSection);
-    String pm = fixtures.bearerFor(Role.PROGRAM_MANAGER, inSection);
+    String qa = fixtures.bearerFor(Role.QA);
+    String pm = fixtures.bearerFor(Role.PROGRAM_MANAGER);
 
     mockMvc
         .perform(upload(otherLecturerToken, goodCsv(), "BLANK", defaultMapping()))

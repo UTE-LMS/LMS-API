@@ -11,7 +11,6 @@ import com.hcmute.lms.lmsapi.document.Enrollment;
 import com.hcmute.lms.lmsapi.document.Student;
 import com.hcmute.lms.lmsapi.document.Term;
 import com.hcmute.lms.lmsapi.document.User;
-import com.hcmute.lms.lmsapi.document.UserScope;
 import com.hcmute.lms.lmsapi.dto.EnrollmentStatusUpdateRequest;
 import com.hcmute.lms.lmsapi.enums.EnrollmentStatus;
 import com.hcmute.lms.lmsapi.enums.Role;
@@ -39,13 +38,13 @@ class EnrollmentIntegrationTest extends IntegrationTestBase {
   void setUpFixtures() {
     Course course = fixtures.course();
     term = fixtures.term();
-    lecturer = fixtures.user(Role.LECTURER, UserScope.builder().build());
-    otherLecturer = fixtures.user(Role.LECTURER, UserScope.builder().build());
+    lecturer = fixtures.user(Role.LECTURER);
+    otherLecturer = fixtures.user(Role.LECTURER);
     section = fixtures.section(course.getId(), List.of(lecturer.getId()));
     section.setTermId(term.getId());
     section = mongo().save(section);
 
-    adminToken = fixtures.bearerFor(Role.ADMIN, UserScope.builder().build());
+    adminToken = fixtures.bearerFor(Role.ADMIN);
     lecturerToken = fixtures.bearer(lecturer);
     otherLecturerToken = fixtures.bearer(otherLecturer);
   }

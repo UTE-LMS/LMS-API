@@ -130,10 +130,10 @@ public class PloServiceImpl implements PloService {
             .findById(programVersionId)
             .orElseThrow(
                 () -> new ResourceNotFoundException("ProgramVersion", "id", programVersionId));
-    if (requireDraft && programVersion.getStatus() != ProgramVersionStatus.DRAFT) {
+    if (requireDraft && programVersion.getStatus() == ProgramVersionStatus.ARCHIVED) {
       throw new BusinessRuleViolationException(
           "PROGRAM_VERSION_LOCKED",
-          "Chỉ được sửa nội dung PLO khi phiên bản chương trình đào tạo ở trạng thái DRAFT");
+          "Không thể sửa nội dung PLO khi phiên bản chương trình đào tạo đã lưu trữ (ARCHIVED)");
     }
     return programVersion;
   }

@@ -64,7 +64,7 @@ class SyllabusServiceImplTest {
             .id(syllabusId)
             .courseId(courseId)
             .version("2024.1")
-            .status(SyllabusStatus.DRAFT)
+            .status(SyllabusStatus.CONFIRMED)
             .build();
 
     request = SyllabusRequest.builder().version("2024.1").build();
@@ -74,7 +74,7 @@ class SyllabusServiceImplTest {
             .id(syllabusId)
             .courseId(courseId)
             .version("2024.1")
-            .status(SyllabusStatus.DRAFT)
+            .status(SyllabusStatus.CONFIRMED)
             .build();
   }
 
@@ -231,24 +231,24 @@ class SyllabusServiceImplTest {
   }
 
   @Test
-  @DisplayName("updateStatus: Chuyển DRAFT -> CONFIRMED thành công")
+  @DisplayName("updateStatus: Chuyển CONFIRMED -> ARCHIVED thành công")
   void updateStatus_DraftToConfirmed_Success() {
     when(syllabusRepository.findById(syllabusId)).thenReturn(Optional.of(syllabus));
     when(syllabusRepository.save(any(Syllabus.class))).thenReturn(syllabus);
     when(syllabusMapper.toResponse(any(Syllabus.class))).thenReturn(response);
 
-    SyllabusResponse result = syllabusService.updateStatus(syllabusId, SyllabusStatus.CONFIRMED);
+    SyllabusResponse result = syllabusService.updateStatus(syllabusId, SyllabusStatus.ARCHIVED);
     assertThat(result).isNotNull();
-    assertThat(syllabus.getStatus()).isEqualTo(SyllabusStatus.CONFIRMED);
+    assertThat(syllabus.getStatus()).isEqualTo(SyllabusStatus.ARCHIVED);
   }
 
   @Test
-  @DisplayName("updateStatus: Chuyển ngược CONFIRMED -> DRAFT bị chặn (422)")
+  @DisplayName("updateStatus: Chuyển ngược ARCHIVED -> CONFIRMED bị chặn (422)")
   void updateStatus_ConfirmedToDraft_ThrowsBusinessRuleViolation() {
-    syllabus.setStatus(SyllabusStatus.CONFIRMED);
+    syllabus.setStatus(SyllabusStatus.ARCHIVED);
     when(syllabusRepository.findById(syllabusId)).thenReturn(Optional.of(syllabus));
 
-    assertThatThrownBy(() -> syllabusService.updateStatus(syllabusId, SyllabusStatus.DRAFT))
+    assertThatThrownBy(() -> syllabusService.updateStatus(syllabusId, SyllabusStatus.CONFIRMED))
         .isInstanceOf(BusinessRuleViolationException.class)
         .hasMessageContaining("Không thể chuyển trạng thái đề cương");
   }

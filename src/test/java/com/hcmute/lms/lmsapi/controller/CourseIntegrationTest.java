@@ -6,10 +6,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.hcmute.lms.lmsapi.document.Course;
+import com.hcmute.lms.lmsapi.document.Faculty;
 import com.hcmute.lms.lmsapi.document.Program;
 import com.hcmute.lms.lmsapi.document.ProgramCourse;
 import com.hcmute.lms.lmsapi.document.ProgramVersion;
-import com.hcmute.lms.lmsapi.document.UserScope;
 import com.hcmute.lms.lmsapi.dto.CourseRequest;
 import com.hcmute.lms.lmsapi.enums.CourseCategory;
 import com.hcmute.lms.lmsapi.enums.CourseType;
@@ -40,17 +40,27 @@ class CourseIntegrationTest extends IntegrationTestBase {
   @BeforeEach
   void setUpFixtures() {
     program = fixtures.program();
-    programVersion = fixtures.programVersion(program, ProgramVersionStatus.DRAFT);
+    programVersion = fixtures.programVersion(program, ProgramVersionStatus.ACTIVE);
+
+    Faculty faculty = fixtures.faculty();
+    program.setFacultyId(faculty.getId());
+    program = mongo().save(program);
 
     course1 = fixtures.course();
-    course2 = fixtures.course();
-    course3 = fixtures.course();
+    course1.setFacultyId(faculty.getId());
+    course1 = mongo().save(course1);
 
-    adminToken = fixtures.bearerFor(Role.ADMIN, UserScope.builder().build());
-    pmToken =
-        fixtures.bearerFor(
-            Role.PROGRAM_MANAGER, UserScope.builder().programIds(List.of(program.getId())).build());
-    lecturerToken = fixtures.bearerFor(Role.LECTURER, UserScope.builder().build());
+    course2 = fixtures.course();
+    course2.setFacultyId(faculty.getId());
+    course2 = mongo().save(course2);
+
+    course3 = fixtures.course();
+    course3.setFacultyId(faculty.getId());
+    course3 = mongo().save(course3);
+
+    adminToken = fixtures.bearerFor(Role.ADMIN);
+    pmToken = fixtures.bearerFor(Role.PROGRAM_MANAGER);
+    lecturerToken = fixtures.bearerFor(Role.LECTURER);
   }
 
   @Test

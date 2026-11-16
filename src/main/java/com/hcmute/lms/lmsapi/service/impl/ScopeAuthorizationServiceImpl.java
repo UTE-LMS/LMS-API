@@ -2,8 +2,6 @@ package com.hcmute.lms.lmsapi.service.impl;
 
 import com.hcmute.lms.lmsapi.document.Course;
 import com.hcmute.lms.lmsapi.document.CourseSection;
-import com.hcmute.lms.lmsapi.document.RoleAssignment;
-import com.hcmute.lms.lmsapi.document.UserScope;
 import com.hcmute.lms.lmsapi.dto.UserPrincipal;
 import com.hcmute.lms.lmsapi.enums.AccessType;
 import com.hcmute.lms.lmsapi.enums.AssessmentScope;
@@ -63,10 +61,8 @@ public class ScopeAuthorizationServiceImpl implements ScopeAuthorizationService 
       return false;
     }
 
-    if (principal.getRoleAssignments() == null || principal.getRoleAssignments().isEmpty()) {
-      log.debug(
-          "canAccessSection: Fail-closed - user [{}] has no role assignments",
-          principal.getUsername());
+    if (principal.getRoles() == null || principal.getRoles().isEmpty()) {
+      log.debug("canAccessSection: Fail-closed - user [{}] has no roles", principal.getUsername());
       return false;
     }
 
@@ -86,20 +82,20 @@ public class ScopeAuthorizationServiceImpl implements ScopeAuthorizationService 
     if (principal == null || section == null || accessType == null) {
       return false;
     }
-    if (principal.getRoleAssignments() == null || principal.getRoleAssignments().isEmpty()) {
+    if (principal.getRoles() == null || principal.getRoles().isEmpty()) {
       return false;
     }
     String sectionId = section.getId();
 
-    // Duyệt qua từng phân công vai trò của người dùng; nếu có ít nhất 1 vai trò hợp lệ -> cho phép
-    for (RoleAssignment assignment : principal.getRoleAssignments()) {
-      if (checkAssignment(assignment, principal, section, accessType)) {
+    // Duyệt qua từng vai trò của người dùng; nếu có ít nhất 1 vai trò hợp lệ -> cho phép
+    for (Role role : principal.getRoles()) {
+      if (checkRoleForSection(role, principal, section, accessType)) {
         log.debug(
             "canAccessSection: Access GRANTED to user [{}] for section [{}] with accessType [{}] via role [{}]",
             principal.getUsername(),
             sectionId,
             accessType,
-            assignment.getRole());
+            role);
         return true;
       }
     }
@@ -114,41 +110,7 @@ public class ScopeAuthorizationServiceImpl implements ScopeAuthorizationService 
 
   @Override
   public boolean canManageCourseSections(UserPrincipal principal, String courseId) {
-    if (principal == null
-        || courseId == null
-        || courseId.isBlank()
-        || principal.getRoleAssignments() == null) {
-      return false;
-    }
-
-    for (RoleAssignment assignment : principal.getRoleAssignments()) {
-      if (assignment == null || assignment.getRole() == null) {
-        continue;
-      }
-      if (assignment.getRole() == Role.ADMIN) {
-        return true;
-      }
-      if (assignment.getRole() == Role.PROGRAM_MANAGER) {
-        if (principal.getFacultyId() != null) {
-          boolean sameFaculty =
-              courseRepository
-                  .findById(courseId.trim())
-                  .map(c -> Objects.equals(c.getFacultyId(), principal.getFacultyId()))
-                  .orElse(false);
-          if (sameFaculty) {
-            return true;
-          }
-        }
-        if (courseInManagedProgram(assignment.getScope(), courseId.trim())) {
-          return true;
-        }
-      }
-    }
-    log.debug(
-        "canManageCourseSections: Access DENIED to user [{}] for course [{}]",
-        principal.getUsername(),
-        courseId);
-    return false;
+    return canManageCourse(principal, courseId);
   }
 
   @Override
@@ -220,17 +182,6 @@ public class ScopeAuthorizationServiceImpl implements ScopeAuthorizationService 
             });
   }
 
-  /** Học phần có nằm trong một phiên bản CTĐT thuộc chương trình trong scope.programIds không. */
-  private boolean courseInManagedProgram(UserScope scope, String courseId) {
-    if (scope == null || scope.getProgramIds() == null || scope.getProgramIds().isEmpty()) {
-      return false;
-    }
-    return programCourseRepository.findByCourseId(courseId).stream()
-        .map(pc -> programVersionRepository.findById(pc.getProgramVersionId()))
-        .flatMap(Optional::stream)
-        .anyMatch(version -> scope.getProgramIds().contains(version.getProgramId()));
-  }
-
   @Override
   public boolean canAccessProgram(
       UserPrincipal principal, String programId, AccessType accessType) {
@@ -243,21 +194,19 @@ public class ScopeAuthorizationServiceImpl implements ScopeAuthorizationService 
       return false;
     }
 
-    if (principal.getRoleAssignments() == null || principal.getRoleAssignments().isEmpty()) {
-      log.debug(
-          "canAccessProgram: Fail-closed - user [{}] has no role assignments",
-          principal.getUsername());
+    if (principal.getRoles() == null || principal.getRoles().isEmpty()) {
+      log.debug("canAccessProgram: Fail-closed - user [{}] has no roles", principal.getUsername());
       return false;
     }
 
-    for (RoleAssignment assignment : principal.getRoleAssignments()) {
-      if (checkProgramAssignment(assignment, principal, programId, accessType)) {
+    for (Role role : principal.getRoles()) {
+      if (checkProgramRole(role, principal, programId, accessType)) {
         log.debug(
             "canAccessProgram: Access GRANTED to user [{}] for program [{}] with accessType [{}] via role [{}]",
             principal.getUsername(),
             programId,
             accessType,
-            assignment.getRole());
+            role);
         return true;
       }
     }
@@ -303,18 +252,13 @@ public class ScopeAuthorizationServiceImpl implements ScopeAuthorizationService 
       log.debug("canAccessCourse: Fail-closed due to null or blank parameters");
       return false;
     }
-    if (principal.getRoleAssignments() == null || principal.getRoleAssignments().isEmpty()) {
-      log.debug(
-          "canAccessCourse: Fail-closed - user [{}] has no role assignments",
-          principal.getUsername());
+    if (principal.getRoles() == null || principal.getRoles().isEmpty()) {
+      log.debug("canAccessCourse: Fail-closed - user [{}] has no roles", principal.getUsername());
       return false;
     }
 
     // ADMIN luôn có toàn quyền
-    boolean isAdmin =
-        principal.getRoleAssignments().stream()
-            .anyMatch(a -> a != null && a.getRole() == Role.ADMIN);
-    if (isAdmin) {
+    if (principal.getRoles().contains(Role.ADMIN)) {
       return true;
     }
 
@@ -325,14 +269,14 @@ public class ScopeAuthorizationServiceImpl implements ScopeAuthorizationService 
       return false;
     }
 
-    for (RoleAssignment assignment : principal.getRoleAssignments()) {
-      if (checkCourseAssignment(assignment, principal, course, accessType)) {
+    for (Role role : principal.getRoles()) {
+      if (checkCourseRole(role, principal, course, accessType)) {
         log.debug(
             "canAccessCourse: Access GRANTED to user [{}] for course [{}] with accessType [{}] via role [{}]",
             principal.getUsername(),
             courseId,
             accessType,
-            assignment.getRole());
+            role);
         return true;
       }
     }
@@ -351,10 +295,8 @@ public class ScopeAuthorizationServiceImpl implements ScopeAuthorizationService 
       log.debug("canAssignCourse: Fail-closed due to null or blank parameters");
       return false;
     }
-    if (principal.getRoleAssignments() == null || principal.getRoleAssignments().isEmpty()) {
-      log.debug(
-          "canAssignCourse: Fail-closed - user [{}] has no role assignments",
-          principal.getUsername());
+    if (principal.getRoles() == null || principal.getRoles().isEmpty()) {
+      log.debug("canAssignCourse: Fail-closed - user [{}] has no roles", principal.getUsername());
       return false;
     }
 
@@ -364,21 +306,19 @@ public class ScopeAuthorizationServiceImpl implements ScopeAuthorizationService 
       return false;
     }
 
-    // ADMIN hoặc PROGRAM_MANAGER cùng Khoa (hoặc scope.courseIds cho tương thích ngược v0.7)
-    return principal.getRoleAssignments().stream()
+    // ADMIN hoặc PROGRAM_MANAGER cùng Khoa
+    return principal.getRoles().stream()
         .anyMatch(
-            a -> {
-              if (a == null || a.getRole() == null) {
+            role -> {
+              if (role == null) {
                 return false;
               }
-              if (a.getRole() == Role.ADMIN) {
+              if (role == Role.ADMIN) {
                 return true;
               }
-              if (a.getRole() == Role.PROGRAM_MANAGER) {
-                if (principal.getFacultyId() != null && course.getFacultyId() != null) {
-                  return Objects.equals(principal.getFacultyId(), course.getFacultyId());
-                }
-                return matchesCourseScope(a.getScope(), courseId.trim());
+              if (role == Role.PROGRAM_MANAGER) {
+                return principal.getFacultyId() != null
+                    && Objects.equals(principal.getFacultyId(), course.getFacultyId());
               }
               return false;
             });
@@ -403,18 +343,13 @@ public class ScopeAuthorizationServiceImpl implements ScopeAuthorizationService 
     if (principal == null
         || resourceId == null
         || resourceId.isBlank()
-        || principal.getRoleAssignments() == null) {
+        || principal.getRoles() == null) {
       return false;
     }
-    boolean isAdmin =
-        principal.getRoleAssignments().stream()
-            .anyMatch(a -> a != null && a.getRole() == Role.ADMIN);
-    if (isAdmin) {
+    if (principal.getRoles().contains(Role.ADMIN)) {
       return true;
     }
-    boolean isPm =
-        principal.getRoleAssignments().stream()
-            .anyMatch(a -> a != null && a.getRole() == Role.PROGRAM_MANAGER);
+    boolean isPm = principal.getRoles().contains(Role.PROGRAM_MANAGER);
     if (!isPm || principal.getFacultyId() == null) {
       return false;
     }
@@ -486,52 +421,34 @@ public class ScopeAuthorizationServiceImpl implements ScopeAuthorizationService 
             });
   }
 
-  private boolean checkCourseAssignment(
-      RoleAssignment assignment, UserPrincipal principal, Course course, AccessType accessType) {
-    if (assignment == null || assignment.getRole() == null) {
+  private boolean checkCourseRole(
+      Role role, UserPrincipal principal, Course course, AccessType accessType) {
+    if (role == null) {
       return false;
     }
 
     String courseId = course.getId();
-    UserScope scope = assignment.getScope();
-    return switch (assignment.getRole()) {
+    return switch (role) {
       case ADMIN -> true;
-      case LECTURER -> matchesCourseScope(scope, courseId);
-      case PROGRAM_MANAGER -> {
-        if (accessType == AccessType.READ) {
-          yield true;
-        }
-        // Chống TD-29: Chỉ cho phép WRITE môn học/đề cương nếu môn thuộc đúng Khoa của PM
-        if (principal.getFacultyId() != null && course.getFacultyId() != null) {
-          yield Objects.equals(principal.getFacultyId(), course.getFacultyId());
-        }
-        yield matchesCourseScope(scope, courseId);
-      }
-      case QA ->
-          accessType == AccessType.READ
-              && (isStrictEmptyScope(scope) || matchesCourseScope(scope, courseId));
+      case LECTURER ->
+          courseSectionRepository.findByCourseId(courseId).stream()
+              .anyMatch(s -> isAssignedLecturer(s, principal.getId()));
+      case PROGRAM_MANAGER ->
+          principal.getFacultyId() != null
+              && Objects.equals(principal.getFacultyId(), course.getFacultyId());
+      case QA -> accessType == AccessType.READ;
     };
   }
 
-  private boolean matchesCourseScope(UserScope scope, String courseId) {
-    return scope != null
-        && scope.getCourseIds() != null
-        && scope.getCourseIds().contains(courseId.trim());
-  }
-
-  private boolean checkProgramAssignment(
-      RoleAssignment assignment, UserPrincipal principal, String programId, AccessType accessType) {
-    if (assignment == null || assignment.getRole() == null) {
+  private boolean checkProgramRole(
+      Role role, UserPrincipal principal, String programId, AccessType accessType) {
+    if (role == null) {
       return false;
     }
 
-    UserScope scope = assignment.getScope();
-    return switch (assignment.getRole()) {
+    return switch (role) {
       case ADMIN -> true;
       case PROGRAM_MANAGER -> {
-        if (matchesProgramScope(scope, programId)) {
-          yield true;
-        }
         if (principal.getFacultyId() == null) {
           yield false;
         }
@@ -540,123 +457,47 @@ public class ScopeAuthorizationServiceImpl implements ScopeAuthorizationService 
             .map(p -> Objects.equals(p.getFacultyId(), principal.getFacultyId()))
             .orElse(false);
       }
-      case QA ->
-          accessType == AccessType.READ
-              ? (isStrictEmptyScope(scope) || matchesProgramScope(scope, programId))
-              : matchesProgramScope(scope, programId);
+      case QA -> accessType == AccessType.READ;
       case LECTURER -> false;
     };
   }
 
-  private boolean matchesProgramScope(UserScope scope, String programId) {
-    return scope != null
-        && scope.getProgramIds() != null
-        && scope.getProgramIds().contains(programId.trim());
-  }
-
-  /**
-   * Kiểm tra quyền truy cập của một phân công vai trò cụ thể trên lớp học phần theo ma trận ADR
-   * 0003 (tinh gọn 4 vai trò ADR 0014).
-   */
-  private boolean checkAssignment(
-      RoleAssignment assignment,
-      UserPrincipal principal,
-      CourseSection section,
-      AccessType accessType) {
-    if (assignment == null || assignment.getRole() == null) {
+  private boolean checkRoleForSection(
+      Role role, UserPrincipal principal, CourseSection section, AccessType accessType) {
+    if (role == null) {
       return false;
     }
 
-    Role role = assignment.getRole();
-    UserScope scope = assignment.getScope();
-    String sectionId = section.getId();
     String courseId = section.getCourseId();
     String userId = principal.getId();
 
     if (accessType == AccessType.WRITE) {
       return switch (role) {
-        // ADMIN: Toàn quyền ghi trên toàn bộ lớp học phần
         case ADMIN -> true;
-
-        // LECTURER: Cho phép ghi khi user còn vai trò LECTURER VÀ:
-        // (1) sectionId trong scope.sectionIds, HOẶC
-        // (2) courseId trong scope.courseIds, HOẶC
-        // (3) userId có trong CourseSection.lecturerIds (quy tắc độc lập từ phân công giảng dạy)
-        case LECTURER ->
-            matchesScope(scope, sectionId, courseId) || isAssignedLecturer(section, userId);
-
-        // Tất cả các vai trò khác không có quyền WRITE trên tài nguyên lớp học phần
+        case LECTURER -> isAssignedLecturer(section, userId);
         case PROGRAM_MANAGER, QA -> false;
       };
     } else if (accessType == AccessType.READ) {
       return switch (role) {
-        // ADMIN: Toàn quyền đọc toàn bộ lớp học phần
-        case ADMIN -> true;
-
-        // LECTURER: Cho phép đọc khi thỏa mãn phạm vi scope hoặc nằm trong danh sách phân công
-        // giảng viên
-        case LECTURER ->
-            matchesScope(scope, sectionId, courseId) || isAssignedLecturer(section, userId);
-
-        // PROGRAM_MANAGER: Cho phép đọc khi lớp nằm trong scope.sectionIds hoặc courseId nằm trong
-        // scope.courseIds.
-        case PROGRAM_MANAGER -> matchesScope(scope, sectionId, courseId);
-
-        // QA:
-        // - Strict empty scope (scope == null hoặc cả 3 mảng rỗng) -> Đọc toàn hệ thống.
-        // - Non-empty scope -> Chỉ đọc trong phạm vi sectionIds hoặc courseIds.
-        case QA -> {
-          if (isStrictEmptyScope(scope)) {
-            yield true;
-          }
-          yield matchesScope(scope, sectionId, courseId);
-        }
+        case ADMIN, QA -> true;
+        case LECTURER -> isAssignedLecturer(section, userId);
+        case PROGRAM_MANAGER ->
+            principal.getFacultyId() != null
+                && courseId != null
+                && courseRepository
+                    .findById(courseId)
+                    .map(c -> Objects.equals(c.getFacultyId(), principal.getFacultyId()))
+                    .orElse(false);
       };
     }
 
     return false;
   }
 
-  /** So khớp lớp học phần với phạm vi phân công (theo sectionIds hoặc courseIds). */
-  private boolean matchesScope(UserScope scope, String sectionId, String courseId) {
-    if (scope == null) {
-      return false;
-    }
-
-    if (scope.getSectionIds() != null
-        && sectionId != null
-        && scope.getSectionIds().contains(sectionId)) {
-      return true;
-    }
-
-    if (scope.getCourseIds() != null
-        && courseId != null
-        && scope.getCourseIds().contains(courseId)) {
-      return true;
-    }
-
-    return false;
-  }
-
-  /**
-   * Kiểm tra quy tắc độc lập: Giảng viên có tên trong danh sách phân công của lớp học phần hay
-   * không.
-   */
   private boolean isAssignedLecturer(CourseSection section, String userId) {
     if (section.getLecturerIds() == null || userId == null) {
       return false;
     }
     return section.getLecturerIds().contains(userId);
-  }
-
-  /**
-   * Định nghĩa Scope rỗng nghiêm ngặt (Strict Empty Scope per ADR 0003): Scope chỉ rỗng khi scope
-   * == null HOẶC cả 3 mảng programIds, courseIds, sectionIds đều rỗng/null.
-   */
-  private boolean isStrictEmptyScope(UserScope scope) {
-    if (scope == null) {
-      return true;
-    }
-    return scope.isEmpty();
   }
 }

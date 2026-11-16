@@ -5,9 +5,7 @@ import com.hcmute.lms.lmsapi.document.Pi;
 import com.hcmute.lms.lmsapi.document.Plo;
 import com.hcmute.lms.lmsapi.document.Program;
 import com.hcmute.lms.lmsapi.document.ProgramVersion;
-import com.hcmute.lms.lmsapi.document.RoleAssignment;
 import com.hcmute.lms.lmsapi.document.User;
-import com.hcmute.lms.lmsapi.document.UserScope;
 import com.hcmute.lms.lmsapi.document.Verification;
 import com.hcmute.lms.lmsapi.enums.PloCategory;
 import com.hcmute.lms.lmsapi.enums.ProgramVersionStatus;
@@ -23,7 +21,6 @@ import com.hcmute.lms.lmsapi.repository.UserRepository;
 import com.hcmute.lms.lmsapi.validator.PasswordPolicyValidator;
 import jakarta.annotation.PostConstruct;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -189,8 +186,7 @@ public final class DemoDataSeeder implements ApplicationRunner {
                 ProgramVersion.builder()
                     .programId(program.getId())
                     .version(versionCode())
-                    .status(ProgramVersionStatus.DRAFT)
-                    .applicableCohorts(new ArrayList<>())
+                    .status(ProgramVersionStatus.ACTIVE)
                     .verification(unverified("phiên bản mẫu, chưa đối chiếu CTĐT gốc"))
                     .build()),
         () -> findVersion(program));
@@ -319,23 +315,16 @@ public final class DemoDataSeeder implements ApplicationRunner {
       return false;
     }
     String hash = passwordEncoder.encode(password);
-    UserScope programScope = UserScope.builder().programIds(List.of(program.getId())).build();
-    UserScope courseScope = UserScope.builder().courseIds(List.of(course.getId())).build();
 
-    ensureUser("admin", "Quản trị viên", Role.ADMIN, null, hash, counter);
-    ensureUser("manager", "Quản lý CTĐT", Role.PROGRAM_MANAGER, programScope, hash, counter);
-    ensureUser("lecturer", "Giảng viên", Role.LECTURER, courseScope, hash, counter);
-    ensureUser("qa", "Cán bộ đảm bảo chất lượng", Role.QA, programScope, hash, counter);
+    ensureUser("admin", "Quản trị viên", Role.ADMIN, hash, counter);
+    ensureUser("manager", "Quản lý CTĐT", Role.PROGRAM_MANAGER, hash, counter);
+    ensureUser("lecturer", "Giảng viên", Role.LECTURER, hash, counter);
+    ensureUser("qa", "Cán bộ đảm bảo chất lượng", Role.QA, hash, counter);
     return true;
   }
 
   private void ensureUser(
-      String suffix,
-      String title,
-      Role role,
-      UserScope scope,
-      String passwordHash,
-      Counter counter) {
+      String suffix, String title, Role role, String passwordHash, Counter counter) {
     String username = username(suffix);
     if (userRepository.existsByUsername(username)) {
       counter.existing++;
@@ -352,7 +341,7 @@ public final class DemoDataSeeder implements ApplicationRunner {
               .fullName(LABEL + " " + title)
               .status(UserStatus.ACTIVE)
               .tokenVersion(0L)
-              .roleAssignments(List.of(RoleAssignment.builder().role(role).scope(scope).build()))
+              .roles(List.of(role))
               .createdAt(now)
               .updatedAt(now)
               .build());

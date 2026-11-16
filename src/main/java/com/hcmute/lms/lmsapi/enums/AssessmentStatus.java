@@ -13,7 +13,7 @@ public enum AssessmentStatus {
 
   private static final Set<AssessmentStatus> LOCKED_STATUSES = Set.of(LOCKED, SCORE_ENTERED);
 
-  /** Trạng thái làm {@code isLocked = true}: cấm sửa items[] (validator của MongoDB ép khớp). */
+  /** Trạng thái khóa cấu trúc bài đánh giá: cấm sửa items[]. */
   public boolean locksStructure() {
     return LOCKED_STATUSES.contains(this);
   }

@@ -15,9 +15,10 @@ erDiagram
         string email UK
         string passwordHash
         string fullName
+        ObjectId facultyId FK "Khoa chủ quản (cho PROGRAM_MANAGER)"
         string status "ACTIVE hoặc LOCKED"
         long tokenVersion
-        array roleAssignments "role + scope(programIds, courseIds, sectionIds)"
+        array roles "Danh sách Role (ADMIN, PROGRAM_MANAGER, LECTURER, QA)"
         date createdAt
         date updatedAt
     }
@@ -119,13 +120,10 @@ erDiagram
 
 | Đối tượng nhúng (class) | Nằm trong | Trường |
 |---|---|---|
-| `RoleAssignment` | `users.roleAssignments[]` | `role` (enum `Role`), `scope` |
-| `UserScope` | `RoleAssignment.scope` | `programIds[]`, `courseIds[]`, `sectionIds[]` (ObjectId; tham chiếu `programs`, `courses`, `course_sections`). "Scope rỗng" = `scope` null hoặc cả ba mảng rỗng (`UserScope.isEmpty()`) |
 | `Verification` | `program_versions`, `plos`, `pis`, `course_pi_contributions` | `status` (`UNVERIFIED`, `VERIFIED`, `NEEDS_CLARIFICATION`), `verifiedBy` (ObjectId của `users`), `verifiedAt`, `note` |
 | `AuditEntity` | `audit_logs.entity` | `collection` (tên collection bất kỳ), `id` (chuỗi) — tham chiếu đa hình, không phải khóa ngoại |
 
-Tham chiếu có trong mã nhưng không vẽ để tránh rối: `users.roleAssignments[].scope.*` → `programs`/`courses`/`course_sections`
-(kiểm tra tồn tại bởi `ScopeValidationServiceImpl`); `Verification.verifiedBy` → `users`.
+Tham chiếu có trong mã nhưng không vẽ để tránh rối: `Verification.verifiedBy` → `users`.
 
 ## 3. Chỉ mục (đối chiếu `@CompoundIndex` / `@Indexed` với `database_import.js`)
 
@@ -160,7 +158,7 @@ Các collection của F05b–F08 (8 collections): `import_batches`, `import_row_
 - Plan F02 §3 vẫn ghi `courses.departmentId`; trường này đã bị bỏ khỏi cả `Course` lẫn validator (commit `9a281b8`), nên
   sơ đồ không có.
 - `users.createdAt/updatedAt` và `fullName` có trong `document` nhưng không nằm trong danh sách `required` của validator
-  (chỉ `username, email, passwordHash, status, roleAssignments` là bắt buộc).
+  (chỉ `username, email, passwordHash, status, roles` là bắt buộc).
 
 ## 6. Nhập điểm (F05b): `import_batches`, `import_row_errors`, `scores`
 

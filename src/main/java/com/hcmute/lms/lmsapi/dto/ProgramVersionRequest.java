@@ -5,8 +5,6 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
-import java.util.ArrayList;
-import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -34,7 +32,6 @@ public class ProgramVersionRequest {
   @DecimalMin(value = "0.0", message = "Thời gian đào tạo không được âm")
   private Double durationYears;
 
-  @Builder.Default
-  private List<@Size(max = 50, message = "Mỗi khóa tối đa 50 ký tự") String> applicableCohorts =
-      new ArrayList<>();
+  @Size(max = 50, message = "Khóa áp dụng tối đa 50 ký tự")
+  private String applicableCohort;
 }

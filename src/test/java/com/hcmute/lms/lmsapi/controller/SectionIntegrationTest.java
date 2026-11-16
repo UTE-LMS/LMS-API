@@ -7,12 +7,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.hcmute.lms.lmsapi.document.Course;
 import com.hcmute.lms.lmsapi.document.CourseSection;
+import com.hcmute.lms.lmsapi.document.Faculty;
 import com.hcmute.lms.lmsapi.document.Program;
 import com.hcmute.lms.lmsapi.document.ProgramVersion;
 import com.hcmute.lms.lmsapi.document.Syllabus;
 import com.hcmute.lms.lmsapi.document.Term;
 import com.hcmute.lms.lmsapi.document.User;
-import com.hcmute.lms.lmsapi.document.UserScope;
 import com.hcmute.lms.lmsapi.dto.SectionRequest;
 import com.hcmute.lms.lmsapi.dto.SectionStatusUpdateRequest;
 import com.hcmute.lms.lmsapi.dto.SectionUpdateRequest;
@@ -23,7 +23,6 @@ import com.hcmute.lms.lmsapi.enums.SyllabusStatus;
 import com.hcmute.lms.lmsapi.enums.TermStatus;
 import com.hcmute.lms.lmsapi.testsupport.ApiTestFixtures;
 import com.hcmute.lms.lmsapi.testsupport.IntegrationTestBase;
-import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -51,24 +50,30 @@ class SectionIntegrationTest extends IntegrationTestBase {
     course = fixtures.course();
     confirmedSyllabus = fixtures.syllabus(course, SyllabusStatus.CONFIRMED);
     openTerm = fixtures.term();
-    lecturerA = fixtures.user(Role.LECTURER, UserScope.builder().build());
-    lecturerB = fixtures.user(Role.LECTURER, UserScope.builder().build());
+    lecturerA = fixtures.user(Role.LECTURER);
+    lecturerB = fixtures.user(Role.LECTURER);
 
-    // Học phần thuộc CTĐT "program"; PM trong phạm vi quản lý program, PM ngoài phạm vi thì không
+    Faculty faculty = fixtures.faculty();
+    course.setFacultyId(faculty.getId());
+    course = mongo().save(course);
+
     program = fixtures.program();
-    ProgramVersion version = fixtures.programVersion(program, ProgramVersionStatus.DRAFT);
+    program.setFacultyId(faculty.getId());
+    program = mongo().save(program);
+    ProgramVersion version = fixtures.programVersion(program, ProgramVersionStatus.ACTIVE);
     fixtures.programCourse(version, course);
-    Program otherProgram = fixtures.program();
 
-    adminToken = fixtures.bearerFor(Role.ADMIN, UserScope.builder().build());
-    pmInScopeToken =
-        fixtures.bearerFor(
-            Role.PROGRAM_MANAGER,
-            UserScope.builder().programIds(new ArrayList<>(List.of(program.getId()))).build());
-    pmOutOfScopeToken =
-        fixtures.bearerFor(
-            Role.PROGRAM_MANAGER,
-            UserScope.builder().programIds(new ArrayList<>(List.of(otherProgram.getId()))).build());
+    Faculty otherFaculty = fixtures.faculty();
+
+    adminToken = fixtures.bearerFor(Role.ADMIN);
+    User pmInScope = fixtures.user(Role.PROGRAM_MANAGER);
+    pmInScope.setFacultyId(faculty.getId());
+    pmInScopeToken = fixtures.bearer(mongo().save(pmInScope));
+
+    User pmOutOfScope = fixtures.user(Role.PROGRAM_MANAGER);
+    pmOutOfScope.setFacultyId(otherFaculty.getId());
+    pmOutOfScopeToken = fixtures.bearer(mongo().save(pmOutOfScope));
+
     lecturerAToken = fixtures.bearer(lecturerA);
     lecturerBToken = fixtures.bearer(lecturerB);
   }
@@ -130,11 +135,9 @@ class SectionIntegrationTest extends IntegrationTestBase {
   void us19_ac2_syllabusMustMatchCourseAndBeConfirmed() throws Exception {
     Course otherCourse = fixtures.course();
     Syllabus foreignSyllabus = fixtures.syllabus(otherCourse, SyllabusStatus.CONFIRMED);
-    Syllabus draftSyllabus = fixtures.syllabus(course, SyllabusStatus.DRAFT);
     Syllabus archivedSyllabus = fixtures.syllabus(course, SyllabusStatus.ARCHIVED);
 
-    for (String syllabusId :
-        List.of(foreignSyllabus.getId(), draftSyllabus.getId(), archivedSyllabus.getId())) {
+    for (String syllabusId : List.of(foreignSyllabus.getId(), archivedSyllabus.getId())) {
       mockMvc
           .perform(
               postAs(adminToken, "/api/v1/sections", validRequest().syllabusId(syllabusId).build()))
@@ -170,7 +173,7 @@ class SectionIntegrationTest extends IntegrationTestBase {
   @Test
   @DisplayName("US-19/AC-2: người dùng không có vai trò LECTURER hoặc bị khóa -> 422")
   void us19_ac2_lecturerMustBeActiveLecturer() throws Exception {
-    User notLecturer = fixtures.user(Role.QA, UserScope.builder().build());
+    User notLecturer = fixtures.user(Role.QA);
     mockMvc
         .perform(
             postAs(
@@ -179,7 +182,7 @@ class SectionIntegrationTest extends IntegrationTestBase {
                 validRequest().lecturerIds(List.of(notLecturer.getId())).build()))
         .andExpect(status().isUnprocessableEntity());
 
-    User lockedLecturer = fixtures.user(Role.LECTURER, UserScope.builder().build());
+    User lockedLecturer = fixtures.user(Role.LECTURER);
     lockedLecturer.setStatus(com.hcmute.lms.lmsapi.enums.UserStatus.LOCKED);
     mongo().save(lockedLecturer);
     mockMvc

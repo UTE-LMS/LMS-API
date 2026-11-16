@@ -117,7 +117,7 @@ public class AssessmentMapperImpl implements AssessmentMapper {
         .phase(a.getPhase())
         .scheduledAt(a.getScheduledAt())
         .status(a.getStatus())
-        .locked(a.isLocked())
+        .locked(a.getStatus() != null && a.getStatus().locksStructure())
         .cloWeights(toCloWeightDtos(a.getCloWeights()))
         .coverageSummary(toCoverageResponse(a.getCoverageSummary(), null))
         .items(

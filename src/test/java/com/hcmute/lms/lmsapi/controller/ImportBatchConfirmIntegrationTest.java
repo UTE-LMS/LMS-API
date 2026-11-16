@@ -94,13 +94,6 @@ class ImportBatchConfirmIntegrationTest extends ScoreImportIntegrationBase {
     assertThat(batch.getObjectId("confirmedBy")).isEqualTo(new ObjectId(lecturer.getId()));
     assertThat(batch.getDate("confirmedAt")).isNotNull();
     assertThat(assessmentStatus()).isEqualTo("SCORE_ENTERED");
-    Document assessmentDoc =
-        mongo()
-            .findOne(
-                Query.query(Criteria.where("_id").is(new ObjectId(assessment.getId()))),
-                Document.class,
-                "assessments");
-    assertThat(assessmentDoc.getBoolean("isLocked")).isTrue();
 
     assertThat(importConfirmAudits(id)).isEqualTo(1);
     Document audit =

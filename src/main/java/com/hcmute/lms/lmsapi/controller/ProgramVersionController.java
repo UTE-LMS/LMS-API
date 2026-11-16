@@ -11,10 +11,12 @@ import com.hcmute.lms.lmsapi.service.ProgramImportService;
 import com.hcmute.lms.lmsapi.service.ProgramVersionService;
 import com.hcmute.lms.lmsapi.util.PageableValidationUtils;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
@@ -92,23 +94,9 @@ public class ProgramVersionController {
         .body(template.content());
   }
 
-  @PostMapping(value = "/import/preview", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-  @PreAuthorize(
-      "hasRole('ADMIN') or (hasRole('PROGRAM_MANAGER') and @scopeAuthorizationService.canAccessProgram(authentication.principal, #programId, T(com.hcmute.lms.lmsapi.enums.AccessType).WRITE))")
-  public ResponseEntity<ProgramCsvImportResponse> previewImportProgramCsv(
-      @RequestParam("programId")
-          @Pattern(
-              regexp = "^[0-9a-fA-F]{24}$",
-              message = "ID ngành đào tạo phải là ObjectId 24 ký tự hex")
-          String programId,
-      @RequestParam("version") @NotBlank(message = "Phiên bản CTĐT không được để trống")
-          String version,
-      @RequestPart("file") MultipartFile file,
-      @AuthenticationPrincipal UserPrincipal principal) {
-    return importProgramCsv(programId, version, file, principal);
-  }
-
-  @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+  @PostMapping(
+      value = {"/import", "/import/preview"},
+      consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   @PreAuthorize(
       "hasRole('ADMIN') or (hasRole('PROGRAM_MANAGER') and @scopeAuthorizationService.canAccessProgram(authentication.principal, #programId, T(com.hcmute.lms.lmsapi.enums.AccessType).WRITE))")
   public ResponseEntity<ProgramCsvImportResponse> importProgramCsv(
@@ -119,6 +107,15 @@ public class ProgramVersionController {
           String programId,
       @RequestParam("version") @NotBlank(message = "Phiên bản CTĐT không được để trống")
           String version,
+      @RequestParam(value = "totalCredits", required = false)
+          @Min(value = 0, message = "Tổng số tín chỉ không được âm")
+          Integer totalCredits,
+      @RequestParam(value = "durationYears", required = false)
+          @DecimalMin(value = "0.0", message = "Thời gian đào tạo không được âm")
+          Double durationYears,
+      @RequestParam(value = "applicableCohort", required = false)
+          @Size(max = 50, message = "Khóa áp dụng tối đa 50 ký tự")
+          String applicableCohort,
       @RequestPart("file") MultipartFile file,
       @AuthenticationPrincipal UserPrincipal principal) {
     log.info(
@@ -127,7 +124,8 @@ public class ProgramVersionController {
         version);
     String actorId = principal != null ? principal.getId() : null;
     return ResponseEntity.ok(
-        programImportService.importProgramCsv(programId, version, file, actorId));
+        programImportService.importProgramCsv(
+            programId, version, totalCredits, durationYears, applicableCohort, file, actorId));
   }
 
   @PostMapping("/{id}/confirm-import")

@@ -4,9 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
-import com.hcmute.lms.lmsapi.document.RoleAssignment;
 import com.hcmute.lms.lmsapi.document.User;
-import com.hcmute.lms.lmsapi.document.UserScope;
 import com.hcmute.lms.lmsapi.dto.UserPrincipal;
 import com.hcmute.lms.lmsapi.enums.Role;
 import com.hcmute.lms.lmsapi.enums.UserStatus;
@@ -47,15 +45,7 @@ class AuthSessionServiceImplTest {
             .fullName("Nguyễn Văn Giảng Viên")
             .status(UserStatus.ACTIVE)
             .tokenVersion(5L)
-            .roleAssignments(
-                List.of(
-                    RoleAssignment.builder()
-                        .role(Role.LECTURER)
-                        .scope(
-                            UserScope.builder()
-                                .sectionIds(List.of("671dcba5f123456789abcdef"))
-                                .build())
-                        .build()))
+            .roles(List.of(Role.LECTURER))
             .build();
   }
 
@@ -75,7 +65,7 @@ class AuthSessionServiceImplTest {
     assertThat(principal.getFullName()).isEqualTo("Nguyễn Văn Giảng Viên");
     assertThat(principal.getStatus()).isEqualTo(UserStatus.ACTIVE);
     assertThat(principal.getTokenVersion()).isEqualTo(5L);
-    assertThat(principal.getRoleAssignments()).hasSize(1);
+    assertThat(principal.getRoles()).containsExactly(Role.LECTURER);
     assertThat(principal.getAuthorities())
         .extracting(GrantedAuthority::getAuthority)
         .containsExactly("ROLE_LECTURER");

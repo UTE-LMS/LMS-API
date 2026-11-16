@@ -1,6 +1,8 @@
 package com.hcmute.lms.lmsapi.controller;
 
+import com.hcmute.lms.lmsapi.dto.AssessmentScoreTemplate;
 import com.hcmute.lms.lmsapi.dto.CreateUserRequest;
+import com.hcmute.lms.lmsapi.dto.CsvImportResultResponse;
 import com.hcmute.lms.lmsapi.dto.PageResponse;
 import com.hcmute.lms.lmsapi.dto.UpdateUserRequest;
 import com.hcmute.lms.lmsapi.dto.UpdateUserStatusRequest;
@@ -14,7 +16,9 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -26,7 +30,9 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
  * REST Controller cho phân hệ quản lý người dùng (F01 / US-02). Toàn bộ các API đều yêu cầu quyền
@@ -148,5 +154,25 @@ public class UserController {
         currentUserId);
     UserResponse response = userService.updateStatus(id, request, currentUserId);
     return ResponseEntity.ok(response);
+  }
+
+  @GetMapping(value = "/import-template", produces = "text/csv; charset=UTF-8")
+  public ResponseEntity<byte[]> getImportTemplateCsv() {
+    log.info("API request: GET /api/v1/users/import-template");
+    AssessmentScoreTemplate template = userService.generateTemplateCsv();
+    return ResponseEntity.ok()
+        .header(
+            HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + template.fileName() + "\"")
+        .contentType(MediaType.parseMediaType("text/csv; charset=UTF-8"))
+        .body(template.content());
+  }
+
+  @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+  public ResponseEntity<CsvImportResultResponse> importUsers(
+      @RequestPart("file") MultipartFile file) {
+    log.info(
+        "API request: POST /api/v1/users/import with file [{}]",
+        file != null ? file.getOriginalFilename() : "null");
+    return ResponseEntity.ok(userService.importUsers(file));
   }
 }

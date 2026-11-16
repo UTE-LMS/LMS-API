@@ -6,7 +6,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.hcmute.lms.lmsapi.document.RoleAssignment;
 import com.hcmute.lms.lmsapi.document.User;
 import com.hcmute.lms.lmsapi.dto.LoginRequest;
 import com.hcmute.lms.lmsapi.enums.Role;
@@ -94,7 +93,7 @@ public class AuthTimingAndRevocationEmpiricalChallengeTest {
             .fullName(FIXTURE_LABEL + "User " + usernameSuffix)
             .status(status)
             .tokenVersion(tokenVersion)
-            .roleAssignments(List.of(RoleAssignment.builder().role(Role.LECTURER).build()))
+            .roles(List.of(Role.LECTURER))
             .createdAt(Instant.now())
             .updatedAt(Instant.now())
             .build();

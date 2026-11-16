@@ -250,7 +250,7 @@ Có 2 phương án đặt `facultyId` khi thiết kế:
 - *Phương án B: Đặt trực tiếp ở cấp gốc Document `User` (`User.facultyId`)*:
   * **Đảm bảo tính bất biến ngay từ mô hình dữ liệu (Schema-level Invariant):** Do mỗi document `User` chỉ có duy nhất 1 trường `facultyId`, một Program Manager về mặt cấu trúc thực thể không thể thuộc về 2 khoa cùng một lúc!
   * **Phù hợp với cơ chế nhân sự đại học:** Mỗi cán bộ, giảng viên trong trường đại học biên chế hoặc bổ nhiệm chính thức tại đúng một Khoa chủ quản duy nhất.
-  * **Truy vấn hiệu năng cao ($O(1)$ Index Lookup):** Dễ dàng tìm kiếm danh sách PM của Khoa hoặc lọc danh sách giảng viên của Khoa thông qua chỉ mục `{"facultyId": 1, "roleAssignments.role": 1}`.
+  * **Truy vấn hiệu năng cao ($O(1)$ Index Lookup):** Dễ dàng tìm kiếm danh sách PM của Khoa hoặc lọc danh sách giảng viên của Khoa thông qua chỉ mục `{"facultyId": 1, "roles": 1}`.
 
 ### Cập nhật Schema `users`:
 ```json
@@ -263,22 +263,13 @@ Có 2 phương án đặt `facultyId` khi thiết kế:
   "status": "ACTIVE",
   "tokenVersion": 1,
   "facultyId": {"$oid": "67370a1b2c4e8f1234567890"},
-  "roleAssignments": [
-    {
-      "role": "PROGRAM_MANAGER",
-      "scope": {
-        "programIds": [],
-        "courseIds": [],
-        "sectionIds": []
-      }
-    }
-  ]
+  "roles": ["PROGRAM_MANAGER"]
 }
 ```
 
 ### Chỉ mục bổ sung trên `users`:
 1. `user_faculty_idx`: `{"facultyId": 1}`
-2. `user_faculty_role_status_idx`: `{"facultyId": 1, "roleAssignments.role": 1, "status": 1}`
+2. `user_faculty_role_status_idx`: `{"facultyId": 1, "roles": 1, "status": 1}`
 
 ### Cập nhật Java Entity (`User.java`):
 ```java
@@ -310,7 +301,7 @@ private String facultyId;
              .status(user.getStatus())
              .tokenVersion(user.getTokenVersion())
              .facultyId(user.getFacultyId()) // Sao chép facultyId từ User entity
-             .roleAssignments(user.getRoleAssignments() != null ? user.getRoleAssignments() : Collections.emptyList())
+             .roles(user.getRoles() != null ? user.getRoles() : Collections.emptyList())
              .build();
      }
      ```
@@ -488,7 +479,7 @@ erDiagram
         string status "ACTIVE, LOCKED"
         long tokenVersion
         ObjectId facultyId "FK -> faculties._id (1 PM -> 1 Faculty)"
-        object roleAssignments "role: PM, ADMIN, LECTURER, QA"
+        array roles "PM, ADMIN, LECTURER, QA"
     }
 
     programs {
@@ -1115,7 +1106,7 @@ Hệ thống cung cấp đầy đủ các API RESTful cho 5 luồng nghiệp v�
 - **Xử lý nghiệp vụ tại Service Layer:**
   1. Kiểm tra `facultyId` tồn tại và đang `isActive == true`. Nếu không $\to$ 404/422.
   2. Kiểm tra `userId` tồn tại, trạng thái `ACTIVE`.
-  3. Kiểm tra user có chứa role `PROGRAM_MANAGER` trong danh sách `roleAssignments` không. Nếu chưa có $\to$ ném `422 Unprocessable Entity` (`USER_NOT_PROGRAM_MANAGER`).
+  3. Kiểm tra user có chứa role `PROGRAM_MANAGER` trong danh sách `roles` không. Nếu chưa có $\to$ ném `422 Unprocessable Entity` (`USER_NOT_PROGRAM_MANAGER`).
   4. **Kiểm tra Ràng buộc Bất biến 1 PM - 1 Khoa:**
      * Nếu `user.facultyId != null && !user.facultyId.equals(facultyId)`: Người dùng này đang thuộc Khoa khác.
      * Ném lỗi `409 Conflict` (hoặc `422 BusinessRuleViolation`): `"Người dùng [username] hiện đang thuộc Khoa [Mã Khoa Cũ]. Mỗi Program Manager chỉ được phép thuộc đúng 1 Khoa. Vui lòng chuyển công tác hoặc hủy gán trước."`

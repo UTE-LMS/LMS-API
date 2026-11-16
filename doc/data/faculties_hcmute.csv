@@ -1,0 +1,15 @@
+﻿code,name,description,isActive
+FIT,Khoa Công nghệ Thông tin,"Đào tạo các ngành Công nghệ Thông tin, Kỹ thuật phần mềm, An toàn thông tin, Kỹ thuật dữ liệu",true
+FME,Khoa Cơ khí Chế tạo máy,"Đào tạo các ngành Công nghệ Kỹ thuật Cơ khí, Chế tạo máy, Cơ điện tử, Robot và Trí tuệ nhân tạo, Kỹ nghệ Gỗ",true
+FEEE,Khoa Điện - Điện tử,"Đào tạo các ngành Công nghệ Kỹ thuật Điện - Điện tử, Điều khiển và Tự động hóa, Điện tử - Viễn thông, Kỹ thuật Máy tính",true
+FVEE,Khoa Cơ khí Động lực,"Đào tạo các ngành Công nghệ Kỹ thuật Ô tô, Cơ khí Động lực, Kỹ thuật Nhiệt (Khoa Giao thông và Năng lượng)",true
+FCE,Khoa Xây dựng,"Đào tạo các ngành Công nghệ Kỹ thuật Xây dựng, Xây dựng Công trình giao thông, Kiến trúc, Quản lý Xây dựng",true
+FCFT,Khoa Công nghệ Hóa học và Thực phẩm,"Đào tạo các ngành Công nghệ Kỹ thuật Hóa học, Công nghệ Thực phẩm, Công nghệ Sinh học, Kỹ thuật Môi trường",true
+FE,Khoa Kinh tế,"Đào tạo các ngành Công nghệ Tài chính (Fintech), Quản trị Kinh doanh, Kế toán, Thương mại Điện tử, Logistics",true
+FFL,Khoa Ngoại ngữ,"Đào tạo ngành Ngôn ngữ Anh và giảng dạy tiếng Anh chuyên ngành",true
+FAS,Khoa Khoa học Ứng dụng,"Đào tạo các môn Toán, Vật lý, Hóa học đại cương và Khoa học Ứng dụng",true
+FPM,Khoa In và Truyền thông,"Đào tạo các ngành Công nghệ Kỹ thuật In, Thiết kế Đồ họa, Truyền thông Đa phương tiện",true
+FFT,Khoa Thời trang và Du lịch,"Đào tạo các ngành Công nghệ May, Thiết kế Thời trang, Quản trị Nhà hàng và Dịch vụ Ăn uống",true
+FIE,Khoa Đào tạo Quốc tế,"Quản lý và đào tạo các chương trình Chất lượng cao Tiếng Anh và Liên kết Quốc tế",true
+FPL,Khoa Chính trị và Luật,"Đào tạo các học phần Lý luận Chính trị và Pháp luật đại cương",true
+ITE,Viện Sư phạm Kỹ thuật,"Đào tạo và bồi dưỡng nghiệp vụ Sư phạm Kỹ thuật",true

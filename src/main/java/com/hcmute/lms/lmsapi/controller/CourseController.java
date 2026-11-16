@@ -1,5 +1,6 @@
 package com.hcmute.lms.lmsapi.controller;
 
+import com.hcmute.lms.lmsapi.dto.AssessmentScoreTemplate;
 import com.hcmute.lms.lmsapi.dto.CourseImportResultResponse;
 import com.hcmute.lms.lmsapi.dto.CourseRequest;
 import com.hcmute.lms.lmsapi.dto.CourseResponse;
@@ -15,6 +16,7 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -91,6 +93,18 @@ public class CourseController {
     return ResponseEntity.status(HttpStatus.CREATED).body(courseService.createCourse(request));
   }
 
+  @GetMapping(value = "/import-template", produces = "text/csv; charset=UTF-8")
+  @PreAuthorize("hasAnyRole('ADMIN', 'PROGRAM_MANAGER')")
+  public ResponseEntity<byte[]> getImportTemplateCsv() {
+    log.info("API request: GET /api/v1/courses/import-template");
+    AssessmentScoreTemplate template = courseService.generateTemplateCsv();
+    return ResponseEntity.ok()
+        .header(
+            HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + template.fileName() + "\"")
+        .contentType(MediaType.parseMediaType("text/csv; charset=UTF-8"))
+        .body(template.content());
+  }
+
   @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   @PreAuthorize(
       "hasRole('ADMIN') or (hasRole('PROGRAM_MANAGER') and (#facultyId == null or authentication.principal.facultyId == #facultyId))")
@@ -98,8 +112,9 @@ public class CourseController {
       @RequestParam("file") MultipartFile file,
       @RequestParam(value = "facultyId", required = false) String facultyId,
       @AuthenticationPrincipal UserPrincipal principal) {
+    boolean isAdmin = principal != null && hasRole(principal, Role.ADMIN);
     String effectiveFacultyId = facultyId;
-    if (principal != null && !hasRole(principal, Role.ADMIN)) {
+    if (principal != null && !isAdmin) {
       if (principal.getFacultyId() == null) {
         throw new AccessDeniedException("Program Manager chưa được gán vào Khoa nào");
       }
@@ -110,7 +125,7 @@ public class CourseController {
     log.info(
         "API request: POST /api/v1/courses/import with file [{}]",
         file != null ? file.getOriginalFilename() : "null");
-    return ResponseEntity.ok(courseService.importCourses(file, effectiveFacultyId));
+    return ResponseEntity.ok(courseService.importCourses(file, effectiveFacultyId, isAdmin));
   }
 
   @PutMapping("/{id}")
@@ -151,8 +166,6 @@ public class CourseController {
   }
 
   private boolean hasRole(UserPrincipal principal, Role role) {
-    return principal.getRoleAssignments() != null
-        && principal.getRoleAssignments().stream()
-            .anyMatch(ra -> ra != null && ra.getRole() == role);
+    return principal.getRoles() != null && principal.getRoles().contains(role);
   }
 }

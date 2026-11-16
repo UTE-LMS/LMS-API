@@ -4,12 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.hcmute.lms.lmsapi.document.RoleAssignment;
 import com.hcmute.lms.lmsapi.document.User;
 import com.hcmute.lms.lmsapi.dto.UpdateUserRequest;
 import com.hcmute.lms.lmsapi.dto.UpdateUserStatusRequest;
@@ -19,7 +17,6 @@ import com.hcmute.lms.lmsapi.enums.UserStatus;
 import com.hcmute.lms.lmsapi.exception.BusinessRuleViolationException;
 import com.hcmute.lms.lmsapi.mapper.UserMapper;
 import com.hcmute.lms.lmsapi.repository.UserRepository;
-import com.hcmute.lms.lmsapi.service.ScopeValidationService;
 import com.hcmute.lms.lmsapi.validator.PasswordPolicyValidator;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -56,8 +53,6 @@ class AdminGuardsEmpiricalChallengeTest {
 
   @Spy private PasswordPolicyValidator passwordPolicyValidator = new PasswordPolicyValidator();
 
-  @Mock private ScopeValidationService scopeValidationService;
-
   private UserServiceImpl userService;
 
   private static final String CURRENT_ADMIN_ID = "671dcba5f123456789abcd01";
@@ -73,11 +68,7 @@ class AdminGuardsEmpiricalChallengeTest {
   void setUp() {
     userService =
         new UserServiceImpl(
-            userRepository,
-            userMapper,
-            passwordEncoder,
-            passwordPolicyValidator,
-            scopeValidationService);
+            userRepository, null, userMapper, passwordEncoder, passwordPolicyValidator);
 
     currentAdmin =
         User.builder()
@@ -87,8 +78,7 @@ class AdminGuardsEmpiricalChallengeTest {
             .fullName("[DỮ LIỆU THỬ NGHIỆM] Quản Trị Viên Hiện Tại")
             .status(UserStatus.ACTIVE)
             .tokenVersion(0L)
-            .roleAssignments(
-                new ArrayList<>(List.of(RoleAssignment.builder().role(Role.ADMIN).build())))
+            .roles(new ArrayList<>(List.of(Role.ADMIN)))
             .createdAt(Instant.now())
             .updatedAt(Instant.now())
             .build();
@@ -101,8 +91,7 @@ class AdminGuardsEmpiricalChallengeTest {
             .fullName("[DỮ LIỆU THỬ NGHIỆM] Quản Trị Viên Khác")
             .status(UserStatus.ACTIVE)
             .tokenVersion(0L)
-            .roleAssignments(
-                new ArrayList<>(List.of(RoleAssignment.builder().role(Role.ADMIN).build())))
+            .roles(new ArrayList<>(List.of(Role.ADMIN)))
             .createdAt(Instant.now())
             .updatedAt(Instant.now())
             .build();
@@ -115,8 +104,7 @@ class AdminGuardsEmpiricalChallengeTest {
             .fullName("[DỮ LIỆU THỬ NGHIỆM] Giảng Viên")
             .status(UserStatus.ACTIVE)
             .tokenVersion(0L)
-            .roleAssignments(
-                new ArrayList<>(List.of(RoleAssignment.builder().role(Role.LECTURER).build())))
+            .roles(new ArrayList<>(List.of(Role.LECTURER)))
             .createdAt(Instant.now())
             .updatedAt(Instant.now())
             .build();
@@ -133,7 +121,7 @@ class AdminGuardsEmpiricalChallengeTest {
     return UpdateUserRequest.builder()
         .email(email)
         .fullName(fullName)
-        .roleAssignments(List.of(RoleAssignment.builder().role(Role.LECTURER).build()))
+        .roles(List.of(Role.LECTURER))
         .build();
   }
 
@@ -222,7 +210,6 @@ class AdminGuardsEmpiricalChallengeTest {
         "Challenger 2.1: Admin self-demote by replacing ADMIN with LECTURER must throw HTTP 422")
     void selfDemote_ToLecturer_MustThrow422() {
       when(userRepository.findById(CURRENT_ADMIN_ID)).thenReturn(Optional.of(currentAdmin));
-      doNothing().when(scopeValidationService).validateRoleAssignments(any());
 
       UpdateUserRequest demotionRequest = lecturerOnlyRequest("admin@hcmute.edu.vn", "Admin Name");
 
@@ -235,14 +222,9 @@ class AdminGuardsEmpiricalChallengeTest {
     @DisplayName(
         "Challenger 2.2: Multi-role Admin self-demote (ADMIN + LECTURER -> only LECTURER) must throw HTTP 422")
     void multiRoleAdmin_SelfDemote_MustThrow422() {
-      currentAdmin.setRoleAssignments(
-          new ArrayList<>(
-              List.of(
-                  RoleAssignment.builder().role(Role.ADMIN).build(),
-                  RoleAssignment.builder().role(Role.LECTURER).build())));
+      currentAdmin.setRoles(new ArrayList<>(List.of(Role.ADMIN, Role.LECTURER)));
 
       when(userRepository.findById(CURRENT_ADMIN_ID)).thenReturn(Optional.of(currentAdmin));
-      doNothing().when(scopeValidationService).validateRoleAssignments(any());
 
       UpdateUserRequest demotionRequest = lecturerOnlyRequest("admin@hcmute.edu.vn", "Admin Name");
 
@@ -255,7 +237,6 @@ class AdminGuardsEmpiricalChallengeTest {
     @DisplayName("Challenger 2.3: Admin updating self while retaining ADMIN role must succeed")
     void selfUpdate_RetainingAdminRole_Succeeds() {
       when(userRepository.findById(CURRENT_ADMIN_ID)).thenReturn(Optional.of(currentAdmin));
-      doNothing().when(scopeValidationService).validateRoleAssignments(any());
       when(userRepository.save(any(User.class))).thenReturn(currentAdmin);
       when(userMapper.toResponse(currentAdmin)).thenReturn(mockResponse);
 
@@ -263,10 +244,7 @@ class AdminGuardsEmpiricalChallengeTest {
           UpdateUserRequest.builder()
               .email("admin@hcmute.edu.vn")
               .fullName("Admin Updated FullName")
-              .roleAssignments(
-                  List.of(
-                      RoleAssignment.builder().role(Role.ADMIN).build(),
-                      RoleAssignment.builder().role(Role.QA).build()))
+              .roles(List.of(Role.ADMIN, Role.QA))
               .build();
 
       UserResponse response =
@@ -290,7 +268,7 @@ class AdminGuardsEmpiricalChallengeTest {
     @DisplayName("Challenger 3A.1: Locking active ADMIN when active count <= 1 must throw HTTP 422")
     void lockActiveAdmin_WhenCountLessThanOrEqual1_MustThrow422(long activeAdminCount) {
       when(userRepository.findById(OTHER_ADMIN_ID)).thenReturn(Optional.of(otherAdmin));
-      when(userRepository.countByRoleAssignmentsRoleAndStatus(Role.ADMIN, UserStatus.ACTIVE))
+      when(userRepository.countByRolesContainingAndStatus(Role.ADMIN, UserStatus.ACTIVE))
           .thenReturn(activeAdminCount);
 
       UpdateUserStatusRequest lockRequest = new UpdateUserStatusRequest(UserStatus.LOCKED);
@@ -310,7 +288,7 @@ class AdminGuardsEmpiricalChallengeTest {
         "Challenger 3A.2: Locking active ADMIN when active count >= 2 must succeed and increment tokenVersion")
     void lockActiveAdmin_WhenCountGreaterThan1_Succeeds() {
       when(userRepository.findById(OTHER_ADMIN_ID)).thenReturn(Optional.of(otherAdmin));
-      when(userRepository.countByRoleAssignmentsRoleAndStatus(Role.ADMIN, UserStatus.ACTIVE))
+      when(userRepository.countByRolesContainingAndStatus(Role.ADMIN, UserStatus.ACTIVE))
           .thenReturn(2L);
       when(userRepository.save(any(User.class))).thenReturn(otherAdmin);
       when(userRepository.incrementTokenVersion(OTHER_ADMIN_ID)).thenReturn(1L);
@@ -341,7 +319,7 @@ class AdminGuardsEmpiricalChallengeTest {
           userService.updateStatus(OTHER_ADMIN_ID, lockRequest, CURRENT_ADMIN_ID);
 
       assertThat(response).isNotNull();
-      verify(userRepository, never()).countByRoleAssignmentsRoleAndStatus(any(), any());
+      verify(userRepository, never()).countByRolesContainingAndStatus(any(), any());
       verify(userRepository).incrementTokenVersion(OTHER_ADMIN_ID);
     }
 
@@ -356,7 +334,7 @@ class AdminGuardsEmpiricalChallengeTest {
       UserResponse response = userService.updateStatus(NON_ADMIN_ID, lockRequest, CURRENT_ADMIN_ID);
 
       assertThat(response).isNotNull();
-      verify(userRepository, never()).countByRoleAssignmentsRoleAndStatus(any(), any());
+      verify(userRepository, never()).countByRolesContainingAndStatus(any(), any());
       verify(userRepository).incrementTokenVersion(NON_ADMIN_ID);
     }
   }
@@ -375,8 +353,7 @@ class AdminGuardsEmpiricalChallengeTest {
         "Challenger 3B.1: Demoting other active ADMIN when active count <= 1 must throw HTTP 422")
     void demoteActiveAdmin_WhenCountLessThanOrEqual1_MustThrow422(long activeAdminCount) {
       when(userRepository.findById(OTHER_ADMIN_ID)).thenReturn(Optional.of(otherAdmin));
-      doNothing().when(scopeValidationService).validateRoleAssignments(any());
-      when(userRepository.countByRoleAssignmentsRoleAndStatus(Role.ADMIN, UserStatus.ACTIVE))
+      when(userRepository.countByRolesContainingAndStatus(Role.ADMIN, UserStatus.ACTIVE))
           .thenReturn(activeAdminCount);
 
       UpdateUserRequest demotionRequest =
@@ -395,8 +372,7 @@ class AdminGuardsEmpiricalChallengeTest {
     @DisplayName("Challenger 3B.2: Demoting other active ADMIN when active count >= 2 must succeed")
     void demoteActiveAdmin_WhenCountGreaterThan1_Succeeds() {
       when(userRepository.findById(OTHER_ADMIN_ID)).thenReturn(Optional.of(otherAdmin));
-      doNothing().when(scopeValidationService).validateRoleAssignments(any());
-      when(userRepository.countByRoleAssignmentsRoleAndStatus(Role.ADMIN, UserStatus.ACTIVE))
+      when(userRepository.countByRolesContainingAndStatus(Role.ADMIN, UserStatus.ACTIVE))
           .thenReturn(2L);
       when(userRepository.save(any(User.class))).thenReturn(otherAdmin);
       when(userMapper.toResponse(any(User.class))).thenReturn(mockResponse);
@@ -417,7 +393,6 @@ class AdminGuardsEmpiricalChallengeTest {
     void demoteAlreadyLockedAdmin_WhenCountIs1_Succeeds() {
       otherAdmin.setStatus(UserStatus.LOCKED);
       when(userRepository.findById(OTHER_ADMIN_ID)).thenReturn(Optional.of(otherAdmin));
-      doNothing().when(scopeValidationService).validateRoleAssignments(any());
       when(userRepository.save(any(User.class))).thenReturn(otherAdmin);
       when(userMapper.toResponse(any(User.class))).thenReturn(mockResponse);
 
@@ -428,7 +403,7 @@ class AdminGuardsEmpiricalChallengeTest {
           userService.updateUser(OTHER_ADMIN_ID, demotionRequest, CURRENT_ADMIN_ID);
 
       assertThat(response).isNotNull();
-      verify(userRepository, never()).countByRoleAssignmentsRoleAndStatus(any(), any());
+      verify(userRepository, never()).countByRolesContainingAndStatus(any(), any());
       verify(userRepository).save(otherAdmin);
     }
 
@@ -437,7 +412,6 @@ class AdminGuardsEmpiricalChallengeTest {
         "Challenger 3B.4: Updating non-admin user when active admin count == 1 does not check Guard 3B")
     void updateNonAdmin_WhenActiveCountIs1_Succeeds() {
       when(userRepository.findById(NON_ADMIN_ID)).thenReturn(Optional.of(nonAdminUser));
-      doNothing().when(scopeValidationService).validateRoleAssignments(any());
       when(userRepository.save(any(User.class))).thenReturn(nonAdminUser);
       when(userMapper.toResponse(any(User.class))).thenReturn(mockResponse);
 
@@ -445,13 +419,13 @@ class AdminGuardsEmpiricalChallengeTest {
           UpdateUserRequest.builder()
               .email("lecturer@hcmute.edu.vn")
               .fullName("Lecturer Updated")
-              .roleAssignments(List.of(RoleAssignment.builder().role(Role.QA).build()))
+              .roles(List.of(Role.QA))
               .build();
 
       UserResponse response = userService.updateUser(NON_ADMIN_ID, updateRequest, CURRENT_ADMIN_ID);
 
       assertThat(response).isNotNull();
-      verify(userRepository, never()).countByRoleAssignmentsRoleAndStatus(any(), any());
+      verify(userRepository, never()).countByRolesContainingAndStatus(any(), any());
       verify(userRepository).save(nonAdminUser);
     }
   }

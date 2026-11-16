@@ -2,19 +2,14 @@ package com.hcmute.lms.lmsapi.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.hcmute.lms.lmsapi.document.RoleAssignment;
 import com.hcmute.lms.lmsapi.document.User;
-import com.hcmute.lms.lmsapi.document.UserScope;
-import com.hcmute.lms.lmsapi.dto.CreateUserRequest;
 import com.hcmute.lms.lmsapi.dto.LoginRequest;
-import com.hcmute.lms.lmsapi.dto.UpdateUserRequest;
 import com.hcmute.lms.lmsapi.dto.UpdateUserStatusRequest;
 import com.hcmute.lms.lmsapi.enums.Role;
 import com.hcmute.lms.lmsapi.enums.UserStatus;
@@ -22,10 +17,7 @@ import com.hcmute.lms.lmsapi.repository.UserRepository;
 import com.hcmute.lms.lmsapi.service.AuthSessionService;
 import com.hcmute.lms.lmsapi.support.ApiTestSupport;
 import java.time.Instant;
-import java.util.Collections;
 import java.util.List;
-import org.bson.Document;
-import org.bson.types.ObjectId;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -70,10 +62,6 @@ public class UserSecurityAndIntegrityEmpiricalChallengeTest {
   private static final String CREATED_USERNAME = PREFIX + "created";
   private static final String RAW_PASSWORD = "ChallengePassword123!";
 
-  private static final String TEST_PROG_ID = "671dcba5f123456789000011";
-  private static final String TEST_COURSE_ID = "671dcba5f123456789000012";
-  private static final String TEST_SECTION_ID = "671dcba5f123456789000013";
-
   @Autowired private WebApplicationContext context;
 
   @Autowired private UserRepository userRepository;
@@ -109,7 +97,7 @@ public class UserSecurityAndIntegrityEmpiricalChallengeTest {
             .fullName("[DỮ LIỆU THỬ NGHIỆM] Challenger Admin")
             .status(UserStatus.ACTIVE)
             .tokenVersion(0L)
-            .roleAssignments(List.of(RoleAssignment.builder().role(Role.ADMIN).build()))
+            .roles(List.of(Role.ADMIN))
             .createdAt(Instant.now())
             .updatedAt(Instant.now())
             .build());
@@ -124,7 +112,7 @@ public class UserSecurityAndIntegrityEmpiricalChallengeTest {
                 .fullName("[DỮ LIỆU THỬ NGHIỆM] Challenger Target")
                 .status(UserStatus.ACTIVE)
                 .tokenVersion(0L)
-                .roleAssignments(List.of(RoleAssignment.builder().role(Role.LECTURER).build()))
+                .roles(List.of(Role.LECTURER))
                 .createdAt(Instant.now())
                 .updatedAt(Instant.now())
                 .build());
@@ -142,32 +130,6 @@ public class UserSecurityAndIntegrityEmpiricalChallengeTest {
     // Xóa sạch toàn bộ người dùng thử nghiệm theo tiền tố PREFIX
     mongoTemplate.remove(new Query(Criteria.where("username").regex("^" + PREFIX)), "users");
     mongoTemplate.remove(new Query(Criteria.where("email").regex("^" + PREFIX)), "users");
-
-    // Xóa tài liệu scope thử nghiệm
-    mongoTemplate.remove(
-        new Query(
-            new Criteria()
-                .orOperator(
-                    Criteria.where("_id").is(TEST_PROG_ID),
-                    Criteria.where("_id").is(new ObjectId(TEST_PROG_ID)),
-                    Criteria.where("code").is("PROG_CH_01"))),
-        "programs");
-    mongoTemplate.remove(
-        new Query(
-            new Criteria()
-                .orOperator(
-                    Criteria.where("_id").is(TEST_COURSE_ID),
-                    Criteria.where("_id").is(new ObjectId(TEST_COURSE_ID)),
-                    Criteria.where("code").is("COURSE_CH_01"))),
-        "courses");
-    mongoTemplate.remove(
-        new Query(
-            new Criteria()
-                .orOperator(
-                    Criteria.where("_id").is(TEST_SECTION_ID),
-                    Criteria.where("_id").is(new ObjectId(TEST_SECTION_ID)),
-                    Criteria.where("code").is("SEC_CH_01"))),
-        "course_sections");
   }
 
   private String obtainAccessToken(String username, String password) throws Exception {
@@ -194,8 +156,8 @@ public class UserSecurityAndIntegrityEmpiricalChallengeTest {
                         "username": "%s",\
                         "email": "%starget_updated@hcmute.edu.vn",\
                         "fullName": "Victim Updated Name",\
-                        "roleAssignments": [\
-                            { "role": "LECTURER" }\
+                        "roles": [\
+                            "LECTURER"\
                         ]\
                     }\
                     """
@@ -248,8 +210,8 @@ public class UserSecurityAndIntegrityEmpiricalChallengeTest {
                         "passwordHash": "$2a$10$maliciousFakeHashValueHere1234567890abcdef",\
                         "email": "%starget_pw@hcmute.edu.vn",\
                         "fullName": "Tamper PW Name",\
-                        "roleAssignments": [\
-                            { "role": "LECTURER" }\
+                        "roles": [\
+                            "LECTURER"\
                         ]\
                     }\
                     """
@@ -294,8 +256,8 @@ public class UserSecurityAndIntegrityEmpiricalChallengeTest {
                         "tokenVersion": 9999,\
                         "email": "%starget_ver@hcmute.edu.vn",\
                         "fullName": "Tamper Version Name",\
-                        "roleAssignments": [\
-                            { "role": "LECTURER" }\
+                        "roles": [\
+                            "LECTURER"\
                         ]\
                     }\
                     """
@@ -327,8 +289,8 @@ public class UserSecurityAndIntegrityEmpiricalChallengeTest {
                         "id": "%s",\
                         "email": "%starget_id@hcmute.edu.vn",\
                         "fullName": "Tamper ID Name",\
-                        "roleAssignments": [\
-                            { "role": "LECTURER" }\
+                        "roles": [\
+                            "LECTURER"\
                         ]\
                     }\
                     """
@@ -345,321 +307,6 @@ public class UserSecurityAndIntegrityEmpiricalChallengeTest {
 
       assertThat(userRepository.findById(fakeId)).isEmpty();
       assertThat(userRepository.findById(targetUser.getId())).isPresent();
-    }
-  }
-
-  // =========================================================================
-  // 2. THỬ THÁCH SCOPE REFERENCE VALIDATION (ID RÁC -> HTTP 422)
-  // =========================================================================
-
-  @Nested
-  @DisplayName("2. Scope Reference Validation Adversarial Challenge (Nonexistent IDs -> HTTP 422)")
-  class ScopeReferenceValidationAdversarialChallengeTests {
-
-    @Test
-    @DisplayName(
-        "POST /api/v1/users với programId rác không tồn tại: Trả về HTTP 422 SCOPE_NOT_FOUND")
-    void postUser_withNonExistentProgramId_returns422ScopeNotFound() throws Exception {
-      String nonExistentProgId = "garbage_prog_id_999";
-      CreateUserRequest request =
-          CreateUserRequest.builder()
-              .username(CREATED_USERNAME)
-              .email(PREFIX + "created_prog@hcmute.edu.vn")
-              .password(RAW_PASSWORD)
-              .fullName("Prog Scope User")
-              .roleAssignments(
-                  List.of(
-                      RoleAssignment.builder()
-                          .role(Role.PROGRAM_MANAGER)
-                          .scope(UserScope.builder().programIds(List.of(nonExistentProgId)).build())
-                          .build()))
-              .build();
-
-      ApiTestSupport.expectBusinessRuleViolation(
-              ApiTestSupport.performJson(
-                  mockMvc, objectMapper, post("/api/v1/users"), adminToken, request),
-              "SCOPE_NOT_FOUND")
-          .andExpect(jsonPath("$.message").value(containsString(nonExistentProgId)));
-    }
-
-    @Test
-    @DisplayName(
-        "POST /api/v1/users với courseId ObjectId rác không tồn tại: Trả về HTTP 422 SCOPE_NOT_FOUND")
-    void postUser_withNonExistentCourseId_returns422ScopeNotFound() throws Exception {
-      String nonExistentCourseId = "671dcba5f123456789beef01";
-      CreateUserRequest request =
-          CreateUserRequest.builder()
-              .username(CREATED_USERNAME)
-              .email(PREFIX + "created_course@hcmute.edu.vn")
-              .password(RAW_PASSWORD)
-              .fullName("Course Scope User")
-              .roleAssignments(
-                  List.of(
-                      RoleAssignment.builder()
-                          .role(Role.LECTURER)
-                          .scope(
-                              UserScope.builder().courseIds(List.of(nonExistentCourseId)).build())
-                          .build()))
-              .build();
-
-      ApiTestSupport.expectBusinessRuleViolation(
-              ApiTestSupport.performJson(
-                  mockMvc, objectMapper, post("/api/v1/users"), adminToken, request),
-              "SCOPE_NOT_FOUND")
-          .andExpect(jsonPath("$.message").value(containsString(nonExistentCourseId)));
-    }
-
-    @Test
-    @DisplayName(
-        "POST /api/v1/users với sectionId rác không tồn tại: Trả về HTTP 422 SCOPE_NOT_FOUND")
-    void postUser_withNonExistentSectionId_returns422ScopeNotFound() throws Exception {
-      String nonExistentSectionId = "nonexistent_section_id_xyz";
-      CreateUserRequest request =
-          CreateUserRequest.builder()
-              .username(CREATED_USERNAME)
-              .email(PREFIX + "created_sec@hcmute.edu.vn")
-              .password(RAW_PASSWORD)
-              .fullName("Section Scope User")
-              .roleAssignments(
-                  List.of(
-                      RoleAssignment.builder()
-                          .role(Role.LECTURER)
-                          .scope(
-                              UserScope.builder().sectionIds(List.of(nonExistentSectionId)).build())
-                          .build()))
-              .build();
-
-      ApiTestSupport.expectBusinessRuleViolation(
-              ApiTestSupport.performJson(
-                  mockMvc, objectMapper, post("/api/v1/users"), adminToken, request),
-              "SCOPE_NOT_FOUND")
-          .andExpect(jsonPath("$.message").value(containsString(nonExistentSectionId)));
-    }
-
-    @Test
-    @DisplayName(
-        "PUT /api/v1/users/{id} với programId rác không tồn tại: Trả về HTTP 422 SCOPE_NOT_FOUND")
-    void putUser_withNonExistentProgramId_returns422ScopeNotFound() throws Exception {
-      String nonExistentProgId = "671dcba5f123456789prog99";
-      UpdateUserRequest request =
-          UpdateUserRequest.builder()
-              .email(PREFIX + "target_put_prog@hcmute.edu.vn")
-              .fullName("Updated Prog User")
-              .roleAssignments(
-                  List.of(
-                      RoleAssignment.builder()
-                          .role(Role.PROGRAM_MANAGER)
-                          .scope(UserScope.builder().programIds(List.of(nonExistentProgId)).build())
-                          .build()))
-              .build();
-
-      ApiTestSupport.expectBusinessRuleViolation(
-              ApiTestSupport.performJson(
-                  mockMvc,
-                  objectMapper,
-                  put("/api/v1/users/" + targetUser.getId()),
-                  adminToken,
-                  request),
-              "SCOPE_NOT_FOUND")
-          .andExpect(jsonPath("$.message").value(containsString(nonExistentProgId)));
-    }
-
-    @Test
-    @DisplayName(
-        "PUT /api/v1/users/{id} với courseId rác không tồn tại: Trả về HTTP 422 SCOPE_NOT_FOUND")
-    void putUser_withNonExistentCourseId_returns422ScopeNotFound() throws Exception {
-      String nonExistentCourseId = "garbage_course_id_abc";
-      UpdateUserRequest request =
-          UpdateUserRequest.builder()
-              .email(PREFIX + "target_put_course@hcmute.edu.vn")
-              .fullName("Updated Course User")
-              .roleAssignments(
-                  List.of(
-                      RoleAssignment.builder()
-                          .role(Role.LECTURER)
-                          .scope(
-                              UserScope.builder().courseIds(List.of(nonExistentCourseId)).build())
-                          .build()))
-              .build();
-
-      ApiTestSupport.expectBusinessRuleViolation(
-              ApiTestSupport.performJson(
-                  mockMvc,
-                  objectMapper,
-                  put("/api/v1/users/" + targetUser.getId()),
-                  adminToken,
-                  request),
-              "SCOPE_NOT_FOUND")
-          .andExpect(jsonPath("$.message").value(containsString(nonExistentCourseId)));
-    }
-
-    @Test
-    @DisplayName(
-        "PUT /api/v1/users/{id} với sectionId rác không tồn tại: Trả về HTTP 422 SCOPE_NOT_FOUND")
-    void putUser_withNonExistentSectionId_returns422ScopeNotFound() throws Exception {
-      String nonExistentSecId = "garbage_section_id_123";
-      UpdateUserRequest request =
-          UpdateUserRequest.builder()
-              .email(PREFIX + "target_put_sec@hcmute.edu.vn")
-              .fullName("Updated Section User")
-              .roleAssignments(
-                  List.of(
-                      RoleAssignment.builder()
-                          .role(Role.LECTURER)
-                          .scope(UserScope.builder().sectionIds(List.of(nonExistentSecId)).build())
-                          .build()))
-              .build();
-
-      ApiTestSupport.expectBusinessRuleViolation(
-              ApiTestSupport.performJson(
-                  mockMvc,
-                  objectMapper,
-                  put("/api/v1/users/" + targetUser.getId()),
-                  adminToken,
-                  request),
-              "SCOPE_NOT_FOUND")
-          .andExpect(jsonPath("$.message").value(containsString(nonExistentSecId)));
-    }
-
-    @Test
-    @DisplayName(
-        "Nhiều roleAssignments trong đó chỉ assignment thứ 2 có ID rác: Vẫn từ chối với HTTP 422")
-    void multipleRoleAssignments_whereSecondAssignmentHasInvalidScope_returns422()
-        throws Exception {
-      String nonExistentProgId = "671dcba5f123456789prog88";
-      UpdateUserRequest request =
-          UpdateUserRequest.builder()
-              .email(PREFIX + "target_multi@hcmute.edu.vn")
-              .fullName("Multi Role User")
-              .roleAssignments(
-                  List.of(
-                      RoleAssignment.builder().role(Role.LECTURER).build(), // hợp lệ (scope rỗng)
-                      RoleAssignment.builder()
-                          .role(Role.PROGRAM_MANAGER)
-                          .scope(
-                              UserScope.builder()
-                                  .programIds(List.of(nonExistentProgId))
-                                  .build()) // không hợp lệ
-                          .build()))
-              .build();
-
-      ApiTestSupport.expectBusinessRuleViolation(
-          ApiTestSupport.performJson(
-              mockMvc,
-              objectMapper,
-              put("/api/v1/users/" + targetUser.getId()),
-              adminToken,
-              request),
-          "SCOPE_NOT_FOUND");
-    }
-
-    @Test
-    @DisplayName(
-        "Positive Control: ID thực sự tồn tại trong CSDL -> Chấp nhận thành công (HTTP 200/201)")
-    void whenScopeIdsActuallyExistInDatabase_succeedsWithOkOrCreated() throws Exception {
-      // Chèn bản ghi giả lập thỏa mãn validator schema của MongoDB vào đúng 3 collections
-      mongoTemplate.insert(
-          new Document("_id", new ObjectId(TEST_PROG_ID))
-              .append("code", "PROG_CH_01")
-              .append("name", "Challenger Program"),
-          "programs");
-
-      mongoTemplate.insert(
-          new Document("_id", new ObjectId(TEST_COURSE_ID))
-              .append("code", "COURSE_CH_01")
-              .append("name", "Challenger Course"),
-          "courses");
-
-      mongoTemplate.insert(
-          new Document("_id", new ObjectId(TEST_SECTION_ID))
-              .append("code", "SEC_CH_01")
-              .append("courseId", new ObjectId(TEST_COURSE_ID))
-              .append("syllabusId", new ObjectId("671dcba5f123456789000002"))
-              .append("termId", new ObjectId("671dcba5f123456789000003"))
-              .append("status", "OPEN"),
-          "course_sections");
-
-      // 1. Tạo mới user với scope hợp lệ chứa cả 3 ID có thật
-      CreateUserRequest postRequest =
-          CreateUserRequest.builder()
-              .username(CREATED_USERNAME)
-              .email(PREFIX + "created_valid@hcmute.edu.vn")
-              .password(RAW_PASSWORD)
-              .fullName("Valid Scope User")
-              .roleAssignments(
-                  List.of(
-                      RoleAssignment.builder()
-                          .role(Role.LECTURER)
-                          .scope(
-                              UserScope.builder()
-                                  .programIds(List.of(TEST_PROG_ID))
-                                  .courseIds(List.of(TEST_COURSE_ID))
-                                  .sectionIds(List.of(TEST_SECTION_ID))
-                                  .build())
-                          .build()))
-              .build();
-
-      ApiTestSupport.performJson(
-              mockMvc, objectMapper, post("/api/v1/users"), adminToken, postRequest)
-          .andExpect(status().isCreated())
-          .andExpect(jsonPath("$.username").value(CREATED_USERNAME));
-
-      // 2. Cập nhật user với scope hợp lệ
-      UpdateUserRequest putRequest =
-          UpdateUserRequest.builder()
-              .email(PREFIX + "target_valid@hcmute.edu.vn")
-              .fullName("Valid Put Scope")
-              .roleAssignments(
-                  List.of(
-                      RoleAssignment.builder()
-                          .role(Role.LECTURER)
-                          .scope(
-                              UserScope.builder()
-                                  .programIds(List.of(TEST_PROG_ID))
-                                  .courseIds(List.of(TEST_COURSE_ID))
-                                  .sectionIds(List.of(TEST_SECTION_ID))
-                                  .build())
-                          .build()))
-              .build();
-
-      ApiTestSupport.performJson(
-              mockMvc,
-              objectMapper,
-              put("/api/v1/users/" + targetUser.getId()),
-              adminToken,
-              putRequest)
-          .andExpect(status().isOk())
-          .andExpect(jsonPath("$.email").value(PREFIX + "target_valid@hcmute.edu.vn"));
-    }
-
-    @Test
-    @DisplayName("Scope rỗng hoặc null: Không thực hiện kiểm tra DB và chấp nhận thành công")
-    void scopeEmptyOrNull_acceptedWithoutCheckingDb() throws Exception {
-      UpdateUserRequest request =
-          UpdateUserRequest.builder()
-              .email(PREFIX + "target_empty_scope@hcmute.edu.vn")
-              .fullName("Empty Scope User")
-              .roleAssignments(
-                  List.of(
-                      RoleAssignment.builder().role(Role.QA).scope(null).build(),
-                      RoleAssignment.builder()
-                          .role(Role.LECTURER)
-                          .scope(
-                              UserScope.builder()
-                                  .programIds(Collections.emptyList())
-                                  .courseIds(Collections.emptyList())
-                                  .sectionIds(Collections.emptyList())
-                                  .build())
-                          .build()))
-              .build();
-
-      ApiTestSupport.performJson(
-              mockMvc,
-              objectMapper,
-              put("/api/v1/users/" + targetUser.getId()),
-              adminToken,
-              request)
-          .andExpect(status().isOk());
     }
   }
 
