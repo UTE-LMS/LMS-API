@@ -21,6 +21,7 @@ import com.hcmute.lms.lmsapi.document.Term;
 import com.hcmute.lms.lmsapi.dto.AggregateResultResponse;
 import com.hcmute.lms.lmsapi.dto.CalculationRunRequest;
 import com.hcmute.lms.lmsapi.dto.CalculationRunResponse;
+import com.hcmute.lms.lmsapi.dto.PageResponse;
 import com.hcmute.lms.lmsapi.dto.StudentResultResponse;
 import com.hcmute.lms.lmsapi.dto.UserPrincipal;
 import com.hcmute.lms.lmsapi.enums.AccessType;
@@ -52,6 +53,7 @@ import com.hcmute.lms.lmsapi.repository.TermRepository;
 import com.hcmute.lms.lmsapi.service.AuditService;
 import com.hcmute.lms.lmsapi.service.CalculationService;
 import com.hcmute.lms.lmsapi.service.ScopeAuthorizationService;
+import com.hcmute.lms.lmsapi.util.PageableValidationUtils;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -161,19 +163,26 @@ public class CalculationServiceImpl implements CalculationService {
   }
 
   @Override
-  public List<CalculationRunResponse> getCalculationRuns(String programVersionId) {
+  public PageResponse<CalculationRunResponse> getCalculationRuns(
+      String programVersionId, int page, int size) {
     List<CalculationRun> runs =
         programVersionId != null && !programVersionId.isBlank()
             ? calculationRunRepository.findByProgramVersionIdOrderByStartedAtDesc(programVersionId)
             : calculationRunRepository.findAllByOrderByStartedAtDesc();
-    return runs.stream()
-        .map(
-            r ->
-                toRunResponse(
-                    r,
-                    studentResultRepository.findByRunId(r.getId()).size(),
-                    aggregateResultRepository.findByRunId(r.getId()).size()))
-        .toList();
+    // Chỉ đếm số kết quả (truy vấn tốn kém) cho các lượt tính nằm trong trang hiện tại
+    return PageResponse.slice(
+        runs,
+        page,
+        size,
+        pageRuns ->
+            pageRuns.stream()
+                .map(
+                    r ->
+                        toRunResponse(
+                            r,
+                            studentResultRepository.findByRunId(r.getId()).size(),
+                            aggregateResultRepository.findByRunId(r.getId()).size()))
+                .toList());
   }
 
   @Override
@@ -189,11 +198,27 @@ public class CalculationServiceImpl implements CalculationService {
   }
 
   @Override
-  public List<StudentResultResponse> getStudentResults(
-      String runId, ResultLevel level, String sectionId, String assessmentId) {
+  public PageResponse<StudentResultResponse> getStudentResults(
+      String runId,
+      ResultLevel level,
+      String sectionId,
+      String assessmentId,
+      String studentId,
+      String subjectId,
+      Boolean passed,
+      int page,
+      int size) {
+    PageableValidationUtils.validate(page, size);
     ensureRunExists(runId);
     List<StudentResult> results;
-    if (level != null && sectionId != null && assessmentId != null) {
+    if (studentId != null && !studentId.isBlank()) {
+      results =
+          studentResultRepository.findByRunIdAndStudentId(runId, studentId.trim()).stream()
+              .filter(r -> level == null || level == r.getLevel())
+              .filter(r -> sectionId == null || sectionId.equals(r.getSectionId()))
+              .filter(r -> assessmentId == null || assessmentId.equals(r.getAssessmentId()))
+              .toList();
+    } else if (level != null && sectionId != null && assessmentId != null) {
       results =
           studentResultRepository.findByRunIdAndLevelAndSectionIdAndAssessmentId(
               runId, level, sectionId, assessmentId);
@@ -205,6 +230,18 @@ public class CalculationServiceImpl implements CalculationService {
       results = studentResultRepository.findByRunId(runId);
     }
 
+    // Lọc theo chuẩn đích danh và theo Đạt / Chưa đạt (kết quả thiếu dữ liệu không có passed)
+    if (subjectId != null && !subjectId.isBlank()) {
+      results = results.stream().filter(r -> subjectId.trim().equals(r.getSubjectId())).toList();
+    }
+    if (passed != null) {
+      results = results.stream().filter(r -> passed.equals(r.getPassed())).toList();
+    }
+
+    return PageResponse.slice(results, page, size, this::toStudentResultResponses);
+  }
+
+  private List<StudentResultResponse> toStudentResultResponses(List<StudentResult> results) {
     Map<String, String> studentRefs = loadStudentRefs(results);
     Map<String, String> subjectCodes =
         loadSubjectCodes(results.stream().map(StudentResult::getSubjectId).toList());
@@ -235,8 +272,9 @@ public class CalculationServiceImpl implements CalculationService {
   }
 
   @Override
-  public List<AggregateResultResponse> getAggregateResults(
-      String runId, ResultLevel level, String sectionId) {
+  public PageResponse<AggregateResultResponse> getAggregateResults(
+      String runId, ResultLevel level, String sectionId, int page, int size) {
+    PageableValidationUtils.validate(page, size);
     ensureRunExists(runId);
     List<AggregateResult> results;
     if (level != null) {
@@ -250,6 +288,10 @@ public class CalculationServiceImpl implements CalculationService {
       results = aggregateResultRepository.findByRunId(runId);
     }
 
+    return PageResponse.slice(results, page, size, this::toAggregateResponses);
+  }
+
+  private List<AggregateResultResponse> toAggregateResponses(List<AggregateResult> results) {
     Map<String, String> subjectCodes =
         loadSubjectCodes(results.stream().map(AggregateResult::getSubjectId).toList());
     return results.stream()

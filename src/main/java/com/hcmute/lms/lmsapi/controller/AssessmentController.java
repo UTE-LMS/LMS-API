@@ -3,6 +3,7 @@ package com.hcmute.lms.lmsapi.controller;
 import com.hcmute.lms.lmsapi.dto.AssessmentItemsRequest;
 import com.hcmute.lms.lmsapi.dto.AssessmentRequest;
 import com.hcmute.lms.lmsapi.dto.AssessmentResponse;
+import com.hcmute.lms.lmsapi.dto.AssessmentScoreItemResponse;
 import com.hcmute.lms.lmsapi.dto.AssessmentScoreTemplate;
 import com.hcmute.lms.lmsapi.dto.AssessmentUpdateRequest;
 import com.hcmute.lms.lmsapi.dto.CoverageResponse;
@@ -222,5 +223,34 @@ public class AssessmentController {
             HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + template.fileName() + "\"")
         .contentType(MediaType.parseMediaType("text/csv; charset=UTF-8"))
         .body(template.content());
+  }
+
+  // ------------------------------------------------------------------ xem danh sách điểm đã nhập
+
+  @GetMapping("/assessments/{id}/scores")
+  @PreAuthorize(
+      "@scopeAuthorizationService.canAccessAssessment(authentication.principal, #id, " + READ + ")")
+  public ResponseEntity<List<AssessmentScoreItemResponse>> getAssessmentScores(
+      @PathVariable("id")
+          @Pattern(regexp = ID_PATTERN, message = "ID bài đánh giá phải là ObjectId 24 ký tự hex")
+          String id) {
+    log.info("API request: GET /api/v1/assessments/{}/scores", id);
+    return ResponseEntity.ok(assessmentService.getAssessmentScores(id));
+  }
+
+  @GetMapping("/sections/{sectionId}/assessments/{assessmentId}/scores")
+  @PreAuthorize(
+      "@scopeAuthorizationService.canAccessSection(authentication.principal, #sectionId, "
+          + READ
+          + ")")
+  public ResponseEntity<List<AssessmentScoreItemResponse>> getSectionAssessmentScores(
+      @PathVariable("sectionId")
+          @Pattern(regexp = ID_PATTERN, message = "ID lớp học phần phải là ObjectId 24 ký tự hex")
+          String sectionId,
+      @PathVariable("assessmentId")
+          @Pattern(regexp = ID_PATTERN, message = "ID bài đánh giá phải là ObjectId 24 ký tự hex")
+          String assessmentId) {
+    log.info("API request: GET /api/v1/sections/{}/assessments/{}/scores", sectionId, assessmentId);
+    return ResponseEntity.ok(assessmentService.getSectionAssessmentScores(sectionId, assessmentId));
   }
 }

@@ -67,4 +67,16 @@ public class AnalyticsQueryRequest {
 
   /** Danh sách định danh sinh viên cần phân tích (tùy chọn, dùng cho chiều STUDENT). */
   private List<String> studentIds;
+
+  /**
+   * Chỉ giữ các dòng là CLO/PI/PLO có id hoặc mã nằm trong danh sách này (ví dụ PLO1, PI1.2). Không
+   * áp dụng cho chiều CURRICULUM_CLASSIFICATION (dòng là nhóm phân loại).
+   */
+  private List<String> subjectIds;
+
+  /**
+   * Lọc theo kết quả đạt chuẩn: true giữ các dòng/cột có ít nhất 1 ô có người Đạt; false giữ các
+   * dòng/cột có ít nhất 1 ô có người Chưa đạt. Null: không lọc.
+   */
+  private Boolean passed;
 }

@@ -7,11 +7,13 @@ import com.hcmute.lms.lmsapi.document.AuditEntity;
 import com.hcmute.lms.lmsapi.document.CourseSection;
 import com.hcmute.lms.lmsapi.document.Enrollment;
 import com.hcmute.lms.lmsapi.document.OutcomeMapping;
+import com.hcmute.lms.lmsapi.document.Score;
 import com.hcmute.lms.lmsapi.document.Student;
 import com.hcmute.lms.lmsapi.dto.AssessmentItemDto;
 import com.hcmute.lms.lmsapi.dto.AssessmentItemsRequest;
 import com.hcmute.lms.lmsapi.dto.AssessmentRequest;
 import com.hcmute.lms.lmsapi.dto.AssessmentResponse;
+import com.hcmute.lms.lmsapi.dto.AssessmentScoreItemResponse;
 import com.hcmute.lms.lmsapi.dto.AssessmentScoreTemplate;
 import com.hcmute.lms.lmsapi.dto.AssessmentUpdateRequest;
 import com.hcmute.lms.lmsapi.dto.CoverageResponse;
@@ -476,6 +478,91 @@ public class AssessmentServiceImpl implements AssessmentService {
     byte[] content = sb.toString().getBytes(StandardCharsets.UTF_8);
     String fileName = sanitizeFileName(assessment.getCode()) + "-scores-template.csv";
     return new AssessmentScoreTemplate(fileName, content);
+  }
+
+  @Override
+  public List<AssessmentScoreItemResponse> getAssessmentScores(String id) {
+    Assessment assessment = requireAssessment(id);
+    return loadScoresForAssessment(assessment);
+  }
+
+  @Override
+  public List<AssessmentScoreItemResponse> getSectionAssessmentScores(
+      String sectionId, String assessmentId) {
+    Assessment assessment = requireAssessment(assessmentId);
+    if (!sectionId.equals(assessment.getSectionId())) {
+      throw new ResourceNotFoundException(
+          "Không tìm thấy bài đánh giá ["
+              + assessmentId
+              + "] trong lớp học phần ["
+              + sectionId
+              + "]");
+    }
+    return loadScoresForAssessment(assessment);
+  }
+
+  private List<AssessmentScoreItemResponse> loadScoresForAssessment(Assessment assessment) {
+    if (assessment.getScope() != AssessmentScope.SECTION || assessment.getSectionId() == null) {
+      throw new BusinessRuleViolationException(
+          "Chỉ xem được điểm cho bài đánh giá thuộc lớp học phần");
+    }
+    List<Score> scores =
+        scoreRepository.findBySectionIdAndAssessmentId(
+            assessment.getSectionId(), assessment.getId());
+    if (scores.isEmpty()) {
+      return List.of();
+    }
+
+    Set<String> studentIds = scores.stream().map(Score::getStudentId).collect(Collectors.toSet());
+    Map<String, Student> studentMap = new HashMap<>();
+    studentRepository.findAllById(studentIds).forEach(s -> studentMap.put(s.getId(), s));
+
+    Set<String> cloIds = scores.stream().map(Score::getCloId).collect(Collectors.toSet());
+    Map<String, String> cloCodeMap = new HashMap<>();
+    cloRepository.findAllById(cloIds).forEach(c -> cloCodeMap.put(c.getId(), c.getCode()));
+
+    Map<String, AssessmentItem> itemMap = new HashMap<>();
+    if (assessment.getItems() != null) {
+      for (AssessmentItem item : assessment.getItems()) {
+        itemMap.put(item.getId(), item);
+      }
+    }
+
+    return scores.stream()
+        .map(
+            score -> {
+              Student student = studentMap.get(score.getStudentId());
+              AssessmentItem item = itemMap.get(score.getItemId());
+              return AssessmentScoreItemResponse.builder()
+                  .id(score.getId())
+                  .sectionId(score.getSectionId())
+                  .assessmentId(score.getAssessmentId())
+                  .studentId(score.getStudentId())
+                  .studentCode(student != null ? student.getStudentCode() : null)
+                  .studentName(student != null ? student.getFullName() : null)
+                  .itemId(score.getItemId())
+                  .itemCode(item != null ? item.getCode() : null)
+                  .bloomLevel(item != null ? item.getBloomLevel() : null)
+                  .cloId(score.getCloId())
+                  .cloCode(cloCodeMap.get(score.getCloId()))
+                  .rawScore(score.getRawScore())
+                  .maxScore(score.getMaxScore())
+                  .importBatchId(score.getImportBatchId())
+                  .sourceRow(score.getSourceRow())
+                  .updatedAt(score.getUpdatedAt())
+                  .build();
+            })
+        .sorted(
+            Comparator.comparing(
+                    AssessmentScoreItemResponse::getStudentCode,
+                    Comparator.nullsLast(String::compareTo))
+                .thenComparing(
+                    AssessmentScoreItemResponse::getItemCode,
+                    Comparator.nullsLast(String::compareTo))
+                .thenComparing(
+                    AssessmentScoreItemResponse::getCloCode,
+                    Comparator.nullsLast(String::compareTo)))
+        .toList();
   }
 
   private String formatScore(Double score) {

@@ -1,7 +1,9 @@
 package com.hcmute.lms.lmsapi.dto;
 
+import com.hcmute.lms.lmsapi.util.PageableValidationUtils;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Function;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -52,6 +54,23 @@ public class PageResponse<T> {
         .totalPages(calculatedTotalPages)
         .last(isLast)
         .build();
+  }
+
+  /**
+   * Phân trang một danh sách đã có đầy đủ trong bộ nhớ (kết quả đo lường, báo cáo...). Chỉ phần tử
+   * của trang hiện tại mới được đưa qua {@code mapper}, để các bước tra cứu bổ sung (mã sinh viên,
+   * mã chuẩn...) chỉ chạy cho trang đó.
+   *
+   * @param page chỉ số trang (0-indexed), size trong [1, 100]; sai biên thì ném HTTP 400
+   */
+  public static <S, T> PageResponse<T> slice(
+      List<S> all, int page, int size, Function<List<S>, List<T>> mapper) {
+    PageableValidationUtils.validate(page, size);
+    long total = all.size();
+    long from = Math.min((long) page * size, total);
+    long to = Math.min(from + size, total);
+    List<S> pageItems = all.subList((int) from, (int) to);
+    return of(mapper.apply(pageItems), page, size, total);
   }
 
   /** Chuyển đổi từ đối tượng Spring Data {@link Page} sang {@link PageResponse}. */

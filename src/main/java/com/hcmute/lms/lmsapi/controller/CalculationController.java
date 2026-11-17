@@ -3,13 +3,15 @@ package com.hcmute.lms.lmsapi.controller;
 import com.hcmute.lms.lmsapi.dto.AggregateResultResponse;
 import com.hcmute.lms.lmsapi.dto.CalculationRunRequest;
 import com.hcmute.lms.lmsapi.dto.CalculationRunResponse;
+import com.hcmute.lms.lmsapi.dto.PageResponse;
 import com.hcmute.lms.lmsapi.dto.StudentResultResponse;
 import com.hcmute.lms.lmsapi.dto.UserPrincipal;
 import com.hcmute.lms.lmsapi.enums.ResultLevel;
 import com.hcmute.lms.lmsapi.service.CalculationService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Pattern;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -50,9 +52,16 @@ public class CalculationController {
 
   @GetMapping
   @PreAuthorize("isAuthenticated()")
-  public ResponseEntity<List<CalculationRunResponse>> listCalculationRuns(
-      @RequestParam(name = "programVersionId", required = false) String programVersionId) {
-    return ResponseEntity.ok(calculationService.getCalculationRuns(programVersionId));
+  public ResponseEntity<PageResponse<CalculationRunResponse>> listCalculationRuns(
+      @RequestParam(name = "programVersionId", required = false) String programVersionId,
+      @RequestParam(name = "page", defaultValue = "0")
+          @Min(value = 0, message = "Chỉ số trang phải lớn hơn hoặc bằng 0")
+          int page,
+      @RequestParam(name = "size", defaultValue = "20")
+          @Min(value = 1, message = "Kích thước trang phải lớn hơn hoặc bằng 1")
+          @Max(value = 100, message = "Kích thước trang tối đa 100")
+          int size) {
+    return ResponseEntity.ok(calculationService.getCalculationRuns(programVersionId, page, size));
   }
 
   @GetMapping("/{id}")
@@ -66,25 +75,44 @@ public class CalculationController {
 
   @GetMapping("/{id}/student-results")
   @PreAuthorize("isAuthenticated()")
-  public ResponseEntity<List<StudentResultResponse>> getStudentResults(
+  public ResponseEntity<PageResponse<StudentResultResponse>> getStudentResults(
       @PathVariable("id")
           @Pattern(regexp = ID_PATTERN, message = "runId phải là ObjectId 24 ký tự hex")
           String id,
       @RequestParam(name = "level", required = false) ResultLevel level,
       @RequestParam(name = "sectionId", required = false) String sectionId,
-      @RequestParam(name = "assessmentId", required = false) String assessmentId) {
+      @RequestParam(name = "assessmentId", required = false) String assessmentId,
+      @RequestParam(name = "studentId", required = false) String studentId,
+      @RequestParam(name = "subjectId", required = false) String subjectId,
+      @RequestParam(name = "passed", required = false) Boolean passed,
+      @RequestParam(name = "page", defaultValue = "0")
+          @Min(value = 0, message = "Chỉ số trang phải lớn hơn hoặc bằng 0")
+          int page,
+      @RequestParam(name = "size", defaultValue = "20")
+          @Min(value = 1, message = "Kích thước trang phải lớn hơn hoặc bằng 1")
+          @Max(value = 100, message = "Kích thước trang tối đa 100")
+          int size) {
     return ResponseEntity.ok(
-        calculationService.getStudentResults(id, level, sectionId, assessmentId));
+        calculationService.getStudentResults(
+            id, level, sectionId, assessmentId, studentId, subjectId, passed, page, size));
   }
 
   @GetMapping("/{id}/aggregate-results")
   @PreAuthorize("isAuthenticated()")
-  public ResponseEntity<List<AggregateResultResponse>> getAggregateResults(
+  public ResponseEntity<PageResponse<AggregateResultResponse>> getAggregateResults(
       @PathVariable("id")
           @Pattern(regexp = ID_PATTERN, message = "runId phải là ObjectId 24 ký tự hex")
           String id,
       @RequestParam(name = "level", required = false) ResultLevel level,
-      @RequestParam(name = "sectionId", required = false) String sectionId) {
-    return ResponseEntity.ok(calculationService.getAggregateResults(id, level, sectionId));
+      @RequestParam(name = "sectionId", required = false) String sectionId,
+      @RequestParam(name = "page", defaultValue = "0")
+          @Min(value = 0, message = "Chỉ số trang phải lớn hơn hoặc bằng 0")
+          int page,
+      @RequestParam(name = "size", defaultValue = "20")
+          @Min(value = 1, message = "Kích thước trang phải lớn hơn hoặc bằng 1")
+          @Max(value = 100, message = "Kích thước trang tối đa 100")
+          int size) {
+    return ResponseEntity.ok(
+        calculationService.getAggregateResults(id, level, sectionId, page, size));
   }
 }

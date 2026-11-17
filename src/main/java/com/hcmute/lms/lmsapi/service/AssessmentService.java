@@ -3,6 +3,7 @@ package com.hcmute.lms.lmsapi.service;
 import com.hcmute.lms.lmsapi.dto.AssessmentItemsRequest;
 import com.hcmute.lms.lmsapi.dto.AssessmentRequest;
 import com.hcmute.lms.lmsapi.dto.AssessmentResponse;
+import com.hcmute.lms.lmsapi.dto.AssessmentScoreItemResponse;
 import com.hcmute.lms.lmsapi.dto.AssessmentScoreTemplate;
 import com.hcmute.lms.lmsapi.dto.AssessmentUpdateRequest;
 import com.hcmute.lms.lmsapi.dto.CoverageResponse;
@@ -34,4 +35,9 @@ public interface AssessmentService {
   void deleteAssessment(String id, String actorId);
 
   AssessmentScoreTemplate generateScoreTemplateCsv(String id);
+
+  List<AssessmentScoreItemResponse> getAssessmentScores(String id);
+
+  List<AssessmentScoreItemResponse> getSectionAssessmentScores(
+      String sectionId, String assessmentId);
 }

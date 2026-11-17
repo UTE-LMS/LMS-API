@@ -1,13 +1,15 @@
 package com.hcmute.lms.lmsapi.controller;
 
+import com.hcmute.lms.lmsapi.dto.PageResponse;
 import com.hcmute.lms.lmsapi.dto.ReportCreateRequest;
 import com.hcmute.lms.lmsapi.dto.ReportResponse;
 import com.hcmute.lms.lmsapi.dto.UserPrincipal;
 import com.hcmute.lms.lmsapi.enums.ReportType;
 import com.hcmute.lms.lmsapi.service.ReportService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Pattern;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
@@ -53,11 +55,18 @@ public class ReportController {
 
   @GetMapping
   @PreAuthorize("isAuthenticated()")
-  public ResponseEntity<List<ReportResponse>> listReports(
+  public ResponseEntity<PageResponse<ReportResponse>> listReports(
       @RequestParam(name = "type", required = false) ReportType type,
       @RequestParam(name = "programVersionId", required = false) String programVersionId,
-      @RequestParam(name = "runId", required = false) String runId) {
-    return ResponseEntity.ok(reportService.listReports(type, programVersionId, runId));
+      @RequestParam(name = "runId", required = false) String runId,
+      @RequestParam(name = "page", defaultValue = "0")
+          @Min(value = 0, message = "Chỉ số trang phải lớn hơn hoặc bằng 0")
+          int page,
+      @RequestParam(name = "size", defaultValue = "20")
+          @Min(value = 1, message = "Kích thước trang phải lớn hơn hoặc bằng 1")
+          @Max(value = 100, message = "Kích thước trang tối đa 100")
+          int size) {
+    return ResponseEntity.ok(reportService.listReports(type, programVersionId, runId, page, size));
   }
 
   @GetMapping("/{id}")

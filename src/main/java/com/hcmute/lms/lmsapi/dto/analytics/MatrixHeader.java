@@ -25,6 +25,9 @@ public class MatrixHeader {
   /** Mức Bloom nhận thức (nếu là CLO). */
   private Integer bloomLevel;
 
+  /** Ngưỡng đạt (0,1] của CLO/PI/PLO đã import; null với tiêu đề không phải chuẩn đầu ra. */
+  private Double passThreshold;
+
   /** Thông tin mở rộng tùy chọn. */
   private Map<String, Object> extra;
 }
