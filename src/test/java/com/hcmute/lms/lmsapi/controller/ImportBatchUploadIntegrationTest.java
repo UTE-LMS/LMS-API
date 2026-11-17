@@ -478,5 +478,34 @@ class ImportBatchUploadIntegrationTest extends ScoreImportIntegrationBase {
         .perform(postAction(lecturerToken, batchId, "confirm"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.status").value("CONFIRMED"));
+
+    // Xem lại danh sách điểm đã nhập theo sinh viên và câu hỏi/CLO
+    mockMvc
+        .perform(
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(
+                    "/api/v1/assessments/{id}/scores", assessment.getId())
+                .header("Authorization", lecturerToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$", hasSize(2)))
+        .andExpect(jsonPath("$[0].studentCode").value(s1.getStudentCode()))
+        .andExpect(jsonPath("$[0].itemCode").value("Q1"))
+        .andExpect(
+            jsonPath("$[0].cloId")
+                .value(assessment.getItems().get(0).getOutcomeMappings().get(0).getCloId()))
+        .andExpect(jsonPath("$[0].rawScore").value(3.5))
+        .andExpect(jsonPath("$[0].maxScore").value(4.0))
+        .andExpect(jsonPath("$[0].importBatchId").value(batchId))
+        .andExpect(jsonPath("$[1].itemCode").value("Q2"))
+        .andExpect(jsonPath("$[1].rawScore").value(5.5));
+
+    mockMvc
+        .perform(
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(
+                    "/api/v1/sections/{sectionId}/assessments/{assessmentId}/scores",
+                    section.getId(),
+                    assessment.getId())
+                .header("Authorization", lecturerToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$", hasSize(2)));
   }
 }

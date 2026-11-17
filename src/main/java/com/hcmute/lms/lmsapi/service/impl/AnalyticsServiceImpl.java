@@ -118,15 +118,96 @@ public class AnalyticsServiceImpl implements AnalyticsService {
     CalculationRun targetRun = resolveCalculationRun(request, principal);
 
     // 3. Phân luồng tổng hợp theo các chiều phân tích
-    return switch (request.getDimension()) {
-      case TIME_TERM -> buildTimeTermMatrix(request, targetRun);
-      case COURSE_SECTIONS -> buildCourseSectionsMatrix(request, targetRun, principal);
-      case COHORT -> buildCohortMatrix(request, targetRun);
-      case ASSESSMENT_COMPONENT -> buildAssessmentComponentMatrix(request, targetRun);
-      case CURRICULUM_CLASSIFICATION -> buildCurriculumClassificationMatrix(request, targetRun);
-      case COURSE_LECTURER -> buildCourseLecturerMatrix(request, targetRun, principal);
-      case STUDENT -> buildStudentMatrix(request, targetRun, principal);
-    };
+    AnalyticsMatrixResponse response =
+        switch (request.getDimension()) {
+          case TIME_TERM -> buildTimeTermMatrix(request, targetRun);
+          case COURSE_SECTIONS -> buildCourseSectionsMatrix(request, targetRun, principal);
+          case COHORT -> buildCohortMatrix(request, targetRun);
+          case ASSESSMENT_COMPONENT -> buildAssessmentComponentMatrix(request, targetRun);
+          case CURRICULUM_CLASSIFICATION -> buildCurriculumClassificationMatrix(request, targetRun);
+          case COURSE_LECTURER -> buildCourseLecturerMatrix(request, targetRun, principal);
+          case STUDENT -> buildStudentMatrix(request, targetRun, principal);
+        };
+
+    // 4. Lọc theo chuẩn đích danh và theo Đạt / Chưa đạt (sau khi đã tổng hợp)
+    return AnalyticsServiceImpl.applyResultFilters(response, request);
+  }
+
+  /**
+   * Lọc dòng theo {@code subjectIds} và lọc dòng/cột theo {@code passed}. Ô còn lại giữ nguyên, nên
+   * mẫu số và tỷ lệ của từng ô không đổi.
+   */
+  static AnalyticsMatrixResponse applyResultFilters(
+      AnalyticsMatrixResponse response, AnalyticsQueryRequest request) {
+    boolean filterSubjects =
+        request.getSubjectIds() != null
+            && !request.getSubjectIds().isEmpty()
+            && request.getDimension() != AnalyticsDimension.CURRICULUM_CLASSIFICATION;
+    Boolean passed = request.getPassed();
+    if (!filterSubjects && passed == null) {
+      return response;
+    }
+
+    List<MatrixHeader> rows = response.getRows();
+    List<MatrixHeader> columns = response.getColumns();
+    List<List<MatrixMetricCell>> matrix = response.getMatrix();
+
+    List<Integer> keptRows = new ArrayList<>();
+    for (int i = 0; i < rows.size(); i++) {
+      MatrixHeader row = rows.get(i);
+      if (filterSubjects
+          && !request.getSubjectIds().contains(row.getId())
+          && !request.getSubjectIds().contains(row.getCode())) {
+        continue;
+      }
+      if (passed != null && !rowHasMatch(matrix, i, passed)) {
+        continue;
+      }
+      keptRows.add(i);
+    }
+
+    List<Integer> keptColumns = new ArrayList<>();
+    for (int col = 0; col < columns.size(); col++) {
+      final int c = col;
+      if (passed == null
+          || keptRows.stream().anyMatch(i -> cellMatchesPassed(cellAt(matrix, i, c), passed))) {
+        keptColumns.add(col);
+      }
+    }
+
+    List<List<MatrixMetricCell>> newMatrix = new ArrayList<>();
+    for (int i : keptRows) {
+      List<MatrixMetricCell> newRow = new ArrayList<>();
+      for (int col : keptColumns) {
+        newRow.add(cellAt(matrix, i, col));
+      }
+      newMatrix.add(newRow);
+    }
+    response.setRows(keptRows.stream().map(rows::get).toList());
+    response.setColumns(keptColumns.stream().map(columns::get).toList());
+    response.setMatrix(newMatrix);
+    return response;
+  }
+
+  private static boolean rowHasMatch(List<List<MatrixMetricCell>> matrix, int row, boolean passed) {
+    return row < matrix.size()
+        && matrix.get(row).stream().anyMatch(cell -> cellMatchesPassed(cell, passed));
+  }
+
+  private static MatrixMetricCell cellAt(List<List<MatrixMetricCell>> matrix, int row, int col) {
+    if (row >= matrix.size()) {
+      return null;
+    }
+    List<MatrixMetricCell> r = matrix.get(row);
+    return col < r.size() ? r.get(col) : null;
+  }
+
+  private static boolean cellMatchesPassed(MatrixMetricCell cell, boolean passed) {
+    if (cell == null) {
+      return false;
+    }
+    Integer count = passed ? cell.getPassed() : cell.getFailed();
+    return count != null && count > 0;
   }
 
   @Override
@@ -1447,6 +1528,10 @@ public class AnalyticsServiceImpl implements AnalyticsService {
                     .code(c.getCode())
                     .name(c.getContentOriginal())
                     .bloomLevel(c.getBloomLevel())
+                    .passThreshold(
+                        c.getMeasurement() != null
+                            ? c.getMeasurement().getDefaultPassThreshold()
+                            : null)
                     .build())
         .toList();
   }
@@ -1458,6 +1543,7 @@ public class AnalyticsServiceImpl implements AnalyticsService {
                 MatrixHeader.builder()
                     .id(plo.getId())
                     .code(plo.getCode())
+                    .passThreshold(plo.getPassThreshold())
                     .name(
                         plo.getContentSummary() != null
                             ? plo.getContentSummary()
@@ -1473,6 +1559,7 @@ public class AnalyticsServiceImpl implements AnalyticsService {
                 MatrixHeader.builder()
                     .id(pi.getId())
                     .code(pi.getCode())
+                    .passThreshold(pi.getPassThreshold())
                     .name(
                         pi.getContentShort() != null
                             ? pi.getContentShort()

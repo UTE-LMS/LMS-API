@@ -475,3 +475,45 @@ Phần này chuẩn bị sẵn câu trả lời khoa học, chuẩn mực cho 4 
   - Độ phủ dòng lệnh JaCoCo: `AnalyticsController` **100%**, `MatrixCsvExporter` **98.46%**, `AnalyticsServiceImpl` **87.44%**.
 - **Sinh viên đã sửa/rà soát:** _chờ sinh viên rà soát_
 - **Commit / PR:** cập nhật trên nhánh `feat/f07-multi-dimensional-analytics` (PR #91).
+
+---
+
+## Phiên #36 — 2026-11-17: Lọc kết quả theo chuẩn/Đạt–Chưa đạt/sinh viên và kiểm tra độ bám sát đề thi
+
+- **Sinh viên yêu cầu:** minhat5 (theo `git config user.name`; chưa xác nhận là IBS hay IT)
+- **Công cụ / mô hình:** Antigravity (Claude Sonnet)
+- **Mục tiêu:** đáp ứng yêu cầu của giảng viên: (1) lọc đích danh PLO/PI/CLO và lọc Đạt/Chưa đạt; (2) lọc kết quả theo sinh viên; (3) hiển thị ngưỡng đạt cạnh kết quả; (4) kiểm tra bộ đề của lớp có bám sát CLO (kèm Bloom, tỷ trọng, liên kết PI/PLO).
+- **File AI sinh/sửa:**
+  - `dto/analytics/AnalyticsQueryRequest.java` (+`subjectIds`, `passed`), `dto/analytics/MatrixHeader.java` (+`passThreshold`), `service/impl/AnalyticsServiceImpl.java` (`applyResultFilters`, ngưỡng đạt ở header).
+  - `CalculationController`/`CalculationService`/`CalculationServiceImpl`: `student-results` thêm lọc `studentId`, `subjectId`, `passed`.
+  - Mới: `SectionAlignmentController` (`GET /api/v1/sections/{sectionId}/assessment-alignment`), `AssessmentAlignmentService(+Impl)`, `AssessmentAlignmentResponse`.
+  - Test mới: `AnalyticsResultFilterTest`, `AssessmentAlignmentServiceImplTest`.
+- **Lưu ý:** cảnh báo `BLOOM_BELOW_CLO` (mức Bloom cao nhất của câu hỏi < mức Bloom của CLO) là quy tắc đề xuất, chưa được GVHD xác nhận; Bloom chỉ để thống kê, không quy đổi ra điểm.
+- **Kiểm chứng đã làm:** `AnalyticsResultFilterTest`, `AssessmentAlignmentServiceImplTest`, `AnalyticsServiceImplTest` chạy qua (sau `clean`). Chưa chạy toàn bộ test suite và chưa có integration test cho endpoint mới.
+- **Sinh viên đã sửa/rà soát:** _chờ sinh viên rà soát_
+- **Commit / PR:** chưa commit.
+
+---
+
+## Phiên #37 — 2026-11-17: Phân trang danh sách đo lường và báo cáo
+
+- **Sinh viên yêu cầu:** minhat5 (theo `git config user.name`)
+- **Công cụ / mô hình:** Antigravity (Claude Sonnet)
+- **Mục tiêu:** các API danh sách trả mảng thô khiến giao diện bị dài; chuyển sang `PageResponse` chuẩn của hệ thống (`page` từ 0, `size` 1–100, mặc định 20).
+- **File AI sinh/sửa:** `dto/PageResponse.java` (+`slice`), `CalculationController`/`CalculationService`/`CalculationServiceImpl` (`GET /calculation-runs`, `/{id}/student-results`, `/{id}/aggregate-results`), `ReportController`/`ReportService`/`ReportServiceImpl` (`GET /reports`), test `PageResponseSliceTest`, cập nhật `CalculationAndReportIntegrationTest`.
+- **Thay đổi phá vỡ tương thích:** 4 endpoint trên đổi từ mảng `[...]` sang `{content, page, size, totalElements, totalPages, last}`. Repo `LMS-UI` phải đổi theo (chưa sửa).
+- **Kiểm chứng đã làm:** `PageResponseSliceTest` 6/6, `CalculationAndReportIntegrationTest` 1/1, `AnalyticsResultFilterTest` 7/7, `AssessmentAlignmentServiceImplTest` 5/5 đạt; `spotless:apply` đã chạy. Chưa chạy toàn bộ test suite.
+- **Sinh viên đã sửa/rà soát:** _chờ sinh viên rà soát_
+- **Commit / PR:** chưa commit.
+
+---
+
+## Phiên #38 — 2026-11-17: Cập nhật doc/ban-cam-ket-buoc-3-metric.md
+
+- **Sinh viên yêu cầu:** minhat5 (theo `git config user.name`)
+- **Công cụ / mô hình:** Antigravity (Gemini)
+- **Mục tiêu:** bổ sung các chức năng mới hoàn thiện (kiểm tra độ bám sát đề thi theo lớp học phần, lọc kết quả đo lường theo chuẩn/đạt-chưa đạt/sinh viên, kèm `passThreshold`, và phân trang chuẩn `PageResponse` cho danh sách đo lường/báo cáo) vào `doc/ban-cam-ket-buoc-3-metric.md`.
+- **File AI sinh/sửa:** `doc/ban-cam-ket-buoc-3-metric.md`.
+- **Kiểm chứng đã làm:** đối chiếu trực tiếp nội dung mô tả với các endpoint và DTO vừa triển khai ở Phiên #36 và #37 (`SectionAlignmentController`, `AnalyticsQueryRequest`, `MatrixHeader`, `CalculationController`, `ReportController`).
+- **Sinh viên đã sửa/rà soát:** _chờ sinh viên rà soát_
+- **Commit / PR:** chưa commit.

@@ -5,6 +5,7 @@ import com.hcmute.lms.lmsapi.document.CalculationRun;
 import com.hcmute.lms.lmsapi.document.Report;
 import com.hcmute.lms.lmsapi.document.Student;
 import com.hcmute.lms.lmsapi.document.StudentResult;
+import com.hcmute.lms.lmsapi.dto.PageResponse;
 import com.hcmute.lms.lmsapi.dto.ReportCreateRequest;
 import com.hcmute.lms.lmsapi.dto.ReportResponse;
 import com.hcmute.lms.lmsapi.dto.UserPrincipal;
@@ -26,6 +27,7 @@ import com.hcmute.lms.lmsapi.repository.StudentRepository;
 import com.hcmute.lms.lmsapi.repository.StudentResultRepository;
 import com.hcmute.lms.lmsapi.service.ReportService;
 import com.hcmute.lms.lmsapi.service.ScopeAuthorizationService;
+import com.hcmute.lms.lmsapi.util.PageableValidationUtils;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -98,7 +100,9 @@ public class ReportServiceImpl implements ReportService {
   }
 
   @Override
-  public List<ReportResponse> listReports(ReportType type, String programVersionId, String runId) {
+  public PageResponse<ReportResponse> listReports(
+      ReportType type, String programVersionId, String runId, int page, int size) {
+    PageableValidationUtils.validate(page, size);
     List<Report> reports;
     if (runId != null && !runId.isBlank()) {
       reports = reportRepository.findByRunIdOrderByCreatedAtDesc(runId);
@@ -109,15 +113,17 @@ public class ReportServiceImpl implements ReportService {
     } else {
       reports = reportRepository.findAllByOrderByCreatedAtDesc();
     }
-    return reports.stream()
-        .filter(r -> type == null || r.getType() == type)
-        .filter(
-            r ->
-                programVersionId == null
-                    || programVersionId.isBlank()
-                    || programVersionId.equals(r.getProgramVersionId()))
-        .map(this::toResponse)
-        .toList();
+    List<Report> filtered =
+        reports.stream()
+            .filter(r -> type == null || r.getType() == type)
+            .filter(
+                r ->
+                    programVersionId == null
+                        || programVersionId.isBlank()
+                        || programVersionId.equals(r.getProgramVersionId()))
+            .toList();
+    return PageResponse.slice(
+        filtered, page, size, pageItems -> pageItems.stream().map(this::toResponse).toList());
   }
 
   @Override

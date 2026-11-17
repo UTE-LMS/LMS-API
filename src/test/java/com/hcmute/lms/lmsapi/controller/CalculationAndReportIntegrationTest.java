@@ -315,12 +315,22 @@ class CalculationAndReportIntegrationTest extends IntegrationTestBase {
             getAs(
                 qaToken, "/api/v1/calculation-runs/{id}/aggregate-results?level=PLO", createdRunId))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$", hasSize(1)))
-        .andExpect(jsonPath("$[0].subjectCode").value("PLO1"))
-        .andExpect(jsonPath("$[0].counts.enrolled").value(2))
-        .andExpect(jsonPath("$[0].counts.passed").value(1))
-        .andExpect(jsonPath("$[0].insufficientData").value(1))
-        .andExpect(jsonPath("$[0].passRateOfEnrolled").value(0.5));
+        .andExpect(jsonPath("$.content", hasSize(1)))
+        .andExpect(jsonPath("$.totalElements").value(1))
+        .andExpect(jsonPath("$.content[0].subjectCode").value("PLO1"))
+        .andExpect(jsonPath("$.content[0].counts.enrolled").value(2))
+        .andExpect(jsonPath("$.content[0].counts.passed").value(1))
+        .andExpect(jsonPath("$.content[0].insufficientData").value(1))
+        .andExpect(jsonPath("$.content[0].passRateOfEnrolled").value(0.5));
+
+    // Phân trang: size ngoài biên [1, 100] bị từ chối 400
+    mockMvc
+        .perform(
+            getAs(
+                qaToken,
+                "/api/v1/calculation-runs/{id}/aggregate-results?level=PLO&size=0",
+                createdRunId))
+        .andExpect(status().isBadRequest());
 
     // Sinh báo cáo PROGRAM_PLO cho QA
     ReportCreateRequest reportReq =
@@ -359,7 +369,9 @@ class CalculationAndReportIntegrationTest extends IntegrationTestBase {
             .andExpect(status().isOk())
             .andReturn();
     String ploResultId =
-        JsonPath.read(ploSrRes.getResponse().getContentAsString(), "$[?(@.status=='COMPUTED')].id")
+        JsonPath.read(
+                ploSrRes.getResponse().getContentAsString(),
+                "$.content[?(@.status=='COMPUTED')].id")
             .toString()
             .replaceAll("[\\[\\]\"]", "");
 
