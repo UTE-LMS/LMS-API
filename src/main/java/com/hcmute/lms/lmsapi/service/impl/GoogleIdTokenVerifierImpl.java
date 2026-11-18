@@ -109,19 +109,25 @@ public class GoogleIdTokenVerifierImpl implements GoogleIdTokenVerifier {
 
   /** Bộ kiểm tra: thời hạn, nơi phát hành là Google, đối tượng nhận là client ID của hệ thống. */
   static OAuth2TokenValidator<Jwt> validator(String clientId) {
+    // List.of(...).contains(null) ném NullPointerException nên phải kiểm tra null trước (token
+    // thiếu iss/aud
+    // phải bị từ chối bằng 401, không được thành lỗi 500)
     OAuth2TokenValidator<Jwt> issuer =
-        jwt ->
-            ISSUERS.contains(jwt.getClaimAsString("iss"))
-                ? OAuth2TokenValidatorResult.success()
-                : OAuth2TokenValidatorResult.failure(
-                    new OAuth2Error(
-                        "invalid_token", "Nơi phát hành token không phải Google", null));
+        jwt -> {
+          String iss = jwt.getClaimAsString("iss");
+          return iss != null && ISSUERS.contains(iss)
+              ? OAuth2TokenValidatorResult.success()
+              : OAuth2TokenValidatorResult.failure(
+                  new OAuth2Error("invalid_token", "Nơi phát hành token không phải Google", null));
+        };
     OAuth2TokenValidator<Jwt> audience =
-        jwt ->
-            jwt.getAudience() != null && jwt.getAudience().contains(clientId)
-                ? OAuth2TokenValidatorResult.success()
-                : OAuth2TokenValidatorResult.failure(
-                    new OAuth2Error("invalid_token", "Token không dành cho ứng dụng này", null));
+        jwt -> {
+          List<String> aud = jwt.getAudience();
+          return aud != null && aud.contains(clientId)
+              ? OAuth2TokenValidatorResult.success()
+              : OAuth2TokenValidatorResult.failure(
+                  new OAuth2Error("invalid_token", "Token không dành cho ứng dụng này", null));
+        };
     return new DelegatingOAuth2TokenValidator<>(new JwtTimestampValidator(), issuer, audience);
   }
 }

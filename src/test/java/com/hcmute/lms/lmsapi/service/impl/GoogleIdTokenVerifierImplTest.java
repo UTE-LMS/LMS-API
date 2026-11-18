@@ -142,6 +142,18 @@ class GoogleIdTokenVerifierImplTest {
   }
 
   @Test
+  @DisplayName(
+      "Token thiếu iss hoặc thiếu aud bị từ chối bằng 401, không thành lỗi 500 (NullPointerException)")
+  void missingIssuerOrAudience() {
+    JWTClaimsSet withoutIss = new JWTClaimsSet.Builder(validClaims().build()).issuer(null).build();
+    JWTClaimsSet withoutAud =
+        new JWTClaimsSet.Builder(validClaims().build()).audience((String) null).build();
+
+    assertRejected(sign(withoutIss, privateKey), "không hợp lệ");
+    assertRejected(sign(withoutAud, privateKey), "không hợp lệ");
+  }
+
+  @Test
   @DisplayName("Chữ ký bằng khóa khác (giả mạo) bị từ chối")
   void forgedSignature() {
     String token = sign(validClaims().build(), otherPrivateKey);
