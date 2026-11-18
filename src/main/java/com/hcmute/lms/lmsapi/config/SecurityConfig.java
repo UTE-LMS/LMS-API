@@ -80,7 +80,7 @@ public class SecurityConfig {
                     .permitAll()
 
                     // Công khai endpoint đăng nhập hệ thống (US-01 / ADR 0003)
-                    .requestMatchers("/api/v1/auth/login")
+                    .requestMatchers("/api/v1/auth/login", "/api/v1/auth/google")
                     .permitAll()
 
                     // Công khai endpoint Actuator Health và Info cho giám sát hệ thống (US-39)
@@ -170,7 +170,7 @@ public class SecurityConfig {
       return false;
     }
     String clean = uri.endsWith("/") && uri.length() > 1 ? uri.substring(0, uri.length() - 1) : uri;
-    if ("/api/v1/auth/login".equals(clean)) {
+    if ("/api/v1/auth/login".equals(clean) || "/api/v1/auth/google".equals(clean)) {
       return true;
     }
     if ("/actuator/info".equals(clean)) {
