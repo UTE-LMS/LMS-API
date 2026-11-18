@@ -168,7 +168,7 @@ class ImportBatchServiceImplTest {
   @DisplayName("US-21 (ADR 0013): ghi lô thất bại thì tệp vừa lưu bị xóa và lỗi được ném lại")
   void createBatchDeletesStoredFileWhenSavingTheBatchFails() {
     stubOpenSectionAndAssessment();
-    when(fileStorage.save(anyString(), any())).thenReturn("ref.csv");
+    when(fileStorage.save(anyString(), any(), anyString())).thenReturn("ref.csv");
     when(batchRepository.save(any())).thenThrow(new IllegalStateException("DỮ LIỆU THỬ NGHIỆM"));
 
     assertThatThrownBy(
@@ -182,7 +182,7 @@ class ImportBatchServiceImplTest {
   @DisplayName("US-21: tên tệp người dùng gửi được làm sạch")
   void fileNameIsSanitised() {
     stubOpenSectionAndAssessment();
-    when(fileStorage.save(anyString(), any())).thenReturn("ref.csv");
+    when(fileStorage.save(anyString(), any(), anyString())).thenReturn("ref.csv");
     when(batchRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
     for (String raw :
@@ -235,5 +235,125 @@ class ImportBatchServiceImplTest {
             });
 
     verify(rowErrorRepository, never()).deleteByBatchId(anyString());
+  }
+
+  private static byte[] xlsxScores() {
+    try (org.apache.poi.xssf.usermodel.XSSFWorkbook wb =
+            new org.apache.poi.xssf.usermodel.XSSFWorkbook();
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream()) {
+      org.apache.poi.ss.usermodel.Sheet sheet = wb.createSheet("Diem");
+      sheet.createRow(0).createCell(0).setCellValue("studentCode");
+      sheet.getRow(0).createCell(1).setCellValue("Q1");
+      sheet.createRow(1).createCell(0).setCellValue("S1");
+      sheet.getRow(1).createCell(1).setCellValue(4);
+      wb.write(out);
+      return out.toByteArray();
+    } catch (java.io.IOException ex) {
+      throw new IllegalStateException(ex);
+    }
+  }
+
+  @Test
+  @DisplayName(
+      "ADR 0015: tải lên .xlsx -> nguồn EXCEL, lưu tệp gốc đuôi .xlsx, checksum tính trên tệp gốc")
+  void createBatchAcceptsXlsx() {
+    stubOpenSectionAndAssessment();
+    byte[] xlsx = xlsxScores();
+    when(fileStorage.save(anyString(), any(), anyString())).thenReturn("ref.xlsx");
+    when(batchRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+    service.createBatch(sectionId, assessmentId, "diem.xlsx", xlsx, request(), actor);
+
+    verify(fileStorage)
+        .save(
+            anyString(),
+            org.mockito.ArgumentMatchers.eq(xlsx),
+            org.mockito.ArgumentMatchers.eq(".xlsx"));
+    ArgumentCaptor<ImportBatch> saved = ArgumentCaptor.forClass(ImportBatch.class);
+    verify(batchRepository).save(saved.capture());
+    assertThat(saved.getValue().getSourceSystem())
+        .isEqualTo(com.hcmute.lms.lmsapi.enums.ImportSourceSystem.EXCEL);
+    assertThat(saved.getValue().getFileName()).isEqualTo("diem.xlsx");
+    assertThat(saved.getValue().getFileChecksum())
+        .isEqualTo(com.hcmute.lms.lmsapi.util.ChecksumUtils.sha256Hex(xlsx));
+  }
+
+  @Test
+  @DisplayName("ADR 0015: nguồn EXCEL mà tệp là .csv -> bị từ chối, không lưu gì")
+  void createBatchRejectsExcelSourceWithCsvFile() {
+    stubOpenSectionAndAssessment();
+    ImportBatchCreateRequest excel = request();
+    excel.setSourceSystem(com.hcmute.lms.lmsapi.enums.ImportSourceSystem.EXCEL);
+
+    assertThatThrownBy(
+            () -> service.createBatch(sectionId, assessmentId, "diem.csv", CSV, excel, actor))
+        .isInstanceOf(com.hcmute.lms.lmsapi.exception.BusinessRuleViolationException.class)
+        .hasMessageContaining(".xlsx");
+
+    verify(fileStorage, never()).save(anyString(), any(), anyString());
+  }
+
+  @Test
+  @DisplayName("ADR 0015: kiểm tra lô đọc lại tệp .xlsx đã lưu và đưa đúng bảng cho bộ kiểm tra")
+  void validateBatchReadsStoredXlsx() {
+    stubOpenSectionAndAssessment();
+    byte[] xlsx = xlsxScores();
+    ImportBatch batch =
+        ImportBatch.builder()
+            .id(new ObjectId().toHexString())
+            .sectionId(sectionId)
+            .assessmentId(assessmentId)
+            .fileRef("ref.xlsx")
+            .fileChecksum(com.hcmute.lms.lmsapi.util.ChecksumUtils.sha256Hex(xlsx))
+            .status(ImportBatchStatus.UPLOADED)
+            .columnMapping(
+                ImportColumnMapping.builder()
+                    .studentColumn("studentCode")
+                    .items(
+                        List.of(
+                            ImportColumnMapping.Entry.builder()
+                                .column("Q1")
+                                .itemId(itemId)
+                                .cloId(cloId)
+                                .build()))
+                    .build())
+            .build();
+    when(batchRepository.findById(batch.getId())).thenReturn(Optional.of(batch));
+    when(batchRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+    when(fileStorage.load("ref.xlsx")).thenReturn(xlsx);
+    ArgumentCaptor<com.hcmute.lms.lmsapi.util.ScoreCsvParser.Table> table =
+        ArgumentCaptor.forClass(com.hcmute.lms.lmsapi.util.ScoreCsvParser.Table.class);
+    when(rowValidator.validate(
+            table.capture(), org.mockito.ArgumentMatchers.anyInt(), any(), any(), any(), any()))
+        .thenReturn(new ScoreRowValidator.Result(1, 0, List.of(), List.of()));
+
+    service.validateBatch(batch.getId(), actor);
+
+    assertThat(table.getValue().headers()).containsExactly("studentCode", "Q1");
+    assertThat(table.getValue().rows()).hasSize(1);
+    assertThat(table.getValue().rows().get(0).lineNumber()).isEqualTo(2);
+    assertThat(table.getValue().rows().get(0).cells()).containsExactly("S1", "4");
+    assertThat(batch.getStatus()).isEqualTo(ImportBatchStatus.VALIDATED);
+  }
+
+  @Test
+  @DisplayName("ADR 0015: xem trước trả tên cột và số dòng cho cả .csv và .xlsx giống nhau")
+  void previewFileReadsCsvAndXlsx() {
+    var fromCsv = service.previewFile("diem.csv", CSV);
+    var fromXlsx = service.previewFile("diem.xlsx", xlsxScores());
+
+    assertThat(fromCsv.headers()).containsExactly("studentCode", "Q1");
+    assertThat(fromCsv.rowCount()).isEqualTo(1);
+    assertThat(fromXlsx).isEqualTo(fromCsv);
+  }
+
+  @Test
+  @DisplayName("ADR 0015: xem trước tệp .xlsx hỏng -> lỗi 400 dễ hiểu")
+  void previewFileRejectsBrokenXlsx() {
+    byte[] broken = {'P', 'K', 1, 2, 3};
+
+    assertThatThrownBy(() -> service.previewFile("diem.xlsx", broken))
+        .isInstanceOf(AppException.class)
+        .hasMessageContaining(".xlsx");
   }
 }

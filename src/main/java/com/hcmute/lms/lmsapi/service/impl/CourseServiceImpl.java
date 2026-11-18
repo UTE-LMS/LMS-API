@@ -24,8 +24,10 @@ import com.hcmute.lms.lmsapi.repository.ProgramVersionRepository;
 import com.hcmute.lms.lmsapi.service.AuditService;
 import com.hcmute.lms.lmsapi.service.CourseService;
 import com.hcmute.lms.lmsapi.util.CsvUtils;
+import com.hcmute.lms.lmsapi.util.ImportFiles;
 import com.hcmute.lms.lmsapi.util.ObjectIdUtils;
 import com.hcmute.lms.lmsapi.util.PageableValidationUtils;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -313,16 +315,19 @@ public class CourseServiceImpl implements CourseService {
     }
 
     String originalFilename = file.getOriginalFilename();
-    if (originalFilename == null || !originalFilename.toLowerCase().endsWith(".csv")) {
+    if (originalFilename == null
+        || !(originalFilename.toLowerCase().endsWith(".csv")
+            || ImportFiles.isXlsx(originalFilename))) {
       throw new AppException(
           ErrorCode.VALIDATION_ERROR,
           HttpStatus.BAD_REQUEST,
-          "Định dạng tệp không hợp lệ, hệ thống chỉ chấp nhận tệp định dạng .csv");
+          "Định dạng tệp không hợp lệ, hệ thống chỉ chấp nhận tệp định dạng .csv hoặc .xlsx");
     }
 
     List<List<String>> records;
     try {
-      records = CsvUtils.parse(file.getInputStream());
+      // .xlsx được đổi sang CSV trước (ADR 0015)
+      records = CsvUtils.parse(new ByteArrayInputStream(ImportFiles.toCsvBytes(file)));
     } catch (IllegalArgumentException ex) {
       throw new AppException(ErrorCode.VALIDATION_ERROR, HttpStatus.BAD_REQUEST, ex.getMessage());
     } catch (IOException ex) {

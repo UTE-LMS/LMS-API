@@ -13,15 +13,15 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
 /**
- * Lưu tệp điểm gốc vào một thư mục trên máy chủ (ADR 0013). Tên tệp là {@code <batchId>.csv} do máy
- * chủ đặt, và {@code fileRef} được kiểm tra đúng mẫu đó trước khi đọc/xóa, nên người dùng không thể
- * dẫn tới đường dẫn khác (path traversal).
+ * Lưu tệp điểm gốc vào một thư mục trên máy chủ (ADR 0013). Tên tệp là {@code <batchId>.csv} hoặc
+ * {@code <batchId>.xlsx} do máy chủ đặt, và {@code fileRef} được kiểm tra đúng mẫu đó trước khi
+ * đọc/xóa, nên người dùng không thể dẫn tới đường dẫn khác (path traversal).
  */
 @Slf4j
 @Component
 public class LocalImportFileStorage implements ImportFileStorage {
 
-  private static final Pattern FILE_REF = Pattern.compile("^[0-9a-f]{24}\\.csv$");
+  private static final Pattern FILE_REF = Pattern.compile("^[0-9a-f]{24}\\.(csv|xlsx)$");
 
   private final Path directory;
 
@@ -31,8 +31,8 @@ public class LocalImportFileStorage implements ImportFileStorage {
   }
 
   @Override
-  public String save(String batchId, byte[] content) {
-    String fileRef = batchId + ".csv";
+  public String save(String batchId, byte[] content, String extension) {
+    String fileRef = batchId + extension;
     requireValidRef(fileRef);
     try {
       Files.createDirectories(directory);

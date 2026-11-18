@@ -7,11 +7,12 @@ package com.hcmute.lms.lmsapi.service;
 public interface ImportFileStorage {
 
   /**
-   * Lưu nội dung tệp cho lô {@code batchId} và trả về {@code fileRef}.
+   * Lưu nội dung tệp gốc cho lô {@code batchId} và trả về {@code fileRef}. Tệp lưu đúng như người
+   * dùng tải lên (kể cả .xlsx) để truy vết được; {@code extension} chỉ nhận ".csv" hoặc ".xlsx".
    *
    * @param batchId mã lô (ObjectId 24 ký tự hex) do máy chủ sinh, dùng để đặt tên tệp
    */
-  String save(String batchId, byte[] content);
+  String save(String batchId, byte[] content, String extension);
 
   /** Đọc lại tệp đã lưu; ném {@code AppException} (500) nếu tệp không còn. */
   byte[] load(String fileRef);

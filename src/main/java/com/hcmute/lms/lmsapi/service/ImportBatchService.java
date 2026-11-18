@@ -2,6 +2,7 @@ package com.hcmute.lms.lmsapi.service;
 
 import com.hcmute.lms.lmsapi.dto.ImportBatchCreateRequest;
 import com.hcmute.lms.lmsapi.dto.ImportBatchResponse;
+import com.hcmute.lms.lmsapi.dto.ImportFilePreviewResponse;
 import com.hcmute.lms.lmsapi.dto.ImportRowErrorResponse;
 import com.hcmute.lms.lmsapi.dto.PageResponse;
 import com.hcmute.lms.lmsapi.dto.UserPrincipal;
@@ -16,7 +17,7 @@ public interface ImportBatchService {
    * gì) khi: bài chưa APPROVED/SCORE_ENTERED, lớp/học kỳ khóa điểm, bài không phải ITEM, tệp đã
    * CONFIRMED trước đó (409), lỗi cấp tệp (400), ánh xạ cột sai.
    *
-   * @param content nội dung tệp CSV (UTF-8)
+   * @param content nội dung tệp gốc: CSV (UTF-8) hoặc .xlsx (theo đuôi {@code fileName}, ADR 0015)
    */
   ImportBatchResponse createBatch(
       String sectionId,
@@ -25,6 +26,13 @@ public interface ImportBatchService {
       byte[] content,
       ImportBatchCreateRequest request,
       UserPrincipal actor);
+
+  /**
+   * Đọc tệp .csv hoặc .xlsx và trả về tên cột cùng số dòng dữ liệu, không lưu gì. Giao diện dùng để
+   * tự ánh xạ cột (trình duyệt không đọc được .xlsx). Lỗi cấp tệp trả 400 giống {@link
+   * #createBatch}.
+   */
+  ImportFilePreviewResponse previewFile(String fileName, byte[] content);
 
   /**
    * Kiểm tra từng dòng, ghi {@code import_row_errors} (thay lỗi của lần kiểm tra trước) và chuyển

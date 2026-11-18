@@ -1,7 +1,9 @@
 package com.hcmute.lms.lmsapi.service.impl;
 
 import com.hcmute.lms.lmsapi.exception.BusinessRuleViolationException;
+import com.hcmute.lms.lmsapi.util.ImportFiles;
 import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
@@ -13,7 +15,8 @@ import java.util.Map;
 import org.springframework.web.multipart.MultipartFile;
 
 /**
- * Bộ đọc tệp CSV dùng chung cho Import CTĐT và Import Đề cương (UTF-8 / BOM, hỗ trợ dấu ngoặc kép).
+ * Bộ đọc tệp CSV dùng chung cho các chức năng nhập danh mục (UTF-8 / BOM, hỗ trợ dấu ngoặc kép).
+ * Nhận cả tệp .xlsx: được đổi sang CSV bằng {@link ImportFiles} rồi đọc như CSV (ADR 0015).
  */
 final class CsvTextParser {
 
@@ -23,9 +26,12 @@ final class CsvTextParser {
     if (file == null || file.isEmpty()) {
       throw new BusinessRuleViolationException("Tệp CSV không được để trống");
     }
+    // .xlsx được đổi sang CSV trước (ADR 0015); .csv giữ nguyên nội dung
+    byte[] csv = ImportFiles.toCsvBytes(file);
     List<String> rawLines = new ArrayList<>();
     try (BufferedReader reader =
-        new BufferedReader(new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8))) {
+        new BufferedReader(
+            new InputStreamReader(new ByteArrayInputStream(csv), StandardCharsets.UTF_8))) {
       String line;
       while ((line = reader.readLine()) != null) {
         if (!line.trim().isEmpty()) {

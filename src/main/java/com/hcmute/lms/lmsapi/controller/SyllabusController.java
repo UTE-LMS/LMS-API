@@ -7,13 +7,13 @@ import com.hcmute.lms.lmsapi.dto.SyllabusStatusUpdateRequest;
 import com.hcmute.lms.lmsapi.dto.UserPrincipal;
 import com.hcmute.lms.lmsapi.service.SyllabusImportService;
 import com.hcmute.lms.lmsapi.service.SyllabusService;
+import com.hcmute.lms.lmsapi.util.ImportTemplateResponses;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -72,21 +72,18 @@ public class SyllabusController {
 
   @GetMapping(
       value = "/courses/{courseId}/syllabi/import-template",
-      produces = "text/csv; charset=UTF-8")
+      produces = {ImportTemplateResponses.CSV_MEDIA_TYPE, ImportTemplateResponses.XLSX_MEDIA_TYPE})
   @PreAuthorize("hasAnyRole('PROGRAM_MANAGER', 'ADMIN')")
   public ResponseEntity<byte[]> getImportTemplateCsv(
       @PathVariable("courseId")
           @Pattern(
               regexp = "^[0-9a-fA-F]{24}$",
               message = "ID học phần phải là ObjectId 24 ký tự hex")
-          String courseId) {
+          String courseId,
+      @RequestParam(name = "format", defaultValue = "csv") String format) {
     log.info("API request: GET /api/v1/courses/{}/syllabi/import-template", courseId);
     AssessmentScoreTemplate template = syllabusImportService.generateTemplateCsv();
-    return ResponseEntity.ok()
-        .header(
-            HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + template.fileName() + "\"")
-        .contentType(MediaType.parseMediaType("text/csv; charset=UTF-8"))
-        .body(template.content());
+    return ImportTemplateResponses.of(template, format);
   }
 
   @PostMapping(

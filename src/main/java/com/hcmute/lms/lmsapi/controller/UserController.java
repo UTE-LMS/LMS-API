@@ -9,6 +9,7 @@ import com.hcmute.lms.lmsapi.dto.UpdateUserStatusRequest;
 import com.hcmute.lms.lmsapi.dto.UserPrincipal;
 import com.hcmute.lms.lmsapi.dto.UserResponse;
 import com.hcmute.lms.lmsapi.service.UserService;
+import com.hcmute.lms.lmsapi.util.ImportTemplateResponses;
 import com.hcmute.lms.lmsapi.util.PageableValidationUtils;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
@@ -16,7 +17,6 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -156,15 +156,14 @@ public class UserController {
     return ResponseEntity.ok(response);
   }
 
-  @GetMapping(value = "/import-template", produces = "text/csv; charset=UTF-8")
-  public ResponseEntity<byte[]> getImportTemplateCsv() {
+  @GetMapping(
+      value = "/import-template",
+      produces = {ImportTemplateResponses.CSV_MEDIA_TYPE, ImportTemplateResponses.XLSX_MEDIA_TYPE})
+  public ResponseEntity<byte[]> getImportTemplateCsv(
+      @RequestParam(name = "format", defaultValue = "csv") String format) {
     log.info("API request: GET /api/v1/users/import-template");
     AssessmentScoreTemplate template = userService.generateTemplateCsv();
-    return ResponseEntity.ok()
-        .header(
-            HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + template.fileName() + "\"")
-        .contentType(MediaType.parseMediaType("text/csv; charset=UTF-8"))
-        .body(template.content());
+    return ImportTemplateResponses.of(template, format);
   }
 
   @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

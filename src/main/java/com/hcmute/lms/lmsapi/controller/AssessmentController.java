@@ -9,14 +9,13 @@ import com.hcmute.lms.lmsapi.dto.AssessmentUpdateRequest;
 import com.hcmute.lms.lmsapi.dto.CoverageResponse;
 import com.hcmute.lms.lmsapi.dto.UserPrincipal;
 import com.hcmute.lms.lmsapi.service.AssessmentService;
+import com.hcmute.lms.lmsapi.util.ImportTemplateResponses;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Pattern;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -28,6 +27,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /** API bài đánh giá: khung, bản lớp, items, độ phủ và khóa/mở khóa ma trận (ADR 0014, v0.7). */
@@ -209,20 +209,19 @@ public class AssessmentController {
 
   // ------------------------------------------------------------------ xuất tệp CSV mẫu nhập điểm
 
-  @GetMapping(value = "/assessments/{id}/scores/template-csv", produces = "text/csv; charset=UTF-8")
+  @GetMapping(
+      value = "/assessments/{id}/scores/template-csv",
+      produces = {ImportTemplateResponses.CSV_MEDIA_TYPE, ImportTemplateResponses.XLSX_MEDIA_TYPE})
   @PreAuthorize(
       "@scopeAuthorizationService.canAccessAssessment(authentication.principal, #id, " + READ + ")")
   public ResponseEntity<byte[]> getScoreTemplateCsv(
       @PathVariable("id")
           @Pattern(regexp = ID_PATTERN, message = "ID bài đánh giá phải là ObjectId 24 ký tự hex")
-          String id) {
+          String id,
+      @RequestParam(name = "format", defaultValue = "csv") String format) {
     log.info("API request: GET /assessments/{}/scores/template-csv", id);
     AssessmentScoreTemplate template = assessmentService.generateScoreTemplateCsv(id);
-    return ResponseEntity.ok()
-        .header(
-            HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + template.fileName() + "\"")
-        .contentType(MediaType.parseMediaType("text/csv; charset=UTF-8"))
-        .body(template.content());
+    return ImportTemplateResponses.of(template, format);
   }
 
   // ------------------------------------------------------------------ xem danh sách điểm đã nhập

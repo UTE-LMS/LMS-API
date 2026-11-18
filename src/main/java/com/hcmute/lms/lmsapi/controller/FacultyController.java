@@ -11,6 +11,7 @@ import com.hcmute.lms.lmsapi.dto.FacultyUpdateRequest;
 import com.hcmute.lms.lmsapi.dto.PageResponse;
 import com.hcmute.lms.lmsapi.dto.UserResponse;
 import com.hcmute.lms.lmsapi.service.FacultyService;
+import com.hcmute.lms.lmsapi.util.ImportTemplateResponses;
 import com.hcmute.lms.lmsapi.util.PageableValidationUtils;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
@@ -19,7 +20,6 @@ import jakarta.validation.constraints.Pattern;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -148,16 +148,15 @@ public class FacultyController {
     return ResponseEntity.ok(facultyService.transferProgramManager(request));
   }
 
-  @GetMapping(value = "/import-template", produces = "text/csv; charset=UTF-8")
+  @GetMapping(
+      value = "/import-template",
+      produces = {ImportTemplateResponses.CSV_MEDIA_TYPE, ImportTemplateResponses.XLSX_MEDIA_TYPE})
   @PreAuthorize("hasRole('ADMIN')")
-  public ResponseEntity<byte[]> getImportTemplateCsv() {
+  public ResponseEntity<byte[]> getImportTemplateCsv(
+      @RequestParam(name = "format", defaultValue = "csv") String format) {
     log.info("API request: GET /api/v1/faculties/import-template");
     AssessmentScoreTemplate template = facultyService.generateTemplateCsv();
-    return ResponseEntity.ok()
-        .header(
-            HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + template.fileName() + "\"")
-        .contentType(MediaType.parseMediaType("text/csv; charset=UTF-8"))
-        .body(template.content());
+    return ImportTemplateResponses.of(template, format);
   }
 
   @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
