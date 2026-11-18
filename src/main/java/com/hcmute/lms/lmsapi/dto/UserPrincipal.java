@@ -47,6 +47,9 @@ public class UserPrincipal implements Principal {
   /** Định danh Khoa quản lý của người dùng (dành cho PROGRAM_MANAGER). */
   private String facultyId;
 
+  /** Tài khoản đang bị bắt buộc đổi mật khẩu trước khi dùng hệ thống. */
+  private boolean mustChangePassword;
+
   /** Danh sách vai trò của người dùng. */
   @Builder.Default private List<Role> roles = new ArrayList<>();
 
@@ -88,6 +91,7 @@ public class UserPrincipal implements Principal {
         .status(user.getStatus())
         .tokenVersion(user.getTokenVersion())
         .facultyId(user.getFacultyId())
+        .mustChangePassword(user.isMustChangePassword())
         .roles(user.getRoles() != null ? new ArrayList<>(user.getRoles()) : new ArrayList<>())
         .build();
   }

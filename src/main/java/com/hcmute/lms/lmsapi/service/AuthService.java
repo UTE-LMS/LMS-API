@@ -1,5 +1,6 @@
 package com.hcmute.lms.lmsapi.service;
 
+import com.hcmute.lms.lmsapi.dto.ChangePasswordRequest;
 import com.hcmute.lms.lmsapi.dto.LoginRequest;
 import com.hcmute.lms.lmsapi.dto.LoginResponse;
 import com.hcmute.lms.lmsapi.dto.UserPrincipal;
@@ -27,6 +28,18 @@ public interface AuthService {
    * @param userId ID định danh của người dùng
    */
   void logout(String userId);
+
+  /**
+   * Người dùng tự đổi mật khẩu: kiểm tra mật khẩu hiện tại, lưu hash mới, tắt cờ
+   * mustChangePassword, tăng tokenVersion (thu hồi token cũ) và cấp token mới.
+   *
+   * @param principal người dùng đã xác thực
+   * @param request mật khẩu hiện tại và mật khẩu mới
+   * @param httpRequest yêu cầu HTTP để trích xuất địa chỉ IP client cho nhật ký kiểm toán
+   * @return {@link LoginResponse} chứa token mới và hồ sơ đã cập nhật
+   */
+  LoginResponse changePassword(
+      UserPrincipal principal, ChangePasswordRequest request, HttpServletRequest httpRequest);
 
   /**
    * Lấy thông tin hồ sơ người dùng hiện tại.

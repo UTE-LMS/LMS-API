@@ -517,3 +517,19 @@ Phần này chuẩn bị sẵn câu trả lời khoa học, chuẩn mực cho 4 
 - **Kiểm chứng đã làm:** đối chiếu trực tiếp nội dung mô tả với các endpoint và DTO vừa triển khai ở Phiên #36 và #37 (`SectionAlignmentController`, `AnalyticsQueryRequest`, `MatrixHeader`, `CalculationController`, `ReportController`).
 - **Sinh viên đã sửa/rà soát:** _chờ sinh viên rà soát_
 - **Commit / PR:** chưa commit.
+
+---
+
+## Phiên #39 — 2026-11-18: Bắt buộc đổi mật khẩu lần đầu cho tài khoản Admin tạo (API)
+
+- **Sinh viên yêu cầu:** TinMH (theo `git config user.name`)
+- **Công cụ / mô hình:** Claude Code, Claude Sonnet 5.5
+- **Mục tiêu:** tài khoản Admin tạo (thủ công hoặc import CSV) đang dùng mật khẩu Admin biết; bắt người dùng tự đổi ở lần đăng nhập đầu. Thứ tự làm đã thống nhất với sinh viên: đổi mật khẩu lần đầu → trang profile → xlsx → OAuth2.
+- **Nhánh:** `feat/force-password-change`.
+- **File AI sinh/sửa:** `document/User` (+`mustChangePassword`), `dto/UserPrincipal`, `dto/UserProfileResponse`, `dto/ChangePasswordRequest` (mới), `service/AuthService` + `AuthServiceImpl` (`changePassword`, tách `issueLoginResponse`), `controller/AuthController` (`POST /auth/change-password`), `filter/MustChangePasswordFilter` (mới, chặn API khác bằng 403), `config/SecurityConfig` (đăng ký filter), `service/impl/UserServiceImpl` (tạo user/import CSV bật cờ), `doc/database_import.js` (thêm `mustChangePassword: BOOL` vào validator `users`). Test mới: `AuthServiceChangePasswordTest` (3), `MustChangePasswordFilterTest` (5).
+- **Quyết định thiết kế cần sinh viên nắm:** (1) chặn ở server bằng filter, không chỉ cờ ở UI, vì gọi thẳng API bằng token vẫn lách được cờ UI; (2) đổi mật khẩu tăng `tokenVersion` rồi cấp token mới, nên token cũ mất hiệu lực nhưng người dùng không bị đăng xuất; (3) sai mật khẩu hiện tại trả 422, không trả 401, để interceptor UI không tự đăng xuất; (4) tài khoản cũ không có trường → `false`, không cần migration; `InitialAdminSeeder`/`DemoDataSeeder` không bật cờ.
+- **Kiểm chứng đã làm:** `./mvnw compile` và `test-compile` qua; `spotless:apply` đã chạy; `AuthServiceChangePasswordTest` 3/3, `MustChangePasswordFilterTest` 5/5, `TimingAttackDefenseTest` 5/5, `AuthSessionServiceImplTest` 9/9 đạt. **Chưa chạy** các integration test (`AuthIntegrationTest`, `UserIntegrationTest`...) vì Docker không chạy và cổng 27018 không có MongoDB; **chưa có integration test** cho `/auth/change-password`. Chưa chạy toàn bộ test suite.
+- **Lỗi/ảo giác AI tự phát hiện:** lần đầu thêm `ErrorCode.PASSWORD_CHANGE_REQUIRED`; `ErrorCodeAndResponseChallengerTest` khẳng định đúng 7 mã lỗi theo hợp đồng nên đã **hoàn tác**, filter dùng `ErrorCode.FORBIDDEN` kèm thông điệp riêng. Nguyên nhân: không kiểm tra test ràng buộc enum trước khi thêm mã. Commit sửa: cùng commit `feat(auth)` của nhánh `feat/force-password-change`.
+- **Việc còn lại:** viết integration test (cần MongoDB replica set), nhắc nhở đóng gói tài liệu sơ đồ nếu có sequence đăng nhập.
+- **Sinh viên đã sửa/rà soát:** _chờ sinh viên rà soát_
+- **Commit / PR:** một commit `feat(auth): require password change on first login` trên nhánh `feat/force-password-change` (xem `git log`; chưa mở PR).

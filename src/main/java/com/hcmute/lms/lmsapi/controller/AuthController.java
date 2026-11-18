@@ -1,5 +1,6 @@
 package com.hcmute.lms.lmsapi.controller;
 
+import com.hcmute.lms.lmsapi.dto.ChangePasswordRequest;
 import com.hcmute.lms.lmsapi.dto.LoginRequest;
 import com.hcmute.lms.lmsapi.dto.LoginResponse;
 import com.hcmute.lms.lmsapi.dto.UserPrincipal;
@@ -46,6 +47,19 @@ public class AuthController {
     log.info("Nhận yêu cầu đăng xuất từ user id={}", principal.getId());
     authService.logout(principal.getId());
     return ResponseEntity.ok(Map.of("message", "Đăng xuất thành công"));
+  }
+
+  /**
+   * Đổi mật khẩu của chính mình (POST /api/v1/auth/change-password). Là endpoint duy nhất ngoài /me
+   * và /logout mà tài khoản còn cờ mustChangePassword được gọi.
+   */
+  @PostMapping("/change-password")
+  public ResponseEntity<LoginResponse> changePassword(
+      @AuthenticationPrincipal UserPrincipal principal,
+      @Valid @RequestBody ChangePasswordRequest request,
+      HttpServletRequest httpRequest) {
+    log.info("Nhận yêu cầu đổi mật khẩu từ user id={}", principal.getId());
+    return ResponseEntity.ok(authService.changePassword(principal, request, httpRequest));
   }
 
   /**

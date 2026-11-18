@@ -27,6 +27,9 @@ public class UserProfileResponse {
   private UserStatus status;
   private String facultyId;
 
+  /** true: người dùng phải đổi mật khẩu (POST /auth/change-password) trước khi dùng hệ thống. */
+  private boolean mustChangePassword;
+
   @Builder.Default private List<Role> roles = new ArrayList<>();
 
   public static UserProfileResponse from(User user) {
@@ -40,6 +43,7 @@ public class UserProfileResponse {
         .fullName(user.getFullName())
         .status(user.getStatus())
         .facultyId(user.getFacultyId())
+        .mustChangePassword(user.isMustChangePassword())
         .roles(user.getRoles() != null ? new ArrayList<>(user.getRoles()) : new ArrayList<>())
         .build();
   }
@@ -55,6 +59,7 @@ public class UserProfileResponse {
         .fullName(principal.getFullName())
         .status(principal.getStatus())
         .facultyId(principal.getFacultyId())
+        .mustChangePassword(principal.isMustChangePassword())
         .roles(
             principal.getRoles() != null
                 ? new ArrayList<>(principal.getRoles())

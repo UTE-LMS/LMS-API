@@ -74,6 +74,15 @@ public class User {
   @Field(name = "facultyId", targetType = FieldType.OBJECT_ID)
   private String facultyId;
 
+  /**
+   * Cờ bắt buộc đổi mật khẩu ở lần đăng nhập đầu. Bật khi Admin tạo tài khoản (thủ công hoặc import
+   * CSV) vì Admin biết mật khẩu khởi tạo; tắt sau khi người dùng tự đổi mật khẩu. Tài khoản cũ chưa
+   * có trường này trong CSDL được hiểu là false.
+   */
+  @Builder.Default
+  @Field("mustChangePassword")
+  private boolean mustChangePassword = false;
+
   /** Danh sách vai trò của người dùng. */
   @Builder.Default
   @Field("roles")
