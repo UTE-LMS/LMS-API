@@ -21,6 +21,7 @@ có thể code và test; mỗi phương án đều đổi được mà không đ
 - Chỉ nhận CSV UTF-8 (chấp nhận BOM, phân cách `,` hoặc `;`, giá trị trong nháy kép), dùng lại `EnrollmentCsvParser.splitLine`
   của F05a nhập danh sách lớp (cùng quy ước số dòng: dòng tiêu đề là dòng 1, `rowNumber`/`sourceRow` là số dòng vật lý trong tệp).
 - **Không thêm dependency** (Apache POI, …). Excel (`.xlsx`) chưa làm; giảng viên xuất sang CSV (TD-32).
+  *(Cập nhật 2026-11-18: phần Excel đã được ADR 0015 thay thế; phần còn lại của ADR này giữ nguyên.)*
 - `sourceSystem` nhận `CSV` hoặc `MOODLE_EXPORT` (đều là CSV); `EXCEL` bị từ chối 422 cho tới khi có ADR Excel.
 
 ### 2.2 Nơi lưu tệp gốc: thư mục cục bộ do cấu hình, `fileRef` = tên tệp do máy chủ đặt
