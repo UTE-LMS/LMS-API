@@ -6,6 +6,7 @@ import com.hcmute.lms.lmsapi.document.User;
 import com.hcmute.lms.lmsapi.dto.ChangePasswordRequest;
 import com.hcmute.lms.lmsapi.dto.LoginRequest;
 import com.hcmute.lms.lmsapi.dto.LoginResponse;
+import com.hcmute.lms.lmsapi.dto.UpdateProfileRequest;
 import com.hcmute.lms.lmsapi.dto.UserPrincipal;
 import com.hcmute.lms.lmsapi.dto.UserProfileResponse;
 import com.hcmute.lms.lmsapi.enums.AuditAction;
@@ -177,6 +178,33 @@ public class AuthServiceImpl implements AuthService {
       throw new BadCredentialsException("Chưa xác thực người dùng");
     }
     return UserProfileResponse.from(principal);
+  }
+
+  @Override
+  public UserProfileResponse updateProfile(
+      UserPrincipal principal, UpdateProfileRequest request, HttpServletRequest httpRequest) {
+    User user =
+        userRepository
+            .findById(principal.getId())
+            .orElseThrow(() -> new BadCredentialsException("Chưa xác thực người dùng"));
+
+    // Chỉ họ tên được sửa; email, vai trò, khoa, trạng thái do Admin quản lý
+    user.setFullName(request.getFullName().trim());
+    user.setUpdatedAt(Instant.now());
+    userRepository.save(user);
+
+    AuditEntity auditEntity = AuditEntity.builder().collection("users").id(user.getId()).build();
+    auditService.record(
+        AuditAction.UPDATE,
+        auditEntity,
+        null,
+        null,
+        "Người dùng tự sửa họ tên",
+        user.getId(),
+        resolveClientIp(httpRequest));
+
+    log.info("Người dùng '{}' (id={}) đã sửa họ tên", user.getUsername(), user.getId());
+    return UserProfileResponse.from(user);
   }
 
   private String resolveClientIp(HttpServletRequest request) {

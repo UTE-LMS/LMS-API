@@ -32,8 +32,10 @@ import tools.jackson.databind.ObjectMapper;
 @RequiredArgsConstructor
 public class MustChangePasswordFilter extends OncePerRequestFilter {
 
+  private static final String PROFILE_PATH = "/api/v1/auth/me";
+
   private static final Set<String> ALLOWED_PATHS =
-      Set.of("/api/v1/auth/change-password", "/api/v1/auth/me", "/api/v1/auth/logout");
+      Set.of("/api/v1/auth/change-password", "/api/v1/auth/logout");
 
   private static final String PASSWORD_CHANGE_MESSAGE =
       "Bạn cần đổi mật khẩu trước khi tiếp tục sử dụng hệ thống";
@@ -66,6 +68,10 @@ public class MustChangePasswordFilter extends OncePerRequestFilter {
     }
     String uri = request.getRequestURI();
     String clean = uri.endsWith("/") && uri.length() > 1 ? uri.substring(0, uri.length() - 1) : uri;
+    // /me chỉ được đọc (UI cần cờ); sửa hồ sơ (PUT /me) phải đợi đổi mật khẩu xong
+    if (PROFILE_PATH.equals(clean)) {
+      return "GET".equalsIgnoreCase(request.getMethod());
+    }
     return ALLOWED_PATHS.contains(clean);
   }
 

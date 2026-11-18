@@ -533,3 +533,17 @@ Phần này chuẩn bị sẵn câu trả lời khoa học, chuẩn mực cho 4 
 - **Việc còn lại:** viết integration test (cần MongoDB replica set), nhắc nhở đóng gói tài liệu sơ đồ nếu có sequence đăng nhập.
 - **Sinh viên đã sửa/rà soát:** _chờ sinh viên rà soát_
 - **Commit / PR:** một commit `feat(auth): require password change on first login` trên nhánh `feat/force-password-change` (xem `git log`; chưa mở PR).
+
+---
+
+## Phiên #40 — 2026-11-18: Trang Tài khoản của tôi — API tự sửa họ tên
+
+- **Sinh viên yêu cầu:** TinMH (theo `git config user.name`)
+- **Công cụ / mô hình:** Claude Code, Claude Sonnet 5.5
+- **Mục tiêu:** bước 2 trong thứ tự đã thống nhất (đổi mật khẩu lần đầu → trang profile → xlsx → OAuth2). Trang profile cần tự sửa hồ sơ.
+- **Nhánh:** `feat/profile-page`, tách từ `feat/force-password-change` (cần commit của Phiên #39).
+- **File AI sinh/sửa:** `dto/UpdateProfileRequest` (mới), `service/AuthService` + `AuthServiceImpl` (`updateProfile`), `controller/AuthController` (`PUT /auth/me`), `filter/MustChangePasswordFilter` (`/me` chỉ cho GET khi còn cờ). Test mới `AuthServiceUpdateProfileTest` (2); sửa `MustChangePasswordFilterTest` (nay 6 ca, vì hành vi `/me` đổi: trước đó POST `/me` được cho qua).
+- **Quyết định thiết kế cần sinh viên nắm:** (1) chỉ cho sửa **họ tên**; email dùng để định danh/liên kết tài khoản (sẽ quan trọng khi làm OAuth2), vai trò/khoa/trạng thái do Admin quản lý; muốn cho sửa email phải cân nhắc lại cùng OAuth2. (2) Không đổi `tokenVersion` khi sửa họ tên. (3) Tài khoản còn cờ đổi mật khẩu không sửa được hồ sơ.
+- **Kiểm chứng đã làm:** `spotless:apply` đã chạy; `AuthServiceUpdateProfileTest` 2/2, `AuthServiceChangePasswordTest` 3/3, `MustChangePasswordFilterTest` 6/6, `TimingAttackDefenseTest` 5/5, `AuthSessionServiceImplTest` 9/9 đạt. Vẫn **chưa chạy integration test** (không có MongoDB test) và **chưa có integration test** cho `PUT /auth/me`.
+- **Sinh viên đã sửa/rà soát:** _chờ sinh viên rà soát_
+- **Commit / PR:** một commit `feat(profile): let users edit their full name` trên nhánh `feat/profile-page` (xem `git log`; chưa mở PR).

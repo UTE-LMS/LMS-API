@@ -62,20 +62,33 @@ class MustChangePasswordFilterTest {
   }
 
   @Test
-  @DisplayName("Còn cờ: change-password, me, logout (kể cả dấu / cuối) được cho qua")
+  @DisplayName("Còn cờ: POST change-password, POST logout, GET me (kể cả dấu / cuối) được cho qua")
   void allowsAuthEndpoints() throws Exception {
     authenticateAs(true);
-    for (String uri :
+    List<String[]> allowed =
         List.of(
-            "/api/v1/auth/change-password",
-            "/api/v1/auth/me",
-            "/api/v1/auth/logout",
-            "/api/v1/auth/me/")) {
+            new String[] {"POST", "/api/v1/auth/change-password"},
+            new String[] {"POST", "/api/v1/auth/logout"},
+            new String[] {"GET", "/api/v1/auth/me"},
+            new String[] {"GET", "/api/v1/auth/me/"});
+    for (String[] call : allowed) {
       MockHttpServletResponse response = new MockHttpServletResponse();
-      MockFilterChain chain = run("POST", uri, response);
-      assertThat(chain.getRequest()).as(uri).isNotNull();
-      assertThat(response.getStatus()).as(uri).isEqualTo(200);
+      MockFilterChain chain = run(call[0], call[1], response);
+      assertThat(chain.getRequest()).as(call[0] + " " + call[1]).isNotNull();
+      assertThat(response.getStatus()).as(call[0] + " " + call[1]).isEqualTo(200);
     }
+  }
+
+  @Test
+  @DisplayName("Còn cờ: PUT /auth/me (sửa hồ sơ) bị chặn, chỉ được đọc hồ sơ")
+  void blocksProfileUpdate() throws Exception {
+    authenticateAs(true);
+    MockHttpServletResponse response = new MockHttpServletResponse();
+
+    MockFilterChain chain = run("PUT", "/api/v1/auth/me", response);
+
+    assertThat(chain.getRequest()).isNull();
+    assertThat(response.getStatus()).isEqualTo(403);
   }
 
   @Test

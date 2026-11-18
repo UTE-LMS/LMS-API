@@ -3,6 +3,7 @@ package com.hcmute.lms.lmsapi.service;
 import com.hcmute.lms.lmsapi.dto.ChangePasswordRequest;
 import com.hcmute.lms.lmsapi.dto.LoginRequest;
 import com.hcmute.lms.lmsapi.dto.LoginResponse;
+import com.hcmute.lms.lmsapi.dto.UpdateProfileRequest;
 import com.hcmute.lms.lmsapi.dto.UserPrincipal;
 import com.hcmute.lms.lmsapi.dto.UserProfileResponse;
 import jakarta.servlet.http.HttpServletRequest;
@@ -48,4 +49,15 @@ public interface AuthService {
    * @return {@link UserProfileResponse} thông tin hồ sơ và phân quyền
    */
   UserProfileResponse getCurrentUserProfile(UserPrincipal principal);
+
+  /**
+   * Người dùng tự sửa họ tên của mình. Không đổi tokenVersion nên phiên hiện tại vẫn hợp lệ.
+   *
+   * @param principal người dùng đã xác thực
+   * @param request họ tên mới
+   * @param httpRequest yêu cầu HTTP để trích xuất địa chỉ IP client cho nhật ký kiểm toán
+   * @return {@link UserProfileResponse} hồ sơ sau khi cập nhật
+   */
+  UserProfileResponse updateProfile(
+      UserPrincipal principal, UpdateProfileRequest request, HttpServletRequest httpRequest);
 }
