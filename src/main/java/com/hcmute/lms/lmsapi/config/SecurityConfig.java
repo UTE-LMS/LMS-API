@@ -3,6 +3,7 @@ package com.hcmute.lms.lmsapi.config;
 import com.hcmute.lms.lmsapi.dto.ErrorResponse;
 import com.hcmute.lms.lmsapi.dto.UserPrincipal;
 import com.hcmute.lms.lmsapi.exception.ErrorCode;
+import com.hcmute.lms.lmsapi.filter.MustChangePasswordFilter;
 import com.hcmute.lms.lmsapi.service.AuthSessionService;
 import jakarta.servlet.http.HttpServletResponse;
 import java.nio.charset.StandardCharsets;
@@ -29,6 +30,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.web.BearerTokenResolver;
 import org.springframework.security.oauth2.server.resource.web.DefaultBearerTokenResolver;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.AccessDeniedHandler;
@@ -128,6 +130,10 @@ public class SecurityConfig {
                     .bearerTokenResolver(bearerTokenResolver)
                     .authenticationEntryPoint(authenticationEntryPoint())
                     .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter)))
+
+        // Ép đổi mật khẩu lần đầu ở server: chạy ngay sau khi Bearer token đã được xác thực
+        .addFilterAfter(
+            new MustChangePasswordFilter(objectMapper), BearerTokenAuthenticationFilter.class)
 
         // Tùy biến xử lý lỗi 401 & 403 tại tầng Filter Chain tuân thủ ErrorResponse
         .exceptionHandling(

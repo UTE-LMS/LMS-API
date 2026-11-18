@@ -108,7 +108,7 @@ const COLLECTIONS = {
     validator: schema(['username', 'email', 'passwordHash', 'status', 'roles'], {
       username: STR, email: STR, passwordHash: STR, fullName: STR_N,
       facultyId: OID_N,
-      status: en('ACTIVE', 'LOCKED'), tokenVersion: INT,
+      status: en('ACTIVE', 'LOCKED'), tokenVersion: INT, mustChangePassword: BOOL,
       roles: arr(en('ADMIN', 'PROGRAM_MANAGER', 'LECTURER', 'QA'))
     }),
     indexes: [[{ username: 1 }, { unique: true }], [{ email: 1 }, { unique: true }], [{ facultyId: 1 }]]

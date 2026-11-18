@@ -3,12 +3,15 @@ package com.hcmute.lms.lmsapi.service.impl;
 import com.hcmute.lms.lmsapi.config.JwtConfig;
 import com.hcmute.lms.lmsapi.document.AuditEntity;
 import com.hcmute.lms.lmsapi.document.User;
+import com.hcmute.lms.lmsapi.dto.ChangePasswordRequest;
 import com.hcmute.lms.lmsapi.dto.LoginRequest;
 import com.hcmute.lms.lmsapi.dto.LoginResponse;
+import com.hcmute.lms.lmsapi.dto.UpdateProfileRequest;
 import com.hcmute.lms.lmsapi.dto.UserPrincipal;
 import com.hcmute.lms.lmsapi.dto.UserProfileResponse;
 import com.hcmute.lms.lmsapi.enums.AuditAction;
 import com.hcmute.lms.lmsapi.enums.UserStatus;
+import com.hcmute.lms.lmsapi.exception.BusinessRuleViolationException;
 import com.hcmute.lms.lmsapi.repository.UserRepository;
 import com.hcmute.lms.lmsapi.service.AuditService;
 import com.hcmute.lms.lmsapi.service.AuthService;
@@ -81,31 +84,78 @@ public class AuthServiceImpl implements AuthService {
       throw new BadCredentialsException("Tên đăng nhập hoặc mật khẩu không chính xác");
     }
 
-    // 4. Sinh JWT Access Token (HS256) chứa sub và tokenVersion
-    Instant now = Instant.now();
-    Duration ttl = jwtConfig.getTtl();
-    Instant expiresAt = now.plus(ttl);
-
-    JwtClaimsSet claims =
-        JwtClaimsSet.builder()
-            .issuer(jwtConfig.getIssuer())
-            .subject(user.getId())
-            .issuedAt(now)
-            .expiresAt(expiresAt)
-            .claim("tokenVersion", user.getTokenVersion())
-            .build();
-
-    JwsHeader jwsHeader = JwsHeader.with(MacAlgorithm.HS256).build();
-    String token = jwtEncoder.encode(JwtEncoderParameters.from(jwsHeader, claims)).getTokenValue();
-
-    // 5. Ghi nhật ký kiểm toán LOGIN
+    // 4. Ghi nhật ký kiểm toán LOGIN
     AuditEntity auditEntity = AuditEntity.builder().collection("users").id(user.getId()).build();
     String clientIp = resolveClientIp(httpRequest);
     auditService.record(AuditAction.LOGIN, auditEntity, null, null, null, user.getId(), clientIp);
 
     log.info("Người dùng '{}' (id={}) đăng nhập thành công", user.getUsername(), user.getId());
 
-    // 6. Trả về LoginResponse
+    // 5. Sinh JWT và trả về LoginResponse (kèm cờ mustChangePassword trong user)
+    return issueLoginResponse(user);
+  }
+
+  @Override
+  public LoginResponse changePassword(
+      UserPrincipal principal, ChangePasswordRequest request, HttpServletRequest httpRequest) {
+    User user =
+        userRepository
+            .findById(principal.getId())
+            .orElseThrow(() -> new BadCredentialsException("Chưa xác thực người dùng"));
+
+    // 1. Phải nhập đúng mật khẩu hiện tại (chống người khác dùng phiên bị bỏ ngỏ để đổi mật khẩu)
+    if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPasswordHash())) {
+      throw new BusinessRuleViolationException(
+          "WRONG_CURRENT_PASSWORD", "Mật khẩu hiện tại không chính xác");
+    }
+
+    // 2. Mật khẩu mới phải khác mật khẩu cũ, nếu không cờ mustChangePassword mất tác dụng
+    if (passwordEncoder.matches(request.getNewPassword(), user.getPasswordHash())) {
+      throw new BusinessRuleViolationException(
+          "SAME_PASSWORD", "Mật khẩu mới phải khác mật khẩu hiện tại");
+    }
+
+    // 3. Lưu hash mới, tắt cờ, tăng tokenVersion để mọi token cũ (kể cả của phiên khác) mất hiệu
+    // lực
+    user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+    user.setMustChangePassword(false);
+    user.setTokenVersion(user.getTokenVersion() + 1);
+    user.setUpdatedAt(Instant.now());
+    userRepository.save(user);
+
+    AuditEntity auditEntity = AuditEntity.builder().collection("users").id(user.getId()).build();
+    auditService.record(
+        AuditAction.UPDATE,
+        auditEntity,
+        null,
+        null,
+        "Người dùng tự đổi mật khẩu",
+        user.getId(),
+        resolveClientIp(httpRequest));
+
+    log.info("Người dùng '{}' (id={}) đã đổi mật khẩu", user.getUsername(), user.getId());
+
+    // 4. Cấp token mới (tokenVersion mới) để người dùng không phải đăng nhập lại
+    return issueLoginResponse(user);
+  }
+
+  /** Sinh JWT Access Token (HS256) chứa sub và tokenVersion rồi đóng gói LoginResponse. */
+  private LoginResponse issueLoginResponse(User user) {
+    Instant now = Instant.now();
+    Duration ttl = jwtConfig.getTtl();
+
+    JwtClaimsSet claims =
+        JwtClaimsSet.builder()
+            .issuer(jwtConfig.getIssuer())
+            .subject(user.getId())
+            .issuedAt(now)
+            .expiresAt(now.plus(ttl))
+            .claim("tokenVersion", user.getTokenVersion())
+            .build();
+
+    JwsHeader jwsHeader = JwsHeader.with(MacAlgorithm.HS256).build();
+    String token = jwtEncoder.encode(JwtEncoderParameters.from(jwsHeader, claims)).getTokenValue();
+
     return LoginResponse.builder()
         .accessToken(token)
         .tokenType("Bearer")
@@ -128,6 +178,33 @@ public class AuthServiceImpl implements AuthService {
       throw new BadCredentialsException("Chưa xác thực người dùng");
     }
     return UserProfileResponse.from(principal);
+  }
+
+  @Override
+  public UserProfileResponse updateProfile(
+      UserPrincipal principal, UpdateProfileRequest request, HttpServletRequest httpRequest) {
+    User user =
+        userRepository
+            .findById(principal.getId())
+            .orElseThrow(() -> new BadCredentialsException("Chưa xác thực người dùng"));
+
+    // Chỉ họ tên được sửa; email, vai trò, khoa, trạng thái do Admin quản lý
+    user.setFullName(request.getFullName().trim());
+    user.setUpdatedAt(Instant.now());
+    userRepository.save(user);
+
+    AuditEntity auditEntity = AuditEntity.builder().collection("users").id(user.getId()).build();
+    auditService.record(
+        AuditAction.UPDATE,
+        auditEntity,
+        null,
+        null,
+        "Người dùng tự sửa họ tên",
+        user.getId(),
+        resolveClientIp(httpRequest));
+
+    log.info("Người dùng '{}' (id={}) đã sửa họ tên", user.getUsername(), user.getId());
+    return UserProfileResponse.from(user);
   }
 
   private String resolveClientIp(HttpServletRequest request) {

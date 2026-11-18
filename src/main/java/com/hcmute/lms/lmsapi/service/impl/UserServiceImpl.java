@@ -112,6 +112,7 @@ public class UserServiceImpl implements UserService {
             .fullName(request.getFullName().trim())
             .status(UserStatus.ACTIVE)
             .tokenVersion(0L)
+            .mustChangePassword(true)
             .roles(
                 request.getRoles() != null
                     ? new ArrayList<>(request.getRoles())
@@ -434,6 +435,7 @@ public class UserServiceImpl implements UserService {
               .facultyId(facultyId)
               .status(status)
               .tokenVersion(0L)
+              .mustChangePassword(true)
               .roles(parsedRoles)
               .createdAt(now)
               .updatedAt(now)
