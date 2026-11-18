@@ -3,6 +3,7 @@ package com.hcmute.lms.lmsapi.controller;
 import com.hcmute.lms.lmsapi.dto.ChangePasswordRequest;
 import com.hcmute.lms.lmsapi.dto.LoginRequest;
 import com.hcmute.lms.lmsapi.dto.LoginResponse;
+import com.hcmute.lms.lmsapi.dto.UpdateProfileRequest;
 import com.hcmute.lms.lmsapi.dto.UserPrincipal;
 import com.hcmute.lms.lmsapi.dto.UserProfileResponse;
 import com.hcmute.lms.lmsapi.service.AuthService;
@@ -15,6 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -71,5 +73,15 @@ public class AuthController {
     log.info("Nhận yêu cầu lấy thông tin cá nhân từ user id={}", principal.getId());
     UserProfileResponse response = authService.getCurrentUserProfile(principal);
     return ResponseEntity.ok(response);
+  }
+
+  /** Người dùng tự sửa họ tên của mình (PUT /api/v1/auth/me). Yêu cầu Bearer token hợp lệ. */
+  @PutMapping("/me")
+  public ResponseEntity<UserProfileResponse> updateMe(
+      @AuthenticationPrincipal UserPrincipal principal,
+      @Valid @RequestBody UpdateProfileRequest request,
+      HttpServletRequest httpRequest) {
+    log.info("Nhận yêu cầu sửa hồ sơ cá nhân từ user id={}", principal.getId());
+    return ResponseEntity.ok(authService.updateProfile(principal, request, httpRequest));
   }
 }
