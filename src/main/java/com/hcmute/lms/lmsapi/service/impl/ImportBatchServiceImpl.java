@@ -18,6 +18,7 @@ import com.hcmute.lms.lmsapi.document.Term;
 import com.hcmute.lms.lmsapi.dto.ImportBatchCreateRequest;
 import com.hcmute.lms.lmsapi.dto.ImportBatchResponse;
 import com.hcmute.lms.lmsapi.dto.ImportColumnMappingDto;
+import com.hcmute.lms.lmsapi.dto.ImportFilePreviewResponse;
 import com.hcmute.lms.lmsapi.dto.ImportRowErrorResponse;
 import com.hcmute.lms.lmsapi.dto.PageResponse;
 import com.hcmute.lms.lmsapi.dto.UserPrincipal;
@@ -52,6 +53,7 @@ import com.hcmute.lms.lmsapi.service.AuditService;
 import com.hcmute.lms.lmsapi.service.ImportBatchService;
 import com.hcmute.lms.lmsapi.service.ImportFileStorage;
 import com.hcmute.lms.lmsapi.util.ChecksumUtils;
+import com.hcmute.lms.lmsapi.util.ImportFiles;
 import com.hcmute.lms.lmsapi.util.ObjectIdUtils;
 import com.hcmute.lms.lmsapi.util.ScoreCsvParser;
 import java.time.Instant;
@@ -109,10 +111,8 @@ public class ImportBatchServiceImpl implements ImportBatchService {
     CourseSection section = requireSection(sectionId);
     Assessment assessment = requireSectionAssessment(section, assessmentId);
     requireScoreEntryAllowed(section, assessment);
-    ImportSourceSystem source = resolveSource(request);
-    if (source == ImportSourceSystem.EXCEL) {
-      throw new BusinessRuleViolationException("Định dạng Excel chưa được hỗ trợ (chờ ADR)");
-    }
+    boolean xlsx = ImportFiles.isXlsx(fileName);
+    ImportSourceSystem source = resolveSource(request, xlsx);
     ReimportPolicy policy = resolveReimportPolicy(request);
 
     String checksum = ChecksumUtils.sha256Hex(content);
@@ -122,7 +122,9 @@ public class ImportBatchServiceImpl implements ImportBatchService {
           ErrorCode.CONFLICT,
           "Tệp này đã được nhập và xác nhận cho bài đánh giá này (cùng checksum)");
     }
-    ScoreCsvParser.Table table = ScoreCsvParser.parse(content);
+    // .xlsx được đổi sang CSV để dùng chung bộ đọc; tệp gốc vẫn được lưu và tính checksum nguyên
+    // trạng
+    ScoreCsvParser.Table table = ScoreCsvParser.parse(ImportFiles.toCsvBytes(fileName, content));
     ImportColumnMapping mapping =
         resolveMapping(
             request == null ? null : request.getColumnMapping(),
@@ -131,7 +133,9 @@ public class ImportBatchServiceImpl implements ImportBatchService {
             table);
 
     String batchId = new ObjectId().toHexString();
-    String fileRef = fileStorage.save(batchId, content);
+    String fileRef =
+        fileStorage.save(
+            batchId, content, xlsx ? ImportFiles.XLSX_EXTENSION : ImportFiles.CSV_EXTENSION);
     ImportBatch batch =
         ImportBatch.builder()
             .id(batchId)
@@ -163,10 +167,27 @@ public class ImportBatchServiceImpl implements ImportBatchService {
     return batchMapper.toResponse(saved);
   }
 
-  private ImportSourceSystem resolveSource(ImportBatchCreateRequest request) {
-    return request != null && request.getSourceSystem() != null
-        ? request.getSourceSystem()
-        : ImportSourceSystem.CSV;
+  @Override
+  public ImportFilePreviewResponse previewFile(String fileName, byte[] content) {
+    ScoreCsvParser.Table table = ScoreCsvParser.parse(ImportFiles.toCsvBytes(fileName, content));
+    return new ImportFilePreviewResponse(
+        table.headers().stream().filter(header -> !header.isEmpty()).toList(), table.rows().size());
+  }
+
+  /**
+   * Nguồn của lô do định dạng tệp quyết định: tệp .xlsx luôn là EXCEL (trừ khi người gọi khai báo
+   * MOODLE_EXPORT), còn EXCEL chỉ hợp lệ với tệp .xlsx.
+   */
+  private ImportSourceSystem resolveSource(ImportBatchCreateRequest request, boolean xlsx) {
+    ImportSourceSystem requested = request == null ? null : request.getSourceSystem();
+    if (requested == ImportSourceSystem.EXCEL && !xlsx) {
+      throw new BusinessRuleViolationException(
+          "Nguồn Excel (EXCEL) chỉ dùng cho tệp có đuôi .xlsx");
+    }
+    if (xlsx) {
+      return requested == ImportSourceSystem.MOODLE_EXPORT ? requested : ImportSourceSystem.EXCEL;
+    }
+    return requested != null ? requested : ImportSourceSystem.CSV;
   }
 
   private String cleanFileName(String fileName) {
@@ -504,7 +525,9 @@ public class ImportBatchServiceImpl implements ImportBatchService {
           HttpStatus.INTERNAL_SERVER_ERROR,
           "Tệp gốc đã lưu không còn khớp checksum của lô " + batch.getId());
     }
-    ScoreCsvParser.Table table = ScoreCsvParser.parse(content);
+    // fileRef có đúng đuôi của tệp đã lưu (.csv hoặc .xlsx)
+    ScoreCsvParser.Table table =
+        ScoreCsvParser.parse(ImportFiles.toCsvBytes(batch.getFileRef(), content));
     ImportColumnMapping mapping = batch.getColumnMapping();
     List<ScoreRowValidator.Column> columns =
         mapping.getItems().stream()

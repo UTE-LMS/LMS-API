@@ -9,13 +9,15 @@ import com.hcmute.lms.lmsapi.dto.EnrollmentStatusUpdateRequest;
 import com.hcmute.lms.lmsapi.dto.UserPrincipal;
 import com.hcmute.lms.lmsapi.enums.EnrollmentStatus;
 import com.hcmute.lms.lmsapi.service.EnrollmentService;
+import com.hcmute.lms.lmsapi.util.ImportFiles;
+import com.hcmute.lms.lmsapi.util.ImportTemplateResponses;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Pattern;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -75,7 +77,8 @@ public class EnrollmentController {
         sectionId,
         file.getSize(),
         actor);
-    try (InputStream csv = file.getInputStream()) {
+    // .xlsx được đổi sang CSV trước khi vào bộ đọc danh sách lớp (ADR 0015)
+    try (InputStream csv = new ByteArrayInputStream(ImportFiles.toCsvBytes(file))) {
       return ResponseEntity.ok(enrollmentService.importEnrollments(sectionId, csv, actor));
     }
   }
@@ -102,7 +105,7 @@ public class EnrollmentController {
 
   @GetMapping(
       value = "/sections/{sectionId}/enrollments/import-template",
-      produces = "text/csv; charset=UTF-8")
+      produces = {ImportTemplateResponses.CSV_MEDIA_TYPE, ImportTemplateResponses.XLSX_MEDIA_TYPE})
   @PreAuthorize(
       "@scopeAuthorizationService.canAccessSection(authentication.principal, #sectionId, T(com.hcmute.lms.lmsapi.enums.AccessType).READ)"
           + " or @scopeAuthorizationService.canManageSection(authentication.principal, #sectionId)")
@@ -111,24 +114,20 @@ public class EnrollmentController {
           @Pattern(
               regexp = "^[0-9a-fA-F]{24}$",
               message = "ID lớp học phần phải là ObjectId 24 ký tự hex")
-          String sectionId) {
+          String sectionId,
+      @RequestParam(name = "format", defaultValue = "csv") String format) {
     AssessmentScoreTemplate template = enrollmentService.generateTemplateCsv();
-    return ResponseEntity.ok()
-        .header(
-            HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + template.fileName() + "\"")
-        .contentType(MediaType.parseMediaType("text/csv; charset=UTF-8"))
-        .body(template.content());
+    return ImportTemplateResponses.of(template, format);
   }
 
-  @GetMapping(value = "/enrollments/import-template", produces = "text/csv; charset=UTF-8")
+  @GetMapping(
+      value = "/enrollments/import-template",
+      produces = {ImportTemplateResponses.CSV_MEDIA_TYPE, ImportTemplateResponses.XLSX_MEDIA_TYPE})
   @PreAuthorize("hasAnyRole('ADMIN', 'PROGRAM_MANAGER', 'LECTURER')")
-  public ResponseEntity<byte[]> getBulkEnrollmentTemplate() {
+  public ResponseEntity<byte[]> getBulkEnrollmentTemplate(
+      @RequestParam(name = "format", defaultValue = "csv") String format) {
     AssessmentScoreTemplate template = enrollmentService.generateBulkTemplateCsv();
-    return ResponseEntity.ok()
-        .header(
-            HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + template.fileName() + "\"")
-        .contentType(MediaType.parseMediaType("text/csv; charset=UTF-8"))
-        .body(template.content());
+    return ImportTemplateResponses.of(template, format);
   }
 
   @PostMapping(value = "/enrollments/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

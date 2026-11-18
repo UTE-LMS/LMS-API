@@ -3,6 +3,7 @@ package com.hcmute.lms.lmsapi.controller;
 import com.hcmute.lms.lmsapi.dto.ImportBatchCreateRequest;
 import com.hcmute.lms.lmsapi.dto.ImportBatchResponse;
 import com.hcmute.lms.lmsapi.dto.ImportColumnMappingDto;
+import com.hcmute.lms.lmsapi.dto.ImportFilePreviewResponse;
 import com.hcmute.lms.lmsapi.dto.ImportRowErrorResponse;
 import com.hcmute.lms.lmsapi.dto.PageResponse;
 import com.hcmute.lms.lmsapi.dto.UserPrincipal;
@@ -91,6 +92,26 @@ public class ImportBatchController {
             request,
             principal);
     return ResponseEntity.status(HttpStatus.CREATED).body(created);
+  }
+
+  /** Xem trước tệp (.csv/.xlsx): trả tên cột để giao diện tự ánh xạ, không tạo lô. */
+  @PostMapping(value = BATCHES_PATH + "/preview", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+  @PreAuthorize(
+      "hasRole('LECTURER') and"
+          + " @scopeAuthorizationService.canAccessSection(authentication.principal, #sectionId, "
+          + WRITE
+          + ")")
+  public ResponseEntity<ImportFilePreviewResponse> previewFile(
+      @PathVariable("sectionId")
+          @Pattern(regexp = ID_PATTERN, message = "ID lớp học phần phải là ObjectId 24 ký tự hex")
+          String sectionId,
+      @PathVariable("assessmentId")
+          @Pattern(regexp = ID_PATTERN, message = "ID bài đánh giá phải là ObjectId 24 ký tự hex")
+          String assessmentId,
+      @RequestPart("file") MultipartFile file)
+      throws IOException {
+    return ResponseEntity.ok(
+        importBatchService.previewFile(file.getOriginalFilename(), file.getBytes()));
   }
 
   @GetMapping(BATCHES_PATH)

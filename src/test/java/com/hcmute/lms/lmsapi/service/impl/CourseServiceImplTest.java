@@ -196,15 +196,43 @@ class CourseServiceImplTest {
   }
 
   @Test
-  @DisplayName("Import CSV: Định dạng file không phải .csv ném lỗi VALIDATION_ERROR")
+  @DisplayName("Import CSV: Định dạng file không phải .csv/.xlsx ném lỗi VALIDATION_ERROR")
   void importCourses_invalidExtension_throwsValidationException() {
-    MockMultipartFile excelFile =
+    MockMultipartFile pdfFile =
+        new MockMultipartFile("file", "courses.pdf", "application/pdf", "test".getBytes());
+
+    assertThatThrownBy(() -> courseService.importCourses(pdfFile))
+        .isInstanceOf(AppException.class)
+        .hasFieldOrPropertyWithValue("errorCode", ErrorCode.VALIDATION_ERROR)
+        .hasMessageContaining(".xlsx");
+  }
+
+  @Test
+  @DisplayName("ADR 0015: tệp .xlsx giả (nội dung không phải Excel) ném lỗi VALIDATION_ERROR")
+  void importCourses_fakeXlsx_throwsValidationException() {
+    MockMultipartFile fake =
         new MockMultipartFile(
             "file", "courses.xlsx", "application/vnd.ms-excel", "test".getBytes());
 
-    assertThatThrownBy(() -> courseService.importCourses(excelFile))
+    assertThatThrownBy(() -> courseService.importCourses(fake))
         .isInstanceOf(AppException.class)
-        .hasFieldOrPropertyWithValue("errorCode", ErrorCode.VALIDATION_ERROR);
+        .hasFieldOrPropertyWithValue("errorCode", ErrorCode.VALIDATION_ERROR)
+        .hasMessageContaining("không phải tệp Excel");
+  }
+
+  @Test
+  @DisplayName("ADR 0015: tệp .xlsx thật đi qua cùng bước kiểm tra cột như CSV (thiếu cột -> 400)")
+  void importCourses_xlsxMissingHeaders_sameValidationAsCsv() {
+    byte[] xlsx =
+        com.hcmute.lms.lmsapi.util.XlsxCsvConverter.fromCsv(
+            "ma_mon,ten_mon\nCS101,Lap trinh\n".getBytes(StandardCharsets.UTF_8));
+    MockMultipartFile file =
+        new MockMultipartFile("file", "courses.xlsx", "application/octet-stream", xlsx);
+
+    assertThatThrownBy(() -> courseService.importCourses(file))
+        .isInstanceOf(AppException.class)
+        .hasFieldOrPropertyWithValue("errorCode", ErrorCode.VALIDATION_ERROR)
+        .hasMessageContaining("thiếu các cột bắt buộc");
   }
 
   @Test

@@ -23,7 +23,7 @@ class LocalImportFileStorageTest {
     String batchId = new ObjectId().toHexString();
     byte[] content = {'s', 't', 0, (byte) 0xC3, (byte) 0xA9};
 
-    String fileRef = storage.save(batchId, content);
+    String fileRef = storage.save(batchId, content, ".csv");
 
     assertThat(fileRef).isEqualTo(batchId + ".csv");
     assertThat(storage.load(fileRef)).containsExactly(content);
@@ -33,7 +33,7 @@ class LocalImportFileStorageTest {
   @DisplayName("US-21: xóa tệp, xóa lại tệp đã mất không lỗi, đọc tệp đã mất báo lỗi 500")
   void deleteIsIdempotentAndLoadOfMissingFails() {
     LocalImportFileStorage storage = new LocalImportFileStorage(tempDir.toString());
-    String fileRef = storage.save(new ObjectId().toHexString(), new byte[] {1});
+    String fileRef = storage.save(new ObjectId().toHexString(), new byte[] {1}, ".csv");
 
     storage.delete(fileRef);
     storage.delete(fileRef);
@@ -54,7 +54,7 @@ class LocalImportFileStorageTest {
       assertThatThrownBy(() -> storage.load(bad)).isInstanceOf(AppException.class);
       assertThatThrownBy(() -> storage.delete(bad)).isInstanceOf(AppException.class);
     }
-    assertThatThrownBy(() -> storage.save("../../evil", new byte[0]))
+    assertThatThrownBy(() -> storage.save("../../evil", new byte[0], ".csv"))
         .isInstanceOf(AppException.class);
   }
 
@@ -65,7 +65,25 @@ class LocalImportFileStorageTest {
     Path blocker = Files.writeString(tempDir.resolve("blocker"), "x");
     LocalImportFileStorage storage = new LocalImportFileStorage(blocker.toString());
 
-    assertThatThrownBy(() -> storage.save(new ObjectId().toHexString(), new byte[] {1}))
+    assertThatThrownBy(() -> storage.save(new ObjectId().toHexString(), new byte[] {1}, ".csv"))
+        .isInstanceOf(AppException.class);
+  }
+
+  @Test
+  @DisplayName(
+      "ADR 0015: lưu tệp .xlsx gốc nguyên byte, fileRef là <batchId>.xlsx; đuôi khác bị từ chối")
+  void xlsxIsStoredAsIs() {
+    LocalImportFileStorage storage = new LocalImportFileStorage(tempDir.toString());
+    String batchId = new ObjectId().toHexString();
+    byte[] content = {'P', 'K', 3, 4, 0, (byte) 0xFF};
+
+    String fileRef = storage.save(batchId, content, ".xlsx");
+
+    assertThat(fileRef).isEqualTo(batchId + ".xlsx");
+    assertThat(storage.load(fileRef)).containsExactly(content);
+    assertThatThrownBy(() -> storage.save(batchId, content, ".exe"))
+        .isInstanceOf(AppException.class);
+    assertThatThrownBy(() -> storage.save(batchId, content, "/../x.xlsx"))
         .isInstanceOf(AppException.class);
   }
 }
