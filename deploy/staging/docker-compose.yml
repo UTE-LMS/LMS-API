@@ -69,6 +69,7 @@ services:
       INITIAL_ADMIN_EMAIL: ${INITIAL_ADMIN_EMAIL:-}
       INITIAL_ADMIN_PASSWORD: ${INITIAL_ADMIN_PASSWORD:-}
       APP_CORS_ALLOWED_ORIGINS: ${APP_CORS_ALLOWED_ORIGINS:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       # Staging công khai: /actuator/health chỉ trả UP/DOWN, không kèm chi tiết thành phần (mẫu cấu hình đang để always).
       MANAGEMENT_ENDPOINT_HEALTH_SHOWDETAILS: never
       # Log JSON (ECS) một dòng một sự kiện, có correlationId, để công cụ gom log đọc được.

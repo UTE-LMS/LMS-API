@@ -1,6 +1,7 @@
 package com.hcmute.lms.lmsapi.controller;
 
 import com.hcmute.lms.lmsapi.dto.ChangePasswordRequest;
+import com.hcmute.lms.lmsapi.dto.GoogleLoginRequest;
 import com.hcmute.lms.lmsapi.dto.LoginRequest;
 import com.hcmute.lms.lmsapi.dto.LoginResponse;
 import com.hcmute.lms.lmsapi.dto.UpdateProfileRequest;
@@ -40,6 +41,17 @@ public class AuthController {
     log.info("Nhận yêu cầu đăng nhập cho username: {}", request.getUsername());
     LoginResponse response = authService.login(request, httpRequest);
     return ResponseEntity.ok(response);
+  }
+
+  /**
+   * Đăng nhập bằng Google (POST /api/v1/auth/google, ADR 0016). Endpoint công khai (permitAll); chỉ
+   * nhận tài khoản có sẵn khớp email Google đã xác minh.
+   */
+  @PostMapping("/google")
+  public ResponseEntity<LoginResponse> loginWithGoogle(
+      @Valid @RequestBody GoogleLoginRequest request, HttpServletRequest httpRequest) {
+    log.info("Nhận yêu cầu đăng nhập bằng Google");
+    return ResponseEntity.ok(authService.loginWithGoogle(request, httpRequest));
   }
 
   /** Đăng xuất hệ thống (POST /api/v1/auth/logout). Yêu cầu Bearer token hợp lệ. */

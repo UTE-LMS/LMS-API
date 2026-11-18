@@ -1,6 +1,7 @@
 package com.hcmute.lms.lmsapi.service;
 
 import com.hcmute.lms.lmsapi.dto.ChangePasswordRequest;
+import com.hcmute.lms.lmsapi.dto.GoogleLoginRequest;
 import com.hcmute.lms.lmsapi.dto.LoginRequest;
 import com.hcmute.lms.lmsapi.dto.LoginResponse;
 import com.hcmute.lms.lmsapi.dto.UpdateProfileRequest;
@@ -29,6 +30,17 @@ public interface AuthService {
    * @param userId ID định danh của người dùng
    */
   void logout(String userId);
+
+  /**
+   * Đăng nhập bằng Google (ADR 0016): xác minh ID token, tìm tài khoản có sẵn theo email đã được
+   * Google xác minh rồi cấp JWT của hệ thống. Không tự tạo tài khoản; cờ mustChangePassword giữ
+   * nguyên.
+   *
+   * @param request ID token Google
+   * @param httpRequest yêu cầu HTTP để trích xuất địa chỉ IP client cho nhật ký kiểm toán
+   * @return {@link LoginResponse} giống đăng nhập bằng mật khẩu
+   */
+  LoginResponse loginWithGoogle(GoogleLoginRequest request, HttpServletRequest httpRequest);
 
   /**
    * Người dùng tự đổi mật khẩu: kiểm tra mật khẩu hiện tại, lưu hash mới, tắt cờ

@@ -37,6 +37,10 @@ app.security.jwt.secret=${JWT_SECRET:0123456789012345678901234567890123456789012
 app.security.jwt.ttl=60m
 app.security.jwt.issuer=lms-api
 
+# Đăng nhập bằng Google (ADR 0016). Client ID là giá trị công khai, lấy từ Google Cloud Console
+# (OAuth client loại Web). Để trống = tắt đăng nhập Google. Không cần client secret.
+app.security.google.client-id=${GOOGLE_CLIENT_ID:}
+
 # ==============================================================================
 # KHỞI TẠO TÀI KHOẢN ADMIN BAN ĐẦU (F01 / ADR 0003)
 # Đọc khi collection users rỗng. Mật khẩu 8-72 bytes UTF-8. KHÔNG commit mật khẩu thật.

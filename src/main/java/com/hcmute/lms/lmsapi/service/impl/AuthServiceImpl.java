@@ -4,6 +4,7 @@ import com.hcmute.lms.lmsapi.config.JwtConfig;
 import com.hcmute.lms.lmsapi.document.AuditEntity;
 import com.hcmute.lms.lmsapi.document.User;
 import com.hcmute.lms.lmsapi.dto.ChangePasswordRequest;
+import com.hcmute.lms.lmsapi.dto.GoogleLoginRequest;
 import com.hcmute.lms.lmsapi.dto.LoginRequest;
 import com.hcmute.lms.lmsapi.dto.LoginResponse;
 import com.hcmute.lms.lmsapi.dto.UpdateProfileRequest;
@@ -15,6 +16,7 @@ import com.hcmute.lms.lmsapi.exception.BusinessRuleViolationException;
 import com.hcmute.lms.lmsapi.repository.UserRepository;
 import com.hcmute.lms.lmsapi.service.AuditService;
 import com.hcmute.lms.lmsapi.service.AuthService;
+import com.hcmute.lms.lmsapi.service.GoogleIdTokenVerifier;
 import com.hcmute.lms.lmsapi.util.StringNormalizationUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Duration;
@@ -52,6 +54,7 @@ public class AuthServiceImpl implements AuthService {
   private final JwtEncoder jwtEncoder;
   private final JwtConfig jwtConfig;
   private final AuditService auditService;
+  private final GoogleIdTokenVerifier googleVerifier;
 
   @Override
   public LoginResponse login(LoginRequest request, HttpServletRequest httpRequest) {
@@ -92,6 +95,46 @@ public class AuthServiceImpl implements AuthService {
     log.info("Người dùng '{}' (id={}) đăng nhập thành công", user.getUsername(), user.getId());
 
     // 5. Sinh JWT và trả về LoginResponse (kèm cờ mustChangePassword trong user)
+    return issueLoginResponse(user);
+  }
+
+  @Override
+  public LoginResponse loginWithGoogle(GoogleLoginRequest request, HttpServletRequest httpRequest) {
+    // 1. Google xác nhận danh tính (chữ ký, hạn, nơi phát hành, đúng ứng dụng, email đã xác minh)
+    GoogleIdTokenVerifier.GoogleIdentity identity = googleVerifier.verify(request.getIdToken());
+    String email = StringNormalizationUtils.normalizeEmail(identity.email());
+
+    // 2. Chỉ cho vào khi email khớp một tài khoản Admin đã tạo sẵn; không tự tạo tài khoản mới
+    User user =
+        userRepository
+            .findByEmail(email)
+            .orElseThrow(
+                () -> {
+                  log.warn("Đăng nhập Google thất bại: email '{}' chưa có tài khoản", email);
+                  return new BadCredentialsException(
+                      "Email Google này chưa được cấp tài khoản. Hãy liên hệ quản trị viên");
+                });
+
+    if (user.getStatus() != UserStatus.ACTIVE) {
+      log.warn(
+          "Đăng nhập Google thất bại: tài khoản '{}' đang ở trạng thái {}",
+          email,
+          user.getStatus());
+      throw new BadCredentialsException("Tài khoản đang bị khóa. Hãy liên hệ quản trị viên");
+    }
+
+    AuditEntity auditEntity = AuditEntity.builder().collection("users").id(user.getId()).build();
+    auditService.record(
+        AuditAction.LOGIN,
+        auditEntity,
+        null,
+        null,
+        "Đăng nhập bằng Google",
+        user.getId(),
+        resolveClientIp(httpRequest));
+    log.info("Người dùng '{}' (id={}) đăng nhập bằng Google", user.getUsername(), user.getId());
+
+    // 3. Cấp JWT của hệ thống; mustChangePassword nằm trong user và vẫn được filter áp dụng
     return issueLoginResponse(user);
   }
 

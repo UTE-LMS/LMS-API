@@ -561,3 +561,22 @@ Phần này chuẩn bị sẵn câu trả lời khoa học, chuẩn mực cho 4 
 - **Rủi ro còn lại:** POI nạp cả tệp vào bộ nhớ (giới hạn 20.000 dòng, 200 cột, giới hạn upload Spring); ô phần trăm/ngày lấy đúng như hiển thị; chỉ đọc trang tính đầu tiên.
 - **Sinh viên đã sửa/rà soát:** _chờ sinh viên rà soát_
 - **Commit / PR:** một commit `feat(import): accept .xlsx files in every import` trên nhánh `feat/xlsx-import`, PR vào `main` (xem `git log`).
+
+
+---
+
+## Phiên #42 — 2026-11-18: Đăng nhập bằng Google (ADR 0016)
+
+- **Sinh viên yêu cầu:** TinMH (theo `git config user.name`)
+- **Công cụ / mô hình:** Claude Code, Claude Sonnet 5.5
+- **Mục tiêu:** bước 4 trong thứ tự đã thống nhất (đổi mật khẩu lần đầu → profile → xlsx → OAuth2). Sinh viên chọn qua câu hỏi: **chỉ khớp email có sẵn** (không tự tạo tài khoản); **giữ cờ `mustChangePassword`**; luồng **UI lấy ID token, API xác minh**.
+- **Nhánh:** `feat/google-login` (từ `main`).
+- **Không thêm dependency:** dùng `NimbusJwtDecoder` đã có trong `spring-boot-starter-oauth2-resource-server` để kiểm tra ID token bằng JWKS của Google. Không cần client secret.
+- **Thiết kế cần sinh viên nắm:** `POST /api/v1/auth/google {idToken}` (công khai) → `GoogleIdTokenVerifierImpl` kiểm tra chữ ký RS256, hạn, `iss` (`https://accounts.google.com` hoặc `accounts.google.com`), `aud` = `GOOGLE_CLIENT_ID`, có `email` và `email_verified` → `AuthServiceImpl.loginWithGoogle` chuẩn hóa email, tìm user, từ chối nếu không có/bị khóa, ghi audit `LOGIN`, cấp JWT hệ thống bằng chính `issueLoginResponse` của đăng nhập mật khẩu. `GOOGLE_CLIENT_ID` rỗng = tắt (422 "chưa được cấu hình"). Verifier là interface nên service kiểm thử không gọi Google.
+- **File AI sinh/sửa:** mới `service/GoogleIdTokenVerifier`, `service/impl/GoogleIdTokenVerifierImpl`, `dto/GoogleLoginRequest`, `doc/adr/0016-dang-nhap-google.md`; sửa `AuthService`, `AuthServiceImpl`, `AuthController`, `SecurityConfig` (permitAll cho `/auth/google` ở cả filter chain và bộ giải quyết Bearer), `application.properties(.example)`, `deploy/staging/{docker-compose.yml,.env.example}`, `doc/deploy/staging.md`. Test mới: `GoogleIdTokenVerifierImplTest` (11, token ký bằng khóa RSA sinh trong test), `AuthServiceGoogleLoginTest` (6).
+- **Kiểm chứng đã làm:** `spotless:check` đạt; chạy 77 lớp test không dùng `@SpringBootTest`: 731 test, 0 lỗi logic, 206 lỗi đều là lớp cần Spring context/MongoDB (giống trước). **Chưa chạy** integration test nên chưa kiểm chứng bean `GoogleIdTokenVerifierImpl` khởi tạo được trong context thật và `permitAll` của `/auth/google` qua HTTP. **Chưa thử với ID token thật của Google** (chưa có OAuth client ID; không có mạng/credential để thử).
+- **Rủi ro còn lại:** (1) Người chỉ đăng nhập Google vẫn phải biết mật khẩu ban đầu để qua bước đổi mật khẩu lần đầu (quyết định 4 của ADR). (2) Email trong hệ thống phải trùng email Google. (3) API cần ra Internet để lấy khóa công khai của Google.
+- **Lỗi/ảo giác AI tự phát hiện:** lúc đầu dùng `jwt.getIssuer()` (kiểu URL) để so `iss`; Google có khi gửi `accounts.google.com` (không phải URL hợp lệ) nên đổi sang `getClaimAsString("iss")` và thêm test cho dạng này. Phát hiện khi đọc lại đặc tả `iss`, trước khi chạy test.
+- **Lỗi CI sau khi mở PR #99:** SpotBugs (job Lint và Test) báo "Possible null pointer dereference" ở bộ kiểm tra `aud`; đọc lại thấy cả bộ kiểm tra `iss` cũng có lỗi thật: `List.of(...).contains(null)` ném NullPointerException nên token thiếu `iss`/`aud` sẽ thành lỗi 500 thay vì 401. Đã sửa (kiểm tra null trước) và thêm test `missingIssuerOrAudience`. Nguyên nhân: không chạy `spotbugs:check` cục bộ trước khi mở PR (chỉ chạy `spotless:check` và test). Từ nay chạy đúng lệnh lint của CI (`test-compile spotless:check spotbugs:check pmd:cpd-check`).
+- **Sinh viên đã sửa/rà soát:** _chờ sinh viên rà soát_
+- **Commit / PR:** một commit `feat(auth): add Google sign-in with ID token` trên nhánh `feat/google-login`, PR vào `main` (xem `git log`).

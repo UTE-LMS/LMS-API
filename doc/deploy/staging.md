@@ -116,6 +116,7 @@ không để staging chạy bản cũ mà không biết.
 | `JWT_SECRET` | có (compose báo lỗi nếu thiếu) | không | ≥ 32 byte. Nếu không đặt, ứng dụng dùng khóa công khai trong `application.properties.example`: **không được để vậy ở staging** |
 | `MONGODB_URI` | không | `mongodb://mongo:27017/learning_outcomes?replicaSet=rs0` (compose) | phải có `replicaSet=rs0` cho transaction |
 | `INITIAL_ADMIN_USERNAME`, `INITIAL_ADMIN_EMAIL`, `INITIAL_ADMIN_PASSWORD` | không | rỗng | chỉ dùng khi collection `users` rỗng. Phải *tồn tại* (có thể rỗng): nếu không có biến nào, Spring báo `Circular placeholder reference` và ứng dụng không khởi động. Image đặt sẵn rỗng |
+| `GOOGLE_CLIENT_ID` | không | rỗng (tắt đăng nhập Google) | OAuth client ID loại Web (`<số>-<chuỗi>.apps.googleusercontent.com`), giá trị công khai. Phải trùng `GOOGLE_CLIENT_ID` của frontend. Xem ADR 0016. Không cần client secret |
 | `APP_CORS_ALLOWED_ORIGINS` | không | rỗng (không origin nào) | origin của frontend, phân tách bằng dấu phẩy; khóa `app.cors.allowed-origins` có trong mã (`SecurityConfig`) nhưng chưa có trong file mẫu. Đã kiểm chứng đặt/không đặt |
 | `MANAGEMENT_ENDPOINT_HEALTH_SHOWDETAILS` | không | `never` (compose) | mẫu cấu hình là `always` |
 | `LOGGING_STRUCTURED_FORMAT_CONSOLE` | không | `ecs` (compose) | `ecs`, `logstash`, `gelf` hoặc rỗng |
