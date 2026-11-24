@@ -358,9 +358,9 @@ public class FacultyServiceImpl implements FacultyService {
   public AssessmentScoreTemplate generateTemplateCsv() {
     String csv =
         "\uFEFF"
-            + "code,name,description,isActive\r\n"
-            + "FIT,Khoa Công nghệ Thông tin,Đào tạo ngành CNTT và Kỹ thuật phần mềm,true\r\n"
-            + "FE,Khoa Kinh tế,Đào tạo ngành Công nghệ Tài chính và Quản trị,true\r\n";
+            + "code,name,description\r\n"
+            + "FIT,Khoa Công nghệ Thông tin,Đào tạo ngành CNTT và Kỹ thuật phần mềm\r\n"
+            + "FE,Khoa Kinh tế,Đào tạo ngành Công nghệ Tài chính và Quản trị\r\n";
     return new AssessmentScoreTemplate(
         "faculties-template.csv", csv.getBytes(StandardCharsets.UTF_8));
   }
@@ -382,7 +382,6 @@ public class FacultyServiceImpl implements FacultyService {
       String rawCode = CsvTextParser.cell(parsed.headerIndex(), row, "code");
       String name = CsvTextParser.cell(parsed.headerIndex(), row, "name");
       String description = CsvTextParser.cell(parsed.headerIndex(), row, "description");
-      String activeStr = CsvTextParser.cell(parsed.headerIndex(), row, "isActive");
 
       if (rawCode.isEmpty()) {
         errors.add(new CsvImportResultResponse.RowError(rowNum, "", "Mã khoa không được để trống"));
@@ -393,16 +392,6 @@ public class FacultyServiceImpl implements FacultyService {
         errors.add(
             new CsvImportResultResponse.RowError(rowNum, code, "Tên khoa không được để trống"));
         continue;
-      }
-      boolean isActive = true;
-      if (!activeStr.isEmpty()) {
-        if (!"true".equalsIgnoreCase(activeStr) && !"false".equalsIgnoreCase(activeStr)) {
-          errors.add(
-              new CsvImportResultResponse.RowError(
-                  rowNum, code, "isActive chỉ chấp nhận true hoặc false"));
-          continue;
-        }
-        isActive = Boolean.parseBoolean(activeStr);
       }
 
       if (!seenCodes.add(code) || facultyRepository.existsByCode(code)) {
@@ -422,7 +411,7 @@ public class FacultyServiceImpl implements FacultyService {
               .code(code)
               .name(name)
               .description(description.isEmpty() ? null : description)
-              .isActive(isActive)
+              .isActive(true)
               .createdAt(now)
               .updatedAt(now)
               .build();

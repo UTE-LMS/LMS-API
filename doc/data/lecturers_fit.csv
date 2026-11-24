@@ -1,7 +1,7 @@
-username,email,password,fullName,roles,facultyCode,status
-gv_fit_01,gv.fit01@hcmute.edu.vn,Hcmute@2026,TS. Nguyễn Minh Tuấn,LECTURER,FIT,ACTIVE
-gv_fit_02,gv.fit02@hcmute.edu.vn,Hcmute@2026,ThS. Trần Hoàng Nam,LECTURER,FIT,ACTIVE
-gv_fit_03,gv.fit03@hcmute.edu.vn,Hcmute@2026,TS. Lê Thị Thu Hà,LECTURER,FIT,ACTIVE
-gv_fit_04,gv.fit04@hcmute.edu.vn,Hcmute@2026,ThS. Phạm Quốc Bảo,LECTURER,FIT,ACTIVE
-gv_fit_05,gv.fit05@hcmute.edu.vn,Hcmute@2026,ThS. Võ Ngọc Anh,LECTURER,FIT,ACTIVE
-gv_fit_06,gv.fit06@hcmute.edu.vn,Hcmute@2026,TS. Huỳnh Thanh Phong,LECTURER,FIT,ACTIVE
+username,email,password,fullName,roles,facultyCode
+gv_fit_01,gv.fit01@hcmute.edu.vn,Hcmute@2026,TS. Nguyễn Minh Tuấn,LECTURER,FIT
+gv_fit_02,gv.fit02@hcmute.edu.vn,Hcmute@2026,ThS. Trần Hoàng Nam,LECTURER,FIT
+gv_fit_03,gv.fit03@hcmute.edu.vn,Hcmute@2026,TS. Lê Thị Thu Hà,LECTURER,FIT
+gv_fit_04,gv.fit04@hcmute.edu.vn,Hcmute@2026,ThS. Phạm Quốc Bảo,LECTURER,FIT
+gv_fit_05,gv.fit05@hcmute.edu.vn,Hcmute@2026,ThS. Võ Ngọc Anh,LECTURER,FIT
+gv_fit_06,gv.fit06@hcmute.edu.vn,Hcmute@2026,TS. Huỳnh Thanh Phong,LECTURER,FIT

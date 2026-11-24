@@ -5,11 +5,15 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.hcmute.lms.lmsapi.document.Faculty;
 import com.hcmute.lms.lmsapi.document.User;
+import com.hcmute.lms.lmsapi.dto.AssessmentScoreTemplate;
 import com.hcmute.lms.lmsapi.dto.CreateUserRequest;
+import com.hcmute.lms.lmsapi.dto.CsvImportResultResponse;
 import com.hcmute.lms.lmsapi.dto.PageResponse;
 import com.hcmute.lms.lmsapi.dto.UpdateUserRequest;
 import com.hcmute.lms.lmsapi.dto.UpdateUserStatusRequest;
@@ -21,8 +25,10 @@ import com.hcmute.lms.lmsapi.exception.BusinessRuleViolationException;
 import com.hcmute.lms.lmsapi.exception.ErrorCode;
 import com.hcmute.lms.lmsapi.exception.ResourceNotFoundException;
 import com.hcmute.lms.lmsapi.mapper.UserMapper;
+import com.hcmute.lms.lmsapi.repository.FacultyRepository;
 import com.hcmute.lms.lmsapi.repository.UserRepository;
 import com.hcmute.lms.lmsapi.validator.PasswordPolicyValidator;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -32,12 +38,14 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 @ExtendWith(MockitoExtension.class)
@@ -45,6 +53,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 class UserServiceImplTest {
 
   @Mock private UserRepository userRepository;
+
+  @Mock private FacultyRepository facultyRepository;
 
   @Mock private UserMapper userMapper;
 
@@ -65,7 +75,11 @@ class UserServiceImplTest {
   void setUp() {
     userService =
         new UserServiceImpl(
-            userRepository, null, userMapper, passwordEncoder, passwordPolicyValidator);
+            userRepository,
+            facultyRepository,
+            userMapper,
+            passwordEncoder,
+            passwordPolicyValidator);
 
     sampleTargetUser =
         User.builder()
@@ -435,6 +449,80 @@ class UserServiceImplTest {
       assertThat(sampleTargetUser.getStatus()).isEqualTo(UserStatus.ACTIVE);
       assertThat(sampleTargetUser.getTokenVersion()).isEqualTo(3L); // tokenVersion remains 3L
       verify(userRepository, never()).incrementTokenVersion(anyString());
+    }
+  }
+
+  @Nested
+  @DisplayName("Import Users Tests (GET /import-template, POST /import)")
+  class ImportUsersTests {
+
+    @Test
+    @DisplayName("generateTemplateCsv should omit status column")
+    void shouldGenerateTemplateWithoutStatusColumn() {
+      AssessmentScoreTemplate template = userService.generateTemplateCsv();
+
+      assertThat(template.fileName()).isEqualTo("users-template.csv");
+      String content = new String(template.content(), StandardCharsets.UTF_8);
+      assertThat(content)
+          .startsWith("\uFEFFusername,email,password,fullName,roles,facultyCode\r\n");
+      assertThat(content).doesNotContain("status");
+      assertThat(content).doesNotContain("ACTIVE");
+    }
+
+    @Test
+    @DisplayName("importUsers without status column should save users as ACTIVE")
+    void shouldImportUsersWithDefaultActiveStatus() {
+      Faculty fit =
+          Faculty.builder().id("671dcba5f123456789abcd10").code("FIT").isActive(true).build();
+      when(facultyRepository.findByCode("FIT")).thenReturn(Optional.of(fit));
+
+      List<User> saved =
+          importValidUsers(
+              "username,email,password,fullName,roles,facultyCode\n"
+                  + "pm_fit,pm_fit@hcmute.edu.vn,Password123!,PM FIT,PROGRAM_MANAGER,FIT\n"
+                  + "gv_an,gv_an@hcmute.edu.vn,Password123!,GV An,LECTURER;QA,\n");
+
+      assertThat(saved)
+          .allSatisfy(
+              u -> {
+                assertThat(u.getStatus()).isEqualTo(UserStatus.ACTIVE);
+                assertThat(u.isMustChangePassword()).isTrue();
+                assertThat(u.getTokenVersion()).isZero();
+              });
+      assertThat(saved.get(0).getFacultyId()).isEqualTo(fit.getId());
+      assertThat(saved.get(1).getFacultyId()).isNull();
+    }
+
+    @Test
+    @DisplayName("importUsers should ignore legacy status column and always create ACTIVE users")
+    void shouldIgnoreLegacyStatusColumnAndForceActive() {
+      List<User> saved =
+          importValidUsers(
+              "username,email,password,fullName,roles,facultyCode,status\n"
+                  + "user_locked,locked@hcmute.edu.vn,Password123!,User Locked,LECTURER,,LOCKED\n"
+                  + "user_invalid,invalid@hcmute.edu.vn,Password123!,User Invalid,QA,,INVALID_STATUS\n");
+
+      assertThat(saved).extracting(User::getStatus).containsOnly(UserStatus.ACTIVE);
+    }
+
+    private List<User> importValidUsers(String csv) {
+      when(userRepository.existsByUsername(anyString())).thenReturn(false);
+      when(userRepository.existsByEmail(anyString())).thenReturn(false);
+      when(passwordEncoder.encode(anyString())).thenReturn("hashed_pw");
+      when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+      MockMultipartFile file =
+          new MockMultipartFile(
+              "file", "users.csv", "text/csv", csv.getBytes(StandardCharsets.UTF_8));
+      CsvImportResultResponse result = userService.importUsers(file);
+
+      assertThat(result.getTotalRows()).isEqualTo(2);
+      assertThat(result.getSuccessCount()).isEqualTo(2);
+      assertThat(result.getFailureCount()).isZero();
+
+      ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+      verify(userRepository, times(2)).save(captor.capture());
+      return captor.getAllValues();
     }
   }
 }
