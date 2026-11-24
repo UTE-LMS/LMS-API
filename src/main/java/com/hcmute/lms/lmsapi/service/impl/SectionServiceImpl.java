@@ -12,6 +12,7 @@ import com.hcmute.lms.lmsapi.dto.SectionResponse;
 import com.hcmute.lms.lmsapi.dto.SectionStatusUpdateRequest;
 import com.hcmute.lms.lmsapi.dto.SectionUpdateRequest;
 import com.hcmute.lms.lmsapi.dto.UserPrincipal;
+import com.hcmute.lms.lmsapi.dto.UserResponse;
 import com.hcmute.lms.lmsapi.enums.AccessType;
 import com.hcmute.lms.lmsapi.enums.AuditAction;
 import com.hcmute.lms.lmsapi.enums.Role;
@@ -24,6 +25,7 @@ import com.hcmute.lms.lmsapi.exception.BusinessRuleViolationException;
 import com.hcmute.lms.lmsapi.exception.ErrorCode;
 import com.hcmute.lms.lmsapi.exception.ResourceNotFoundException;
 import com.hcmute.lms.lmsapi.mapper.SectionMapper;
+import com.hcmute.lms.lmsapi.mapper.UserMapper;
 import com.hcmute.lms.lmsapi.repository.CourseRepository;
 import com.hcmute.lms.lmsapi.repository.CourseSectionRepository;
 import com.hcmute.lms.lmsapi.repository.SyllabusRepository;
@@ -42,6 +44,7 @@ import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -65,6 +68,7 @@ public class SectionServiceImpl implements SectionService {
   private final UserRepository userRepository;
   private final ScopeAuthorizationService scopeAuthorizationService;
   private final SectionMapper sectionMapper;
+  private final UserMapper userMapper;
 
   @Autowired(required = false)
   private AuditService auditService;
@@ -97,6 +101,24 @@ public class SectionServiceImpl implements SectionService {
             .sorted(Comparator.comparing(CourseSection::getCode))
             .toList();
     return sectionMapper.toResponseList(visible);
+  }
+
+  @Override
+  public List<UserResponse> getActiveLecturers(String facultyId) {
+    String cleanFacultyId = normalizeFilter(facultyId, "facultyId");
+    List<User> lecturers =
+        userRepository.findByRolesContainingAndStatus(Role.LECTURER, UserStatus.ACTIVE);
+    return userMapper.toResponseList(
+        lecturers.stream()
+            .filter(u -> cleanFacultyId == null || Objects.equals(u.getFacultyId(), cleanFacultyId))
+            .sorted(
+                Comparator.comparing(
+                        (User u) -> u.getFullName() != null ? u.getFullName() : "",
+                        String.CASE_INSENSITIVE_ORDER)
+                    .thenComparing(
+                        u -> u.getUsername() != null ? u.getUsername() : "",
+                        String.CASE_INSENSITIVE_ORDER))
+            .toList());
   }
 
   @Override

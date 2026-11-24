@@ -452,4 +452,54 @@ class SectionIntegrationTest extends IntegrationTestBase {
         .andExpect(jsonPath("$.successCount").value(1))
         .andExpect(jsonPath("$.failureCount").value(1));
   }
+
+  @Test
+  @DisplayName(
+      "GET /api/v1/sections/lecturers: ADMIN và PM tra cứu được GV ACTIVE; LECTURER bị 403")
+  void getActiveLecturers_authorizedAndFiltered() throws Exception {
+    User lockedLecturer = fixtures.user(Role.LECTURER);
+    lockedLecturer.setStatus(com.hcmute.lms.lmsapi.enums.UserStatus.LOCKED);
+    lockedLecturer = mongo().save(lockedLecturer);
+
+    User facultyLecturer = fixtures.user(Role.LECTURER);
+    facultyLecturer.setFacultyId(program.getFacultyId());
+    facultyLecturer = mongo().save(facultyLecturer);
+
+    mockMvc
+        .perform(
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(
+                "/api/v1/sections/lecturers"))
+        .andExpect(status().isUnauthorized());
+
+    mockMvc
+        .perform(getAs(lecturerAToken, "/api/v1/sections/lecturers"))
+        .andExpect(status().isForbidden());
+
+    mockMvc
+        .perform(getAs(adminToken, "/api/v1/sections/lecturers"))
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath(
+                "$[*].id",
+                org.hamcrest.Matchers.hasItems(
+                    lecturerA.getId(), lecturerB.getId(), facultyLecturer.getId())))
+        .andExpect(
+            jsonPath(
+                "$[*].id",
+                org.hamcrest.Matchers.not(org.hamcrest.Matchers.hasItem(lockedLecturer.getId()))));
+
+    mockMvc
+        .perform(
+            getAs(pmInScopeToken, "/api/v1/sections/lecturers?facultyId=" + program.getFacultyId()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[*].id", org.hamcrest.Matchers.hasItem(facultyLecturer.getId())))
+        .andExpect(
+            jsonPath(
+                "$[*].id",
+                org.hamcrest.Matchers.not(org.hamcrest.Matchers.hasItem(lecturerA.getId()))));
+
+    mockMvc
+        .perform(getAs(pmInScopeToken, "/api/v1/sections/lecturers?facultyId=invalid-id"))
+        .andExpect(status().isBadRequest());
+  }
 }

@@ -15,6 +15,7 @@ import com.hcmute.lms.lmsapi.dto.SectionRequest;
 import com.hcmute.lms.lmsapi.dto.SectionResponse;
 import com.hcmute.lms.lmsapi.dto.SectionStatusUpdateRequest;
 import com.hcmute.lms.lmsapi.dto.UserPrincipal;
+import com.hcmute.lms.lmsapi.dto.UserResponse;
 import com.hcmute.lms.lmsapi.enums.AccessType;
 import com.hcmute.lms.lmsapi.enums.Role;
 import com.hcmute.lms.lmsapi.enums.SectionStatus;
@@ -26,6 +27,7 @@ import com.hcmute.lms.lmsapi.exception.BusinessRuleViolationException;
 import com.hcmute.lms.lmsapi.exception.ErrorCode;
 import com.hcmute.lms.lmsapi.exception.ResourceNotFoundException;
 import com.hcmute.lms.lmsapi.mapper.impl.SectionMapperImpl;
+import com.hcmute.lms.lmsapi.mapper.impl.UserMapperImpl;
 import com.hcmute.lms.lmsapi.repository.CourseRepository;
 import com.hcmute.lms.lmsapi.repository.CourseSectionRepository;
 import com.hcmute.lms.lmsapi.repository.SyllabusRepository;
@@ -71,7 +73,8 @@ class SectionServiceImplTest {
             termRepository,
             userRepository,
             scopeAuthorizationService,
-            new SectionMapperImpl());
+            new SectionMapperImpl(),
+            new UserMapperImpl());
   }
 
   private SectionRequest request() {
@@ -343,6 +346,46 @@ class SectionServiceImplTest {
     assertThatThrownBy(() -> service.getSection(SECTION_ID))
         .isInstanceOf(ResourceNotFoundException.class);
     assertThatThrownBy(() -> service.getSection("bad"))
+        .isInstanceOfSatisfying(
+            AppException.class,
+            ex -> assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.VALIDATION_ERROR));
+  }
+
+  @Test
+  @DisplayName("getActiveLecturers: sắp xếp theo tên, lọc theo facultyId, ID sai -> 400")
+  void getActiveLecturers_sortedFilteredAndValidated() {
+    String facultyA = "671dcba5f123456789abc601";
+    String facultyB = "671dcba5f123456789abc602";
+    User zed =
+        User.builder()
+            .id("671dcba5f123456789abc402")
+            .username("gv_zed")
+            .fullName("Zed Lecturer")
+            .facultyId(facultyB)
+            .status(UserStatus.ACTIVE)
+            .roles(List.of(Role.LECTURER))
+            .build();
+    User an =
+        User.builder()
+            .id(LECTURER_ID)
+            .username("gv_an")
+            .fullName("An Lecturer")
+            .facultyId(facultyA)
+            .status(UserStatus.ACTIVE)
+            .roles(List.of(Role.LECTURER))
+            .build();
+    when(userRepository.findByRolesContainingAndStatus(Role.LECTURER, UserStatus.ACTIVE))
+        .thenReturn(List.of(zed, an));
+
+    assertThat(service.getActiveLecturers(null))
+        .extracting(UserResponse::getUsername)
+        .containsExactly("gv_an", "gv_zed");
+
+    assertThat(service.getActiveLecturers(facultyA))
+        .extracting(UserResponse::getUsername)
+        .containsExactly("gv_an");
+
+    assertThatThrownBy(() -> service.getActiveLecturers("bad-faculty-id"))
         .isInstanceOfSatisfying(
             AppException.class,
             ex -> assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.VALIDATION_ERROR));

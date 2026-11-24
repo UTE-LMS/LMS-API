@@ -7,6 +7,7 @@ import com.hcmute.lms.lmsapi.dto.SectionResponse;
 import com.hcmute.lms.lmsapi.dto.SectionStatusUpdateRequest;
 import com.hcmute.lms.lmsapi.dto.SectionUpdateRequest;
 import com.hcmute.lms.lmsapi.dto.UserPrincipal;
+import com.hcmute.lms.lmsapi.dto.UserResponse;
 import java.util.List;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -21,6 +22,14 @@ public interface SectionService {
    * @param courseId lọc theo học phần (null: không lọc)
    */
   List<SectionResponse> getSections(UserPrincipal principal, String termId, String courseId);
+
+  /**
+   * Liệt kê giảng viên đang hoạt động ({@code Role.LECTURER}, {@code UserStatus.ACTIVE}), có thể
+   * lọc theo Khoa.
+   *
+   * @param facultyId lọc theo Khoa (null: lấy tất cả giảng viên đang hoạt động)
+   */
+  List<UserResponse> getActiveLecturers(String facultyId);
 
   SectionResponse getSection(String id);
 

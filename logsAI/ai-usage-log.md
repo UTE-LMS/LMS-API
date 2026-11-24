@@ -620,3 +620,22 @@ Phần này chuẩn bị sẵn câu trả lời khoa học, chuẩn mực cho 4 
 - **Lỗi/ảo giác AI tự phát hiện:** (1) Dùng nhầm `existsDirectory()` / `existsRegularFile()` thay vì `isDirectory()` / `isRegularFile()` của AssertJ `AbstractPathAssert`, được `testCompile` phát hiện và sửa ngay. (2) SpotBugs báo 2 cảnh báo `NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE` cho `Path.getFileName().toString()`; đã đổi sang `String.valueOf(path.getFileName())` để đạt 0 bug SpotBugs.
 - **Sinh viên đã sửa/rà soát:** _chờ sinh viên rà soát_
 - **Commit / PR:** nhánh `feat/import-default-active-and-xlsx-data` (PR vào `main`, xem `git log`).
+
+---
+
+## Phiên #45 — 2026-11-24: Bổ sung endpoint `GET /api/v1/sections/lecturers` tra cứu giảng viên mở lớp học phần
+
+- **Sinh viên yêu cầu:** minhat5 (theo `git config user.name`)
+- **Công cụ / mô hình:** Antigravity, Gemini 4 Neon (High)
+- **Mục tiêu:** thay thế endpoint cũ `GET /api/v1/departments/lecturers` (đã xóa khi bỏ `DEPARTMENT_HEAD` theo ADR 0014) bằng `GET /api/v1/sections/lecturers` (tùy chọn `?facultyId=...`) để `ADMIN` và `PROGRAM_MANAGER` lấy danh sách giảng viên đang hoạt động (`Role.LECTURER`, `UserStatus.ACTIVE`) khi tạo/sửa lớp học phần mà vẫn giữ `/api/v1/users/**` độc quyền cho `ADMIN`.
+- **File AI sinh/sửa:**
+  - `src/main/java/com/hcmute/lms/lmsapi/service/SectionService.java` (`getActiveLecturers`)
+  - `src/main/java/com/hcmute/lms/lmsapi/service/impl/SectionServiceImpl.java` (`getActiveLecturers`, lọc theo `facultyId`, sắp xếp theo `fullName`/`username`)
+  - `src/main/java/com/hcmute/lms/lmsapi/controller/SectionController.java` (`GET /api/v1/sections/lecturers`)
+  - `src/test/java/com/hcmute/lms/lmsapi/service/impl/SectionServiceImplTest.java`
+  - `src/test/java/com/hcmute/lms/lmsapi/controller/SectionIntegrationTest.java`
+  - `logsAI/ai-usage-log.md`
+- **Kiểm chứng đã làm:**
+  - `.\mvnw.cmd spotless:apply test-compile spotless:check spotbugs:check pmd:cpd-check test "-Dtest=SectionServiceImplTest,SectionIntegrationTest"`: `BUILD SUCCESS`, 0 lỗi Spotless / SpotBugs / PMD-CPD, 28/28 test đạt (`SectionIntegrationTest` 15/15 trên MongoDB replica set `localhost:27018`, `SectionServiceImplTest` 13/13).
+- **Sinh viên đã sửa/rà soát:** _chờ sinh viên rà soát_
+- **Commit / PR:** nhánh `feat/section-active-lecturers-endpoint` (PR vào `main`, xem `git log`; lưu ý đổi URL trong `LMS-UI` `list-sections.component.ts` từ `/api/v1/departments/lecturers` sang `/api/v1/sections/lecturers`).
