@@ -4,8 +4,8 @@
 - **Tên đề tài:** Xây dựng Hệ thống Website Quản lý học tập tích hợp đo lường chuẩn đầu ra
 - **Giảng viên hướng dẫn:** Nguyễn Minh Đạo
 - **Nhóm sinh viên thực hiện:**
-  1. Nguyễn Nhật Minh - MSSV: 23110265 - Đóng góp: 100%
-  2. Mai Hồng Tín - MSSV: 23110342 - Đóng góp: 100%
+  1. Nguyễn Nhật Minh - MSSV: 23110265 - Đóng góp: 50%
+  2. Mai Hồng Tín - MSSV: 23110342 - Đóng góp: 50%
 - **Công nghệ cốt lõi:** Backend Java 25 / Spring Boot 4.1.2 + MongoDB Replica Set; Frontend Angular + TypeScript.
 
 ## 2. Danh sách chức năng cốt lõi cam kết hoàn thành
@@ -25,8 +25,8 @@
   - **Immutable Guard:** Chặn đổi tên Khoa, thông tin gốc CTĐT (`code`, `name`, `level`, `degree`), hoặc tên và tín chỉ Học phần khi đã nằm trong phiên bản CTĐT `ACTIVE` hoặc `ARCHIVED`; chặn xóa hoặc khóa khi còn đang được sử dụng.
 
 - [x] **Chức năng 3: Import dữ liệu hàng loạt qua Excel (`.xlsx`, kèm tệp mẫu)**
-  - **Import Khoa (`ADMIN`):** `GET /api/v1/faculties/import-template`, `POST /api/v1/faculties/import` (`code,name,description,isActive`), kiểm tra trùng mã và tên theo từng dòng.
-  - **Import Người dùng (`ADMIN`):** `GET /api/v1/users/import-template`, `POST /api/v1/users/import` (`username,email,password,fullName,roles,facultyCode,status`), hỗ trợ nhiều role ngăn cách bằng `;` hoặc `|`, ánh xạ `facultyCode` và băm BCrypt.
+  - **Import Khoa (`ADMIN`):** `GET /api/v1/faculties/import-template`, `POST /api/v1/faculties/import` (`code,name,description`, mặc định `isActive = true`), kiểm tra trùng mã và tên theo từng dòng.
+  - **Import Người dùng (`ADMIN`):** `GET /api/v1/users/import-template`, `POST /api/v1/users/import` (`username,email,password,fullName,roles,facultyCode`, mặc định `status = ACTIVE`), hỗ trợ nhiều role ngăn cách bằng `;` hoặc `|`, ánh xạ `facultyCode` và băm BCrypt.
   - **Import Học phần (`ADMIN` / `PROGRAM_MANAGER`):** `GET /api/v1/courses/import-template`, `POST /api/v1/courses/import` (`code,name,credits,facultyCode`); `ADMIN` gán theo từng dòng hoặc `facultyId` mặc định, `PROGRAM_MANAGER` tự động gán về khoa của mình.
   - **Import Phiên bản CTĐT và Khung học phần:** `GET/POST /api/v1/program-versions/import` (nạp PLO, PI, ánh xạ môn học, `totalCredits`, `durationYears`, `applicableCohort`, kiểm tra tổng `piWeight = 1.0`) và `GET/POST /api/v1/program-versions/{id}/courses/import` (upsert học kỳ, tín chỉ, loại môn, học trước, tiên quyết).
   - **Import Đề cương và CLO-PI:** `GET/POST /api/v1/courses/{courseId}/syllabi/import` (nạp CLO, mức Bloom, ngưỡng đạt, ánh xạ `piCode` và `linkWeight` theo `programVersionId`, tự động ở trạng thái `CONFIRMED` và `VERIFIED`).
@@ -39,12 +39,12 @@
 
 - [x] **Chức năng 5: Engine Đo lường OBE 4 cấp độ, Thống kê đa chiều, Báo cáo và Kiểm toán**
   - **Engine tính toán 4 cấp độ (`POST /api/v1/calculation-runs`):** Tính tự động từ `scores` qua `ASSESSMENT_CLO` (tổng điểm đạt chia tổng `maxScore`), lên `CLO` (tổng có trọng số `W_{p,j} = 1.0`), lên `PI` (trung bình có trọng số chuẩn hóa theo các CLO đã học), tới `PLO` (tổng có trọng số các PI bằng `1.0`, so ngưỡng đạt `plo.passThreshold`); tổng hợp `aggregate_results` (`passRate`, trung bình, độ lệch chuẩn, min/max, `completeness`), chống chạy trùng bằng `lockKey` và đánh dấu `isStale` khi điểm thay đổi. Các API tra cứu danh sách (`GET /api/v1/calculation-runs`, `/{id}/student-results`, `/{id}/aggregate-results`) hỗ trợ phân trang chuẩn `PageResponse` (`page >= 0`, `1 <= size <= 100`, mặc định `20`), và `/student-results` hỗ trợ lọc theo `studentId`, `subjectId`, `passed`.
-  - **Thống kê ma trận đa chiều (`GET /api/v1/reports/analytics` và `/export`):** Truy vấn cross-tab 2 chiều theo **7 chiều phân tích** (`TIME_TERM`, `COURSE_SECTIONS`, `COHORT`, `ASSESSMENT_COMPONENT`, `CURRICULUM_CLASSIFICATION`, `COURSE_LECTURER`, `STUDENT`), hỗ trợ lọc đích danh theo chuẩn (`subjectIds`), lọc theo trạng thái đạt/chưa đạt (`passed`), trả kèm ngưỡng đạt `passThreshold` trên tiêu đề dòng (`CLO`/`PI`/`PLO`) và xuất CSV/Excel.
+  - **Thống kê ma trận đa chiều (`GET /api/v1/reports/analytics` và `/export`):** Truy vấn cross-tab 2 chiều theo **7 chiều phân tích** (`TIME_TERM`, `COURSE_SECTIONS`, `COHORT`, `ASSESSMENT_COMPONENT`, `CURRICULUM_CLASSIFICATION`, `COURSE_LECTURER`, `STUDENT`), hỗ trợ lọc đích danh theo chuẩn (`subjectIds`), lọc theo trạng thái đạt/chưa đạt (`passed`), trả kèm ngưỡng đạt `passThreshold` trên tiêu đề dòng (`CLO`/`PI`/`PLO`) và xuất Excel.
   - **Báo cáo tĩnh và Truy vết kiểm toán:** Sinh báo cáo snapshot (`POST /api/v1/reports` với 4 loại: `SECTION_CLO`, `COURSE_PI`, `PROGRAM_PLO`, `DATA_COMPLETENESS`), tra cứu danh sách có phân trang (`GET /api/v1/reports` trả `PageResponse`) và xuất tệp; truy vết ngược kết quả `PLO`, `PI`, `CLO` về từng dòng điểm gốc (`TraceController`); tự động lưu `createdAt` và `updatedAt` (`@EnableMongoAuditing`) trên toàn bộ 15 collection nghiệp vụ và ghi `audit_logs` (`CREATE`, `UPDATE`, `DELETE`, `STATUS_CHANGE`, `IMPORT`, `LOGIN`, `ASSESSMENT_LOCK`, `ASSESSMENT_UNLOCK`, `IMPORT_CONFIRM`, `SCORE_UPDATE`, `RUN_CALCULATION`) cho mọi thao tác hệ thống.
 
 ## 3. Danh mục tối thiểu 5 KPI nghiệp vụ định lượng
 1. **KPI 1 (Độ chính xác tính toán OBE 4 cấp):** 100% ca kiểm chứng tính `ASSESSMENT_CLO`, `CLO`, `PI`, `PLO` trên hệ thống khớp với kết quả tính độc lập (bảng tính) trong sai số cho phép **<= 10^-4** (tối đa 0,0001).
-2. **KPI 2 (Phát hiện lỗi tệp điểm đầu vào):** Phát hiện chính xác **100%** các lỗi cài sẵn trong tệp Excel (`.xlsx`) nhập điểm (sai mã sinh viên, điểm âm hoặc vượt `maxScore`, trùng bản ghi, thiếu trường bắt buộc) kèm vị trí dòng và cột trong `import_row_errors`.
+2. **KPI 2 (Phát hiện lỗi tệp điểm đầu vào):** Phát hiện chính xác **100%** các lỗi cài sẵn trong tệp Excel (`.xlsx`) nhập điểm (sai mã sinh viên, điểm âm hoặc vượt `maxScore`, sai định dạng số thập phân dấu ./, hoặc ô ngày tháng do Excel tự chuyển, trùng bản ghi, thiếu trường bắt buộc) kèm vị trí dòng và cột trong `import_row_errors`.
 3. **KPI 3 (Thời gian xử lý tổng hợp và xuất báo cáo CLO/PI/PLO):** Với dữ liệu một lớp học phần khoảng 60 sinh viên (tối đa 5.000 dòng điểm câu hỏi), hệ thống hoàn thành chạy engine tính toán 4 cấp trong **<= 5 giây** và xuất tệp báo cáo Excel (`.xlsx`) hoàn chỉnh trong **<= 2 giây** (tổng thời gian xử lý phía hệ thống **<= 10 giây**).
 4. **KPI 4 (Hiệu quả truy vết minh chứng):** Truy vết ngược trực tiếp ở mỗi cấp độ (`PLO`, `PI`, `CLO`, `ASSESSMENT_CLO`) về thành phần đầu vào hoặc từ một bản ghi điểm về dòng tệp và lô nhập (`import_batches`) chỉ cần **1 lần gọi API** (`GET /api/v1/trace/student-results/{id}` và `GET /api/v1/trace/scores/{id}`), tổng cộng **tối đa 5 bước** khi lần từ cấp `PLO` cao nhất xuống tới dòng điểm gốc.
 5. **KPI 5 (Toàn vẹn dữ liệu và Bảo vệ bất biến):** **0%** bản ghi điểm nửa vời khi xảy ra lỗi giữa chừng lúc xác nhận nhập điểm (MongoDB Transaction rollback); **100%** thao tác sửa tên hoặc tín chỉ học phần, sửa thông tin chương trình đã công bố (`ACTIVE`/`ARCHIVED`) và thao tác nhập điểm trên CTĐT đã khóa (`ARCHIVED`) bị chặn đúng quy tắc.

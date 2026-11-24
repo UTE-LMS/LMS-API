@@ -580,3 +580,43 @@ Phần này chuẩn bị sẵn câu trả lời khoa học, chuẩn mực cho 4 
 - **Lỗi CI sau khi mở PR #99:** SpotBugs (job Lint và Test) báo "Possible null pointer dereference" ở bộ kiểm tra `aud`; đọc lại thấy cả bộ kiểm tra `iss` cũng có lỗi thật: `List.of(...).contains(null)` ném NullPointerException nên token thiếu `iss`/`aud` sẽ thành lỗi 500 thay vì 401. Đã sửa (kiểm tra null trước) và thêm test `missingIssuerOrAudience`. Nguyên nhân: không chạy `spotbugs:check` cục bộ trước khi mở PR (chỉ chạy `spotless:check` và test). Từ nay chạy đúng lệnh lint của CI (`test-compile spotless:check spotbugs:check pmd:cpd-check`).
 - **Sinh viên đã sửa/rà soát:** _chờ sinh viên rà soát_
 - **Commit / PR:** một commit `feat(auth): add Google sign-in with ID token` trên nhánh `feat/google-login`, PR vào `main` (xem `git log`).
+
+---
+
+## Phiên #43 — 2026-11-24: Bỏ cột trạng thái khi import Khoa và Người dùng, mặc định luôn hoạt động
+
+- **Sinh viên yêu cầu:** minhat5 (theo `git config user.name`)
+- **Công cụ / mô hình:** Antigravity, Gemini 4 Neon (High)
+- **Mục tiêu:** loại bỏ cột trạng thái khỏi template và luồng import Khoa (`isActive`) và Người dùng (`status`), luôn khởi tạo bản ghi import ở trạng thái hoạt động (`isActive = true` cho Khoa, `UserStatus.ACTIVE` cho Người dùng); bỏ qua cột trạng thái nếu tệp cũ vẫn còn truyền.
+- **File AI sinh/sửa:**
+  - `src/main/java/com/hcmute/lms/lmsapi/service/impl/FacultyServiceImpl.java` (`generateTemplateCsv`, `importFaculties`)
+  - `src/main/java/com/hcmute/lms/lmsapi/service/impl/UserServiceImpl.java` (`generateTemplateCsv`, `importUsers`)
+  - `src/test/java/com/hcmute/lms/lmsapi/controller/AdminAndFacultyCsvImportIntegrationTest.java`
+  - `src/test/java/com/hcmute/lms/lmsapi/service/impl/UserServiceImplTest.java`
+  - `src/test/java/com/hcmute/lms/lmsapi/service/impl/FacultyServiceImplTest.java` (mới)
+  - `doc/data/faculties_hcmute.csv`, `doc/data/lecturers_fe.csv`, `doc/data/lecturers_fit.csv`, `doc/data/lecturers_hcmute.csv`
+  - `doc/ban-cam-ket-buoc-3-metric.md`
+  - `logsAI/ai-usage-log.md`
+- **Kiểm chứng đã làm:**
+  - `.\mvnw.cmd spotless:apply test-compile spotless:check spotbugs:check pmd:cpd-check test "-Dtest=FacultyServiceImplTest,UserServiceImplTest"`: `BUILD SUCCESS`, 0 lỗi Spotless / SpotBugs / PMD-CPD, 22/22 unit test đạt (`FacultyServiceImplTest` 4/4, `UserServiceImplTest` 18/18).
+  - `.\mvnw.cmd test "-Dtest=AdminAndFacultyCsvImportIntegrationTest"`: `BUILD SUCCESS`, 3/3 integration test đạt trên MongoDB replica set (`localhost:27018`).
+- **Lỗi/ảo giác AI tự phát hiện:** (1) Ban đầu viết `template.filename()` trong test mới thay vì `template.fileName()` của record `AssessmentScoreTemplate`, bị `testCompile` báo lỗi và đã sửa ngay. (2) PMD-CPD báo trùng lặp 11–12 dòng giữa các test case import mới; đã tách helper `importValidFaculties` và `importValidUsers` để đạt 0 lỗi CPD.
+- **Sinh viên đã sửa/rà soát:** _chờ sinh viên rà soát_
+- **Commit / PR:** nhánh `feat/import-default-active-and-xlsx-data` (PR vào `main`, xem `git log`; lưu ý kiểm tra và đồng bộ hiển thị danh sách cột import trên repo `LMS-UI` nếu có).
+
+---
+
+## Phiên #44 — 2026-11-24: Bổ sung 12 tệp dữ liệu mẫu Excel (.xlsx) trong `doc/data/`
+
+- **Sinh viên yêu cầu:** minhat5 (theo `git config user.name`)
+- **Công cụ / mô hình:** Antigravity, Gemini 4 Neon (High)
+- **Mục tiêu:** tạo 12 tệp `.xlsx` trong `doc/data/` có nội dung giống hệt 12 tệp `.csv` hiện có để phục vụ kiểm thử chức năng import bằng Excel (`.xlsx`), đồng thời thêm test tự động đối chiếu 12 cặp `.csv`/`.xlsx`.
+- **File AI sinh/sửa:**
+  - Tạo mới 12 tệp trong `doc/data/`: `courses_cntt.xlsx`, `courses_fintech.xlsx`, `enrollments_fintech_2026_hk1.xlsx`, `faculties_hcmute.xlsx`, `lecturers_fe.xlsx`, `lecturers_fit.xlsx`, `lecturers_hcmute.xlsx`, `program_courses_fintech.xlsx`, `program_version_fintech.xlsx`, `sections_fintech_2026_hk1.xlsx`, `syllabus_abda433708.xlsx`, `syllabus_apcm220307.xlsx` (sinh trực tiếp qua `XlsxCsvConverter.fromCsv` từ 12 tệp `.csv` tương ứng)
+  - Sửa `src/test/java/com/hcmute/lms/lmsapi/util/XlsxCsvConverterTest.java` (thêm test `docDataXlsxMatchesCsvFiles`)
+  - Cập nhật `logsAI/ai-usage-log.md`
+- **Kiểm chứng đã làm:**
+  - `.\mvnw.cmd spotless:apply test-compile spotless:check spotbugs:check pmd:cpd-check test "-Dtest=XlsxCsvConverterTest,CsvUtilsTest"`: `BUILD SUCCESS`, 0 lỗi Spotless / SpotBugs / PMD-CPD, 23/23 test đạt (`CsvUtilsTest` 7/7, `XlsxCsvConverterTest` 16/16, gồm `docDataXlsxMatchesCsvFiles` đối chiếu toàn bộ 12 cặp `.csv`–`.xlsx`).
+- **Lỗi/ảo giác AI tự phát hiện:** (1) Dùng nhầm `existsDirectory()` / `existsRegularFile()` thay vì `isDirectory()` / `isRegularFile()` của AssertJ `AbstractPathAssert`, được `testCompile` phát hiện và sửa ngay. (2) SpotBugs báo 2 cảnh báo `NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE` cho `Path.getFileName().toString()`; đã đổi sang `String.valueOf(path.getFileName())` để đạt 0 bug SpotBugs.
+- **Sinh viên đã sửa/rà soát:** _chờ sinh viên rà soát_
+- **Commit / PR:** nhánh `feat/import-default-active-and-xlsx-data` (PR vào `main`, xem `git log`).

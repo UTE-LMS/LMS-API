@@ -8,6 +8,10 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.stream.Stream;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.Row;
@@ -261,5 +265,36 @@ class XlsxCsvConverterTest {
     byte[] file = XlsxCsvConverter.fromCsv("a,b\r\n".getBytes(StandardCharsets.UTF_8));
 
     assertThat(csv(file)).isEqualTo("a,b\n");
+  }
+
+  @Test
+  @DisplayName("Các tệp .xlsx trong doc/data khớp nội dung với 12 tệp .csv tương ứng")
+  void docDataXlsxMatchesCsvFiles() throws IOException {
+    Path dataDir = Path.of("doc/data");
+    assertThat(dataDir).isDirectory();
+
+    List<Path> csvFiles;
+    try (Stream<Path> stream = Files.list(dataDir)) {
+      csvFiles =
+          stream.filter(p -> String.valueOf(p.getFileName()).endsWith(".csv")).sorted().toList();
+    }
+    assertThat(csvFiles).hasSize(12);
+
+    for (Path csvPath : csvFiles) {
+      String csvName = String.valueOf(csvPath.getFileName());
+      Path xlsxPath = dataDir.resolve(csvName.substring(0, csvName.length() - 4) + ".xlsx");
+      assertThat(xlsxPath).isRegularFile();
+
+      List<List<String>> expectedRows =
+          CsvUtils.parse(new ByteArrayInputStream(Files.readAllBytes(csvPath))).stream()
+              .map(row -> row.stream().map(String::trim).toList())
+              .toList();
+      byte[] convertedCsv = XlsxCsvConverter.toCsv(Files.readAllBytes(xlsxPath));
+      List<List<String>> actualRows = CsvUtils.parse(new ByteArrayInputStream(convertedCsv));
+
+      assertThat(actualRows)
+          .as("Nội dung %s phải khớp %s", xlsxPath, csvPath)
+          .isEqualTo(expectedRows);
+    }
   }
 }

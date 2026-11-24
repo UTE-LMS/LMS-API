@@ -1,9 +1,9 @@
-username,email,password,fullName,roles,facultyCode,status
-gv_dangquangvang,vangdq@hcmute.edu.vn,Hcmute@2026,TS. Đàng Quang Vắng,LECTURER,FE,ACTIVE
-gv_lengochieu,hieuln@hcmute.edu.vn,Hcmute@2026,TS. Lê Ngọc Hiếu,LECTURER,FE,ACTIVE
-gv_dophuocsang,sangdp@hcmute.edu.vn,Hcmute@2026,ThS. Đỗ Phước Sang,LECTURER,FE,ACTIVE
-gv_dangthingoc,ngocdt@hcmute.edu.vn,Hcmute@2026,ThS. Đặng Thị Ngọc,LECTURER,FE,ACTIVE
-gv_nguyenthihuyentrang,trangnth@hcmute.edu.vn,Hcmute@2026,ThS. Nguyễn Thị Huyền Trang,LECTURER,FE,ACTIVE
-gv_nguyenphananhhuy,huynpa@hcmute.edu.vn,Hcmute@2026,TS. Nguyễn Phan Anh Huy,LECTURER,FE,ACTIVE
-gv_nguyenkhachieu,hieunk@hcmute.edu.vn,Hcmute@2026,TS. Nguyễn Khắc Hiếu,LECTURER,FE,ACTIVE
-gv_nguyenthichaulong,longntc@hcmute.edu.vn,Hcmute@2026,ThS. Nguyễn Thị Châu Long,LECTURER,FE,ACTIVE
+username,email,password,fullName,roles,facultyCode
+gv_dangquangvang,vangdq@hcmute.edu.vn,Hcmute@2026,TS. Đàng Quang Vắng,LECTURER,FE
+gv_lengochieu,hieuln@hcmute.edu.vn,Hcmute@2026,TS. Lê Ngọc Hiếu,LECTURER,FE
+gv_dophuocsang,sangdp@hcmute.edu.vn,Hcmute@2026,ThS. Đỗ Phước Sang,LECTURER,FE
+gv_dangthingoc,ngocdt@hcmute.edu.vn,Hcmute@2026,ThS. Đặng Thị Ngọc,LECTURER,FE
+gv_nguyenthihuyentrang,trangnth@hcmute.edu.vn,Hcmute@2026,ThS. Nguyễn Thị Huyền Trang,LECTURER,FE
+gv_nguyenphananhhuy,huynpa@hcmute.edu.vn,Hcmute@2026,TS. Nguyễn Phan Anh Huy,LECTURER,FE
+gv_nguyenkhachieu,hieunk@hcmute.edu.vn,Hcmute@2026,TS. Nguyễn Khắc Hiếu,LECTURER,FE
+gv_nguyenthichaulong,longntc@hcmute.edu.vn,Hcmute@2026,ThS. Nguyễn Thị Châu Long,LECTURER,FE

@@ -317,9 +317,9 @@ public class UserServiceImpl implements UserService {
   public AssessmentScoreTemplate generateTemplateCsv() {
     String csv =
         "\uFEFF"
-            + "username,email,password,fullName,roles,facultyCode,status\r\n"
-            + "pm_fit,pm_fit@hcmute.edu.vn,Password123!,Trưởng ngành CNTT,PROGRAM_MANAGER,FIT,ACTIVE\r\n"
-            + "gv_an,gv_an@hcmute.edu.vn,Password123!,Nguyễn Văn An,LECTURER,,ACTIVE\r\n";
+            + "username,email,password,fullName,roles,facultyCode\r\n"
+            + "pm_fit,pm_fit@hcmute.edu.vn,Password123!,Trưởng ngành CNTT,PROGRAM_MANAGER,FIT\r\n"
+            + "gv_an,gv_an@hcmute.edu.vn,Password123!,Nguyễn Văn An,LECTURER,\r\n";
     return new AssessmentScoreTemplate("users-template.csv", csv.getBytes(StandardCharsets.UTF_8));
   }
 
@@ -345,7 +345,6 @@ public class UserServiceImpl implements UserService {
       String fullName = CsvTextParser.cell(parsed.headerIndex(), row, "fullName");
       String rawRoles = CsvTextParser.cell(parsed.headerIndex(), row, "roles");
       String rawFacultyCode = CsvTextParser.cell(parsed.headerIndex(), row, "facultyCode");
-      String rawStatus = CsvTextParser.cell(parsed.headerIndex(), row, "status");
 
       String username = StringNormalizationUtils.normalizeUsername(rawUsername);
       String email = StringNormalizationUtils.normalizeEmail(rawEmail);
@@ -386,18 +385,6 @@ public class UserServiceImpl implements UserService {
         continue;
       }
 
-      UserStatus status = UserStatus.ACTIVE;
-      if (!rawStatus.isEmpty()) {
-        try {
-          status = UserStatus.valueOf(rawStatus.trim().toUpperCase(Locale.ROOT));
-        } catch (IllegalArgumentException ex) {
-          errors.add(
-              new CsvImportResultResponse.RowError(
-                  rowNum, username, "Trạng thái không hợp lệ (chỉ ACTIVE hoặc LOCKED)"));
-          continue;
-        }
-      }
-
       String facultyId = null;
       if (!rawFacultyCode.isEmpty()) {
         String facultyCode = rawFacultyCode.trim().toUpperCase(Locale.ROOT);
@@ -433,7 +420,7 @@ public class UserServiceImpl implements UserService {
               .passwordHash(passwordEncoder.encode(password))
               .fullName(fullName.trim())
               .facultyId(facultyId)
-              .status(status)
+              .status(UserStatus.ACTIVE)
               .tokenVersion(0L)
               .mustChangePassword(true)
               .roles(parsedRoles)

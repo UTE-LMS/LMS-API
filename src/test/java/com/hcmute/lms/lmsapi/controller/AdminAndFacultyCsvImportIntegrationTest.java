@@ -2,7 +2,9 @@ package com.hcmute.lms.lmsapi.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -11,6 +13,7 @@ import com.hcmute.lms.lmsapi.document.Course;
 import com.hcmute.lms.lmsapi.document.Faculty;
 import com.hcmute.lms.lmsapi.document.User;
 import com.hcmute.lms.lmsapi.enums.Role;
+import com.hcmute.lms.lmsapi.enums.UserStatus;
 import com.hcmute.lms.lmsapi.repository.CourseRepository;
 import com.hcmute.lms.lmsapi.repository.FacultyRepository;
 import com.hcmute.lms.lmsapi.repository.UserRepository;
@@ -58,20 +61,22 @@ class AdminAndFacultyCsvImportIntegrationTest extends IntegrationTestBase {
   }
 
   @Test
-  @DisplayName("ADMIN import Khoa (template + CSV best-effort); PM bị 403")
+  @DisplayName("ADMIN import Khoa (template + CSV best-effort, mặc định active); PM bị 403")
   void adminImportFaculties_SuccessAndPmForbidden() throws Exception {
     mockMvc
         .perform(getAs(adminToken, "/api/v1/faculties/import-template"))
         .andExpect(status().isOk())
         .andExpect(
             header()
-                .string(HttpHeaders.CONTENT_DISPOSITION, containsString("faculties-template.csv")));
+                .string(HttpHeaders.CONTENT_DISPOSITION, containsString("faculties-template.csv")))
+        .andExpect(content().string(containsString("code,name,description")))
+        .andExpect(content().string(not(containsString("isActive"))));
 
     String csv =
-        "code,name,description,isActive\n"
-            + "ITEST_IMP_FIT,Khoa CNTT Import,Mo ta FIT,true\n"
-            + "ITEST_IMP_FE,Khoa Kinh te Import,Mo ta FE,false\n"
-            + ",Khoa Thieu Ma,Mo ta,true\n";
+        "code,name,description\n"
+            + "ITEST_IMP_FIT,Khoa CNTT Import,Mo ta FIT\n"
+            + "ITEST_IMP_FE,Khoa Kinh te Import,Mo ta FE\n"
+            + ",Khoa Thieu Ma,Mo ta\n";
     MockMultipartFile file =
         new MockMultipartFile(
             "file", "faculties.csv", "text/csv", csv.getBytes(StandardCharsets.UTF_8));
@@ -96,25 +101,29 @@ class AdminAndFacultyCsvImportIntegrationTest extends IntegrationTestBase {
     Faculty fit = facultyRepository.findByCode("ITEST_IMP_FIT").orElseThrow();
     assertThat(fit.isActive()).isTrue();
     Faculty fe = facultyRepository.findByCode("ITEST_IMP_FE").orElseThrow();
-    assertThat(fe.isActive()).isFalse();
+    assertThat(fe.isActive()).isTrue();
   }
 
   @Test
-  @DisplayName("ADMIN import Người dùng (template + CSV kèm roles và facultyCode); PM bị 403")
+  @DisplayName(
+      "ADMIN import Người dùng (template + CSV kèm roles, facultyCode, mặc định ACTIVE); PM bị 403")
   void adminImportUsers_SuccessAndPmForbidden() throws Exception {
     mockMvc
         .perform(getAs(adminToken, "/api/v1/users/import-template"))
         .andExpect(status().isOk())
         .andExpect(
-            header().string(HttpHeaders.CONTENT_DISPOSITION, containsString("users-template.csv")));
+            header().string(HttpHeaders.CONTENT_DISPOSITION, containsString("users-template.csv")))
+        .andExpect(
+            content().string(containsString("username,email,password,fullName,roles,facultyCode")))
+        .andExpect(content().string(not(containsString("status"))));
 
     String csv =
-        "username,email,password,fullName,roles,facultyCode,status\n"
+        "username,email,password,fullName,roles,facultyCode\n"
             + "itest_imp_pm,itest_imp_pm@hcmute.edu.vn,Password123!,PM Import,PROGRAM_MANAGER,"
             + pmFaculty.getCode()
-            + ",ACTIVE\n"
-            + "itest_imp_gv,itest_imp_gv@hcmute.edu.vn,Password123!,GV Import,LECTURER;QA,,ACTIVE\n"
-            + "itest_imp_bad,bad-email,Password123!,Bad Email,LECTURER,,ACTIVE\n";
+            + "\n"
+            + "itest_imp_gv,itest_imp_gv@hcmute.edu.vn,Password123!,GV Import,LECTURER;QA,\n"
+            + "itest_imp_bad,bad-email,Password123!,Bad Email,LECTURER,\n";
     MockMultipartFile file =
         new MockMultipartFile(
             "file", "users.csv", "text/csv", csv.getBytes(StandardCharsets.UTF_8));
@@ -137,10 +146,12 @@ class AdminAndFacultyCsvImportIntegrationTest extends IntegrationTestBase {
     User pm = userRepository.findByUsername("itest_imp_pm").orElseThrow();
     assertThat(pm.getRoles()).containsExactly(Role.PROGRAM_MANAGER);
     assertThat(pm.getFacultyId()).isEqualTo(pmFaculty.getId());
+    assertThat(pm.getStatus()).isEqualTo(UserStatus.ACTIVE);
 
     User gv = userRepository.findByUsername("itest_imp_gv").orElseThrow();
     assertThat(gv.getRoles()).containsExactlyInAnyOrder(Role.LECTURER, Role.QA);
     assertThat(gv.getFacultyId()).isNull();
+    assertThat(gv.getStatus()).isEqualTo(UserStatus.ACTIVE);
   }
 
   @Test
