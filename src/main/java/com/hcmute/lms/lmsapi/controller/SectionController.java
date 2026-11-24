@@ -7,6 +7,7 @@ import com.hcmute.lms.lmsapi.dto.SectionResponse;
 import com.hcmute.lms.lmsapi.dto.SectionStatusUpdateRequest;
 import com.hcmute.lms.lmsapi.dto.SectionUpdateRequest;
 import com.hcmute.lms.lmsapi.dto.UserPrincipal;
+import com.hcmute.lms.lmsapi.dto.UserResponse;
 import com.hcmute.lms.lmsapi.service.SectionService;
 import com.hcmute.lms.lmsapi.util.ImportTemplateResponses;
 import jakarta.validation.Valid;
@@ -48,6 +49,14 @@ public class SectionController {
       @RequestParam(required = false) String courseId,
       @AuthenticationPrincipal UserPrincipal principal) {
     return ResponseEntity.ok(sectionService.getSections(principal, termId, courseId));
+  }
+
+  @GetMapping("/lecturers")
+  @PreAuthorize("hasAnyRole('ADMIN', 'PROGRAM_MANAGER')")
+  public ResponseEntity<List<UserResponse>> getActiveLecturers(
+      @RequestParam(required = false) String facultyId) {
+    log.debug("API request: GET /api/v1/sections/lecturers facultyId=[{}]", facultyId);
+    return ResponseEntity.ok(sectionService.getActiveLecturers(facultyId));
   }
 
   @GetMapping("/{id}")
