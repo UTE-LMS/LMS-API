@@ -54,13 +54,16 @@ Biết **ai học lớp nào, học kỳ nào, đề cương nào**. Số ghi da
 
 | Phương thức | Đường dẫn | Quyền | Trạng thái |
 |---|---|---|---|
-| GET/POST/PUT/DELETE | `/api/v1/terms`, `/api/v1/terms/{id}`; `PUT /api/v1/terms/{id}/status` | ghi/đổi trạng thái/xóa: chỉ ADMIN; đọc: authenticated | **ĐÃ HIỆN THỰC** |
-| GET | `/api/v1/sections?termId=&courseId=` | authenticated; chỉ trả lớp người gọi đọc/quản lý được | **ĐÃ HIỆN THỰC** |
+| GET/POST/PUT/DELETE | `/api/v1/terms?search=&status=&page=&size=`, `/api/v1/terms/{id}`; `PUT /api/v1/terms/{id}/status` | ghi/đổi trạng thái/xóa: chỉ ADMIN; đọc: authenticated | **ĐÃ HIỆN THỰC** (có phân trang + tìm kiếm) |
+| GET | `/api/v1/sections?termId=&courseId=&search=&page=&size=` | authenticated; chỉ trả lớp người gọi đọc/quản lý được | **ĐÃ HIỆN THỰC** (có phân trang + tìm kiếm theo mã lớp) |
 | GET | `/api/v1/sections/{id}` | đọc được lớp (giảng viên lớp mình, ADMIN, scope) hoặc quản lý được lớp | **ĐÃ HIỆN THỰC** |
 | POST | `/api/v1/sections` | ADMIN; PROGRAM_MANAGER có CTĐT chứa học phần trong `scope.programIds` | **ĐÃ HIỆN THỰC** |
 | PUT | `/api/v1/sections/{id}` (chỉ `lecturerIds`), `PUT /api/v1/sections/{id}/status` | như POST | **ĐÃ HIỆN THỰC** |
-| POST | `/api/v1/sections/{id}/enrollments/import` (multipart `file`, CSV) | LECTURER lớp mình, ADMIN (`canAccessSection` WRITE) | **ĐÃ HIỆN THỰC** |
-| GET | `/api/v1/sections/{id}/enrollments?status=` | đọc được lớp | **ĐÃ HIỆN THỰC** |
+| GET, PUT | `/api/v1/students`, `/api/v1/students/{id}/status`, `/api/v1/students/status` | ADMIN | **ĐÃ HIỆN THỰC** (tra cứu + đổi trạng thái đơn/hàng loạt) |
+| POST | `/api/v1/students/import` (multipart `file`, CSV/XLSX), `GET /api/v1/students/import-template` | ADMIN | **ĐÃ HIỆN THỰC** (cập nhật 2026-11-25) |
+| POST | `/api/v1/students/status-import` (multipart `file`, CSV/XLSX), `GET /api/v1/students/status-import-template` | ADMIN | **ĐÃ HIỆN THỰC** (đổi trạng thái hàng loạt qua tệp) |
+| POST | `/api/v1/sections/{id}/enrollments/import` (multipart `file`, CSV/XLSX), `GET .../import-template` | LECTURER lớp mình, ADMIN (`canAccessSection` WRITE) | **ĐÃ HIỆN THỰC** (báo lỗi nếu `studentCode` chưa tồn tại hoặc khác `ACTIVE`) |
+| GET | `/api/v1/sections/{id}/enrollments?status=&search=&page=&size=` | đọc được lớp | **ĐÃ HIỆN THỰC** (giữ tổng `enrolled`/`withdrawn`, phân trang `enrollments`) |
 | PUT | `/api/v1/enrollments/{id}/status` (rút/ghi danh lại) | LECTURER lớp mình, ADMIN | **ĐÃ HIỆN THỰC** |
 
 ## 7. Kiểm tra tham chiếu ở service
@@ -101,8 +104,15 @@ hiện thực, chờ hai sinh viên và GVHD xác nhận**; mục nào đổi th
 | D8 | Nhập lại cùng tệp bị từ chối 422 ("đã ghi danh") chứ không bỏ qua êm; sinh viên đã `WITHDRAWN` xuất hiện lại trong tệp cũng bị 422 và được chỉ dẫn dùng `PUT /enrollments/{id}/status` | Không nhân đôi sinh viên/ghi danh; việc ghi danh lại là quyết định có chủ đích, không phải hệ quả của nhập tệp |
 | D9 | Tệp CSV UTF-8 (chấp nhận BOM), phân cách `,` hoặc `;`, tối đa 5000 dòng dữ liệu; chỉ đọc cột `studentRef` (bắt buộc), `cohort`, `majorCode`. Cột khác (họ tên, email...) **bị bỏ qua và được báo lại** trong `ignoredColumns` | Không thêm thư viện; không lưu dữ liệu cá nhân khi Khoa chưa cho phép. Sinh viên đã có thì dùng lại, **không ghi đè** `cohort`/`majorCode` |
 | D10 | Excel (`.xlsx`) **chưa làm**: cần chọn thư viện bằng một ADR dùng chung với F05b | CLAUDE.md quy tắc 3 (không thêm dependency khi chưa có lý do) |
-| D11 | `GET /sections` không phân trang | Số lớp theo học kỳ nhỏ; ghi ở `doc/tech-debt.md` TD-30 |
+| D11 | `GET /sections` phân trang theo `page`, `size` (mặc định `0`, `20`, tối đa `100`) và lọc `search` trên bộ nhớ sau lọc quyền | Đáp ứng `PageResponse<SectionResponse>`; phần tối ưu lọc `lecturerIds` ở DB giữ trong TD-30 |
 | D12 | Đổi trạng thái học kỳ/lớp/ghi danh mới ghi log ứng dụng, **chưa ghi `audit_logs`** | `audit_logs.action` là enum đóng trong `database_import.js`; thêm hành động mới là đổi thiết kế CSDL, cần ADR (TD-31) |
 
 **Chưa làm của F05a:** US-18/AC-2 vế "từ chối nhập/sửa điểm" (chờ F05b); nhập Excel (D10); ghi `audit_logs` (D12); `programVersionId`,
 `userId`, `fullName`, `email` của `students` (chưa có tính năng dùng đến, NEW-03 và Q09).
+
+**Cập nhật 2026-11-25:**
+- Bổ sung quản lý & import danh sách sinh viên cho `ADMIN`: `GET /api/v1/students` (lọc `search`, `cohort`, `status`, phân trang), `PUT /api/v1/students/{id}/status`, `PUT /api/v1/students/status` (đổi trạng thái nhiều sinh viên), `GET /api/v1/students/import-template`, `POST /api/v1/students/import` (tạo mới với 3 cột bắt buộc `studentCode`, `fullName`, `cohort`, mặc định `status = ACTIVE`), `GET /api/v1/students/status-import-template`, `POST /api/v1/students/status-import` (đổi trạng thái hàng loạt qua `.csv`/`.xlsx`).
+- Cập nhật nghiệp vụ import ghi danh (`POST /api/v1/sections/{id}/enrollments/import`, `POST /api/v1/enrollments/import`) và ghi danh lại (`PUT /api/v1/enrollments/{id}/status` sang `ENROLLED`): không tự tạo mới `Student` khi `studentCode` chưa có và **chặn ghi danh** nếu sinh viên không ở trạng thái `ACTIVE` (`SUSPENDED`, `GRADUATED`, `DROPPED_OUT`).
+
+**Cập nhật 2026-11-26:**
+- Bổ sung phân trang chuẩn (`page`, `size`, `totalElements`, `totalPages`, `last`) và tìm kiếm `search` cho `GET /api/v1/sections`, `GET /api/v1/terms`, `GET /api/v1/sections/{sectionId}/enrollments` (giữ nguyên tổng mẫu số `enrolled`/`withdrawn` toàn lớp).

@@ -1,6 +1,7 @@
 package com.hcmute.lms.lmsapi.service.impl;
 
 import com.hcmute.lms.lmsapi.document.Term;
+import com.hcmute.lms.lmsapi.dto.PageResponse;
 import com.hcmute.lms.lmsapi.dto.TermRequest;
 import com.hcmute.lms.lmsapi.dto.TermResponse;
 import com.hcmute.lms.lmsapi.dto.TermStatusUpdateRequest;
@@ -18,8 +19,10 @@ import com.hcmute.lms.lmsapi.repository.TermRepository;
 import com.hcmute.lms.lmsapi.service.AuditService;
 import com.hcmute.lms.lmsapi.service.TermService;
 import com.hcmute.lms.lmsapi.util.ObjectIdUtils;
+import com.hcmute.lms.lmsapi.util.PageableValidationUtils;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -42,8 +45,24 @@ public class TermServiceImpl implements TermService {
   private AuditService auditService;
 
   @Override
-  public List<TermResponse> getTerms() {
-    return termMapper.toResponseList(termRepository.findAllByOrderByStartDateDesc());
+  public PageResponse<TermResponse> getTerms(String search, TermStatus status, int page, int size) {
+    PageableValidationUtils.validate(page, size);
+    String keyword =
+        search != null && !search.isBlank() ? search.trim().toLowerCase(Locale.ROOT) : null;
+    List<Term> filtered =
+        termRepository.findAllByOrderByStartDateDesc().stream()
+            .filter(t -> status == null || status == t.getStatus())
+            .filter(
+                t ->
+                    keyword == null
+                        || containsIgnoreCase(t.getCode(), keyword)
+                        || containsIgnoreCase(t.getAcademicYear(), keyword))
+            .toList();
+    return PageResponse.slice(filtered, page, size, termMapper::toResponseList);
+  }
+
+  private boolean containsIgnoreCase(String value, String keyword) {
+    return value != null && value.toLowerCase(Locale.ROOT).contains(keyword);
   }
 
   @Override

@@ -1,5 +1,6 @@
 package com.hcmute.lms.lmsapi.dto.analytics;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.hcmute.lms.lmsapi.enums.AnalyticsDimension;
 import com.hcmute.lms.lmsapi.enums.ResultLevel;
@@ -46,4 +47,24 @@ public class AnalyticsMatrixResponse {
    * Ma trận 2 chiều chứa các ô chỉ số. Phần tử [i][j] tương ứng với dòng rows[i] và cột columns[j].
    */
   @Builder.Default private List<List<MatrixMetricCell>> matrix = new ArrayList<>();
+
+  /** Chỉ số trang hiện tại (0-indexed) khi phân trang cột sinh viên (dimension = STUDENT). */
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  private Integer page;
+
+  /** Kích thước trang thực tế khi phân trang cột sinh viên (dimension = STUDENT). */
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  private Integer size;
+
+  /** Tổng số sinh viên khớp điều kiện (dimension = STUDENT). */
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  private Long totalElements;
+
+  /** Tổng số trang sinh viên (dimension = STUDENT). */
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  private Integer totalPages;
+
+  /** Cờ trang cuối cùng (dimension = STUDENT). */
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  private Boolean last;
 }

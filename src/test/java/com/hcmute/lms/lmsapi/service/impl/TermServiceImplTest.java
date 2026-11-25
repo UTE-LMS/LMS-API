@@ -8,12 +8,14 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.hcmute.lms.lmsapi.document.Term;
+import com.hcmute.lms.lmsapi.dto.PageResponse;
 import com.hcmute.lms.lmsapi.dto.TermRequest;
 import com.hcmute.lms.lmsapi.dto.TermResponse;
 import com.hcmute.lms.lmsapi.dto.TermStatusUpdateRequest;
 import com.hcmute.lms.lmsapi.enums.TermStatus;
 import com.hcmute.lms.lmsapi.exception.AppException;
 import com.hcmute.lms.lmsapi.exception.BusinessRuleViolationException;
+import com.hcmute.lms.lmsapi.exception.PageableValidationException;
 import com.hcmute.lms.lmsapi.mapper.TermMapper;
 import com.hcmute.lms.lmsapi.mapper.impl.TermMapperImpl;
 import com.hcmute.lms.lmsapi.repository.CourseSectionRepository;
@@ -217,5 +219,46 @@ class TermServiceImplTest {
     termService.deleteTerm("507f1f77bcf86cd799439011");
 
     verify(termRepository).delete(term);
+  }
+
+  @Test
+  @DisplayName("getTerms: lọc theo search/status và phân trang đúng biên")
+  void getTerms_filterAndPaginate() {
+    Term t1 =
+        Term.builder()
+            .id("t1")
+            .code("2026-HK1")
+            .academicYear("2025-2026")
+            .status(TermStatus.OPEN)
+            .build();
+    Term t2 =
+        Term.builder()
+            .id("t2")
+            .code("2025-HK2")
+            .academicYear("2024-2025")
+            .status(TermStatus.CLOSED)
+            .build();
+    Term t3 =
+        Term.builder()
+            .id("t3")
+            .code("2025-HK1")
+            .academicYear("2024-2025")
+            .status(TermStatus.OPEN)
+            .build();
+    when(termRepository.findAllByOrderByStartDateDesc()).thenReturn(java.util.List.of(t1, t2, t3));
+
+    PageResponse<TermResponse> page0 = termService.getTerms(null, TermStatus.OPEN, 0, 1);
+    assertThat(page0.getContent()).extracting(TermResponse::getCode).containsExactly("2026-HK1");
+    assertThat(page0.getTotalElements()).isEqualTo(2);
+    assertThat(page0.getTotalPages()).isEqualTo(2);
+    assertThat(page0.isLast()).isFalse();
+
+    PageResponse<TermResponse> searched = termService.getTerms("2024-2025", null, 0, 20);
+    assertThat(searched.getContent())
+        .extracting(TermResponse::getCode)
+        .containsExactly("2025-HK2", "2025-HK1");
+
+    assertThatThrownBy(() -> termService.getTerms(null, null, -1, 20))
+        .isInstanceOf(PageableValidationException.class);
   }
 }

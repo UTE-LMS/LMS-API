@@ -140,13 +140,15 @@ class CourseIntegrationTest extends IntegrationTestBase {
                     .previousCourseIds(List.of(course3.getId()))
                     .build());
 
-    // 1. Lấy danh sách học phần của CTĐT
+    // 1. Lấy danh sách học phần của CTĐT (có phân trang)
     mockMvc
         .perform(getAs(pmToken, "/api/v1/program-versions/{pvId}/courses", programVersion.getId()))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$", hasSize(1)))
-        .andExpect(jsonPath("$[0].courseId").value(course2.getId()))
-        .andExpect(jsonPath("$[0].course.code").value(course2.getCode()));
+        .andExpect(jsonPath("$.content", hasSize(1)))
+        .andExpect(jsonPath("$.totalElements").value(1))
+        .andExpect(jsonPath("$.last").value(true))
+        .andExpect(jsonPath("$.content[0].courseId").value(course2.getId()))
+        .andExpect(jsonPath("$.content[0].course.code").value(course2.getCode()));
 
     // 2. Lấy chi tiết gán học phần
     mockMvc

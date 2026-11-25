@@ -53,8 +53,12 @@ public class EnrollmentController {
               regexp = "^[0-9a-fA-F]{24}$",
               message = "ID lớp học phần phải là ObjectId 24 ký tự hex")
           String sectionId,
-      @RequestParam(name = "status", required = false) EnrollmentStatus status) {
-    return ResponseEntity.ok(enrollmentService.getEnrollments(sectionId, status));
+      @RequestParam(name = "status", required = false) EnrollmentStatus status,
+      @RequestParam(name = "search", required = false) String search,
+      @RequestParam(name = "page", defaultValue = "0") int page,
+      @RequestParam(name = "size", defaultValue = "20") int size) {
+    return ResponseEntity.ok(
+        enrollmentService.getEnrollments(sectionId, status, search, page, size));
   }
 
   @PostMapping(

@@ -7,6 +7,7 @@ import com.hcmute.lms.lmsapi.dto.AssessmentScoreItemResponse;
 import com.hcmute.lms.lmsapi.dto.AssessmentScoreTemplate;
 import com.hcmute.lms.lmsapi.dto.AssessmentUpdateRequest;
 import com.hcmute.lms.lmsapi.dto.CoverageResponse;
+import com.hcmute.lms.lmsapi.dto.PageResponse;
 import java.util.List;
 
 /** Khai báo bài đánh giá: khung theo đề cương và bản của từng lớp (ADR 0014, DB Schema v0.7). */
@@ -36,8 +37,19 @@ public interface AssessmentService {
 
   AssessmentScoreTemplate generateScoreTemplateCsv(String id);
 
-  List<AssessmentScoreItemResponse> getAssessmentScores(String id);
+  /**
+   * Lấy bảng điểm của bài đánh giá, phân trang theo nhóm sinh viên ({@code size} sinh viên mỗi
+   * trang, {@code totalElements} = tổng số sinh viên khớp) để chế độ xem ma trận theo sinh viên
+   * không bị cắt đôi dữ liệu giữa hai trang.
+   */
+  PageResponse<AssessmentScoreItemResponse> getAssessmentScores(
+      String id, String search, int page, int size);
 
-  List<AssessmentScoreItemResponse> getSectionAssessmentScores(
-      String sectionId, String assessmentId);
+  PageResponse<AssessmentScoreItemResponse> getSectionAssessmentScores(
+      String sectionId, String assessmentId, String search, int page, int size);
+
+  AssessmentScoreTemplate exportAssessmentScores(String id, String search);
+
+  AssessmentScoreTemplate exportSectionAssessmentScores(
+      String sectionId, String assessmentId, String search);
 }

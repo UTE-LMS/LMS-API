@@ -109,6 +109,9 @@ class SectionIntegrationTest extends IntegrationTestBase {
         .andExpect(jsonPath("$.syllabusId").value(confirmedSyllabus.getId()))
         .andExpect(jsonPath("$.termId").value(openTerm.getId()))
         .andExpect(jsonPath("$.lecturerIds[0]").value(lecturerA.getId()))
+        .andExpect(jsonPath("$.lecturers[0].id").value(lecturerA.getId()))
+        .andExpect(jsonPath("$.lecturers[0].username").value(lecturerA.getUsername()))
+        .andExpect(jsonPath("$.lecturers[0].fullName").value(lecturerA.getFullName()))
         .andExpect(jsonPath("$.enrolledCount").value(0))
         .andExpect(jsonPath("$.status").value("OPEN"));
 
@@ -241,39 +244,82 @@ class SectionIntegrationTest extends IntegrationTestBase {
     mockMvc
         .perform(getAs(lecturerAToken, "/api/v1/sections"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$[?(@.id=='" + sectionA + "')]", hasSize(1)))
-        .andExpect(jsonPath("$[?(@.id=='" + sectionB + "')]", hasSize(0)));
+        .andExpect(jsonPath("$.content[?(@.id=='" + sectionA + "')]", hasSize(1)))
+        .andExpect(
+            jsonPath("$.content[?(@.id=='" + sectionA + "')].lecturers[0].fullName")
+                .value(org.hamcrest.Matchers.hasItem(lecturerA.getFullName())))
+        .andExpect(jsonPath("$.content[?(@.id=='" + sectionB + "')]", hasSize(0)));
 
     mockMvc
         .perform(getAs(lecturerAToken, "/api/v1/sections/{id}", sectionA))
-        .andExpect(status().isOk());
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.lecturers[0].fullName").value(lecturerA.getFullName()));
     mockMvc
         .perform(getAs(lecturerAToken, "/api/v1/sections/{id}", sectionB))
         .andExpect(status().isForbidden());
 
-    // ADMIN thấy cả hai lớp
+    // ADMIN thấy cả hai lớp và hỗ trợ phân trang + search theo mã lớp
     mockMvc
         .perform(getAs(adminToken, "/api/v1/sections?courseId={c}", course.getId()))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$[*].id", containsInAnyOrder(sectionA, sectionB)));
+        .andExpect(jsonPath("$.totalElements").value(2))
+        .andExpect(jsonPath("$.content[*].id", containsInAnyOrder(sectionA, sectionB)));
+
+    mockMvc
+        .perform(getAs(adminToken, "/api/v1/sections?courseId={c}&page=0&size=1", course.getId()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content", hasSize(1)))
+        .andExpect(jsonPath("$.totalElements").value(2))
+        .andExpect(jsonPath("$.totalPages").value(2))
+        .andExpect(jsonPath("$.last").value(false));
+
+    mockMvc
+        .perform(getAs(adminToken, "/api/v1/sections?courseId={c}&page=1&size=1", course.getId()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content", hasSize(1)))
+        .andExpect(jsonPath("$.last").value(true));
   }
 
   @Test
-  @DisplayName("US-19/AC-4: lọc theo học kỳ; ID lọc sai định dạng -> 400; chưa đăng nhập -> 401")
+  @DisplayName(
+      "US-19/AC-4: lọc theo học kỳ và search; ID/page/size sai định dạng -> 400; chưa đăng nhập -> 401")
   void us19_listFiltersAndAuthentication() throws Exception {
-    String section = createSectionAs(adminToken, validRequest().build());
+    SectionRequest secReq = validRequest().build();
+    String section = createSectionAs(adminToken, secReq);
     Term otherTerm = fixtures.term();
 
     mockMvc
         .perform(getAs(adminToken, "/api/v1/sections?termId={t}", openTerm.getId()))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$[?(@.id=='" + section + "')]", hasSize(1)));
+        .andExpect(jsonPath("$.content[?(@.id=='" + section + "')]", hasSize(1)));
+    mockMvc
+        .perform(
+            getAs(
+                adminToken,
+                "/api/v1/sections?termId={t}&search={q}",
+                openTerm.getId(),
+                secReq.getCode().toLowerCase()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content[?(@.id=='" + section + "')]", hasSize(1)));
+    mockMvc
+        .perform(
+            getAs(
+                adminToken, "/api/v1/sections?termId={t}&search=NO_SUCH_SECTION", openTerm.getId()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content", hasSize(0)))
+        .andExpect(jsonPath("$.totalElements").value(0));
     mockMvc
         .perform(getAs(adminToken, "/api/v1/sections?termId={t}", otherTerm.getId()))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$", hasSize(0)));
+        .andExpect(jsonPath("$.content", hasSize(0)));
     mockMvc
         .perform(getAs(adminToken, "/api/v1/sections?termId=bad"))
+        .andExpect(status().isBadRequest());
+    mockMvc
+        .perform(getAs(adminToken, "/api/v1/sections?page=-1&size=20"))
+        .andExpect(status().isBadRequest());
+    mockMvc
+        .perform(getAs(adminToken, "/api/v1/sections?page=0&size=101"))
         .andExpect(status().isBadRequest());
     mockMvc.perform(getAs(null, "/api/v1/sections")).andExpect(status().isUnauthorized());
   }
@@ -501,5 +547,24 @@ class SectionIntegrationTest extends IntegrationTestBase {
     mockMvc
         .perform(getAs(pmInScopeToken, "/api/v1/sections/lecturers?facultyId=invalid-id"))
         .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  @DisplayName("GET /api/v1/sections: giảng viên đã bị LOCKED vẫn hiển thị tên ở lớp cũ")
+  void getSections_keepsLockedLecturerSummary() throws Exception {
+    User tempLecturer = fixtures.user(Role.LECTURER);
+    String sectionId =
+        createSectionAs(
+            adminToken, validRequest().lecturerIds(List.of(tempLecturer.getId())).build());
+
+    tempLecturer.setStatus(com.hcmute.lms.lmsapi.enums.UserStatus.LOCKED);
+    mongo().save(tempLecturer);
+
+    mockMvc
+        .perform(getAs(pmInScopeToken, "/api/v1/sections/{id}", sectionId))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.lecturers[0].id").value(tempLecturer.getId()))
+        .andExpect(jsonPath("$.lecturers[0].username").value(tempLecturer.getUsername()))
+        .andExpect(jsonPath("$.lecturers[0].fullName").value(tempLecturer.getFullName()));
   }
 }

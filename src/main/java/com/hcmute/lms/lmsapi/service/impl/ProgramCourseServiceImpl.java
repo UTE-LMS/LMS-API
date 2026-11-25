@@ -4,6 +4,7 @@ import com.hcmute.lms.lmsapi.document.Course;
 import com.hcmute.lms.lmsapi.document.ProgramCourse;
 import com.hcmute.lms.lmsapi.document.ProgramVersion;
 import com.hcmute.lms.lmsapi.dto.AssessmentScoreTemplate;
+import com.hcmute.lms.lmsapi.dto.PageResponse;
 import com.hcmute.lms.lmsapi.dto.ProgramCourseCsvImportResponse;
 import com.hcmute.lms.lmsapi.dto.ProgramCourseRequest;
 import com.hcmute.lms.lmsapi.dto.ProgramCourseResponse;
@@ -23,6 +24,7 @@ import com.hcmute.lms.lmsapi.repository.ProgramVersionRepository;
 import com.hcmute.lms.lmsapi.service.AuditService;
 import com.hcmute.lms.lmsapi.service.ProgramCourseService;
 import com.hcmute.lms.lmsapi.util.ObjectIdUtils;
+import com.hcmute.lms.lmsapi.util.PageableValidationUtils;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -55,18 +57,16 @@ public class ProgramCourseServiceImpl implements ProgramCourseService {
   private AuditService auditService;
 
   @Override
-  public List<ProgramCourseResponse> getCoursesByProgramVersion(String programVersionId) {
-    return getCoursesByProgramVersion(programVersionId, null, null, null, null);
-  }
-
-  @Override
-  public List<ProgramCourseResponse> getCoursesByProgramVersion(
+  public PageResponse<ProgramCourseResponse> getCoursesByProgramVersion(
       String programVersionId,
       Integer semester,
       CourseType type,
       CourseCategory category,
-      String search) {
+      String search,
+      int page,
+      int size) {
     requireProgramVersion(programVersionId);
+    PageableValidationUtils.validate(page, size);
     List<ProgramCourse> programCourses =
         programCourseRepository.findByProgramVersionIdOrderBySemesterAscCourseIdAsc(
             programVersionId);
@@ -76,26 +76,29 @@ public class ProgramCourseServiceImpl implements ProgramCourseService {
         courseRepository.findAllById(courseIds).stream()
             .collect(Collectors.toMap(Course::getId, Function.identity()));
 
-    String query = search != null && !search.isBlank() ? search.trim().toLowerCase() : null;
-    return programCourses.stream()
-        .filter(pc -> semester == null || semester.equals(pc.getSemester()))
-        .filter(pc -> type == null || type == pc.getType())
-        .filter(pc -> category == null || category == pc.getCategory())
-        .map(pc -> programCourseMapper.toResponse(pc, courseMap.get(pc.getCourseId())))
-        .filter(
-            resp -> {
-              if (query == null) {
-                return true;
-              }
-              if (resp.getCourse() == null) {
-                return false;
-              }
-              String code = resp.getCourse().getCode();
-              String name = resp.getCourse().getName();
-              return (code != null && code.toLowerCase().contains(query))
-                  || (name != null && name.toLowerCase().contains(query));
-            })
-        .toList();
+    String query =
+        search != null && !search.isBlank() ? search.trim().toLowerCase(Locale.ROOT) : null;
+    List<ProgramCourseResponse> filtered =
+        programCourses.stream()
+            .filter(pc -> semester == null || semester.equals(pc.getSemester()))
+            .filter(pc -> type == null || type == pc.getType())
+            .filter(pc -> category == null || category == pc.getCategory())
+            .map(pc -> programCourseMapper.toResponse(pc, courseMap.get(pc.getCourseId())))
+            .filter(
+                resp -> {
+                  if (query == null) {
+                    return true;
+                  }
+                  if (resp.getCourse() == null) {
+                    return false;
+                  }
+                  String code = resp.getCourse().getCode();
+                  String name = resp.getCourse().getName();
+                  return (code != null && code.toLowerCase(Locale.ROOT).contains(query))
+                      || (name != null && name.toLowerCase(Locale.ROOT).contains(query));
+                })
+            .toList();
+    return PageResponse.slice(filtered, page, size, Function.identity());
   }
 
   @Override

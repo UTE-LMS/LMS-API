@@ -20,4 +20,9 @@ public class EnrollmentListResponse {
   private long enrolled;
   private long withdrawn;
   private List<EnrollmentResponse> enrollments;
+  private int page;
+  private int size;
+  private long totalElements;
+  private int totalPages;
+  private boolean last;
 }

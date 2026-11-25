@@ -11,6 +11,7 @@ import com.hcmute.lms.lmsapi.document.CourseSection;
 import com.hcmute.lms.lmsapi.document.Enrollment;
 import com.hcmute.lms.lmsapi.document.Student;
 import com.hcmute.lms.lmsapi.document.Term;
+import com.hcmute.lms.lmsapi.dto.CsvImportResultResponse;
 import com.hcmute.lms.lmsapi.dto.EnrollmentImportResponse;
 import com.hcmute.lms.lmsapi.dto.EnrollmentListResponse;
 import com.hcmute.lms.lmsapi.dto.EnrollmentResponse;
@@ -18,6 +19,7 @@ import com.hcmute.lms.lmsapi.dto.EnrollmentStatusUpdateRequest;
 import com.hcmute.lms.lmsapi.dto.FieldErrorDetail;
 import com.hcmute.lms.lmsapi.enums.EnrollmentStatus;
 import com.hcmute.lms.lmsapi.enums.SectionStatus;
+import com.hcmute.lms.lmsapi.enums.StudentStatus;
 import com.hcmute.lms.lmsapi.enums.TermStatus;
 import com.hcmute.lms.lmsapi.exception.BusinessRuleViolationException;
 import com.hcmute.lms.lmsapi.exception.ImportValidationException;
@@ -27,6 +29,7 @@ import com.hcmute.lms.lmsapi.repository.CourseSectionRepository;
 import com.hcmute.lms.lmsapi.repository.EnrollmentRepository;
 import com.hcmute.lms.lmsapi.repository.StudentRepository;
 import com.hcmute.lms.lmsapi.repository.TermRepository;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,6 +39,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.mock.web.MockMultipartFile;
 
 @ExtendWith(MockitoExtension.class)
 class EnrollmentServiceImplTest {
@@ -230,13 +234,24 @@ class EnrollmentServiceImplTest {
     when(enrollmentRepository.countBySectionIdAndStatus(SECTION_ID, EnrollmentStatus.WITHDRAWN))
         .thenReturn(1L);
 
-    EnrollmentListResponse response = service.getEnrollments(SECTION_ID, EnrollmentStatus.ENROLLED);
+    EnrollmentListResponse response =
+        service.getEnrollments(SECTION_ID, EnrollmentStatus.ENROLLED, null, 0, 20);
 
     assertThat(response.getEnrolled()).isEqualTo(2);
     assertThat(response.getWithdrawn()).isEqualTo(1);
+    assertThat(response.getTotalElements()).isEqualTo(2);
+    assertThat(response.getTotalPages()).isEqualTo(1);
+    assertThat(response.isLast()).isTrue();
     assertThat(response.getEnrollments())
         .extracting(EnrollmentResponse::getStudentCode)
         .containsExactly("SV-A", "SV-B");
+
+    EnrollmentListResponse searched =
+        service.getEnrollments(SECTION_ID, EnrollmentStatus.ENROLLED, "sv-b", 0, 20);
+    assertThat(searched.getTotalElements()).isEqualTo(1);
+    assertThat(searched.getEnrollments())
+        .extracting(EnrollmentResponse::getStudentCode)
+        .containsExactly("SV-B");
   }
 
   private java.io.InputStream csv(String content) {
@@ -245,52 +260,72 @@ class EnrollmentServiceImplTest {
   }
 
   @Test
-  @DisplayName(
-      "US-20/AC-1: nhập tệp -> chỉ tạo sinh viên mới, dùng lại sinh viên cũ, tính lại sĩ số")
-  void importEnrollments_createsNewAndReusesExisting() {
+  @DisplayName("US-20/AC-1: nhập tệp -> ghi danh sinh viên đã tồn tại, không tạo sinh viên mới")
+  void importEnrollments_enrollsExistingStudentsWithoutCreatingNew() {
     CourseSection section = section(SectionStatus.OPEN);
     when(sectionRepository.findById(SECTION_ID)).thenReturn(Optional.of(section));
     stubOpenTerm();
-    Student existing = Student.builder().id(STUDENT_ID).studentCode("SV-OLD").build();
-    when(studentRepository.findByStudentCodeIn(List.of("SV-OLD", "SV-NEW")))
-        .thenReturn(List.of(existing));
+    Student s1 = Student.builder().id(STUDENT_ID).studentCode("SV-1").build();
+    Student s2 = Student.builder().id("671dcba5f123456789abc702").studentCode("SV-2").build();
+    when(studentRepository.findByStudentCodeIn(List.of("SV-1", "SV-2")))
+        .thenReturn(List.of(s1, s2));
     when(enrollmentRepository.findBySectionId(SECTION_ID)).thenReturn(List.of());
-    when(studentRepository.saveAll(any()))
-        .thenAnswer(
-            invocation -> {
-              List<Student> students = invocation.getArgument(0);
-              students.forEach(s -> s.setId("671dcba5f123456789abc799"));
-              return students;
-            });
     when(enrollmentRepository.saveAll(any())).thenAnswer(i -> i.getArgument(0));
     when(enrollmentRepository.countBySectionIdAndStatus(SECTION_ID, EnrollmentStatus.ENROLLED))
         .thenReturn(2L);
 
     EnrollmentImportResponse response =
-        service.importEnrollments(
-            SECTION_ID, csv("studentCode,cohort\nSV-OLD,K22\nSV-NEW,K23\n"), "a");
+        service.importEnrollments(SECTION_ID, csv("studentCode,cohort\nSV-1,K22\nSV-2,K23\n"), "a");
 
     assertThat(response.getTotalRows()).isEqualTo(2);
-    assertThat(response.getNewStudents()).isEqualTo(1);
-    assertThat(response.getReusedStudents()).isEqualTo(1);
+    assertThat(response.getNewStudents()).isZero();
+    assertThat(response.getReusedStudents()).isEqualTo(2);
     assertThat(response.getSectionEnrolledCount()).isEqualTo(2);
-    ArgumentCaptor<List<Student>> saved = ArgumentCaptor.captor();
-    verify(studentRepository).saveAll(saved.capture());
-    assertThat(saved.getValue()).extracting(Student::getStudentCode).containsExactly("SV-NEW");
-    assertThat(saved.getValue().get(0).getCohort()).isEqualTo("K23");
+    verify(studentRepository, never()).saveAll(any());
+    verify(studentRepository, never()).save(any());
   }
 
   @Test
   @DisplayName(
-      "US-20/AC-2: gom đủ mọi lỗi theo dòng (thiếu, sai mẫu, quá dài, trùng, đã ghi danh, đã rút), không ghi gì")
+      "US-20/AC-2: mã sinh viên chưa tồn tại trong hệ thống -> 422 theo dòng, không ghi gì")
+  void importEnrollments_rejectsUnknownStudentCode() {
+    when(sectionRepository.findById(SECTION_ID))
+        .thenReturn(Optional.of(section(SectionStatus.OPEN)));
+    stubOpenTerm();
+    Student existing = Student.builder().id(STUDENT_ID).studentCode("SV-1").build();
+    when(studentRepository.findByStudentCodeIn(List.of("SV-1", "SV-MISSING")))
+        .thenReturn(List.of(existing));
+    when(enrollmentRepository.findBySectionId(SECTION_ID)).thenReturn(List.of());
+
+    assertThatThrownBy(
+            () ->
+                service.importEnrollments(SECTION_ID, csv("studentCode\nSV-1\nSV-MISSING\n"), "a"))
+        .isInstanceOfSatisfying(
+            ImportValidationException.class,
+            ex -> {
+              assertThat(ex.getRowErrors())
+                  .extracting(FieldErrorDetail::getField)
+                  .containsExactly("line 3");
+              assertThat(ex.getRowErrors().get(0).getMessage()).contains("không tồn tại");
+            });
+
+    verify(studentRepository, never()).saveAll(any());
+    verify(enrollmentRepository, never()).saveAll(any());
+    verify(sectionRepository, never()).save(any());
+  }
+
+  @Test
+  @DisplayName(
+      "US-20/AC-2: gom đủ mọi lỗi theo dòng (thiếu, sai mẫu, quá dài, trùng, chưa có SV, đã ghi danh, đã rút), không ghi gì")
   void importEnrollments_collectsAllRowErrorsAndWritesNothing() {
     when(sectionRepository.findById(SECTION_ID))
         .thenReturn(Optional.of(section(SectionStatus.OPEN)));
     stubOpenTerm();
+    Student sv2 = Student.builder().id("s0").studentCode("SV-2").build();
     Student enrolledStudent = Student.builder().id("s1").studentCode("SV-IN").build();
     Student withdrawnStudent = Student.builder().id("s2").studentCode("SV-OUT").build();
     when(studentRepository.findByStudentCodeIn(any()))
-        .thenReturn(List.of(enrolledStudent, withdrawnStudent));
+        .thenReturn(List.of(sv2, enrolledStudent, withdrawnStudent));
     when(enrollmentRepository.findBySectionId(SECTION_ID))
         .thenReturn(
             List.of(
@@ -316,7 +351,8 @@ class EnrollmentServiceImplTest {
             + "SV-2,K22\n" // line 5: hợp lệ
             + "SV-2,K22\n" // line 6: trùng dòng 5
             + "SV-IN,K22\n" // line 7: đã ghi danh
-            + "SV-OUT,K22\n"; // line 8: đã rút
+            + "SV-OUT,K22\n" // line 8: đã rút
+            + "SV-NOPE,K22\n"; // line 9: chưa tồn tại trong hệ thống
 
     assertThatThrownBy(() -> service.importEnrollments(SECTION_ID, csv(content), "a"))
         .isInstanceOfSatisfying(
@@ -324,11 +360,45 @@ class EnrollmentServiceImplTest {
             ex ->
                 assertThat(ex.getRowErrors())
                     .extracting(FieldErrorDetail::getField)
-                    .containsExactly("line 2", "line 3", "line 4", "line 6", "line 7", "line 8"));
+                    .containsExactly(
+                        "line 2", "line 3", "line 4", "line 6", "line 7", "line 8", "line 9"));
 
     verify(studentRepository, never()).saveAll(any());
     verify(enrollmentRepository, never()).saveAll(any());
     verify(sectionRepository, never()).save(any());
+  }
+
+  @Test
+  @DisplayName("importEnrollmentsBulk: từ chối mã sinh viên chưa tồn tại và không tự tạo mới")
+  void importEnrollmentsBulk_rejectsUnknownStudentAndNeverCreatesStudent() {
+    CourseSection section = section(SectionStatus.OPEN);
+    when(sectionRepository.findByCode("SEC-01")).thenReturn(Optional.of(section));
+    stubOpenTerm();
+    Student existing = Student.builder().id(STUDENT_ID).studentCode("SV-1").build();
+    when(studentRepository.findByStudentCode("SV-1")).thenReturn(Optional.of(existing));
+    when(studentRepository.findByStudentCode("SV-MISSING")).thenReturn(Optional.empty());
+    when(enrollmentRepository.save(any(Enrollment.class))).thenAnswer(i -> i.getArgument(0));
+    when(enrollmentRepository.countBySectionIdAndStatus(SECTION_ID, EnrollmentStatus.ENROLLED))
+        .thenReturn(1L);
+
+    MockMultipartFile file =
+        new MockMultipartFile(
+            "file",
+            "bulk.csv",
+            "text/csv",
+            "sectionCode,studentCode,cohort\nSEC-01,SV-1,K23\nSEC-01,SV-MISSING,K23\n"
+                .getBytes(StandardCharsets.UTF_8));
+
+    CsvImportResultResponse result = service.importEnrollmentsBulk(file, null);
+
+    assertThat(result.getTotalRows()).isEqualTo(2);
+    assertThat(result.getSuccessCount()).isEqualTo(1);
+    assertThat(result.getFailureCount()).isEqualTo(1);
+    assertThat(result.getErrors().get(0).getRow()).isEqualTo(3);
+    assertThat(result.getErrors().get(0).getKey()).isEqualTo("SV-MISSING");
+    assertThat(result.getErrors().get(0).getMessage()).contains("không tồn tại");
+    verify(studentRepository, never()).save(any());
+    verify(studentRepository, never()).saveAll(any());
   }
 
   @Test
@@ -350,7 +420,72 @@ class EnrollmentServiceImplTest {
   void getEnrollments_missingSection() {
     when(sectionRepository.findById(SECTION_ID)).thenReturn(Optional.empty());
 
-    assertThatThrownBy(() -> service.getEnrollments(SECTION_ID, null))
+    assertThatThrownBy(() -> service.getEnrollments(SECTION_ID, null, null, 0, 20))
         .isInstanceOf(ResourceNotFoundException.class);
+  }
+
+  @Test
+  @DisplayName("Chặn ghi danh sinh viên khác ACTIVE ở import 1 lớp, bulk import và ghi danh lại")
+  void nonActiveStudents_rejectedOnImportAndReEnroll_butAllowedToWithdraw() {
+    CourseSection section = section(SectionStatus.OPEN);
+    when(sectionRepository.findById(SECTION_ID)).thenReturn(Optional.of(section));
+    stubOpenTerm();
+
+    Student suspended =
+        Student.builder()
+            .id(STUDENT_ID)
+            .studentCode("SV-SUS")
+            .status(StudentStatus.SUSPENDED)
+            .build();
+    Student active =
+        Student.builder()
+            .id("671dcba5f123456789abc702")
+            .studentCode("SV-ACT")
+            .status(StudentStatus.ACTIVE)
+            .build();
+    when(studentRepository.findByStudentCodeIn(List.of("SV-SUS"))).thenReturn(List.of(suspended));
+    when(enrollmentRepository.findBySectionId(SECTION_ID)).thenReturn(List.of());
+
+    assertThatThrownBy(
+            () -> service.importEnrollments(SECTION_ID, csv("studentCode\nSV-SUS\n"), "a"))
+        .isInstanceOfSatisfying(
+            ImportValidationException.class,
+            ex -> {
+              assertThat(ex.getRowErrors()).hasSize(1);
+              assertThat(ex.getRowErrors().get(0).getMessage()).contains("ACTIVE");
+            });
+
+    when(sectionRepository.findByCode("SEC-01")).thenReturn(Optional.of(section));
+    when(studentRepository.findByStudentCode("SV-ACT")).thenReturn(Optional.of(active));
+    when(studentRepository.findByStudentCode("SV-SUS")).thenReturn(Optional.of(suspended));
+    when(enrollmentRepository.save(any(Enrollment.class))).thenAnswer(i -> i.getArgument(0));
+    when(enrollmentRepository.countBySectionIdAndStatus(SECTION_ID, EnrollmentStatus.ENROLLED))
+        .thenReturn(1L);
+
+    MockMultipartFile bulkFile =
+        new MockMultipartFile(
+            "file",
+            "bulk.csv",
+            "text/csv",
+            "sectionCode,studentCode,cohort\nSEC-01,SV-ACT,K23\nSEC-01,SV-SUS,K23\n"
+                .getBytes(StandardCharsets.UTF_8));
+    CsvImportResultResponse bulkResult = service.importEnrollmentsBulk(bulkFile, null);
+    assertThat(bulkResult.getSuccessCount()).isEqualTo(1);
+    assertThat(bulkResult.getFailureCount()).isEqualTo(1);
+    assertThat(bulkResult.getErrors().get(0).getMessage()).contains("ACTIVE");
+
+    Enrollment withdrawn = enrollment(EnrollmentStatus.WITHDRAWN);
+    when(enrollmentRepository.findById(ENROLLMENT_ID)).thenReturn(Optional.of(withdrawn));
+    when(studentRepository.findById(STUDENT_ID)).thenReturn(Optional.of(suspended));
+    assertThatThrownBy(
+            () -> service.updateStatus(ENROLLMENT_ID, request(EnrollmentStatus.ENROLLED), "a"))
+        .isInstanceOf(BusinessRuleViolationException.class)
+        .hasMessageContaining("SUSPENDED");
+
+    Enrollment enrolled = enrollment(EnrollmentStatus.ENROLLED);
+    when(enrollmentRepository.findById(ENROLLMENT_ID)).thenReturn(Optional.of(enrolled));
+    EnrollmentResponse withdrawRes =
+        service.updateStatus(ENROLLMENT_ID, request(EnrollmentStatus.WITHDRAWN), "a");
+    assertThat(withdrawRes.getStatus()).isEqualTo(EnrollmentStatus.WITHDRAWN);
   }
 }

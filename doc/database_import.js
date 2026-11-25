@@ -295,11 +295,11 @@ const COLLECTIONS = {
   },
 
   students: {
-    validator: schema(['studentCode'], {
+    validator: schema(['studentCode', 'fullName', 'cohort'], {
       studentCode: STR,
       userId: OID_N,
-      cohort: STR_N, programVersionId: OID_N,
-      fullName: STR_N, email: STR_N,
+      cohort: STR, programVersionId: OID_N,
+      fullName: STR, email: STR_N,
       status: { enum: ['ACTIVE', 'SUSPENDED', 'GRADUATED', 'DROPPED_OUT', null] },
       createdAt: DATE_N, updatedAt: DATE_N
     }),

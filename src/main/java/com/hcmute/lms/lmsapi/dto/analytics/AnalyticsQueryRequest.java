@@ -79,4 +79,19 @@ public class AnalyticsQueryRequest {
    * dòng/cột có ít nhất 1 ô có người Chưa đạt. Null: không lọc.
    */
   private Boolean passed;
+
+  /**
+   * Chỉ số trang (0-indexed), áp dụng khi truy vấn ma trận với dimension = STUDENT (mặc định 0).
+   */
+  private Integer page;
+
+  /**
+   * Kích thước trang (1..100), áp dụng khi truy vấn ma trận với dimension = STUDENT (mặc định 20).
+   */
+  private Integer size;
+
+  /**
+   * Tìm kiếm sinh viên theo mã SV hoặc họ tên (không phân biệt hoa thường) cho dimension = STUDENT.
+   */
+  private String search;
 }

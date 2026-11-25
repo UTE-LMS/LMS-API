@@ -25,6 +25,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
 import org.springframework.test.web.servlet.MvcResult;
 
 @DisplayName("F05b: tải tệp điểm, ánh xạ cột, chống nhập trùng (US-21)")
@@ -479,24 +480,27 @@ class ImportBatchUploadIntegrationTest extends ScoreImportIntegrationBase {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.status").value("CONFIRMED"));
 
-    // Xem lại danh sách điểm đã nhập theo sinh viên và câu hỏi/CLO
+    // Xem lại danh sách điểm đã nhập theo sinh viên và câu hỏi/CLO (phân trang theo sinh viên)
     mockMvc
         .perform(
             org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(
                     "/api/v1/assessments/{id}/scores", assessment.getId())
                 .header("Authorization", lecturerToken))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$", hasSize(2)))
-        .andExpect(jsonPath("$[0].studentCode").value(s1.getStudentCode()))
-        .andExpect(jsonPath("$[0].itemCode").value("Q1"))
+        .andExpect(jsonPath("$.content", hasSize(2)))
+        .andExpect(jsonPath("$.totalElements").value(1))
+        .andExpect(jsonPath("$.totalPages").value(1))
+        .andExpect(jsonPath("$.last").value(true))
+        .andExpect(jsonPath("$.content[0].studentCode").value(s1.getStudentCode()))
+        .andExpect(jsonPath("$.content[0].itemCode").value("Q1"))
         .andExpect(
-            jsonPath("$[0].cloId")
+            jsonPath("$.content[0].cloId")
                 .value(assessment.getItems().get(0).getOutcomeMappings().get(0).getCloId()))
-        .andExpect(jsonPath("$[0].rawScore").value(3.5))
-        .andExpect(jsonPath("$[0].maxScore").value(4.0))
-        .andExpect(jsonPath("$[0].importBatchId").value(batchId))
-        .andExpect(jsonPath("$[1].itemCode").value("Q2"))
-        .andExpect(jsonPath("$[1].rawScore").value(5.5));
+        .andExpect(jsonPath("$.content[0].rawScore").value(3.5))
+        .andExpect(jsonPath("$.content[0].maxScore").value(4.0))
+        .andExpect(jsonPath("$.content[0].importBatchId").value(batchId))
+        .andExpect(jsonPath("$.content[1].itemCode").value("Q2"))
+        .andExpect(jsonPath("$.content[1].rawScore").value(5.5));
 
     mockMvc
         .perform(
@@ -506,6 +510,113 @@ class ImportBatchUploadIntegrationTest extends ScoreImportIntegrationBase {
                     assessment.getId())
                 .header("Authorization", lecturerToken))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$", hasSize(2)));
+        .andExpect(jsonPath("$.content", hasSize(2)))
+        .andExpect(jsonPath("$.totalElements").value(1));
+  }
+
+  @Test
+  @DisplayName(
+      "scores: phân trang theo nhóm sinh viên (không cắt đôi SV), lọc search và xuất CSV/XLSX toàn bộ")
+  void scores_paginationByStudentSearchAndExport() throws Exception {
+    MvcResult uploaded =
+        mockMvc
+            .perform(upload(lecturerToken, goodCsv(), "MISSING", defaultMapping()))
+            .andExpect(status().isCreated())
+            .andReturn();
+    String batchId = read(uploaded, "$.id");
+    mockMvc.perform(postAction(lecturerToken, batchId, "validate")).andExpect(status().isOk());
+    mockMvc.perform(postAction(lecturerToken, batchId, "confirm")).andExpect(status().isOk());
+
+    List<String> sortedCodes =
+        List.of(s1.getStudentCode(), s2.getStudentCode()).stream().sorted().toList();
+
+    // size=1 -> mỗi trang trả đủ cả Q1 và Q2 của đúng 1 sinh viên
+    mockMvc
+        .perform(
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(
+                    "/api/v1/assessments/{id}/scores?page=0&size=1", assessment.getId())
+                .header("Authorization", lecturerToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalElements").value(2))
+        .andExpect(jsonPath("$.totalPages").value(2))
+        .andExpect(jsonPath("$.last").value(false))
+        .andExpect(jsonPath("$.content", hasSize(2)))
+        .andExpect(jsonPath("$.content[0].studentCode").value(sortedCodes.get(0)))
+        .andExpect(jsonPath("$.content[1].studentCode").value(sortedCodes.get(0)));
+
+    mockMvc
+        .perform(
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(
+                    "/api/v1/assessments/{id}/scores?page=1&size=1", assessment.getId())
+                .header("Authorization", lecturerToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.last").value(true))
+        .andExpect(jsonPath("$.content", hasSize(2)))
+        .andExpect(jsonPath("$.content[0].studentCode").value(sortedCodes.get(1)));
+
+    // search theo itemCode Q2 hoặc studentCode
+    mockMvc
+        .perform(
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(
+                    "/api/v1/assessments/{id}/scores?search={q}",
+                    assessment.getId(),
+                    s2.getStudentCode())
+                .header("Authorization", lecturerToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalElements").value(1))
+        .andExpect(jsonPath("$.content", hasSize(2)))
+        .andExpect(jsonPath("$.content[0].studentCode").value(s2.getStudentCode()));
+
+    // Tham số page/size sai biên -> 400
+    mockMvc
+        .perform(
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(
+                    "/api/v1/assessments/{id}/scores?page=-1&size=20", assessment.getId())
+                .header("Authorization", lecturerToken))
+        .andExpect(status().isBadRequest());
+    mockMvc
+        .perform(
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(
+                    "/api/v1/assessments/{id}/scores?page=0&size=101", assessment.getId())
+                .header("Authorization", lecturerToken))
+        .andExpect(status().isBadRequest());
+
+    // Xuất CSV toàn bộ bảng điểm (không bị cắt trang)
+    mockMvc
+        .perform(
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(
+                    "/api/v1/assessments/{id}/scores/export", assessment.getId())
+                .header("Authorization", lecturerToken))
+        .andExpect(status().isOk())
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                .string(HttpHeaders.CONTENT_TYPE, containsString("text/csv")))
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                .string(HttpHeaders.CONTENT_DISPOSITION, containsString("-scores.csv")))
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.content()
+                .string(containsString(s1.getStudentCode())))
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.content()
+                .string(containsString(s2.getStudentCode())));
+
+    // Xuất XLSX qua endpoint theo section
+    mockMvc
+        .perform(
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(
+                    "/api/v1/sections/{sectionId}/assessments/{assessmentId}/scores/export?format=xlsx",
+                    section.getId(),
+                    assessment.getId())
+                .header("Authorization", lecturerToken))
+        .andExpect(status().isOk())
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                .string(
+                    HttpHeaders.CONTENT_TYPE,
+                    containsString("application/vnd.openxmlformats-officedocument")))
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                .string(HttpHeaders.CONTENT_DISPOSITION, containsString("-scores.xlsx")));
   }
 }

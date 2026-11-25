@@ -1346,9 +1346,47 @@ class AnalyticsServiceImplTest {
 
       assertThat(resp.getDimension()).isEqualTo(AnalyticsDimension.STUDENT);
       assertThat(resp.getLevel()).isEqualTo(ResultLevel.CLO);
+      assertThat(resp.getPage()).isZero();
+      assertThat(resp.getSize()).isEqualTo(20);
+      assertThat(resp.getTotalElements()).isEqualTo(2L);
+      assertThat(resp.getTotalPages()).isEqualTo(1);
+      assertThat(resp.getLast()).isTrue();
       // Cột sinh viên sắp xếp theo MSSV
       assertThat(resp.getColumns()).extracting("code").containsExactly("21110001", "21110002");
       assertThat(resp.getRows()).extracting("code").containsExactly("CLO1", "CLO2");
+
+      // Phân trang cột sinh viên với size=1 -> page 0 chỉ lấy sinh viên đầu, export vẫn xuất đủ
+      AnalyticsQueryRequest pagedReq =
+          AnalyticsQueryRequest.builder()
+              .dimension(AnalyticsDimension.STUDENT)
+              .courseId("crs_algo")
+              .sectionIds(List.of("sec_1"))
+              .runId("run_success_1")
+              .page(0)
+              .size(1)
+              .build();
+      AnalyticsMatrixResponse page0 = analyticsService.getAnalyticsMatrix(pagedReq, adminPrincipal);
+      assertThat(page0.getColumns()).extracting("code").containsExactly("21110001");
+      assertThat(page0.getMatrix().get(0)).hasSize(1);
+      assertThat(page0.getTotalElements()).isEqualTo(2L);
+      assertThat(page0.getTotalPages()).isEqualTo(2);
+      assertThat(page0.getLast()).isFalse();
+
+      when(matrixCsvExporter.exportToCsv(any()))
+          .thenAnswer(
+              inv -> {
+                AnalyticsMatrixResponse exported = inv.getArgument(0);
+                return exported.getColumns().stream()
+                    .map(MatrixHeader::getCode)
+                    .reduce((a, b) -> a + "," + b)
+                    .orElse("")
+                    .getBytes(StandardCharsets.UTF_8);
+              });
+      String exportedCodes =
+          new String(
+              analyticsService.exportAnalyticsMatrixCsv(pagedReq, adminPrincipal),
+              StandardCharsets.UTF_8);
+      assertThat(exportedCodes).isEqualTo("21110001,21110002");
 
       // Dòng CLO1:
       // s1: đạt (mean=0.85, passed=1, passRate=1.0)

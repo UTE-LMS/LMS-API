@@ -58,6 +58,15 @@ class EnrollmentImportIntegrationTest extends IntegrationTestBase {
     return mongo().save(created);
   }
 
+  private Student seedStudent(String cohort) {
+    Student student = fixtures.student();
+    if (cohort != null) {
+      student.setCohort(cohort);
+      student = mongo().save(student);
+    }
+    return student;
+  }
+
   private MockMultipartHttpServletRequestBuilder importAs(
       String bearer, String sectionId, String csv) {
     MockMultipartHttpServletRequestBuilder builder =
@@ -91,11 +100,11 @@ class EnrollmentImportIntegrationTest extends IntegrationTestBase {
 
   @Test
   @DisplayName(
-      "US-20/AC-1 & AC-4: nhập CSV tạo sinh viên mới, ghi danh ENROLLED, sĩ số = số dòng hợp lệ")
-  void us20_ac1_importCreatesStudentsAndEnrollments() throws Exception {
-    String refA = fixtures.code("STU");
-    String refB = fixtures.code("STU");
-    String refC = fixtures.code("STU");
+      "US-20/AC-1 & AC-4: nhập CSV ghi danh ENROLLED sinh viên đã có, không tạo mới, sĩ số = số dòng hợp lệ")
+  void us20_ac1_importEnrollsExistingStudents() throws Exception {
+    String refA = seedStudent("K22").getStudentCode();
+    String refB = seedStudent("K22").getStudentCode();
+    String refC = seedStudent(null).getStudentCode();
 
     mockMvc
         .perform(
@@ -106,8 +115,8 @@ class EnrollmentImportIntegrationTest extends IntegrationTestBase {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.sectionId").value(section.getId()))
         .andExpect(jsonPath("$.totalRows").value(3))
-        .andExpect(jsonPath("$.newStudents").value(3))
-        .andExpect(jsonPath("$.reusedStudents").value(0))
+        .andExpect(jsonPath("$.newStudents").value(0))
+        .andExpect(jsonPath("$.reusedStudents").value(3))
         .andExpect(jsonPath("$.sectionEnrolledCount").value(3))
         .andExpect(jsonPath("$.ignoredColumns", hasSize(0)));
 
@@ -129,9 +138,9 @@ class EnrollmentImportIntegrationTest extends IntegrationTestBase {
 
   @Test
   @DisplayName(
-      "US-20/AC-1 (Q09): cột họ tên/email bị bỏ qua, không được lưu, được báo trong phản hồi")
+      "US-20/AC-1 (Q09): cột họ tên/email trong tệp ghi danh bị bỏ qua, không ghi đè dữ liệu sinh viên")
   void us20_personalColumnsAreNotStored() throws Exception {
-    String ref = fixtures.code("STU");
+    String ref = seedStudent("K22").getStudentCode();
 
     mockMvc
         .perform(
@@ -150,16 +159,15 @@ class EnrollmentImportIntegrationTest extends IntegrationTestBase {
                 org.bson.Document.class,
                 "students");
     assertThat(raw).isNotNull();
-    assertThat(raw.containsKey("fullName")).isFalse();
+    assertThat(raw.getString("fullName")).isEqualTo("Sinh viên " + ref);
     assertThat(raw.containsKey("email")).isFalse();
   }
 
   @Test
-  @DisplayName(
-      "US-20/AC-1: sinh viên đã có ở lớp khác được dùng lại, không tạo trùng (studentCode trùng giữa hai tệp)")
+  @DisplayName("US-20/AC-1: cùng sinh viên đã có trong hệ thống ghi danh được vào nhiều lớp")
   void us20_ac1_existingStudentIsReusedAcrossSections() throws Exception {
-    String shared = fixtures.code("STU");
-    String onlyInSecond = fixtures.code("STU");
+    String shared = seedStudent("K22").getStudentCode();
+    String onlyInSecond = seedStudent("K22").getStudentCode();
     User lecturer2 = fixtures.user(Role.LECTURER);
     CourseSection second = newSection(lecturer2);
 
@@ -173,8 +181,8 @@ class EnrollmentImportIntegrationTest extends IntegrationTestBase {
                 second.getId(),
                 "studentCode\n" + shared + "\n" + onlyInSecond + "\n"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.newStudents").value(1))
-        .andExpect(jsonPath("$.reusedStudents").value(1))
+        .andExpect(jsonPath("$.newStudents").value(0))
+        .andExpect(jsonPath("$.reusedStudents").value(2))
         .andExpect(jsonPath("$.sectionEnrolledCount").value(2));
 
     assertThat(countStudents(shared, onlyInSecond)).isEqualTo(2);
@@ -182,10 +190,36 @@ class EnrollmentImportIntegrationTest extends IntegrationTestBase {
 
   @Test
   @DisplayName(
+      "US-20/AC-2: mã sinh viên chưa tồn tại trong hệ thống -> 422 và không tạo mới hay ghi danh")
+  void us20_ac2_unknownStudentCodeIsRejectedAndNotCreated() throws Exception {
+    String existingRef = seedStudent("K23").getStudentCode();
+    String missingRef = fixtures.code("STU");
+
+    mockMvc
+        .perform(
+            importAs(
+                lecturerToken,
+                section.getId(),
+                "studentCode,cohort\n" + existingRef + ",K23\n" + missingRef + ",K23\n"))
+        .andExpect(status().isUnprocessableEntity())
+        .andExpect(jsonPath("$.code").value("BUSINESS_RULE_VIOLATION"))
+        .andExpect(jsonPath("$.fieldErrors", hasSize(1)))
+        .andExpect(jsonPath("$.fieldErrors[0].field").value("line 3"))
+        .andExpect(
+            jsonPath("$.fieldErrors[0].message")
+                .value(org.hamcrest.Matchers.containsString("không tồn tại")));
+
+    assertThat(countStudents(missingRef)).isZero();
+    assertThat(countEnrollments(section.getId(), EnrollmentStatus.ENROLLED)).isZero();
+    assertThat(enrolledCountOf(section)).isZero();
+  }
+
+  @Test
+  @DisplayName(
       "US-20/AC-2: có dòng lỗi (thiếu, sai định dạng, trùng trong tệp) -> 422 theo dòng và không ghi gì")
   void us20_ac2_rowErrorsMeanNothingIsWritten() throws Exception {
-    String good = fixtures.code("STU");
-    String dup = fixtures.code("STU");
+    String good = seedStudent("K22").getStudentCode();
+    String dup = seedStudent("K22").getStudentCode();
 
     mockMvc
         .perform(
@@ -212,7 +246,6 @@ class EnrollmentImportIntegrationTest extends IntegrationTestBase {
         .andExpect(jsonPath("$.fieldErrors[2].field").value("line 7"));
 
     // Dòng hợp lệ đứng trước cũng không được ghi (một thao tác thống nhất)
-    assertThat(countStudents(good, dup)).isZero();
     assertThat(countEnrollments(section.getId(), EnrollmentStatus.ENROLLED)).isZero();
     assertThat(enrolledCountOf(section)).isZero();
   }
@@ -221,7 +254,7 @@ class EnrollmentImportIntegrationTest extends IntegrationTestBase {
   @DisplayName(
       "US-20/AC-2 & idempotent: nhập lại cùng tệp -> 422 'đã ghi danh', không nhân đôi sinh viên/ghi danh")
   void us20_ac2_reimportingTheSameFileIsRejectedWithoutDuplicates() throws Exception {
-    String ref = fixtures.code("STU");
+    String ref = seedStudent("K22").getStudentCode();
     String csv = "studentCode\n" + ref + "\n";
 
     mockMvc.perform(importAs(lecturerToken, section.getId(), csv)).andExpect(status().isOk());
@@ -275,7 +308,7 @@ class EnrollmentImportIntegrationTest extends IntegrationTestBase {
   @Test
   @DisplayName("US-20 RBAC: giảng viên ngoài lớp -> 403; chưa đăng nhập -> 401; ADMIN nhập được")
   void us20_rbac() throws Exception {
-    String csv = "studentCode\n" + fixtures.code("STU") + "\n";
+    String csv = "studentCode\n" + seedStudent("K23").getStudentCode() + "\n";
 
     mockMvc
         .perform(importAs(otherLecturerToken, section.getId(), csv))
@@ -299,7 +332,7 @@ class EnrollmentImportIntegrationTest extends IntegrationTestBase {
   @DisplayName(
       "US-20 (khóa mẫu số): lớp CLOSED/LOCKED hoặc học kỳ khóa sổ điểm -> 422 và không ghi gì")
   void us20_frozenSectionOrTermRejectsImport() throws Exception {
-    String ref = fixtures.code("STU");
+    String ref = seedStudent("K23").getStudentCode();
     String csv = "studentCode\n" + ref + "\n";
 
     for (SectionStatus frozen : List.of(SectionStatus.CLOSED, SectionStatus.LOCKED)) {
@@ -317,7 +350,7 @@ class EnrollmentImportIntegrationTest extends IntegrationTestBase {
         .perform(importAs(lecturerToken, section.getId(), csv))
         .andExpect(status().isUnprocessableEntity());
 
-    assertThat(countStudents(ref)).isZero();
+    assertThat(countEnrollments(section.getId(), EnrollmentStatus.ENROLLED)).isZero();
     assertThat(enrolledCountOf(section)).isZero();
   }
 
@@ -327,7 +360,7 @@ class EnrollmentImportIntegrationTest extends IntegrationTestBase {
   void us20_ac4_denominatorFollowsWithdrawals() throws Exception {
     StringBuilder csv = new StringBuilder("studentCode\n");
     for (int i = 0; i < 5; i++) {
-      csv.append(fixtures.code("STU")).append('\n');
+      csv.append(seedStudent("K23").getStudentCode()).append('\n');
     }
     mockMvc
         .perform(importAs(lecturerToken, section.getId(), csv.toString()))
@@ -358,13 +391,16 @@ class EnrollmentImportIntegrationTest extends IntegrationTestBase {
 
     mockMvc
         .perform(
-            importAs(lecturerToken, section.getId(), "studentCode\n" + fixtures.code("STU") + "\n"))
+            importAs(
+                lecturerToken,
+                section.getId(),
+                "studentCode\n" + seedStudent("K23").getStudentCode() + "\n"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.sectionEnrolledCount").value(5));
   }
 
   @Test
-  @DisplayName("Tải template và import ghi danh nhiều lớp từ 1 file CSV")
+  @DisplayName("Tải template và import ghi danh nhiều lớp: từ chối sinh viên chưa tồn tại")
   void bulkEnrollmentTemplateAndImport() throws Exception {
     mockMvc
         .perform(
@@ -384,8 +420,9 @@ class EnrollmentImportIntegrationTest extends IntegrationTestBase {
             org.springframework.test.web.servlet.result.MockMvcResultMatchers.content()
                 .string(org.hamcrest.Matchers.containsString("sectionCode,studentCode,cohort")));
 
-    String mssv1 = fixtures.code("MSSV");
-    String mssv2 = fixtures.code("MSSV");
+    String mssv1 = seedStudent("K23").getStudentCode();
+    String mssv2 = seedStudent("K23").getStudentCode();
+    String missingMssv = fixtures.code("MSSV_MISS");
     var file =
         new org.springframework.mock.web.MockMultipartFile(
             "file",
@@ -400,6 +437,10 @@ class EnrollmentImportIntegrationTest extends IntegrationTestBase {
                     + ","
                     + mssv2
                     + ",K23\n"
+                    + section.getCode()
+                    + ","
+                    + missingMssv
+                    + ",K23\n"
                     + "MISSING_SEC,"
                     + mssv2
                     + ",K23\n")
@@ -411,9 +452,144 @@ class EnrollmentImportIntegrationTest extends IntegrationTestBase {
                 .file(file)
                 .header(org.springframework.http.HttpHeaders.AUTHORIZATION, lecturerToken))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.totalRows").value(3))
+        .andExpect(jsonPath("$.totalRows").value(4))
         .andExpect(jsonPath("$.successCount").value(2))
-        .andExpect(jsonPath("$.failureCount").value(1));
+        .andExpect(jsonPath("$.failureCount").value(2))
+        .andExpect(
+            jsonPath("$.errors[0].message")
+                .value(org.hamcrest.Matchers.containsString("không tồn tại")));
     assertThat(enrolledCountOf(section)).isEqualTo(2);
+    assertThat(countStudents(missingMssv)).isZero();
+  }
+
+  @Test
+  @DisplayName(
+      "Luồng E2E: ADMIN import sinh viên trước, sau đó giảng viên ghi danh vào lớp thành công")
+  void endToEnd_adminImportsStudentThenLecturerEnrolls() throws Exception {
+    String studentCode = fixtures.code("STU");
+    MockMultipartFile studentFile =
+        new MockMultipartFile(
+            "file",
+            "students.csv",
+            "text/csv",
+            ("studentCode,fullName,cohort\n" + studentCode + ",Sinh Viên Mới,K24\n")
+                .getBytes(StandardCharsets.UTF_8));
+
+    mockMvc
+        .perform(
+            multipart("/api/v1/students/import")
+                .file(studentFile)
+                .header(HttpHeaders.AUTHORIZATION, adminToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.successCount").value(1));
+
+    mockMvc
+        .perform(importAs(lecturerToken, section.getId(), "studentCode\n" + studentCode + "\n"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalRows").value(1))
+        .andExpect(jsonPath("$.newStudents").value(0))
+        .andExpect(jsonPath("$.reusedStudents").value(1))
+        .andExpect(jsonPath("$.sectionEnrolledCount").value(1));
+  }
+
+  @Test
+  @DisplayName(
+      "Chặn ghi danh sinh viên không ở trạng thái ACTIVE (qua import 1 lớp, nhiều lớp và ghi danh lại)")
+  void nonActiveStudentsAreRejectedFromEnrollment() throws Exception {
+    Student suspended = seedStudent("K23");
+    Student graduated = seedStudent("K22");
+
+    mockMvc
+        .perform(
+            putAs(
+                adminToken,
+                "/api/v1/students/{id}/status",
+                com.hcmute.lms.lmsapi.dto.StudentStatusUpdateRequest.builder()
+                    .status(com.hcmute.lms.lmsapi.enums.StudentStatus.SUSPENDED)
+                    .build(),
+                suspended.getId()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("SUSPENDED"));
+
+    MockMultipartFile statusCsv =
+        new MockMultipartFile(
+            "file",
+            "status.csv",
+            "text/csv",
+            ("studentCode,status\n" + graduated.getStudentCode() + ",GRADUATED\n")
+                .getBytes(StandardCharsets.UTF_8));
+    mockMvc
+        .perform(
+            multipart("/api/v1/students/status-import")
+                .file(statusCsv)
+                .header(HttpHeaders.AUTHORIZATION, adminToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.successCount").value(1));
+
+    // 1. Import 1 lớp phải trả 422 và không ghi danh
+    mockMvc
+        .perform(
+            importAs(
+                lecturerToken,
+                section.getId(),
+                "studentCode\n" + suspended.getStudentCode() + "\n"))
+        .andExpect(status().isUnprocessableEntity())
+        .andExpect(jsonPath("$.fieldErrors[0].field").value("line 2"))
+        .andExpect(
+            jsonPath("$.fieldErrors[0].message")
+                .value(org.hamcrest.Matchers.containsString("ACTIVE")));
+    assertThat(enrolledCountOf(section)).isZero();
+
+    // 2. Import nhiều lớp báo lỗi dòng không ACTIVE
+    MockMultipartFile bulkCsv =
+        new MockMultipartFile(
+            "file",
+            "bulk.csv",
+            "text/csv",
+            ("sectionCode,studentCode,cohort\n"
+                    + section.getCode()
+                    + ","
+                    + graduated.getStudentCode()
+                    + ",K22\n")
+                .getBytes(StandardCharsets.UTF_8));
+    mockMvc
+        .perform(
+            multipart("/api/v1/enrollments/import")
+                .file(bulkCsv)
+                .header(HttpHeaders.AUTHORIZATION, lecturerToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.successCount").value(0))
+        .andExpect(jsonPath("$.failureCount").value(1))
+        .andExpect(
+            jsonPath("$.errors[0].message").value(org.hamcrest.Matchers.containsString("ACTIVE")));
+    assertThat(enrolledCountOf(section)).isZero();
+
+    // 3. Sinh viên đã rút lớp (WITHDRAWN) sau đó đổi sang DROPPED_OUT -> không thể ghi danh lại
+    Student dropped = seedStudent("K23");
+    var withdrawn = fixtures.enrollment(section, dropped, EnrollmentStatus.WITHDRAWN);
+    mockMvc
+        .perform(
+            putAs(
+                adminToken,
+                "/api/v1/students/{id}/status",
+                com.hcmute.lms.lmsapi.dto.StudentStatusUpdateRequest.builder()
+                    .status(com.hcmute.lms.lmsapi.enums.StudentStatus.DROPPED_OUT)
+                    .build(),
+                dropped.getId()))
+        .andExpect(status().isOk());
+
+    mockMvc
+        .perform(
+            putAs(
+                lecturerToken,
+                "/api/v1/enrollments/{id}/status",
+                com.hcmute.lms.lmsapi.dto.EnrollmentStatusUpdateRequest.builder()
+                    .status(EnrollmentStatus.ENROLLED)
+                    .build(),
+                withdrawn.getId()))
+        .andExpect(status().isUnprocessableEntity())
+        .andExpect(jsonPath("$.code").value("BUSINESS_RULE_VIOLATION"))
+        .andExpect(
+            jsonPath("$.message").value(org.hamcrest.Matchers.containsString("DROPPED_OUT")));
   }
 }
