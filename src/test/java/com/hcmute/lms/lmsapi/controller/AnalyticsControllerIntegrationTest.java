@@ -17,6 +17,7 @@ import com.hcmute.lms.lmsapi.document.CourseSection;
 import com.hcmute.lms.lmsapi.document.Faculty;
 import com.hcmute.lms.lmsapi.document.Program;
 import com.hcmute.lms.lmsapi.document.ProgramVersion;
+import com.hcmute.lms.lmsapi.document.Student;
 import com.hcmute.lms.lmsapi.document.Syllabus;
 import com.hcmute.lms.lmsapi.document.Term;
 import com.hcmute.lms.lmsapi.document.User;
@@ -24,6 +25,7 @@ import com.hcmute.lms.lmsapi.document.Verification;
 import com.hcmute.lms.lmsapi.enums.AggregateScopeType;
 import com.hcmute.lms.lmsapi.enums.CalculationScope;
 import com.hcmute.lms.lmsapi.enums.CalculationStatus;
+import com.hcmute.lms.lmsapi.enums.EnrollmentStatus;
 import com.hcmute.lms.lmsapi.enums.ProgramVersionStatus;
 import com.hcmute.lms.lmsapi.enums.ResultLevel;
 import com.hcmute.lms.lmsapi.enums.Role;
@@ -558,8 +560,16 @@ class AnalyticsControllerIntegrationTest extends IntegrationTestBase {
   }
 
   @Test
-  @DisplayName("D7: Truy vấn ma trận STUDENT thành công (200 OK)")
+  @DisplayName(
+      "D7: Truy vấn ma trận STUDENT thành công, hỗ trợ phân trang cột và search; export giữ nguyên toàn bộ")
   void testQueryStudentAnalytics() throws Exception {
+    Student s1 = fixtures.student();
+    Student s2 = fixtures.student();
+    fixtures.enrollment(section1, s1, EnrollmentStatus.ENROLLED);
+    fixtures.enrollment(section1, s2, EnrollmentStatus.ENROLLED);
+    List<String> sortedCodes =
+        List.of(s1.getStudentCode(), s2.getStudentCode()).stream().sorted().toList();
+
     mockMvc
         .perform(
             getAs(
@@ -569,9 +579,80 @@ class AnalyticsControllerIntegrationTest extends IntegrationTestBase {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.dimension").value("STUDENT"))
         .andExpect(jsonPath("$.level").value("CLO"))
-        .andExpect(jsonPath("$.columns").isArray())
-        .andExpect(jsonPath("$.rows").isArray())
+        .andExpect(jsonPath("$.columns", hasSize(2)))
+        .andExpect(jsonPath("$.totalElements").value(2))
+        .andExpect(jsonPath("$.totalPages").value(1))
+        .andExpect(jsonPath("$.last").value(true))
+        .andExpect(jsonPath("$.rows", hasSize(2)))
         .andExpect(jsonPath("$.matrix").isArray());
+
+    // Phân trang cột sinh viên size=1 -> page=0 và page=1 mỗi trang chỉ chứa 1 cột sinh viên
+    mockMvc
+        .perform(
+            getAs(
+                adminToken,
+                "/api/v1/reports/analytics?dimension=STUDENT&courseId={courseId}&page=0&size=1",
+                course.getId()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.columns", hasSize(1)))
+        .andExpect(jsonPath("$.columns[0].code").value(sortedCodes.get(0)))
+        .andExpect(jsonPath("$.matrix[0]", hasSize(1)))
+        .andExpect(jsonPath("$.page").value(0))
+        .andExpect(jsonPath("$.size").value(1))
+        .andExpect(jsonPath("$.totalElements").value(2))
+        .andExpect(jsonPath("$.totalPages").value(2))
+        .andExpect(jsonPath("$.last").value(false));
+
+    mockMvc
+        .perform(
+            getAs(
+                adminToken,
+                "/api/v1/reports/analytics?dimension=STUDENT&courseId={courseId}&page=1&size=1",
+                course.getId()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.columns", hasSize(1)))
+        .andExpect(jsonPath("$.columns[0].code").value(sortedCodes.get(1)))
+        .andExpect(jsonPath("$.last").value(true));
+
+    // Tìm theo MSSV
+    mockMvc
+        .perform(
+            getAs(
+                adminToken,
+                "/api/v1/reports/analytics?dimension=STUDENT&courseId={courseId}&search={q}",
+                course.getId(),
+                s2.getStudentCode()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.columns", hasSize(1)))
+        .andExpect(jsonPath("$.columns[0].code").value(s2.getStudentCode()))
+        .andExpect(jsonPath("$.totalElements").value(1));
+
+    // page/size sai biên cho STUDENT -> 400
+    mockMvc
+        .perform(
+            getAs(
+                adminToken,
+                "/api/v1/reports/analytics?dimension=STUDENT&courseId={courseId}&page=-1",
+                course.getId()))
+        .andExpect(status().isBadRequest());
+    mockMvc
+        .perform(
+            getAs(
+                adminToken,
+                "/api/v1/reports/analytics?dimension=STUDENT&courseId={courseId}&size=101",
+                course.getId()))
+        .andExpect(status().isBadRequest());
+
+    // Export CSV dù truyền page=0&size=1 vẫn xuất đủ cả 2 sinh viên
+    mockMvc
+        .perform(
+            getAs(
+                adminToken,
+                "/api/v1/reports/analytics/export?dimension=STUDENT&courseId={courseId}&page=0&size=1",
+                course.getId()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString(s1.getStudentCode())))
+        .andExpect(content().string(containsString(s2.getStudentCode())));
   }
 
   @Test

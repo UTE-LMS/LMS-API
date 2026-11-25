@@ -11,6 +11,7 @@ import com.hcmute.lms.lmsapi.document.CourseSection;
 import com.hcmute.lms.lmsapi.document.Syllabus;
 import com.hcmute.lms.lmsapi.document.Term;
 import com.hcmute.lms.lmsapi.document.User;
+import com.hcmute.lms.lmsapi.dto.PageResponse;
 import com.hcmute.lms.lmsapi.dto.SectionRequest;
 import com.hcmute.lms.lmsapi.dto.SectionResponse;
 import com.hcmute.lms.lmsapi.dto.SectionStatusUpdateRequest;
@@ -91,6 +92,7 @@ class SectionServiceImplTest {
     return User.builder()
         .id(LECTURER_ID)
         .username("lecturer")
+        .fullName("Giảng viên Mẫu")
         .status(status)
         .roles(new ArrayList<>(List.of(role)))
         .build();
@@ -133,6 +135,13 @@ class SectionServiceImplTest {
     assertThat(response.getStatus()).isEqualTo(SectionStatus.OPEN);
     assertThat(response.getEnrolledCount()).isZero();
     assertThat(response.getLecturerIds()).containsExactly(LECTURER_ID);
+    assertThat(response.getLecturers())
+        .extracting(
+            SectionResponse.LecturerSummary::getId,
+            SectionResponse.LecturerSummary::getUsername,
+            SectionResponse.LecturerSummary::getFullName)
+        .containsExactly(
+            org.assertj.core.groups.Tuple.tuple(LECTURER_ID, "lecturer", "Giảng viên Mẫu"));
   }
 
   @Test
@@ -312,9 +321,13 @@ class SectionServiceImplTest {
     when(scopeAuthorizationService.canManageCourseSections(principal, "671dcba5f123456789abc999"))
         .thenReturn(false);
 
-    List<SectionResponse> result = service.getSections(principal, null, null);
+    PageResponse<SectionResponse> result = service.getSections(principal, null, null, null, 0, 20);
 
-    assertThat(result).extracting(SectionResponse::getCode).containsExactly("SEC-A", "SEC-B");
+    assertThat(result.getContent())
+        .extracting(SectionResponse::getCode)
+        .containsExactly("SEC-A", "SEC-B");
+    assertThat(result.getTotalElements()).isEqualTo(2);
+    assertThat(result.isLast()).isTrue();
   }
 
   @Test
@@ -325,14 +338,19 @@ class SectionServiceImplTest {
     when(sectionRepository.findByTermId(TERM_ID)).thenReturn(List.of());
     when(sectionRepository.findByCourseId(COURSE_ID)).thenReturn(List.of());
 
-    assertThat(service.getSections(principal, TERM_ID, COURSE_ID)).isEmpty();
-    assertThat(service.getSections(principal, TERM_ID, " ")).isEmpty();
-    assertThat(service.getSections(principal, null, COURSE_ID)).isEmpty();
+    assertThat(service.getSections(principal, TERM_ID, COURSE_ID, null, 0, 20).getContent())
+        .isEmpty();
+    assertThat(service.getSections(principal, TERM_ID, " ", null, 0, 20).getContent()).isEmpty();
+    assertThat(service.getSections(principal, null, COURSE_ID, null, 0, 20).getContent()).isEmpty();
     verify(sectionRepository).findByTermIdAndCourseId(TERM_ID, COURSE_ID);
     verify(sectionRepository).findByTermId(TERM_ID);
     verify(sectionRepository).findByCourseId(COURSE_ID);
 
-    assertThatThrownBy(() -> service.getSections(principal, "bad-id", null))
+    assertThatThrownBy(() -> service.getSections(principal, "bad-id", null, null, 0, 20))
+        .isInstanceOfSatisfying(
+            AppException.class,
+            ex -> assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.VALIDATION_ERROR));
+    assertThatThrownBy(() -> service.getSections(principal, null, null, null, -1, 20))
         .isInstanceOfSatisfying(
             AppException.class,
             ex -> assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.VALIDATION_ERROR));
@@ -389,5 +407,50 @@ class SectionServiceImplTest {
         .isInstanceOfSatisfying(
             AppException.class,
             ex -> assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.VALIDATION_ERROR));
+  }
+
+  @Test
+  @DisplayName("getSections: nạp tên giảng viên 1 lần batch, giữ tên cả giảng viên LOCKED")
+  void getSections_populatesLecturerSummariesInSingleBatch() {
+    String lockedId = "671dcba5f123456789abc499";
+    CourseSection s1 =
+        CourseSection.builder()
+            .id("s1")
+            .code("SEC-01")
+            .courseId(COURSE_ID)
+            .lecturerIds(List.of(LECTURER_ID, lockedId))
+            .build();
+    CourseSection s2 =
+        CourseSection.builder()
+            .id("s2")
+            .code("SEC-02")
+            .courseId(COURSE_ID)
+            .lecturerIds(List.of(LECTURER_ID))
+            .build();
+    UserPrincipal principal = UserPrincipal.builder().id(LECTURER_ID).username("u").build();
+
+    when(sectionRepository.findAll()).thenReturn(List.of(s2, s1));
+    when(scopeAuthorizationService.canAccessLoadedSection(any(), any(), any())).thenReturn(true);
+    when(userRepository.findAllById(any()))
+        .thenReturn(
+            List.of(
+                lecturer(UserStatus.ACTIVE, Role.LECTURER),
+                User.builder()
+                    .id(lockedId)
+                    .username("gv_locked")
+                    .fullName("GV Đã Khóa")
+                    .status(UserStatus.LOCKED)
+                    .build()));
+
+    PageResponse<SectionResponse> result = service.getSections(principal, null, null, null, 0, 20);
+
+    verify(userRepository).findAllById(any());
+    assertThat(result.getContent()).hasSize(2);
+    assertThat(result.getContent().get(0).getLecturers())
+        .extracting(SectionResponse.LecturerSummary::getFullName)
+        .containsExactly("Giảng viên Mẫu", "GV Đã Khóa");
+    assertThat(result.getContent().get(1).getLecturers())
+        .extracting(SectionResponse.LecturerSummary::getUsername)
+        .containsExactly("lecturer");
   }
 }

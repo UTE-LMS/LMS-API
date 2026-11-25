@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 
 import com.hcmute.lms.lmsapi.document.Course;
 import com.hcmute.lms.lmsapi.document.ProgramCourse;
+import com.hcmute.lms.lmsapi.dto.PageResponse;
 import com.hcmute.lms.lmsapi.dto.ProgramCourseRequest;
 import com.hcmute.lms.lmsapi.dto.ProgramCourseResponse;
 import com.hcmute.lms.lmsapi.dto.ProgramCourseUpdateRequest;
@@ -17,6 +18,7 @@ import com.hcmute.lms.lmsapi.enums.CourseType;
 import com.hcmute.lms.lmsapi.exception.AppException;
 import com.hcmute.lms.lmsapi.exception.BusinessRuleViolationException;
 import com.hcmute.lms.lmsapi.exception.ErrorCode;
+import com.hcmute.lms.lmsapi.exception.PageableValidationException;
 import com.hcmute.lms.lmsapi.exception.ResourceNotFoundException;
 import com.hcmute.lms.lmsapi.mapper.ProgramCourseMapper;
 import com.hcmute.lms.lmsapi.repository.CourseRepository;
@@ -312,5 +314,52 @@ class ProgramCourseServiceImplTest {
     assertThatThrownBy(
             () -> programCourseService.removeCourseFromProgramVersion(VERSION_ID, COURSE_ID))
         .isInstanceOf(ResourceNotFoundException.class);
+  }
+
+  @Test
+  @DisplayName("getCoursesByProgramVersion: lọc và phân trang hợp lệ; page/size sai biên -> 400")
+  void getCoursesByProgramVersion_paginatesAndValidates() {
+    ProgramCourse pc1 =
+        ProgramCourse.builder()
+            .programVersionId(VERSION_ID)
+            .courseId(COURSE_ID)
+            .semester(1)
+            .type(CourseType.COMPULSORY)
+            .category(CourseCategory.FOUNDATION)
+            .build();
+    ProgramCourse pc2 =
+        ProgramCourse.builder()
+            .programVersionId(VERSION_ID)
+            .courseId(PREREQ_ID)
+            .semester(2)
+            .type(CourseType.ELECTIVE)
+            .category(CourseCategory.SPECIALIZED)
+            .build();
+    Course c1 = Course.builder().id(COURSE_ID).code("CS101").name("Intro CS").build();
+    Course c2 = Course.builder().id(PREREQ_ID).code("CS102").name("Data Structures").build();
+
+    when(programVersionRepository.existsById(VERSION_ID)).thenReturn(true);
+    when(programCourseRepository.findByProgramVersionIdOrderBySemesterAscCourseIdAsc(VERSION_ID))
+        .thenReturn(List.of(pc1, pc2));
+    when(courseRepository.findAllById(List.of(COURSE_ID, PREREQ_ID))).thenReturn(List.of(c1, c2));
+    when(programCourseMapper.toResponse(pc1, c1))
+        .thenReturn(ProgramCourseResponse.builder().courseId(COURSE_ID).semester(1).build());
+    when(programCourseMapper.toResponse(pc2, c2))
+        .thenReturn(ProgramCourseResponse.builder().courseId(PREREQ_ID).semester(2).build());
+
+    PageResponse<ProgramCourseResponse> page0 =
+        programCourseService.getCoursesByProgramVersion(VERSION_ID, null, null, null, null, 0, 1);
+    assertThat(page0.getContent())
+        .extracting(ProgramCourseResponse::getCourseId)
+        .containsExactly(COURSE_ID);
+    assertThat(page0.getTotalElements()).isEqualTo(2);
+    assertThat(page0.getTotalPages()).isEqualTo(2);
+    assertThat(page0.isLast()).isFalse();
+
+    assertThatThrownBy(
+            () ->
+                programCourseService.getCoursesByProgramVersion(
+                    VERSION_ID, null, null, null, null, 0, 101))
+        .isInstanceOf(PageableValidationException.class);
   }
 }

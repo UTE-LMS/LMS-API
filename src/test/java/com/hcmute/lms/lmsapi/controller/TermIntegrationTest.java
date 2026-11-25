@@ -83,11 +83,36 @@ class TermIntegrationTest extends IntegrationTestBase {
         .andExpect(status().isUnprocessableEntity())
         .andExpect(jsonPath("$.code").value("BUSINESS_RULE_VIOLATION"));
 
-    // 4. Tra cứu danh sách và chi tiết
+    // 4. Tra cứu danh sách (phân trang, tìm kiếm, lọc trạng thái) và chi tiết
     mockMvc
         .perform(getAs(lecturerToken, "/api/v1/terms"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$", hasSize(1)));
+        .andExpect(jsonPath("$.content", hasSize(1)))
+        .andExpect(jsonPath("$.totalElements").value(1))
+        .andExpect(jsonPath("$.last").value(true));
+
+    mockMvc
+        .perform(
+            getAs(
+                lecturerToken,
+                "/api/v1/terms?search={q}&status=OPEN&page=0&size=10",
+                code.toLowerCase()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content", hasSize(1)))
+        .andExpect(jsonPath("$.content[0].id").value(termId));
+
+    mockMvc
+        .perform(getAs(lecturerToken, "/api/v1/terms?status=CLOSED"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content", hasSize(0)))
+        .andExpect(jsonPath("$.totalElements").value(0));
+
+    mockMvc
+        .perform(getAs(lecturerToken, "/api/v1/terms?page=-1"))
+        .andExpect(status().isBadRequest());
+    mockMvc
+        .perform(getAs(lecturerToken, "/api/v1/terms?size=101"))
+        .andExpect(status().isBadRequest());
 
     mockMvc
         .perform(getAs(lecturerToken, "/api/v1/terms/{id}", termId))

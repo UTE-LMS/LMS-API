@@ -1,14 +1,15 @@
 package com.hcmute.lms.lmsapi.controller;
 
+import com.hcmute.lms.lmsapi.dto.PageResponse;
 import com.hcmute.lms.lmsapi.dto.TermRequest;
 import com.hcmute.lms.lmsapi.dto.TermResponse;
 import com.hcmute.lms.lmsapi.dto.TermStatusUpdateRequest;
 import com.hcmute.lms.lmsapi.dto.TermUpdateRequest;
+import com.hcmute.lms.lmsapi.enums.TermStatus;
 import com.hcmute.lms.lmsapi.service.TermService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Pattern;
 import java.security.Principal;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -22,6 +23,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @Slf4j
@@ -35,8 +37,12 @@ public class TermController {
 
   @GetMapping
   @PreAuthorize("isAuthenticated()")
-  public ResponseEntity<List<TermResponse>> getTerms() {
-    return ResponseEntity.ok(termService.getTerms());
+  public ResponseEntity<PageResponse<TermResponse>> getTerms(
+      @RequestParam(required = false) String search,
+      @RequestParam(required = false) TermStatus status,
+      @RequestParam(defaultValue = "0") int page,
+      @RequestParam(defaultValue = "20") int size) {
+    return ResponseEntity.ok(termService.getTerms(search, status, page, size));
   }
 
   @GetMapping("/{id}")

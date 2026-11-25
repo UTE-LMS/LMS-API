@@ -59,23 +59,50 @@ class EnrollmentIntegrationTest extends IntegrationTestBase {
 
   @Test
   @DisplayName(
-      "US-20 (mẫu số): lớp có 3 ghi danh WITHDRAWN thì ENROLLED chỉ đếm số còn lại (ví dụ minh họa: 45 ghi danh, 3 rút -> 42)")
+      "US-20 (mẫu số & phân trang): giữ nguyên tổng ENROLLED/WITHDRAWN và phân trang + search danh sách ghi danh")
   void enrolledIsTheDenominatorWithdrawnIsExcluded() throws Exception {
     // Ví dụ minh họa lấy từ plan F05a §8: 45 ghi danh, trong đó 3 người WITHDRAWN
+    Student targetStudent = null;
     for (int i = 0; i < 45; i++) {
       Student student = fixtures.student();
+      if (i == 0) {
+        targetStudent = student;
+      }
       fixtures.enrollment(
           section, student, i < 3 ? EnrollmentStatus.WITHDRAWN : EnrollmentStatus.ENROLLED);
     }
 
+    // Mặc định page=0, size=20: trả 20 dòng, nhưng tổng mẫu số toàn lớp vẫn là 42 và 3
     mockMvc
         .perform(getAs(lecturerToken, "/api/v1/sections/{id}/enrollments", section.getId()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.sectionId").value(section.getId()))
         .andExpect(jsonPath("$.enrolled").value(42))
         .andExpect(jsonPath("$.withdrawn").value(3))
-        .andExpect(jsonPath("$.enrollments", hasSize(45)));
+        .andExpect(jsonPath("$.page").value(0))
+        .andExpect(jsonPath("$.size").value(20))
+        .andExpect(jsonPath("$.totalElements").value(45))
+        .andExpect(jsonPath("$.totalPages").value(3))
+        .andExpect(jsonPath("$.last").value(false))
+        .andExpect(jsonPath("$.enrollments", hasSize(20)));
 
+    // Trang cuối page=2, size=20 -> 5 dòng còn lại
+    mockMvc
+        .perform(
+            getAs(
+                lecturerToken, "/api/v1/sections/{id}/enrollments?page=2&size=20", section.getId()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.enrollments", hasSize(5)))
+        .andExpect(jsonPath("$.last").value(true));
+
+    // size=50 -> trả đủ 45 dòng
+    mockMvc
+        .perform(getAs(lecturerToken, "/api/v1/sections/{id}/enrollments?size=50", section.getId()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.enrollments", hasSize(45)))
+        .andExpect(jsonPath("$.last").value(true));
+
+    // Lọc status=WITHDRAWN
     mockMvc
         .perform(
             getAs(
@@ -84,7 +111,40 @@ class EnrollmentIntegrationTest extends IntegrationTestBase {
                 section.getId()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.enrollments", hasSize(3)))
+        .andExpect(jsonPath("$.totalElements").value(3))
+        .andExpect(jsonPath("$.enrolled").value(42))
+        .andExpect(jsonPath("$.withdrawn").value(3));
+
+    // Tìm theo MSSV không làm lộ fullName trong EnrollmentResponse
+    mockMvc
+        .perform(
+            getAs(
+                lecturerToken,
+                "/api/v1/sections/{id}/enrollments?search={q}",
+                section.getId(),
+                targetStudent.getStudentCode()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalElements").value(1))
+        .andExpect(jsonPath("$.enrollments", hasSize(1)))
+        .andExpect(jsonPath("$.enrollments[0].studentCode").value(targetStudent.getStudentCode()))
+        .andExpect(jsonPath("$.enrollments[0].fullName").doesNotExist())
         .andExpect(jsonPath("$.enrolled").value(42));
+
+    // Tham số phân trang sai biên -> 400
+    mockMvc
+        .perform(
+            getAs(
+                lecturerToken,
+                "/api/v1/sections/{id}/enrollments?page=-1&size=20",
+                section.getId()))
+        .andExpect(status().isBadRequest());
+    mockMvc
+        .perform(
+            getAs(
+                lecturerToken,
+                "/api/v1/sections/{id}/enrollments?page=0&size=101",
+                section.getId()))
+        .andExpect(status().isBadRequest());
   }
 
   @Test

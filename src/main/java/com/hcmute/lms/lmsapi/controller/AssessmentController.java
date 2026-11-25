@@ -7,6 +7,7 @@ import com.hcmute.lms.lmsapi.dto.AssessmentScoreItemResponse;
 import com.hcmute.lms.lmsapi.dto.AssessmentScoreTemplate;
 import com.hcmute.lms.lmsapi.dto.AssessmentUpdateRequest;
 import com.hcmute.lms.lmsapi.dto.CoverageResponse;
+import com.hcmute.lms.lmsapi.dto.PageResponse;
 import com.hcmute.lms.lmsapi.dto.UserPrincipal;
 import com.hcmute.lms.lmsapi.service.AssessmentService;
 import com.hcmute.lms.lmsapi.util.ImportTemplateResponses;
@@ -224,17 +225,21 @@ public class AssessmentController {
     return ImportTemplateResponses.of(template, format);
   }
 
-  // ------------------------------------------------------------------ xem danh sách điểm đã nhập
+  // ------------------------------------------------------------------ xem & xuất danh sách điểm đã
+  // nhập
 
   @GetMapping("/assessments/{id}/scores")
   @PreAuthorize(
       "@scopeAuthorizationService.canAccessAssessment(authentication.principal, #id, " + READ + ")")
-  public ResponseEntity<List<AssessmentScoreItemResponse>> getAssessmentScores(
+  public ResponseEntity<PageResponse<AssessmentScoreItemResponse>> getAssessmentScores(
       @PathVariable("id")
           @Pattern(regexp = ID_PATTERN, message = "ID bài đánh giá phải là ObjectId 24 ký tự hex")
-          String id) {
+          String id,
+      @RequestParam(name = "search", required = false) String search,
+      @RequestParam(name = "page", defaultValue = "0") int page,
+      @RequestParam(name = "size", defaultValue = "20") int size) {
     log.info("API request: GET /api/v1/assessments/{}/scores", id);
-    return ResponseEntity.ok(assessmentService.getAssessmentScores(id));
+    return ResponseEntity.ok(assessmentService.getAssessmentScores(id, search, page, size));
   }
 
   @GetMapping("/sections/{sectionId}/assessments/{assessmentId}/scores")
@@ -242,14 +247,60 @@ public class AssessmentController {
       "@scopeAuthorizationService.canAccessSection(authentication.principal, #sectionId, "
           + READ
           + ")")
-  public ResponseEntity<List<AssessmentScoreItemResponse>> getSectionAssessmentScores(
+  public ResponseEntity<PageResponse<AssessmentScoreItemResponse>> getSectionAssessmentScores(
       @PathVariable("sectionId")
           @Pattern(regexp = ID_PATTERN, message = "ID lớp học phần phải là ObjectId 24 ký tự hex")
           String sectionId,
       @PathVariable("assessmentId")
           @Pattern(regexp = ID_PATTERN, message = "ID bài đánh giá phải là ObjectId 24 ký tự hex")
-          String assessmentId) {
+          String assessmentId,
+      @RequestParam(name = "search", required = false) String search,
+      @RequestParam(name = "page", defaultValue = "0") int page,
+      @RequestParam(name = "size", defaultValue = "20") int size) {
     log.info("API request: GET /api/v1/sections/{}/assessments/{}/scores", sectionId, assessmentId);
-    return ResponseEntity.ok(assessmentService.getSectionAssessmentScores(sectionId, assessmentId));
+    return ResponseEntity.ok(
+        assessmentService.getSectionAssessmentScores(sectionId, assessmentId, search, page, size));
+  }
+
+  @GetMapping(
+      value = "/assessments/{id}/scores/export",
+      produces = {ImportTemplateResponses.CSV_MEDIA_TYPE, ImportTemplateResponses.XLSX_MEDIA_TYPE})
+  @PreAuthorize(
+      "@scopeAuthorizationService.canAccessAssessment(authentication.principal, #id, " + READ + ")")
+  public ResponseEntity<byte[]> exportAssessmentScores(
+      @PathVariable("id")
+          @Pattern(regexp = ID_PATTERN, message = "ID bài đánh giá phải là ObjectId 24 ký tự hex")
+          String id,
+      @RequestParam(name = "format", defaultValue = "csv") String format,
+      @RequestParam(name = "search", required = false) String search) {
+    log.info("API request: GET /api/v1/assessments/{}/scores/export format=[{}]", id, format);
+    AssessmentScoreTemplate exportFile = assessmentService.exportAssessmentScores(id, search);
+    return ImportTemplateResponses.of(exportFile, format);
+  }
+
+  @GetMapping(
+      value = "/sections/{sectionId}/assessments/{assessmentId}/scores/export",
+      produces = {ImportTemplateResponses.CSV_MEDIA_TYPE, ImportTemplateResponses.XLSX_MEDIA_TYPE})
+  @PreAuthorize(
+      "@scopeAuthorizationService.canAccessSection(authentication.principal, #sectionId, "
+          + READ
+          + ")")
+  public ResponseEntity<byte[]> exportSectionAssessmentScores(
+      @PathVariable("sectionId")
+          @Pattern(regexp = ID_PATTERN, message = "ID lớp học phần phải là ObjectId 24 ký tự hex")
+          String sectionId,
+      @PathVariable("assessmentId")
+          @Pattern(regexp = ID_PATTERN, message = "ID bài đánh giá phải là ObjectId 24 ký tự hex")
+          String assessmentId,
+      @RequestParam(name = "format", defaultValue = "csv") String format,
+      @RequestParam(name = "search", required = false) String search) {
+    log.info(
+        "API request: GET /api/v1/sections/{}/assessments/{}/scores/export format=[{}]",
+        sectionId,
+        assessmentId,
+        format);
+    AssessmentScoreTemplate exportFile =
+        assessmentService.exportSectionAssessmentScores(sectionId, assessmentId, search);
+    return ImportTemplateResponses.of(exportFile, format);
   }
 }

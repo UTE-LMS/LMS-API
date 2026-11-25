@@ -1,6 +1,7 @@
 package com.hcmute.lms.lmsapi.controller;
 
 import com.hcmute.lms.lmsapi.dto.AssessmentScoreTemplate;
+import com.hcmute.lms.lmsapi.dto.PageResponse;
 import com.hcmute.lms.lmsapi.dto.ProgramCourseCsvImportResponse;
 import com.hcmute.lms.lmsapi.dto.ProgramCourseResponse;
 import com.hcmute.lms.lmsapi.enums.CourseCategory;
@@ -8,7 +9,6 @@ import com.hcmute.lms.lmsapi.enums.CourseType;
 import com.hcmute.lms.lmsapi.service.ProgramCourseService;
 import com.hcmute.lms.lmsapi.util.ImportTemplateResponses;
 import jakarta.validation.constraints.Pattern;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
@@ -34,7 +34,7 @@ public class ProgramCourseController {
   private final ProgramCourseService programCourseService;
 
   @GetMapping
-  public ResponseEntity<List<ProgramCourseResponse>> getCourses(
+  public ResponseEntity<PageResponse<ProgramCourseResponse>> getCourses(
       @PathVariable("programVersionId")
           @Pattern(
               regexp = "^[0-9a-fA-F]{24}$",
@@ -43,10 +43,12 @@ public class ProgramCourseController {
       @RequestParam(required = false) Integer semester,
       @RequestParam(required = false) CourseType type,
       @RequestParam(required = false) CourseCategory category,
-      @RequestParam(required = false) String search) {
+      @RequestParam(required = false) String search,
+      @RequestParam(defaultValue = "0") int page,
+      @RequestParam(defaultValue = "20") int size) {
     return ResponseEntity.ok(
         programCourseService.getCoursesByProgramVersion(
-            programVersionId, semester, type, category, search));
+            programVersionId, semester, type, category, search, page, size));
   }
 
   @GetMapping("/{courseId}")

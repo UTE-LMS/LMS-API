@@ -268,7 +268,7 @@ class XlsxCsvConverterTest {
   }
 
   @Test
-  @DisplayName("Các tệp .xlsx trong doc/data khớp nội dung với 12 tệp .csv tương ứng")
+  @DisplayName("Các tệp .xlsx trong doc/data khớp nội dung với 13 tệp .csv tương ứng")
   void docDataXlsxMatchesCsvFiles() throws IOException {
     Path dataDir = Path.of("doc/data");
     assertThat(dataDir).isDirectory();
@@ -278,7 +278,7 @@ class XlsxCsvConverterTest {
       csvFiles =
           stream.filter(p -> String.valueOf(p.getFileName()).endsWith(".csv")).sorted().toList();
     }
-    assertThat(csvFiles).hasSize(12);
+    assertThat(csvFiles).hasSize(13);
 
     for (Path csvPath : csvFiles) {
       String csvName = String.valueOf(csvPath.getFileName());

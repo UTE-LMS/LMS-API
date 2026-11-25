@@ -336,7 +336,13 @@ public final class ApiTestFixtures {
 
   /** Tạo sinh viên giả với mã thay thế mang tiền tố của test này (không phải mã sinh viên thật). */
   public Student student() {
-    return mongo.save(Student.builder().studentCode(code("STU")).build());
+    String studentCode = code("STU");
+    return mongo.save(
+        Student.builder()
+            .studentCode(studentCode)
+            .fullName("Sinh viên " + studentCode)
+            .cohort("K23")
+            .build());
   }
 
   /** Ghi danh một sinh viên vào lớp với trạng thái cho trước (không đụng tới sĩ số của lớp). */

@@ -2,6 +2,7 @@ package com.hcmute.lms.lmsapi.service;
 
 import com.hcmute.lms.lmsapi.dto.AssessmentScoreTemplate;
 import com.hcmute.lms.lmsapi.dto.CsvImportResultResponse;
+import com.hcmute.lms.lmsapi.dto.PageResponse;
 import com.hcmute.lms.lmsapi.dto.SectionRequest;
 import com.hcmute.lms.lmsapi.dto.SectionResponse;
 import com.hcmute.lms.lmsapi.dto.SectionStatusUpdateRequest;
@@ -15,13 +16,17 @@ import org.springframework.web.multipart.MultipartFile;
 public interface SectionService {
 
   /**
-   * Liệt kê lớp học phần mà người gọi được phép đọc (US-19/AC-4: giảng viên chỉ thấy lớp mình phụ
-   * trách), có thể lọc theo học kỳ và học phần.
+   * Liệt kê lớp học phần có phân trang mà người gọi được phép đọc (US-19/AC-4: giảng viên chỉ thấy
+   * lớp mình phụ trách), hỗ trợ lọc theo học kỳ, học phần và tìm theo mã lớp.
    *
    * @param termId lọc theo học kỳ (null: không lọc)
    * @param courseId lọc theo học phần (null: không lọc)
+   * @param search tìm theo mã lớp (không phân biệt hoa thường, null: không lọc)
+   * @param page chỉ số trang (0-indexed)
+   * @param size kích thước trang (1..100)
    */
-  List<SectionResponse> getSections(UserPrincipal principal, String termId, String courseId);
+  PageResponse<SectionResponse> getSections(
+      UserPrincipal principal, String termId, String courseId, String search, int page, int size);
 
   /**
    * Liệt kê giảng viên đang hoạt động ({@code Role.LECTURER}, {@code UserStatus.ACTIVE}), có thể

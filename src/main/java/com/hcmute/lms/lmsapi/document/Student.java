@@ -27,11 +27,11 @@ public class Student {
   @Field("studentCode")
   private String studentCode;
 
-  /** Họ và tên sinh viên (tùy chọn). */
+  /** Họ và tên sinh viên (bắt buộc). */
   @Field("fullName")
   private String fullName;
 
-  /** Khóa/niên khóa (tùy chọn). */
+  /** Khóa/niên khóa (bắt buộc). */
   @Field("cohort")
   private String cohort;
 

@@ -17,6 +17,7 @@ import com.hcmute.lms.lmsapi.dto.AssessmentScoreItemResponse;
 import com.hcmute.lms.lmsapi.dto.AssessmentScoreTemplate;
 import com.hcmute.lms.lmsapi.dto.AssessmentUpdateRequest;
 import com.hcmute.lms.lmsapi.dto.CoverageResponse;
+import com.hcmute.lms.lmsapi.dto.PageResponse;
 import com.hcmute.lms.lmsapi.enums.AssessmentScope;
 import com.hcmute.lms.lmsapi.enums.AssessmentStatus;
 import com.hcmute.lms.lmsapi.enums.AuditAction;
@@ -36,12 +37,15 @@ import com.hcmute.lms.lmsapi.repository.SyllabusRepository;
 import com.hcmute.lms.lmsapi.service.AssessmentService;
 import com.hcmute.lms.lmsapi.service.AuditService;
 import com.hcmute.lms.lmsapi.util.ObjectIdUtils;
+import com.hcmute.lms.lmsapi.util.PageableValidationUtils;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -412,11 +416,9 @@ public class AssessmentServiceImpl implements AssessmentService {
 
   @Override
   public AssessmentScoreTemplate generateScoreTemplateCsv(String id) {
-    Assessment assessment = requireAssessment(id);
-    if (assessment.getScope() != AssessmentScope.SECTION || assessment.getSectionId() == null) {
-      throw new BusinessRuleViolationException(
-          "Chỉ xuất tệp CSV mẫu cho bài đánh giá của lớp học phần");
-    }
+    Assessment assessment =
+        requireSectionAssessmentScope(
+            requireAssessment(id), "Chỉ xuất tệp CSV mẫu cho bài đánh giá của lớp học phần");
     if (assessment.getStatus() != AssessmentStatus.LOCKED
         && assessment.getStatus() != AssessmentStatus.SCORE_ENTERED) {
       throw new BusinessRuleViolationException(
@@ -428,16 +430,11 @@ public class AssessmentServiceImpl implements AssessmentService {
       throw new BusinessRuleViolationException(
           "Bài đánh giá chưa có câu hỏi nào để xuất tệp CSV mẫu");
     }
-    long totalMappings =
-        items.stream()
-            .mapToLong(it -> it.getOutcomeMappings() == null ? 0 : it.getOutcomeMappings().size())
-            .sum();
-    if (totalMappings == 0) {
+    List<ScoreColumn> columns = buildScoreColumns(assessment);
+    if (columns.isEmpty()) {
       throw new BusinessRuleViolationException(
           "Bài đánh giá chưa có ma trận câu hỏi - CLO để xuất tệp CSV mẫu");
     }
-
-    Map<String, String> cloCodeMap = itemValidator.resolveCloCodeMap(items);
 
     List<Enrollment> enrollments =
         enrollmentRepository.findBySectionIdAndStatus(
@@ -449,22 +446,9 @@ public class AssessmentServiceImpl implements AssessmentService {
         Comparator.comparing(Student::getStudentCode, Comparator.nullsLast(String::compareTo)));
 
     StringBuilder sb = new StringBuilder();
-    sb.append('\uFEFF'); // UTF-8 BOM
-    sb.append("MaSV,HoTen");
-    for (AssessmentItem item : items) {
-      if (item.getOutcomeMappings() == null) {
-        continue;
-      }
-      for (OutcomeMapping mapping : item.getOutcomeMappings()) {
-        String cloCode = cloCodeMap.getOrDefault(mapping.getCloId(), mapping.getCloId());
-        String maxScoreStr = formatScore(mapping.getMaxScore());
-        String colHeader = item.getCode() + " - " + cloCode + " (Max: " + maxScoreStr + ")";
-        sb.append(',').append(escapeCsv(colHeader));
-      }
-    }
-    sb.append("\r\n");
+    appendCsvHeader(sb, columns);
 
-    int scoreColCount = (int) totalMappings;
+    int scoreColCount = columns.size();
     for (Student student : students) {
       sb.append(escapeCsv(student.getStudentCode() != null ? student.getStudentCode() : ""));
       sb.append(',');
@@ -481,14 +465,34 @@ public class AssessmentServiceImpl implements AssessmentService {
   }
 
   @Override
-  public List<AssessmentScoreItemResponse> getAssessmentScores(String id) {
+  public PageResponse<AssessmentScoreItemResponse> getAssessmentScores(
+      String id, String search, int page, int size) {
     Assessment assessment = requireAssessment(id);
-    return loadScoresForAssessment(assessment);
+    return paginateScoresByStudent(assessment, search, page, size);
   }
 
   @Override
-  public List<AssessmentScoreItemResponse> getSectionAssessmentScores(
-      String sectionId, String assessmentId) {
+  public PageResponse<AssessmentScoreItemResponse> getSectionAssessmentScores(
+      String sectionId, String assessmentId, String search, int page, int size) {
+    Assessment assessment = requireSectionAssessment(sectionId, assessmentId);
+    return paginateScoresByStudent(assessment, search, page, size);
+  }
+
+  @Override
+  public AssessmentScoreTemplate exportAssessmentScores(String id, String search) {
+    Assessment assessment = requireAssessment(id);
+    return buildScoreExportTemplate(assessment, search);
+  }
+
+  @Override
+  public AssessmentScoreTemplate exportSectionAssessmentScores(
+      String sectionId, String assessmentId, String search) {
+    Assessment assessment = requireSectionAssessment(sectionId, assessmentId);
+    return buildScoreExportTemplate(assessment, search);
+  }
+
+  private Assessment requireSectionAssessment(String sectionId, String assessmentId) {
+    ObjectIdUtils.requireValid(sectionId, "sectionId");
     Assessment assessment = requireAssessment(assessmentId);
     if (!sectionId.equals(assessment.getSectionId())) {
       throw new ResourceNotFoundException(
@@ -498,14 +502,139 @@ public class AssessmentServiceImpl implements AssessmentService {
               + sectionId
               + "]");
     }
-    return loadScoresForAssessment(assessment);
+    return assessment;
   }
 
-  private List<AssessmentScoreItemResponse> loadScoresForAssessment(Assessment assessment) {
+  private Assessment requireSectionAssessmentScope(Assessment assessment, String message) {
     if (assessment.getScope() != AssessmentScope.SECTION || assessment.getSectionId() == null) {
-      throw new BusinessRuleViolationException(
-          "Chỉ xem được điểm cho bài đánh giá thuộc lớp học phần");
+      throw new BusinessRuleViolationException(message);
     }
+    return assessment;
+  }
+
+  private PageResponse<AssessmentScoreItemResponse> paginateScoresByStudent(
+      Assessment assessment, String search, int page, int size) {
+    PageableValidationUtils.validate(page, size);
+    List<AssessmentScoreItemResponse> filtered =
+        filterScores(loadScoresForAssessment(assessment), search);
+    if (filtered.isEmpty()) {
+      return PageResponse.of(List.of(), page, size, 0L);
+    }
+
+    Map<String, List<AssessmentScoreItemResponse>> byStudent = groupScoresByStudent(filtered);
+    List<List<AssessmentScoreItemResponse>> studentGroups = new ArrayList<>(byStudent.values());
+    long totalStudents = studentGroups.size();
+    long from = Math.min((long) page * size, totalStudents);
+    long to = Math.min(from + size, totalStudents);
+
+    List<AssessmentScoreItemResponse> content = new ArrayList<>();
+    for (int i = (int) from; i < (int) to; i++) {
+      content.addAll(studentGroups.get(i));
+    }
+    return PageResponse.of(content, page, size, totalStudents);
+  }
+
+  private AssessmentScoreTemplate buildScoreExportTemplate(Assessment assessment, String search) {
+    requireSectionAssessmentScope(
+        assessment, "Chỉ xuất được điểm cho bài đánh giá thuộc lớp học phần");
+    List<AssessmentScoreItemResponse> filtered =
+        filterScores(loadScoresForAssessment(assessment), search);
+    List<ScoreColumn> columns = buildScoreColumns(assessment);
+
+    StringBuilder sb = new StringBuilder();
+    appendCsvHeader(sb, columns);
+
+    Map<String, List<AssessmentScoreItemResponse>> byStudent = groupScoresByStudent(filtered);
+    for (List<AssessmentScoreItemResponse> studentScores : byStudent.values()) {
+      AssessmentScoreItemResponse first = studentScores.get(0);
+      sb.append(escapeCsv(first.getStudentCode() != null ? first.getStudentCode() : ""));
+      sb.append(',');
+      sb.append(escapeCsv(first.getStudentName() != null ? first.getStudentName() : ""));
+
+      Map<String, Double> scoreByCell = new HashMap<>();
+      for (AssessmentScoreItemResponse s : studentScores) {
+        scoreByCell.put(s.getItemId() + "#" + s.getCloId(), s.getRawScore());
+      }
+      for (ScoreColumn col : columns) {
+        sb.append(',');
+        Double raw = scoreByCell.get(col.itemId() + "#" + col.cloId());
+        if (raw != null) {
+          sb.append(escapeCsv(formatScore(raw)));
+        }
+      }
+      sb.append("\r\n");
+    }
+
+    byte[] content = sb.toString().getBytes(StandardCharsets.UTF_8);
+    String fileName = sanitizeFileName(assessment.getCode()) + "-scores.csv";
+    return new AssessmentScoreTemplate(fileName, content);
+  }
+
+  private List<AssessmentScoreItemResponse> filterScores(
+      List<AssessmentScoreItemResponse> scores, String search) {
+    if (search == null || search.isBlank()) {
+      return scores;
+    }
+    String keyword = search.trim().toLowerCase(Locale.ROOT);
+    return scores.stream()
+        .filter(
+            s ->
+                containsIgnoreCase(s.getStudentCode(), keyword)
+                    || containsIgnoreCase(s.getStudentName(), keyword)
+                    || containsIgnoreCase(s.getItemCode(), keyword)
+                    || containsIgnoreCase(s.getCloCode(), keyword))
+        .toList();
+  }
+
+  private boolean containsIgnoreCase(String value, String keyword) {
+    return value != null && value.toLowerCase(Locale.ROOT).contains(keyword);
+  }
+
+  private Map<String, List<AssessmentScoreItemResponse>> groupScoresByStudent(
+      List<AssessmentScoreItemResponse> scores) {
+    Map<String, List<AssessmentScoreItemResponse>> byStudent = new LinkedHashMap<>();
+    for (AssessmentScoreItemResponse item : scores) {
+      String key = item.getStudentId() != null ? item.getStudentId() : "";
+      byStudent.computeIfAbsent(key, k -> new ArrayList<>()).add(item);
+    }
+    return byStudent;
+  }
+
+  private List<ScoreColumn> buildScoreColumns(Assessment assessment) {
+    List<AssessmentItem> items = assessment.getItems();
+    if (items == null || items.isEmpty()) {
+      return List.of();
+    }
+    Map<String, String> cloCodeMap = itemValidator.resolveCloCodeMap(items);
+    List<ScoreColumn> columns = new ArrayList<>();
+    for (AssessmentItem item : items) {
+      if (item.getOutcomeMappings() == null) {
+        continue;
+      }
+      for (OutcomeMapping mapping : item.getOutcomeMappings()) {
+        String cloCode = cloCodeMap.getOrDefault(mapping.getCloId(), mapping.getCloId());
+        String colHeader =
+            item.getCode() + " - " + cloCode + " (Max: " + formatScore(mapping.getMaxScore()) + ")";
+        columns.add(new ScoreColumn(item.getId(), mapping.getCloId(), colHeader));
+      }
+    }
+    return columns;
+  }
+
+  private void appendCsvHeader(StringBuilder sb, List<ScoreColumn> columns) {
+    sb.append('\uFEFF'); // UTF-8 BOM
+    sb.append("MaSV,HoTen");
+    for (ScoreColumn col : columns) {
+      sb.append(',').append(escapeCsv(col.header()));
+    }
+    sb.append("\r\n");
+  }
+
+  private record ScoreColumn(String itemId, String cloId, String header) {}
+
+  private List<AssessmentScoreItemResponse> loadScoresForAssessment(Assessment assessment) {
+    requireSectionAssessmentScope(
+        assessment, "Chỉ xem được điểm cho bài đánh giá thuộc lớp học phần");
     List<Score> scores =
         scoreRepository.findBySectionIdAndAssessmentId(
             assessment.getSectionId(), assessment.getId());

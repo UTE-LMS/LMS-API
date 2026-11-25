@@ -141,7 +141,8 @@ class ProgramAndSyllabusImportIntegrationTest extends IntegrationTestBase {
     mockMvc
         .perform(getAs(lecturerToken, "/api/v1/program-versions/{id}/courses", programVersionId))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$", hasSize(1)));
+        .andExpect(jsonPath("$.content", hasSize(1)))
+        .andExpect(jsonPath("$.totalElements").value(1));
 
     // 5. Tải template Đề cương
     mockMvc

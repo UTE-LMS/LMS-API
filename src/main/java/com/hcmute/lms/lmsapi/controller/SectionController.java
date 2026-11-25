@@ -2,6 +2,7 @@ package com.hcmute.lms.lmsapi.controller;
 
 import com.hcmute.lms.lmsapi.dto.AssessmentScoreTemplate;
 import com.hcmute.lms.lmsapi.dto.CsvImportResultResponse;
+import com.hcmute.lms.lmsapi.dto.PageResponse;
 import com.hcmute.lms.lmsapi.dto.SectionRequest;
 import com.hcmute.lms.lmsapi.dto.SectionResponse;
 import com.hcmute.lms.lmsapi.dto.SectionStatusUpdateRequest;
@@ -44,11 +45,15 @@ public class SectionController {
 
   @GetMapping
   @PreAuthorize("isAuthenticated()")
-  public ResponseEntity<List<SectionResponse>> getSections(
+  public ResponseEntity<PageResponse<SectionResponse>> getSections(
       @RequestParam(required = false) String termId,
       @RequestParam(required = false) String courseId,
+      @RequestParam(required = false) String search,
+      @RequestParam(defaultValue = "0") int page,
+      @RequestParam(defaultValue = "20") int size,
       @AuthenticationPrincipal UserPrincipal principal) {
-    return ResponseEntity.ok(sectionService.getSections(principal, termId, courseId));
+    return ResponseEntity.ok(
+        sectionService.getSections(principal, termId, courseId, search, page, size));
   }
 
   @GetMapping("/lecturers")

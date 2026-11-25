@@ -1,14 +1,15 @@
 package com.hcmute.lms.lmsapi.service;
 
+import com.hcmute.lms.lmsapi.dto.PageResponse;
 import com.hcmute.lms.lmsapi.dto.TermRequest;
 import com.hcmute.lms.lmsapi.dto.TermResponse;
 import com.hcmute.lms.lmsapi.dto.TermStatusUpdateRequest;
 import com.hcmute.lms.lmsapi.dto.TermUpdateRequest;
-import java.util.List;
+import com.hcmute.lms.lmsapi.enums.TermStatus;
 
 public interface TermService {
 
-  List<TermResponse> getTerms();
+  PageResponse<TermResponse> getTerms(String search, TermStatus status, int page, int size);
 
   TermResponse getTerm(String id);
 

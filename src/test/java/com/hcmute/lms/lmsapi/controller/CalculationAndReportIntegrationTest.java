@@ -201,10 +201,18 @@ class CalculationAndReportIntegrationTest extends IntegrationTestBase {
 
     Student s1 =
         studentRepository.save(
-            Student.builder().studentCode("SV_F06_1_" + System.nanoTime()).cohort("K2024").build());
+            Student.builder()
+                .studentCode("SV_F06_1_" + System.nanoTime())
+                .fullName("Sinh viên F06 1")
+                .cohort("K2024")
+                .build());
     Student s2 =
         studentRepository.save(
-            Student.builder().studentCode("SV_F06_2_" + System.nanoTime()).cohort("K2024").build());
+            Student.builder()
+                .studentCode("SV_F06_2_" + System.nanoTime())
+                .fullName("Sinh viên F06 2")
+                .cohort("K2024")
+                .build());
 
     enrollmentRepository.save(
         Enrollment.builder()

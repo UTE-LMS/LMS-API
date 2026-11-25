@@ -639,3 +639,104 @@ Phần này chuẩn bị sẵn câu trả lời khoa học, chuẩn mực cho 4 
   - `.\mvnw.cmd spotless:apply test-compile spotless:check spotbugs:check pmd:cpd-check test "-Dtest=SectionServiceImplTest,SectionIntegrationTest"`: `BUILD SUCCESS`, 0 lỗi Spotless / SpotBugs / PMD-CPD, 28/28 test đạt (`SectionIntegrationTest` 15/15 trên MongoDB replica set `localhost:27018`, `SectionServiceImplTest` 13/13).
 - **Sinh viên đã sửa/rà soát:** _chờ sinh viên rà soát_
 - **Commit / PR:** nhánh `feat/section-active-lecturers-endpoint` (PR vào `main`, xem `git log`; lưu ý đổi URL trong `LMS-UI` `list-sections.component.ts` từ `/api/v1/departments/lecturers` sang `/api/v1/sections/lecturers`).
+
+---
+
+## Phiên #46 — 2026-11-25: Bổ sung danh sách tóm tắt giảng viên (`lecturers`) trong `SectionResponse`
+
+- **Sinh viên yêu cầu:** minhat5 (theo `git config user.name`)
+- **Công cụ / mô hình:** Antigravity, Gemini 4 Neon (High)
+- **Mục tiêu:** trả kèm danh sách tóm tắt `lecturers: [{ id, username, fullName }]` trong `SectionResponse` bằng 1 truy vấn batch `userRepository.findAllById(...)`, giúp mọi vai trò xem danh sách lớp học phần hiển thị được tên giảng viên (kể cả giảng viên đã bị `LOCKED` ở học kỳ cũ) mà không cần gọi thêm `/api/v1/users` (giữ `GET /api/v1/users` độc quyền `ADMIN`) hay mở `/api/v1/sections/lecturers` cho toàn trường.
+- **File AI sinh/sửa:**
+  - `src/main/java/com/hcmute/lms/lmsapi/dto/SectionResponse.java` (thêm `lecturers` và `LecturerSummary`)
+  - `src/main/java/com/hcmute/lms/lmsapi/mapper/SectionMapper.java`, `mapper/impl/SectionMapperImpl.java` (nạp `LecturerSummary` theo đúng thứ tự `lecturerIds`)
+  - `src/main/java/com/hcmute/lms/lmsapi/service/impl/SectionServiceImpl.java` (`loadLecturersById` batch + tái sử dụng map ở `createSection` / `updateLecturers`)
+  - `src/test/java/com/hcmute/lms/lmsapi/service/impl/SectionServiceImplTest.java`
+  - `src/test/java/com/hcmute/lms/lmsapi/controller/SectionIntegrationTest.java`
+  - `logsAI/ai-usage-log.md`
+- **Kiểm chứng đã làm:**
+  - `.\mvnw.cmd spotless:apply test-compile spotless:check spotbugs:check pmd:cpd-check test "-Dtest=SectionServiceImplTest,SectionIntegrationTest"`: `BUILD SUCCESS`, 0 lỗi Spotless / SpotBugs / PMD-CPD, 30/30 test đạt (`SectionIntegrationTest` 16/16 trên MongoDB replica set `localhost:27018`, `SectionServiceImplTest` 14/14).
+- **Sinh viên đã sửa/rà soát:** _chờ sinh viên rà soát_
+- **Commit / PR:** chưa commit (lưu ý cập nhật `LMS-UI` đọc `section.lecturers` để hiện tên giảng viên và chỉ gọi `/api/v1/sections/lecturers` khi user có vai trò `ADMIN` hoặc `PROGRAM_MANAGER`).
+
+---
+
+## Phiên #47 — 2026-11-25: Bổ sung import sinh viên cho ADMIN và chặn tự tạo sinh viên khi ghi danh
+
+- **Sinh viên yêu cầu:** minhat5 (theo `git config user.name`)
+- **Cơ sở / công cụ / mô hình:** Antigravity, Gemini 4 Neon (High)
+- **Mục tiêu:** bổ sung chức năng import danh sách sinh viên hàng loạt (`CSV` và `.xlsx`) cho vai trò `ADMIN` (`GET /api/v1/students/import-template`, `POST /api/v1/students/import`), đồng thời cập nhật nghiệp vụ import ghi danh (`POST /api/v1/sections/{sectionId}/enrollments/import` và `POST /api/v1/enrollments/import`) để báo lỗi và từ chối ghi danh khi `studentCode` chưa tồn tại trong hệ thống thay vì tự động tạo mới `Student`.
+- **File AI sinh/sửa:**
+  - `src/main/java/com/hcmute/lms/lmsapi/repository/StudentRepository.java` (thêm `existsByStudentCode`, `findByStudentCode`)
+  - `src/main/java/com/hcmute/lms/lmsapi/service/StudentService.java`, `src/main/java/com/hcmute/lms/lmsapi/service/impl/StudentServiceImpl.java` (mẫu `studentCode,fullName,cohort`, mặc định `StudentStatus.ACTIVE`, kiểm tra từng dòng best-effort và ghi `audit_logs`)
+  - `src/main/java/com/hcmute/lms/lmsapi/controller/StudentController.java` (`@PreAuthorize("hasRole('ADMIN')")`)
+  - `src/main/java/com/hcmute/lms/lmsapi/service/EnrollmentService.java`, `src/main/java/com/hcmute/lms/lmsapi/service/impl/EnrollmentServiceImpl.java` (báo lỗi theo dòng nếu `studentCode` chưa có trong `students`, không tự tạo `Student`)
+  - `src/test/java/com/hcmute/lms/lmsapi/service/impl/StudentServiceImplTest.java`, `src/test/java/com/hcmute/lms/lmsapi/controller/StudentImportIntegrationTest.java`
+  - `src/test/java/com/hcmute/lms/lmsapi/service/impl/EnrollmentServiceImplTest.java`, `src/test/java/com/hcmute/lms/lmsapi/controller/EnrollmentImportIntegrationTest.java`
+  - `doc/ban-cam-ket-buoc-3-metric.md`, `doc/plan/F05a-hoc-ky-lop-sinh-vien.md`, `logsAI/ai-usage-log.md`
+- **Kiểm chứng đã làm:**
+  - `.\mvnw.cmd spotless:apply test-compile spotless:check spotbugs:check pmd:cpd-check test "-Dtest=StudentServiceImplTest,StudentImportIntegrationTest,EnrollmentServiceImplTest,EnrollmentImportIntegrationTest,EnrollmentCsvParserTest,XlsxCsvConverterTest"`: `BUILD SUCCESS`, 0 lỗi Spotless / SpotBugs / PMD-CPD, 61/61 test đạt (`EnrollmentImportIntegrationTest` 13/13 và `StudentImportIntegrationTest` 4/4 chạy trên MongoDB replica set `localhost:27018`; `EnrollmentServiceImplTest` 12/12; `StudentServiceImplTest` 5/5; `EnrollmentCsvParserTest` 11/11; `XlsxCsvConverterTest` 16/16).
+- **Lỗi/ảo giác AI tự phát hiện:** trong lượt `testCompile` đầu tiên dùng nhầm getter `getRowNumber()`/`getStudentCode()` thay vì `getRow()`/`getKey()` của `CsvImportResultResponse.RowError`; đã sửa lại và chạy vượt qua toàn bộ kiểm tra.
+- **Sinh viên đã sửa/rà soát:** _chờ sinh viên rà soát_
+- **Commit / PR:** chưa commit (lưu ý cập nhật `LMS-UI` để bổ sung màn hình/nút import sinh viên cho `ADMIN` gọi `/api/v1/students/import` và cập nhật thông báo hướng dẫn khi import ghi danh báo lỗi mã sinh viên chưa tồn tại).
+
+---
+
+## Phiên #48 — 2026-11-25: Bổ sung cập nhật trạng thái sinh viên hàng loạt (JSON + CSV/XLSX Import) và chặn ghi danh sinh viên khác `ACTIVE`
+
+- **Sinh viên yêu cầu:** minhat5 (theo `git config user.name`)
+- **Cơ sở / công cụ / mô hình:** Antigravity, Gemini 4 Neon (High)
+- **Mục tiêu:** bổ sung API cho `ADMIN` tra cứu danh sách sinh viên có lọc/phân trang, đổi trạng thái đơn lẻ hoặc nhiều sinh viên cùng lúc (`JSON` API + import `.csv`/`.xlsx` với cột `studentCode,status`), đồng thời chặn ghi danh (import 1 lớp, import nhiều lớp và ghi danh lại từ `WITHDRAWN`) khi sinh viên không ở trạng thái `ACTIVE`.
+- **File AI sinh/sửa:**
+  - DTO mới: `StudentResponse.java`, `StudentStatusUpdateRequest.java`, `StudentBatchStatusUpdateRequest.java`, `StudentBatchStatusUpdateResponse.java`
+  - Repository: `StudentRepositoryCustom.java`, `StudentRepositoryCustomImpl.java`, `StudentRepository.java`
+  - Service & Controller: `StudentService.java`, `StudentServiceImpl.java`, `StudentController.java` (`GET /api/v1/students`, `PUT /api/v1/students/{id}/status`, `PUT /api/v1/students/status`, `GET /api/v1/students/status-import-template`, `POST /api/v1/students/status-import`)
+  - Chặn ghi danh: `EnrollmentServiceImpl.java` (`validateRows`, `importEnrollmentsBulk`, `updateStatus`)
+  - Tests & Docs: `StudentServiceImplTest.java`, `StudentImportIntegrationTest.java`, `EnrollmentServiceImplTest.java`, `EnrollmentImportIntegrationTest.java`, `doc/ban-cam-ket-buoc-3-metric.md`, `doc/plan/F05a-hoc-ky-lop-sinh-vien.md`, `logsAI/ai-usage-log.md`
+- **Kiểm chứng đã làm:**
+  - `.\mvnw.cmd spotless:apply test-compile spotless:check spotbugs:check pmd:cpd-check test "-Dtest=StudentServiceImplTest,StudentImportIntegrationTest,EnrollmentServiceImplTest,EnrollmentImportIntegrationTest,EnrollmentCsvParserTest,XlsxCsvConverterTest"`: `BUILD SUCCESS`, 0 lỗi Spotless / SpotBugs / PMD-CPD, 70/70 test đạt (`EnrollmentImportIntegrationTest` 14/14 và `StudentImportIntegrationTest` 7/7 trên MongoDB replica set `localhost:27018`; `EnrollmentServiceImplTest` 13/13; `StudentServiceImplTest` 9/9; `EnrollmentCsvParserTest` 11/11; `XlsxCsvConverterTest` 16/16).
+- **Lỗi/ảo giác AI tự phát hiện:** trong test tích hợp `EnrollmentImportIntegrationTest.nonActiveStudentsAreRejectedFromEnrollment`, ban đầu assert `$.code == "STUDENT_NOT_ACTIVE"` trong khi `GlobalExceptionHandler` chuẩn hóa mã JSON cho `BusinessRuleViolationException` là `BUSINESS_RULE_VIOLATION` kèm chi tiết trong `message`; đã sửa lại assertion kiểm tra `BUSINESS_RULE_VIOLATION` + `message` chứa `DROPPED_OUT` và chạy lại đạt 70/70.
+- **Sinh viên đã sửa/rà soát:** _chờ sinh viên rà soát_
+- **Commit / PR:** chưa commit (lưu ý cập nhật `LMS-UI` màn hình quản lý sinh viên cho `ADMIN`: bảng lọc/chọn nhiều sinh viên gọi `GET /api/v1/students`, `PUT /api/v1/students/status`, và tải/import file trạng thái qua `/api/v1/students/status-import`).
+
+---
+
+## Phiên #49 — 2026-11-25: Bắt buộc `fullName` và `cohort` cho sinh viên, bổ sung dữ liệu mẫu CSV/Excel và cập nhật Docker `lms-mongo`
+
+- **Sinh viên yêu cầu:** minhat5 (theo `git config user.name`)
+- **Cơ sở / công cụ / mô hình:** Antigravity, Gemini 4 Neon (High)
+- **Mục tiêu:** siết bắt buộc hai trường `fullName` và `cohort` khi import và lưu document `students` (cả Java service lẫn `$jsonSchema` MongoDB validator), tạo tệp dữ liệu mẫu `doc/data/students_fintech.csv` + `.xlsx` cho 25 sinh viên Fintech, và cập nhật trực tiếp 25 bản ghi sinh viên + validator trong container Docker `lms-mongo`.
+- **File AI sinh/sửa:**
+  - `src/main/java/com/hcmute/lms/lmsapi/document/Student.java` (cập nhật Javadoc bắt buộc)
+  - `src/main/java/com/hcmute/lms/lmsapi/service/impl/StudentServiceImpl.java` (`CsvTextParser.requireColumns(..., "studentCode", "fullName", "cohort")` và kiểm tra không được để trống từng dòng)
+  - `doc/database_import.js` (`schema(['studentCode', 'fullName', 'cohort'], ...)` với `fullName: STR, cohort: STR`)
+  - `doc/data/students_fintech.csv`, `doc/data/students_fintech.xlsx` (25 sinh viên K24 và K22 khớp `enrollments_fintech_2026_hk1.csv`)
+  - `src/test/java/com/hcmute/lms/lmsapi/util/XlsxCsvConverterTest.java` (13 cặp CSV/XLSX), `ApiTestFixtures.java`, `CalculationAndReportIntegrationTest.java`, `ImportBatchPerformanceIntegrationTest.java`, `StudentServiceImplTest.java`, `StudentImportIntegrationTest.java`, `EnrollmentImportIntegrationTest.java`
+  - `doc/ban-cam-ket-buoc-3-metric.md`, `doc/plan/F05a-hoc-ky-lop-sinh-vien.md`, `logsAI/ai-usage-log.md`
+- **Kiểm chứng đã làm:**
+  - Cập nhật `lms-mongo` cổng `27018`: `UPDATED=25`, `TOTAL=25`, `MISSING=0`, chạy lại `/opt/loms/database_import.js` cập nhật validator `required: ["studentCode","fullName","cohort"]`.
+  - `.\mvnw.cmd spotless:apply test-compile spotless:check spotbugs:check pmd:cpd-check test "-Dtest=StudentServiceImplTest,StudentImportIntegrationTest,EnrollmentServiceImplTest,EnrollmentImportIntegrationTest,CalculationAndReportIntegrationTest,XlsxCsvConverterTest"`: `BUILD SUCCESS`, 0 lỗi Spotless / SpotBugs / PMD-CPD, 60/60 test đạt (`CalculationAndReportIntegrationTest` 1/1, `EnrollmentImportIntegrationTest` 14/14, `StudentImportIntegrationTest` 7/7 trên `lms-mongo` cổng `27018` bật validator mới; `EnrollmentServiceImplTest` 13/13; `StudentServiceImplTest` 9/9; `XlsxCsvConverterTest` 16/16 đối chiếu 13 cặp `.csv`/`.xlsx` trong `doc/data/`).
+- **Lỗi/ảo giác AI tự phát hiện:** trong câu lệnh PowerShell kiểm tra `$or` trong `mongosh`, quên thoát chuỗi dấu nháy kép khiến PowerShell diễn giải nhầm `$or` là biến; đã chuyển sang here-string nháy đơn `@'...'@` và chạy thành công.
+- **Sinh viên đã sửa/rà soát:** _chờ sinh viên rà soát_
+- **Commit / PR:** chưa commit (lưu ý cập nhật ghi chú phía `LMS-UI` để thể hiện cả 3 cột `studentCode`, `fullName`, `cohort` đều bắt buộc khi import sinh viên).
+
+---
+
+## Phiên #50 — 2026-11-26: Bổ sung phân trang chuẩn (`PageResponse`) kèm tìm kiếm & xuất CSV/XLSX bảng điểm cho 6 endpoint danh sách/báo cáo
+
+- **Sinh viên yêu cầu:** minhat5 (theo `git config user.name`)
+- **Cơ sở / công cụ / mô hình:** Antigravity, Gemini 4 Neon (High)
+- **Mục tiêu:** bổ sung phân trang server-side (`page`, `size`, `totalElements`, `totalPages`, `last` với `PageableValidationUtils`) và tham số `search` cho 6 endpoint ưu tiên cao/trung bình (`GET /api/v1/sections`, `GET /api/v1/assessments/{id}/scores` & `/sections/{sectionId}/assessments/{assessmentId}/scores`, `GET /api/v1/sections/{sectionId}/enrollments`, `GET /api/v1/reports/analytics` với `dimension=STUDENT`, `GET /api/v1/program-versions/{pvId}/courses`, `GET /api/v1/terms`), kèm endpoint xuất toàn bộ bảng điểm `GET /api/v1/assessments/{id}/scores/export` (và `/sections/{sectionId}/assessments/{assessmentId}/scores/export`, hỗ trợ `format=csv|xlsx`).
+- **File AI sinh/sửa:**
+  - `SectionService.java`, `SectionServiceImpl.java`, `SectionController.java` (`GET /api/v1/sections`: `PageResponse<SectionResponse>` + `search`, `page`, `size`; chỉ tải batch giảng viên cho trang hiện tại)
+  - `AssessmentService.java`, `AssessmentServiceImpl.java`, `AssessmentController.java` (`GET /assessments/{id}/scores` & `/sections/{sectionId}/assessments/{assessmentId}/scores`: phân trang theo nhóm sinh viên + `search`, tách helper dựng header CSV dùng chung với `template-csv`, thêm `/scores/export` qua `ImportTemplateResponses.of`)
+  - `EnrollmentListResponse.java`, `EnrollmentService.java`, `EnrollmentServiceImpl.java`, `EnrollmentController.java` (giữ nguyên tổng `enrolled`/`withdrawn` toàn lớp, thêm `search`, `page`, `size` và metadata phân trang vào `EnrollmentListResponse`, không lộ `fullName` ở `EnrollmentResponse`)
+  - `AnalyticsQueryRequest.java`, `AnalyticsMatrixResponse.java`, `AnalyticsServiceImpl.java` (thêm `page`, `size`, `search` cho `dimension=STUDENT` cắt theo trục `columns[]` + từng hàng `matrix`, `exportAnalyticsMatrixCsv` gọi `buildFilteredMatrix` không cắt trang)
+  - `ProgramCourseService.java`, `ProgramCourseServiceImpl.java`, `ProgramCourseController.java` (`PageResponse<ProgramCourseResponse>` + `page`, `size`)
+  - `TermService.java`, `TermServiceImpl.java`, `TermController.java` (`PageResponse<TermResponse>` + `search`, `status`, `page`, `size`)
+  - Tests & Docs: `SectionServiceImplTest.java`, `SectionIntegrationTest.java`, `ImportBatchUploadIntegrationTest.java`, `EnrollmentServiceImplTest.java`, `EnrollmentIntegrationTest.java`, `AnalyticsServiceImplTest.java`, `AnalyticsControllerIntegrationTest.java`, `ProgramCourseServiceImplTest.java`, `CourseIntegrationTest.java`, `ProgramAndSyllabusImportIntegrationTest.java`, `PublicHomepageCatalogIntegrationTest.java`, `TermServiceImplTest.java`, `TermIntegrationTest.java`, `doc/tech-debt.md` (TD-30), `doc/plan/F05a-hoc-ky-lop-sinh-vien.md`, `logsAI/ai-usage-log.md`
+- **Kiểm chứng đã làm:**
+  - `.\mvnw.cmd spotless:apply test-compile spotless:check spotbugs:check pmd:cpd-check test "-Dtest=SectionServiceImplTest,SectionIntegrationTest,AssessmentIntegrationTest,ImportBatchUploadIntegrationTest,EnrollmentServiceImplTest,EnrollmentIntegrationTest,EnrollmentImportIntegrationTest,AnalyticsServiceImplTest,AnalyticsControllerIntegrationTest,ProgramCourseServiceImplTest,CourseIntegrationTest,ProgramAndSyllabusImportIntegrationTest,PublicHomepageCatalogIntegrationTest,TermServiceImplTest,TermIntegrationTest"`: `BUILD SUCCESS`, 0 lỗi Spotless / SpotBugs / PMD-CPD, 199/199 test đạt trên MongoDB replica set `localhost:27018` (`AnalyticsControllerIntegrationTest` 22, `AssessmentIntegrationTest` 18, `CourseIntegrationTest` 7, `EnrollmentImportIntegrationTest` 14, `EnrollmentIntegrationTest` 6, `ImportBatchUploadIntegrationTest` 19, `ProgramAndSyllabusImportIntegrationTest` 2, `PublicHomepageCatalogIntegrationTest` 2, `SectionIntegrationTest` 16, `TermIntegrationTest` 4, `AnalyticsServiceImplTest` 39, `EnrollmentServiceImplTest` 13, `ProgramCourseServiceImplTest` 13, `SectionServiceImplTest` 14, `TermServiceImplTest` 10).
+- **Lỗi/ảo giác AI tự phát hiện:** trong lần chạy đầu (197/199), `AssessmentIntegrationTest.templateCsv_syllabusTemplate_returns422` lỗi khớp chuỗi thông báo do gộp helper kiểm tra phạm vi lớp; đã cho phép truyền thông báo riêng từng ngữ cảnh, đồng thời bổ sung `courseId` vào request phân trang trong `AnalyticsServiceImplTest.testStudentHappyPathCloLevel` để tránh thiếu stub `courseSectionRepository.findById` khi tách `pagedReq`; chạy lại đạt 199/199.
+- **Sinh viên đã sửa/rà soát:** _chờ sinh viên rà soát_
+- **Commit / PR:** chưa commit (lưu ý cập nhật `LMS-UI` đọc `.content` ở 5 endpoint dùng `PageResponse`, đọc `enrollments` kèm `totalElements`/`page`/`size` ở `/enrollments`, cập nhật bảng ma trận `STUDENT` đọc `totalElements`/`page`/`size` ở `/reports/analytics`, và gọi `/scores/export` khi xuất CSV/XLSX bảng điểm).

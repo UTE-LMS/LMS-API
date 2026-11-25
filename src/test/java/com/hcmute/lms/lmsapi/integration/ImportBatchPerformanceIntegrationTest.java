@@ -34,7 +34,9 @@ class ImportBatchPerformanceIntegrationTest extends ScoreImportIntegrationBase {
   void fiveThousandRowsWithinTenSeconds() throws Exception {
     List<Student> students = new ArrayList<>(ROWS);
     for (int i = 0; i < ROWS; i++) {
-      students.add(Student.builder().studentCode(fixtures.code("STU")).build());
+      String code = fixtures.code("STU");
+      students.add(
+          Student.builder().studentCode(code).fullName("Sinh viên " + i).cohort("K24").build());
     }
     List<Student> saved = new ArrayList<>(mongo().insert(students, Student.class));
     List<Enrollment> enrollments = new ArrayList<>(ROWS);

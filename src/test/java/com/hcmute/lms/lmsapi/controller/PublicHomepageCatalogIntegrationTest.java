@@ -128,17 +128,29 @@ class PublicHomepageCatalogIntegrationTest extends IntegrationTestBase {
         .andExpect(jsonPath("$.content", hasSize(1)))
         .andExpect(jsonPath("$.content[0].id").value(itV2025.getId()));
 
-    // 4. Public GET program-versions/{id}/courses filtered by semester, type, category, search
+    // 4. Public GET program-versions/{id}/courses filtered by semester, type, category, search +
+    // pagination
     mockMvc
         .perform(
             get("/api/v1/program-versions/{id}/courses", itV2025.getId())
                 .param("semester", "3")
                 .param("type", "COMPULSORY")
                 .param("category", "FOUNDATION")
-                .param("search", "Java"))
+                .param("search", "Java")
+                .param("page", "0")
+                .param("size", "20"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$", hasSize(1)))
-        .andExpect(jsonPath("$[0].courseId").value(javaCourse.getId()));
+        .andExpect(jsonPath("$.content", hasSize(1)))
+        .andExpect(jsonPath("$.totalElements").value(1))
+        .andExpect(jsonPath("$.last").value(true))
+        .andExpect(jsonPath("$.content[0].courseId").value(javaCourse.getId()));
+
+    mockMvc
+        .perform(
+            get("/api/v1/program-versions/{id}/courses", itV2025.getId())
+                .param("page", "0")
+                .param("size", "101"))
+        .andExpect(status().isBadRequest());
 
     // 5. Public GET program-versions/{id}/syllabi filtered by status & search
     mockMvc

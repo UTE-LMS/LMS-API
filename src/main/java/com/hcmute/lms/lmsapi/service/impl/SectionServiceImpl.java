@@ -7,6 +7,7 @@ import com.hcmute.lms.lmsapi.document.Term;
 import com.hcmute.lms.lmsapi.document.User;
 import com.hcmute.lms.lmsapi.dto.AssessmentScoreTemplate;
 import com.hcmute.lms.lmsapi.dto.CsvImportResultResponse;
+import com.hcmute.lms.lmsapi.dto.PageResponse;
 import com.hcmute.lms.lmsapi.dto.SectionRequest;
 import com.hcmute.lms.lmsapi.dto.SectionResponse;
 import com.hcmute.lms.lmsapi.dto.SectionStatusUpdateRequest;
@@ -35,6 +36,7 @@ import com.hcmute.lms.lmsapi.service.AuditService;
 import com.hcmute.lms.lmsapi.service.ScopeAuthorizationService;
 import com.hcmute.lms.lmsapi.service.SectionService;
 import com.hcmute.lms.lmsapi.util.ObjectIdUtils;
+import com.hcmute.lms.lmsapi.util.PageableValidationUtils;
 import com.hcmute.lms.lmsapi.util.StringNormalizationUtils;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -43,6 +45,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -74,10 +77,11 @@ public class SectionServiceImpl implements SectionService {
   private AuditService auditService;
 
   @Override
-  public List<SectionResponse> getSections(
-      UserPrincipal principal, String termId, String courseId) {
+  public PageResponse<SectionResponse> getSections(
+      UserPrincipal principal, String termId, String courseId, String search, int page, int size) {
     String term = normalizeFilter(termId, "termId");
     String course = normalizeFilter(courseId, "courseId");
+    PageableValidationUtils.validate(page, size);
 
     List<CourseSection> candidates;
     if (term != null && course != null) {
@@ -90,6 +94,9 @@ public class SectionServiceImpl implements SectionService {
       candidates = sectionRepository.findAll();
     }
 
+    String keyword =
+        search != null && !search.isBlank() ? search.trim().toLowerCase(Locale.ROOT) : null;
+
     // US-19/AC-4: chỉ trả về lớp mà người gọi được đọc (giảng viên: lớp mình) hoặc quản lý được
     List<CourseSection> visible =
         candidates.stream()
@@ -98,9 +105,19 @@ public class SectionServiceImpl implements SectionService {
                     scopeAuthorizationService.canAccessLoadedSection(principal, s, AccessType.READ)
                         || scopeAuthorizationService.canManageCourseSections(
                             principal, s.getCourseId()))
+            .filter(
+                s ->
+                    keyword == null
+                        || (s.getCode() != null
+                            && s.getCode().toLowerCase(Locale.ROOT).contains(keyword)))
             .sorted(Comparator.comparing(CourseSection::getCode))
             .toList();
-    return sectionMapper.toResponseList(visible);
+    return PageResponse.slice(
+        visible,
+        page,
+        size,
+        pageSections ->
+            sectionMapper.toResponseList(pageSections, loadLecturersById(pageSections)));
   }
 
   @Override
@@ -123,7 +140,8 @@ public class SectionServiceImpl implements SectionService {
 
   @Override
   public SectionResponse getSection(String id) {
-    return sectionMapper.toResponse(requireSection(id));
+    CourseSection section = requireSection(id);
+    return sectionMapper.toResponse(section, loadLecturersById(List.of(section)));
   }
 
   @Override
@@ -139,15 +157,15 @@ public class SectionServiceImpl implements SectionService {
     }
     validateSyllabus(request.getSyllabusId(), request.getCourseId());
     validateTermOpen(request.getTermId());
-    List<String> lecturerIds = validateLecturers(request.getLecturerIds());
+    ValidatedLecturers validated = validateLecturers(request.getLecturerIds());
 
-    CourseSection section = sectionMapper.toDocument(request, lecturerIds);
+    CourseSection section = sectionMapper.toDocument(request, validated.ids());
     try {
       CourseSection saved = sectionRepository.save(section);
       log.info("Mở lớp học phần id=[{}] mã [{}]", saved.getId(), saved.getCode());
       AuditLogHelper.record(
           auditService, AuditAction.CREATE, "course_sections", saved.getId(), null, saved, null);
-      return sectionMapper.toResponse(saved);
+      return sectionMapper.toResponse(saved, validated.users());
     } catch (DuplicateKeyException ex) {
       throw conflict(String.format("Mã lớp học phần [%s] đã tồn tại trong hệ thống", code));
     }
@@ -156,12 +174,13 @@ public class SectionServiceImpl implements SectionService {
   @Override
   public SectionResponse updateLecturers(String id, SectionUpdateRequest request) {
     CourseSection section = requireSection(id);
-    section.setLecturerIds(validateLecturers(request.getLecturerIds()));
+    ValidatedLecturers validated = validateLecturers(request.getLecturerIds());
+    section.setLecturerIds(validated.ids());
     CourseSection saved = sectionRepository.save(section);
     log.info("Cập nhật giảng viên phụ trách lớp id=[{}] mã [{}]", saved.getId(), saved.getCode());
     AuditLogHelper.record(
         auditService, AuditAction.UPDATE, "course_sections", saved.getId(), null, saved, null);
-    return sectionMapper.toResponse(saved);
+    return sectionMapper.toResponse(saved, validated.users());
   }
 
   @Override
@@ -172,7 +191,7 @@ public class SectionServiceImpl implements SectionService {
     SectionStatus target = request.getStatus();
 
     if (current == target) {
-      return sectionMapper.toResponse(section);
+      return sectionMapper.toResponse(section, loadLecturersById(List.of(section)));
     }
 
     // Mở lại lớp đã khóa sổ điểm phải có lý do giải trình (cùng quy tắc US-18/AC-3 của học kỳ)
@@ -199,7 +218,7 @@ public class SectionServiceImpl implements SectionService {
         Map.of("status", current),
         Map.of("status", target),
         request.getReason());
-    return sectionMapper.toResponse(saved);
+    return sectionMapper.toResponse(saved, loadLecturersById(List.of(saved)));
   }
 
   private void validateSyllabus(String syllabusId, String courseId) {
@@ -235,11 +254,11 @@ public class SectionServiceImpl implements SectionService {
   }
 
   /** Mỗi ID phải là người dùng ACTIVE có vai trò LECTURER; trả về danh sách đã khử trùng lặp. */
-  private List<String> validateLecturers(List<String> requestedIds) {
+  private ValidatedLecturers validateLecturers(List<String> requestedIds) {
     List<String> distinctIds = new ArrayList<>(new LinkedHashSet<>(requestedIds));
     Map<String, User> found =
         userRepository.findAllById(distinctIds).stream()
-            .collect(Collectors.toMap(User::getId, Function.identity()));
+            .collect(Collectors.toMap(User::getId, Function.identity(), (a, b) -> a));
 
     for (String lecturerId : distinctIds) {
       User user = found.get(lecturerId);
@@ -255,8 +274,28 @@ public class SectionServiceImpl implements SectionService {
             "Người dùng [" + user.getUsername() + "] không có vai trò LECTURER");
       }
     }
-    return distinctIds;
+    return new ValidatedLecturers(distinctIds, found);
   }
+
+  private Map<String, User> loadLecturersById(List<CourseSection> sections) {
+    Set<String> allIds = new LinkedHashSet<>();
+    for (CourseSection section : sections) {
+      if (section.getLecturerIds() != null) {
+        for (String lecturerId : section.getLecturerIds()) {
+          if (lecturerId != null && !lecturerId.isBlank()) {
+            allIds.add(lecturerId);
+          }
+        }
+      }
+    }
+    if (allIds.isEmpty()) {
+      return Map.of();
+    }
+    return userRepository.findAllById(allIds).stream()
+        .collect(Collectors.toMap(User::getId, Function.identity(), (first, second) -> first));
+  }
+
+  private record ValidatedLecturers(List<String> ids, Map<String, User> users) {}
 
   private boolean hasLecturerRole(User user) {
     return user.getRoles() != null && user.getRoles().contains(Role.LECTURER);

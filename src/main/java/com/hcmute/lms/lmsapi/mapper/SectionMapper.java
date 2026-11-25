@@ -1,9 +1,11 @@
 package com.hcmute.lms.lmsapi.mapper;
 
 import com.hcmute.lms.lmsapi.document.CourseSection;
+import com.hcmute.lms.lmsapi.document.User;
 import com.hcmute.lms.lmsapi.dto.SectionRequest;
 import com.hcmute.lms.lmsapi.dto.SectionResponse;
 import java.util.List;
+import java.util.Map;
 
 public interface SectionMapper {
 
@@ -12,5 +14,10 @@ public interface SectionMapper {
 
   SectionResponse toResponse(CourseSection section);
 
+  SectionResponse toResponse(CourseSection section, Map<String, User> lecturersById);
+
   List<SectionResponse> toResponseList(List<CourseSection> sections);
+
+  List<SectionResponse> toResponseList(
+      List<CourseSection> sections, Map<String, User> lecturersById);
 }

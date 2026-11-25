@@ -11,11 +11,13 @@ import com.hcmute.lms.lmsapi.dto.EnrollmentListResponse;
 import com.hcmute.lms.lmsapi.dto.EnrollmentResponse;
 import com.hcmute.lms.lmsapi.dto.EnrollmentStatusUpdateRequest;
 import com.hcmute.lms.lmsapi.dto.FieldErrorDetail;
+import com.hcmute.lms.lmsapi.dto.PageResponse;
 import com.hcmute.lms.lmsapi.dto.UserPrincipal;
 import com.hcmute.lms.lmsapi.enums.AccessType;
 import com.hcmute.lms.lmsapi.enums.AuditAction;
 import com.hcmute.lms.lmsapi.enums.EnrollmentStatus;
 import com.hcmute.lms.lmsapi.enums.SectionStatus;
+import com.hcmute.lms.lmsapi.enums.StudentStatus;
 import com.hcmute.lms.lmsapi.enums.TermStatus;
 import com.hcmute.lms.lmsapi.exception.BusinessRuleViolationException;
 import com.hcmute.lms.lmsapi.exception.ImportValidationException;
@@ -30,6 +32,7 @@ import com.hcmute.lms.lmsapi.service.EnrollmentService;
 import com.hcmute.lms.lmsapi.service.ScopeAuthorizationService;
 import com.hcmute.lms.lmsapi.util.EnrollmentCsvParser;
 import com.hcmute.lms.lmsapi.util.ObjectIdUtils;
+import com.hcmute.lms.lmsapi.util.PageableValidationUtils;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -39,7 +42,9 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.regex.Pattern;
@@ -73,8 +78,11 @@ public class EnrollmentServiceImpl implements EnrollmentService {
   private ScopeAuthorizationService scopeAuthorizationService;
 
   @Override
-  public EnrollmentListResponse getEnrollments(String sectionId, EnrollmentStatus status) {
+  public EnrollmentListResponse getEnrollments(
+      String sectionId, EnrollmentStatus status, String search, int page, int size) {
     CourseSection section = requireSection(sectionId);
+    PageableValidationUtils.validate(page, size);
+
     List<Enrollment> enrollments =
         status == null
             ? enrollmentRepository.findBySectionId(section.getId())
@@ -86,14 +94,32 @@ public class EnrollmentServiceImpl implements EnrollmentService {
             .stream()
             .collect(Collectors.toMap(Student::getId, Function.identity()));
 
+    String keyword =
+        search != null && !search.isBlank() ? search.trim().toLowerCase(Locale.ROOT) : null;
+
     List<EnrollmentResponse> items =
         enrollments.stream()
+            .filter(
+                e -> {
+                  if (keyword == null) {
+                    return true;
+                  }
+                  Student student = students.get(e.getStudentId());
+                  if (student == null) {
+                    return false;
+                  }
+                  return containsIgnoreCase(student.getStudentCode(), keyword)
+                      || containsIgnoreCase(student.getFullName(), keyword);
+                })
             .map(e -> enrollmentMapper.toResponse(e, students.get(e.getStudentId())))
             .sorted(
                 Comparator.comparing(
                     EnrollmentResponse::getStudentCode,
                     Comparator.nullsLast(Comparator.naturalOrder())))
             .toList();
+
+    PageResponse<EnrollmentResponse> paged =
+        PageResponse.slice(items, page, size, Function.identity());
 
     return EnrollmentListResponse.builder()
         .sectionId(section.getId())
@@ -103,8 +129,17 @@ public class EnrollmentServiceImpl implements EnrollmentService {
         .withdrawn(
             enrollmentRepository.countBySectionIdAndStatus(
                 section.getId(), EnrollmentStatus.WITHDRAWN))
-        .enrollments(items)
+        .enrollments(paged.getContent())
+        .page(paged.getPage())
+        .size(paged.getSize())
+        .totalElements(paged.getTotalElements())
+        .totalPages(paged.getTotalPages())
+        .last(paged.isLast())
         .build();
+  }
+
+  private boolean containsIgnoreCase(String value, String keyword) {
+    return value != null && value.toLowerCase(Locale.ROOT).contains(keyword);
   }
 
   @Override
@@ -131,19 +166,6 @@ public class EnrollmentServiceImpl implements EnrollmentService {
       throw new ImportValidationException(errors);
     }
 
-    List<Student> newStudents =
-        rows.stream()
-            .filter(row -> !existingStudents.containsKey(row.studentCode()))
-            .map(
-                row ->
-                    Student.builder()
-                        .studentCode(row.studentCode())
-                        .cohort(blankToNull(row.cohort()))
-                        .build())
-            .toList();
-    Map<String, Student> studentByRef = new HashMap<>(existingStudents);
-    studentRepository.saveAll(newStudents).forEach(s -> studentByRef.put(s.getStudentCode(), s));
-
     Instant now = Instant.now();
     List<Enrollment> newEnrollments =
         rows.stream()
@@ -151,7 +173,7 @@ public class EnrollmentServiceImpl implements EnrollmentService {
                 row ->
                     Enrollment.builder()
                         .sectionId(section.getId())
-                        .studentId(studentByRef.get(row.studentCode()).getId())
+                        .studentId(existingStudents.get(row.studentCode()).getId())
                         .status(EnrollmentStatus.ENROLLED)
                         .enrolledAt(now)
                         .build())
@@ -160,25 +182,23 @@ public class EnrollmentServiceImpl implements EnrollmentService {
     recountEnrolled(section);
 
     log.info(
-        "Nhập danh sách lớp=[{}] bởi user=[{}]: {} dòng, {} sinh viên mới, {} sinh viên dùng lại",
+        "Nhập danh sách lớp=[{}] bởi user=[{}]: {} sinh viên đã ghi danh",
         section.getCode(),
         actorUsername,
-        rows.size(),
-        newStudents.size(),
-        rows.size() - newStudents.size());
+        rows.size());
     AuditLogHelper.record(
         auditService,
         AuditAction.IMPORT,
         "enrollments",
         section.getId(),
         null,
-        Map.of("totalRows", rows.size(), "newStudents", newStudents.size()),
+        Map.of("totalRows", rows.size(), "newStudents", 0),
         "Import CSV ghi danh lớp " + section.getCode());
     return EnrollmentImportResponse.builder()
         .sectionId(section.getId())
         .totalRows(rows.size())
-        .newStudents(newStudents.size())
-        .reusedStudents(rows.size() - newStudents.size())
+        .newStudents(0)
+        .reusedStudents(rows.size())
         .sectionEnrolledCount(section.getEnrolledCount())
         .ignoredColumns(parsed.ignoredColumns())
         .build();
@@ -219,7 +239,21 @@ public class EnrollmentServiceImpl implements EnrollmentService {
         continue;
       }
       Student existing = existingStudents.get(ref);
-      Enrollment current = existing == null ? null : enrollmentByStudentId.get(existing.getId());
+      if (existing == null) {
+        errors.add(rowError(field, "Mã sinh viên không tồn tại trong hệ thống: " + ref, ref));
+        continue;
+      }
+      if (existing.getStatus() != StudentStatus.ACTIVE) {
+        errors.add(
+            rowError(
+                field,
+                "Sinh viên không ở trạng thái ACTIVE (hiện tại: "
+                    + existing.getStatus()
+                    + "), không thể ghi danh",
+                ref));
+        continue;
+      }
+      Enrollment current = enrollmentByStudentId.get(existing.getId());
       if (current != null) {
         errors.add(
             rowError(
@@ -243,10 +277,6 @@ public class EnrollmentServiceImpl implements EnrollmentService {
         .build();
   }
 
-  private String blankToNull(String value) {
-    return value == null || value.isBlank() ? null : value;
-  }
-
   @Override
   @Transactional
   public EnrollmentResponse updateStatus(
@@ -267,6 +297,16 @@ public class EnrollmentServiceImpl implements EnrollmentService {
     }
 
     requireEnrollmentEditable(section);
+
+    if (target == EnrollmentStatus.ENROLLED
+        && student != null
+        && student.getStatus() != StudentStatus.ACTIVE) {
+      throw new BusinessRuleViolationException(
+          "STUDENT_NOT_ACTIVE",
+          String.format(
+              "Không thể ghi danh lại vì sinh viên [%s] đang ở trạng thái %s",
+              student.getStudentCode(), student.getStatus()));
+    }
 
     enrollment.setStatus(target);
     if (target == EnrollmentStatus.ENROLLED) {
@@ -365,6 +405,7 @@ public class EnrollmentServiceImpl implements EnrollmentService {
     List<CsvImportResultResponse.RowError> errors = new ArrayList<>();
     Map<String, CourseSection> sectionCache = new HashMap<>();
     Map<String, Term> termCache = new HashMap<>();
+    Map<String, Optional<Student>> studentCache = new HashMap<>();
     Map<String, CourseSection> affectedSections = new LinkedHashMap<>();
     Set<String> seenPairs = new HashSet<>();
 
@@ -422,19 +463,31 @@ public class EnrollmentServiceImpl implements EnrollmentService {
                 rowNum, studentCode, "Lớp học phần hoặc học kỳ không ở trạng thái OPEN"));
         continue;
       }
+      Optional<Student> found =
+          studentCache.computeIfAbsent(studentCode, studentRepository::findByStudentCode);
+      if (found.isEmpty()) {
+        errors.add(
+            new CsvImportResultResponse.RowError(
+                rowNum, studentCode, "Mã sinh viên không tồn tại trong hệ thống: " + studentCode));
+        continue;
+      }
+      Student student = found.get();
+      if (student.getStatus() != StudentStatus.ACTIVE) {
+        errors.add(
+            new CsvImportResultResponse.RowError(
+                rowNum,
+                studentCode,
+                "Sinh viên không ở trạng thái ACTIVE (hiện tại: "
+                    + student.getStatus()
+                    + "), không thể ghi danh"));
+        continue;
+      }
       if (!seenPairs.add(section.getId() + ":" + studentCode)) {
         errors.add(
             new CsvImportResultResponse.RowError(
                 rowNum, studentCode, "Trùng cặp lớp-sinh viên trong tệp: " + sectionCode));
         continue;
       }
-
-      List<Student> found = studentRepository.findByStudentCodeIn(List.of(studentCode));
-      Student student =
-          found.isEmpty()
-              ? studentRepository.save(
-                  Student.builder().studentCode(studentCode).cohort(blankToNull(cohort)).build())
-              : found.get(0);
 
       try {
         enrollmentRepository.save(

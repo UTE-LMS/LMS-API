@@ -47,11 +47,13 @@ import com.hcmute.lms.lmsapi.repository.TermRepository;
 import com.hcmute.lms.lmsapi.repository.UserRepository;
 import com.hcmute.lms.lmsapi.service.AnalyticsService;
 import com.hcmute.lms.lmsapi.service.ScopeAuthorizationService;
+import com.hcmute.lms.lmsapi.util.PageableValidationUtils;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -111,6 +113,21 @@ public class AnalyticsServiceImpl implements AnalyticsService {
           "Yêu cầu truy vấn hoặc chiều phân tích không được để trống");
     }
 
+    if (request.getDimension() == AnalyticsDimension.STUDENT) {
+      int effectivePage =
+          request.getPage() != null ? request.getPage() : PageableValidationUtils.DEFAULT_PAGE;
+      int effectiveSize =
+          request.getSize() != null ? request.getSize() : PageableValidationUtils.DEFAULT_SIZE;
+      PageableValidationUtils.validate(effectivePage, effectiveSize);
+      AnalyticsMatrixResponse filtered = buildFilteredMatrix(request, principal);
+      return paginateStudentColumns(filtered, effectivePage, effectiveSize);
+    }
+
+    return buildFilteredMatrix(request, principal);
+  }
+
+  private AnalyticsMatrixResponse buildFilteredMatrix(
+      AnalyticsQueryRequest request, UserPrincipal principal) {
     // 1. Xác thực phân quyền truy cập phạm vi (Scope-based Access Control)
     verifyScope(request, principal);
 
@@ -131,6 +148,36 @@ public class AnalyticsServiceImpl implements AnalyticsService {
 
     // 4. Lọc theo chuẩn đích danh và theo Đạt / Chưa đạt (sau khi đã tổng hợp)
     return AnalyticsServiceImpl.applyResultFilters(response, request);
+  }
+
+  private AnalyticsMatrixResponse paginateStudentColumns(
+      AnalyticsMatrixResponse response, int page, int size) {
+    List<MatrixHeader> allColumns =
+        response.getColumns() != null ? response.getColumns() : List.of();
+    long totalElements = allColumns.size();
+    int totalPages = totalElements == 0 ? 0 : (int) Math.ceil((double) totalElements / size);
+    int from = (int) Math.min((long) page * size, totalElements);
+    int to = (int) Math.min((long) from + size, totalElements);
+    boolean isLast = totalElements == 0 || page >= totalPages - 1;
+
+    List<MatrixHeader> pagedColumns = new ArrayList<>(allColumns.subList(from, to));
+    List<List<MatrixMetricCell>> pagedMatrix = new ArrayList<>();
+    if (response.getMatrix() != null) {
+      for (List<MatrixMetricCell> row : response.getMatrix()) {
+        int rowFrom = Math.min(from, row.size());
+        int rowTo = Math.min(to, row.size());
+        pagedMatrix.add(new ArrayList<>(row.subList(rowFrom, rowTo)));
+      }
+    }
+
+    response.setColumns(pagedColumns);
+    response.setMatrix(pagedMatrix);
+    response.setPage(page);
+    response.setSize(size);
+    response.setTotalElements(totalElements);
+    response.setTotalPages(totalPages);
+    response.setLast(isLast);
+    return response;
   }
 
   /**
@@ -212,7 +259,11 @@ public class AnalyticsServiceImpl implements AnalyticsService {
 
   @Override
   public byte[] exportAnalyticsMatrixCsv(AnalyticsQueryRequest request, UserPrincipal principal) {
-    AnalyticsMatrixResponse matrix = getAnalyticsMatrix(request, principal);
+    if (request == null || request.getDimension() == null) {
+      throw new IllegalArgumentException(
+          "Yêu cầu truy vấn hoặc chiều phân tích không được để trống");
+    }
+    AnalyticsMatrixResponse matrix = buildFilteredMatrix(request, principal);
     return matrixCsvExporter.exportToCsv(matrix);
   }
 
@@ -1382,13 +1433,12 @@ public class AnalyticsServiceImpl implements AnalyticsService {
       list = new ArrayList<>(list);
       list.sort(
           Comparator.comparing(Student::getStudentCode, Comparator.nullsLast(String::compareTo)));
-      return list;
+      return filterStudentsBySearch(list, request.getSearch());
     }
     if (request.getStudentId() != null && !request.getStudentId().isBlank()) {
-      return studentRepository
-          .findById(request.getStudentId().trim())
-          .map(List::of)
-          .orElse(List.of());
+      List<Student> single =
+          studentRepository.findById(request.getStudentId().trim()).map(List::of).orElse(List.of());
+      return filterStudentsBySearch(single, request.getSearch());
     }
 
     // Thu thập danh sách sectionIds hợp lệ
@@ -1425,7 +1475,8 @@ public class AnalyticsServiceImpl implements AnalyticsService {
               .map(Enrollment::getStudentId)
               .filter(Objects::nonNull)
               .collect(Collectors.toSet());
-      return filterAndSortStudents(studentIds, request.getCohorts());
+      return filterStudentsBySearch(
+          filterAndSortStudents(studentIds, request.getCohorts()), request.getSearch());
     }
 
     // Nếu theo CTĐT hoặc không có lớp trực tiếp: tìm qua student_results của run
@@ -1436,10 +1487,26 @@ public class AnalyticsServiceImpl implements AnalyticsService {
               .map(StudentResult::getStudentId)
               .filter(Objects::nonNull)
               .collect(Collectors.toSet());
-      return filterAndSortStudents(studentIds, request.getCohorts());
+      return filterStudentsBySearch(
+          filterAndSortStudents(studentIds, request.getCohorts()), request.getSearch());
     }
 
     return List.of();
+  }
+
+  private List<Student> filterStudentsBySearch(List<Student> students, String search) {
+    if (search == null || search.isBlank() || students.isEmpty()) {
+      return students;
+    }
+    String keyword = search.trim().toLowerCase(Locale.ROOT);
+    return students.stream()
+        .filter(
+            s ->
+                (s.getStudentCode() != null
+                        && s.getStudentCode().toLowerCase(Locale.ROOT).contains(keyword))
+                    || (s.getFullName() != null
+                        && s.getFullName().toLowerCase(Locale.ROOT).contains(keyword)))
+        .toList();
   }
 
   private String resolveCourseId(AnalyticsQueryRequest request) {
