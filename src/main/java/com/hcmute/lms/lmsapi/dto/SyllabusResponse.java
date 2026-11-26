@@ -16,9 +16,13 @@ public class SyllabusResponse {
 
   private String id;
   private String courseId;
+  private String courseCode;
+  private String courseName;
   private String version;
   private String effectiveFromTermId;
+  private String effectiveFromTermCode;
   private String effectiveToTermId;
+  private String effectiveToTermCode;
   private SyllabusStatus status;
   private Verification verification;
   private Map<String, Object> extra;

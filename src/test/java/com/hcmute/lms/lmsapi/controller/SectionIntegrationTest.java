@@ -106,8 +106,13 @@ class SectionIntegrationTest extends IntegrationTestBase {
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.code").value(request.getCode()))
         .andExpect(jsonPath("$.courseId").value(course.getId()))
+        .andExpect(jsonPath("$.courseCode").value(course.getCode()))
+        .andExpect(jsonPath("$.courseName").value(course.getName()))
         .andExpect(jsonPath("$.syllabusId").value(confirmedSyllabus.getId()))
+        .andExpect(jsonPath("$.syllabusVersion").value(confirmedSyllabus.getVersion()))
+        .andExpect(jsonPath("$.syllabusStatus").value("CONFIRMED"))
         .andExpect(jsonPath("$.termId").value(openTerm.getId()))
+        .andExpect(jsonPath("$.termCode").value(openTerm.getCode()))
         .andExpect(jsonPath("$.lecturerIds[0]").value(lecturerA.getId()))
         .andExpect(jsonPath("$.lecturers[0].id").value(lecturerA.getId()))
         .andExpect(jsonPath("$.lecturers[0].username").value(lecturerA.getUsername()))
@@ -246,6 +251,15 @@ class SectionIntegrationTest extends IntegrationTestBase {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.content[?(@.id=='" + sectionA + "')]", hasSize(1)))
         .andExpect(
+            jsonPath("$.content[?(@.id=='" + sectionA + "')].termCode")
+                .value(org.hamcrest.Matchers.hasItem(openTerm.getCode())))
+        .andExpect(
+            jsonPath("$.content[?(@.id=='" + sectionA + "')].courseCode")
+                .value(org.hamcrest.Matchers.hasItem(course.getCode())))
+        .andExpect(
+            jsonPath("$.content[?(@.id=='" + sectionA + "')].syllabusVersion")
+                .value(org.hamcrest.Matchers.hasItem(confirmedSyllabus.getVersion())))
+        .andExpect(
             jsonPath("$.content[?(@.id=='" + sectionA + "')].lecturers[0].fullName")
                 .value(org.hamcrest.Matchers.hasItem(lecturerA.getFullName())))
         .andExpect(jsonPath("$.content[?(@.id=='" + sectionB + "')]", hasSize(0)));
@@ -253,6 +267,11 @@ class SectionIntegrationTest extends IntegrationTestBase {
     mockMvc
         .perform(getAs(lecturerAToken, "/api/v1/sections/{id}", sectionA))
         .andExpect(status().isOk())
+        .andExpect(jsonPath("$.termCode").value(openTerm.getCode()))
+        .andExpect(jsonPath("$.courseCode").value(course.getCode()))
+        .andExpect(jsonPath("$.courseName").value(course.getName()))
+        .andExpect(jsonPath("$.syllabusVersion").value(confirmedSyllabus.getVersion()))
+        .andExpect(jsonPath("$.syllabusStatus").value("CONFIRMED"))
         .andExpect(jsonPath("$.lecturers[0].fullName").value(lecturerA.getFullName()));
     mockMvc
         .perform(getAs(lecturerAToken, "/api/v1/sections/{id}", sectionB))

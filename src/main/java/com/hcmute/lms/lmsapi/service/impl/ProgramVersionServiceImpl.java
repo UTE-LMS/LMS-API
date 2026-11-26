@@ -1,5 +1,7 @@
 package com.hcmute.lms.lmsapi.service.impl;
 
+import com.hcmute.lms.lmsapi.document.Pi;
+import com.hcmute.lms.lmsapi.document.Plo;
 import com.hcmute.lms.lmsapi.document.Program;
 import com.hcmute.lms.lmsapi.document.ProgramVersion;
 import com.hcmute.lms.lmsapi.document.Verification;
@@ -16,15 +18,25 @@ import com.hcmute.lms.lmsapi.exception.BusinessRuleViolationException;
 import com.hcmute.lms.lmsapi.exception.ErrorCode;
 import com.hcmute.lms.lmsapi.exception.ResourceNotFoundException;
 import com.hcmute.lms.lmsapi.mapper.ProgramVersionMapper;
+import com.hcmute.lms.lmsapi.repository.PiRepository;
+import com.hcmute.lms.lmsapi.repository.PloRepository;
 import com.hcmute.lms.lmsapi.repository.ProgramRepository;
 import com.hcmute.lms.lmsapi.repository.ProgramVersionRepository;
 import com.hcmute.lms.lmsapi.service.AuditService;
 import com.hcmute.lms.lmsapi.service.ProgramVersionService;
+import com.hcmute.lms.lmsapi.util.MongoCountUtils;
 import com.hcmute.lms.lmsapi.util.ObjectIdUtils;
 import com.hcmute.lms.lmsapi.util.PageableValidationUtils;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.function.Function;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.bson.types.ObjectId;
@@ -47,6 +59,8 @@ public class ProgramVersionServiceImpl implements ProgramVersionService {
 
   private final ProgramVersionRepository programVersionRepository;
   private final ProgramRepository programRepository;
+  private final PloRepository ploRepository;
+  private final PiRepository piRepository;
   private final ProgramVersionMapper programVersionMapper;
   private final MongoTemplate mongoTemplate;
 
@@ -84,8 +98,7 @@ public class ProgramVersionServiceImpl implements ProgramVersionService {
         ObjectIdUtils.requireValid(cleanProgramId, "programId");
         versionPage = programVersionRepository.findByProgramId(cleanProgramId, pageable);
       }
-      List<ProgramVersionResponse> content =
-          programVersionMapper.toResponseList(versionPage.getContent());
+      List<ProgramVersionResponse> content = toResponses(versionPage.getContent());
       return PageResponse.of(
           content, versionPage.getNumber(), versionPage.getSize(), versionPage.getTotalElements());
     }
@@ -122,10 +135,7 @@ public class ProgramVersionServiceImpl implements ProgramVersionService {
     query.with(pageable);
     List<ProgramVersion> versions = mongoTemplate.find(query, ProgramVersion.class);
     return PageResponse.of(
-        programVersionMapper.toResponseList(versions),
-        pageable.getPageNumber(),
-        pageable.getPageSize(),
-        total);
+        toResponses(versions), pageable.getPageNumber(), pageable.getPageSize(), total);
   }
 
   private String trimToNull(String value) {
@@ -138,17 +148,20 @@ public class ProgramVersionServiceImpl implements ProgramVersionService {
 
   @Override
   public ProgramVersionResponse getProgramVersionById(String id) {
-    return programVersionMapper.toResponse(requireProgramVersion(id));
+    return toResponse(requireProgramVersion(id));
   }
 
   @Override
   public ProgramVersionResponse createProgramVersion(ProgramVersionRequest request) {
     ObjectIdUtils.requireValid(request.getProgramId(), "programId");
-    if (!programRepository.existsById(request.getProgramId())) {
-      throw new BusinessRuleViolationException(
-          "PROGRAM_VERSION_PROGRAM",
-          "Chương trình đào tạo không tồn tại: " + request.getProgramId());
-    }
+    Program program =
+        programRepository
+            .findById(request.getProgramId())
+            .orElseThrow(
+                () ->
+                    new BusinessRuleViolationException(
+                        "PROGRAM_VERSION_PROGRAM",
+                        "Chương trình đào tạo không tồn tại: " + request.getProgramId()));
 
     String version = request.getVersion().trim();
     if (programVersionRepository.existsByProgramIdAndVersion(request.getProgramId(), version)) {
@@ -180,7 +193,7 @@ public class ProgramVersionServiceImpl implements ProgramVersionService {
         null,
         programVersion,
         null);
-    return programVersionMapper.toResponse(programVersion);
+    return programVersionMapper.toResponse(programVersion, program, 0L, 0L);
   }
 
   @Override
@@ -215,7 +228,7 @@ public class ProgramVersionServiceImpl implements ProgramVersionService {
         null,
         programVersion,
         null);
-    return programVersionMapper.toResponse(programVersion);
+    return toResponse(programVersion);
   }
 
   @Override
@@ -235,7 +248,52 @@ public class ProgramVersionServiceImpl implements ProgramVersionService {
         null,
         programVersion,
         null);
-    return programVersionMapper.toResponse(programVersion);
+    return toResponse(programVersion);
+  }
+
+  private List<ProgramVersionResponse> toResponses(List<ProgramVersion> versions) {
+    if (versions == null || versions.isEmpty()) {
+      return List.of();
+    }
+    Set<String> programIds =
+        versions.stream()
+            .map(ProgramVersion::getProgramId)
+            .filter(id -> id != null && !id.isBlank())
+            .collect(Collectors.toCollection(LinkedHashSet::new));
+    Map<String, Program> programMap =
+        programIds.isEmpty()
+            ? Collections.emptyMap()
+            : programRepository.findAllById(programIds).stream()
+                .collect(Collectors.toMap(Program::getId, Function.identity(), (a, b) -> a));
+
+    List<String> versionIds =
+        versions.stream().map(ProgramVersion::getId).filter(Objects::nonNull).toList();
+    Map<String, Long> ploCounts =
+        MongoCountUtils.countByObjectIdField(
+            mongoTemplate, Plo.class, "programVersionId", versionIds);
+    Map<String, Long> piCounts =
+        MongoCountUtils.countByObjectIdField(
+            mongoTemplate, Pi.class, "programVersionId", versionIds);
+
+    return versions.stream()
+        .map(
+            pv ->
+                programVersionMapper.toResponse(
+                    pv,
+                    pv.getProgramId() != null ? programMap.get(pv.getProgramId()) : null,
+                    ploCounts.getOrDefault(pv.getId(), 0L),
+                    piCounts.getOrDefault(pv.getId(), 0L)))
+        .toList();
+  }
+
+  private ProgramVersionResponse toResponse(ProgramVersion pv) {
+    Program program =
+        pv.getProgramId() != null && !pv.getProgramId().isBlank()
+            ? programRepository.findById(pv.getProgramId()).orElse(null)
+            : null;
+    long ploCount = ploRepository.countByProgramVersionId(pv.getId());
+    long piCount = piRepository.countByProgramVersionId(pv.getId());
+    return programVersionMapper.toResponse(pv, program, ploCount, piCount);
   }
 
   private ProgramVersion requireProgramVersion(String id) {

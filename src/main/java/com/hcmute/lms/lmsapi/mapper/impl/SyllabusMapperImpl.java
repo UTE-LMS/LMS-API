@@ -1,6 +1,8 @@
 package com.hcmute.lms.lmsapi.mapper.impl;
 
+import com.hcmute.lms.lmsapi.document.Course;
 import com.hcmute.lms.lmsapi.document.Syllabus;
+import com.hcmute.lms.lmsapi.document.Term;
 import com.hcmute.lms.lmsapi.document.Verification;
 import com.hcmute.lms.lmsapi.dto.SyllabusRequest;
 import com.hcmute.lms.lmsapi.dto.SyllabusResponse;
@@ -33,15 +35,25 @@ public class SyllabusMapperImpl implements SyllabusMapper {
 
   @Override
   public SyllabusResponse toResponse(Syllabus syllabus) {
+    return toResponse(syllabus, null, null, null);
+  }
+
+  @Override
+  public SyllabusResponse toResponse(
+      Syllabus syllabus, Course course, Term effectiveFromTerm, Term effectiveToTerm) {
     if (syllabus == null) {
       return null;
     }
     return SyllabusResponse.builder()
         .id(syllabus.getId())
         .courseId(syllabus.getCourseId())
+        .courseCode(course != null ? course.getCode() : null)
+        .courseName(course != null ? course.getName() : null)
         .version(syllabus.getVersion())
         .effectiveFromTermId(syllabus.getEffectiveFromTermId())
+        .effectiveFromTermCode(effectiveFromTerm != null ? effectiveFromTerm.getCode() : null)
         .effectiveToTermId(syllabus.getEffectiveToTermId())
+        .effectiveToTermCode(effectiveToTerm != null ? effectiveToTerm.getCode() : null)
         .status(syllabus.getStatus())
         .verification(syllabus.getVerification())
         .extra(syllabus.getExtra())

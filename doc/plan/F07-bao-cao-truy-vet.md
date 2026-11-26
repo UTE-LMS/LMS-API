@@ -80,13 +80,14 @@ truy vết: kết quả không có `inputs`, `refId` mồ côi, sinh viên ngoà
 Vì sao báo cáo không tự tính lại (một nguồn sự thật duy nhất là engine ở F06, tránh hai con số khác nhau); vì sao `limitations` (kết quả nháp/thiếu dữ liệu không được đọc như kết luận chính thức);
 vì sao truy vết đi từng cấp (mỗi kết quả tự chứng minh bằng đầu vào cấp liền kề); bỏ mẫu số thì "80% đạt" có thể là 32/40 hay 32/45.
 
-## 11. Hiện thực Báo cáo phân tích đa chiều 7 chiều & Xuất CSV ma trận (US-36 / US-35)
+## 11. Hiện thực Báo cáo phân tích đa chiều 7 chiều & Xuất CSV/Excel ma trận (US-36 / US-35)
 
 Mở rộng tầng đọc báo cáo/dashboard của F07 bằng động cơ tổng hợp ma trận 2D đa chiều (**không tạo mới collection hay thay đổi `$jsonSchema` của 25 collections MongoDB v0.7**):
 
-- **Endpoint đã hiện thực (`AnalyticsController`):**
+- **Endpoint đã hiện thực (`ReportController`, `AnalyticsController`):**
+  - `POST /api/v1/reports/{id}/export?format=csv|xlsx`: Xuất bản chụp báo cáo (`SECTION_CLO`, `COURSE_PI`, `PROGRAM_PLO`, `DATA_COMPLETENESS`) ra CSV UTF-8 BOM (mặc định `format=csv`) hoặc Excel `.xlsx` (`ReportExcelExporter`), đồng thời ghi nhận `{ format, fileRef, generatedAt }` vào `reports.exports[]`.
   - `GET /api/v1/reports/analytics`: Trả về cấu trúc ma trận 2D `AnalyticsMatrixResponse` (`dimension`, `level`, `runId`, `isOfficial`, `isStale`, `columns[]`, `rows[]`, `matrix[][]`).
-  - `GET /api/v1/reports/analytics/export`: Xuất ma trận và bảng bản ghi chi tiết ra tệp CSV chuẩn RFC 4180 kèm UTF-8 BOM (`\uFEFF`) để mở trực tiếp trên Microsoft Excel tiếng Việt, có cơ chế chống CSV Formula Injection (CWE-1236: tiền tố `'` khi giá trị sau trim bắt đầu bằng `=`, `+`, `-`, `@` hoặc bắt đầu bằng `\t`, `\r`).
+  - `GET /api/v1/reports/analytics/export?format=csv|xlsx`: Xuất ma trận và bảng bản ghi chi tiết ra tệp CSV chuẩn RFC 4180 kèm UTF-8 BOM (`\uFEFF`) (mặc định `format=csv`) hoặc tệp Excel `.xlsx` 2 sheet (`MaTranPhanTich` và `DuLieuChiTiet` qua `MatrixExcelExporter`), có cơ chế chống CSV/Excel Formula Injection (CWE-1236: tiền tố `'` khi giá trị sau trim bắt đầu bằng `=`, `+`, `-`, `@` hoặc bắt đầu bằng `\t`, `\r`). Tham số `format` ngoài `{csv, xlsx}` bị từ chối `400 BAD_REQUEST`.
 - **7 chiều phân tích (`AnalyticsDimension`):**
   1. `TIME_TERM`: Xu hướng mức đạt CLO / PI / PLO qua các học kỳ (`terms`).
   2. `COURSE_SECTIONS`: Đối sánh các lớp học phần song song (`course_sections`) của cùng một học phần trên từng CLO.

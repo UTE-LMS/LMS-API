@@ -9,6 +9,8 @@ public interface StudentResultRepository extends MongoRepository<StudentResult, 
 
   List<StudentResult> findByRunId(String runId);
 
+  long countByRunId(String runId);
+
   List<StudentResult> findByRunIdAndLevel(String runId, ResultLevel level);
 
   List<StudentResult> findByRunIdAndLevelAndSectionId(

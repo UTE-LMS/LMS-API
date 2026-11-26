@@ -28,4 +28,13 @@ public interface AnalyticsService {
    * @return mảng byte file CSV
    */
   byte[] exportAnalyticsMatrixCsv(AnalyticsQueryRequest request, UserPrincipal principal);
+
+  /**
+   * Xuất kết quả ma trận phân tích đa chiều sang file Excel {@code .xlsx}.
+   *
+   * @param request tham số truy vấn lọc và cấu hình chiều
+   * @param principal thông tin người dùng xác thực trong Security Context
+   * @return mảng byte file Excel {@code .xlsx}
+   */
+  byte[] exportAnalyticsMatrixXlsx(AnalyticsQueryRequest request, UserPrincipal principal);
 }

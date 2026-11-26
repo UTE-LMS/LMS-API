@@ -129,7 +129,7 @@ class AdminGuardsEmpiricalChallengeTest {
     when(userRepository.findById(NON_ADMIN_ID)).thenReturn(Optional.of(nonAdminUser));
     when(userRepository.save(any(User.class))).thenReturn(nonAdminUser);
     when(userRepository.incrementTokenVersion(NON_ADMIN_ID)).thenReturn(1L);
-    when(userMapper.toResponse(any(User.class))).thenReturn(mockResponse);
+    when(userMapper.toResponse(any(User.class), any())).thenReturn(mockResponse);
   }
 
   private void expectSelfDemotionRejected(UpdateUserRequest demotionRequest) {
@@ -171,7 +171,7 @@ class AdminGuardsEmpiricalChallengeTest {
     void selfUnlock_Allowed() {
       when(userRepository.findById(CURRENT_ADMIN_ID)).thenReturn(Optional.of(currentAdmin));
       when(userRepository.save(any(User.class))).thenReturn(currentAdmin);
-      when(userMapper.toResponse(currentAdmin)).thenReturn(mockResponse);
+      when(userMapper.toResponse(currentAdmin, null)).thenReturn(mockResponse);
 
       UpdateUserStatusRequest activateRequest = new UpdateUserStatusRequest(UserStatus.ACTIVE);
 
@@ -238,7 +238,7 @@ class AdminGuardsEmpiricalChallengeTest {
     void selfUpdate_RetainingAdminRole_Succeeds() {
       when(userRepository.findById(CURRENT_ADMIN_ID)).thenReturn(Optional.of(currentAdmin));
       when(userRepository.save(any(User.class))).thenReturn(currentAdmin);
-      when(userMapper.toResponse(currentAdmin)).thenReturn(mockResponse);
+      when(userMapper.toResponse(currentAdmin, null)).thenReturn(mockResponse);
 
       UpdateUserRequest updateRequest =
           UpdateUserRequest.builder()
@@ -292,7 +292,7 @@ class AdminGuardsEmpiricalChallengeTest {
           .thenReturn(2L);
       when(userRepository.save(any(User.class))).thenReturn(otherAdmin);
       when(userRepository.incrementTokenVersion(OTHER_ADMIN_ID)).thenReturn(1L);
-      when(userMapper.toResponse(any(User.class))).thenReturn(mockResponse);
+      when(userMapper.toResponse(any(User.class), any())).thenReturn(mockResponse);
 
       UpdateUserStatusRequest lockRequest = new UpdateUserStatusRequest(UserStatus.LOCKED);
 
@@ -311,7 +311,7 @@ class AdminGuardsEmpiricalChallengeTest {
       when(userRepository.findById(OTHER_ADMIN_ID)).thenReturn(Optional.of(otherAdmin));
       when(userRepository.save(any(User.class))).thenReturn(otherAdmin);
       when(userRepository.incrementTokenVersion(OTHER_ADMIN_ID)).thenReturn(1L);
-      when(userMapper.toResponse(any(User.class))).thenReturn(mockResponse);
+      when(userMapper.toResponse(any(User.class), any())).thenReturn(mockResponse);
 
       UpdateUserStatusRequest lockRequest = new UpdateUserStatusRequest(UserStatus.LOCKED);
 
@@ -375,7 +375,7 @@ class AdminGuardsEmpiricalChallengeTest {
       when(userRepository.countByRolesContainingAndStatus(Role.ADMIN, UserStatus.ACTIVE))
           .thenReturn(2L);
       when(userRepository.save(any(User.class))).thenReturn(otherAdmin);
-      when(userMapper.toResponse(any(User.class))).thenReturn(mockResponse);
+      when(userMapper.toResponse(any(User.class), any())).thenReturn(mockResponse);
 
       UpdateUserRequest demotionRequest =
           lecturerOnlyRequest("other_admin@hcmute.edu.vn", "Other Admin");
@@ -394,7 +394,7 @@ class AdminGuardsEmpiricalChallengeTest {
       otherAdmin.setStatus(UserStatus.LOCKED);
       when(userRepository.findById(OTHER_ADMIN_ID)).thenReturn(Optional.of(otherAdmin));
       when(userRepository.save(any(User.class))).thenReturn(otherAdmin);
-      when(userMapper.toResponse(any(User.class))).thenReturn(mockResponse);
+      when(userMapper.toResponse(any(User.class), any())).thenReturn(mockResponse);
 
       UpdateUserRequest demotionRequest =
           lecturerOnlyRequest("other_admin@hcmute.edu.vn", "Other Admin");
@@ -413,7 +413,7 @@ class AdminGuardsEmpiricalChallengeTest {
     void updateNonAdmin_WhenActiveCountIs1_Succeeds() {
       when(userRepository.findById(NON_ADMIN_ID)).thenReturn(Optional.of(nonAdminUser));
       when(userRepository.save(any(User.class))).thenReturn(nonAdminUser);
-      when(userMapper.toResponse(any(User.class))).thenReturn(mockResponse);
+      when(userMapper.toResponse(any(User.class), any())).thenReturn(mockResponse);
 
       UpdateUserRequest updateRequest =
           UpdateUserRequest.builder()

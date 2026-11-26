@@ -17,6 +17,7 @@ import com.hcmute.lms.lmsapi.enums.ResultLevel;
 import com.hcmute.lms.lmsapi.enums.ResultStatus;
 import com.hcmute.lms.lmsapi.exception.BusinessRuleViolationException;
 import com.hcmute.lms.lmsapi.exception.ResourceNotFoundException;
+import com.hcmute.lms.lmsapi.exporter.ReportExcelExporter;
 import com.hcmute.lms.lmsapi.repository.AggregateResultRepository;
 import com.hcmute.lms.lmsapi.repository.CalculationRunRepository;
 import com.hcmute.lms.lmsapi.repository.CloRepository;
@@ -57,6 +58,7 @@ public class ReportServiceImpl implements ReportService {
   private final PloRepository ploRepository;
   private final StudentRepository studentRepository;
   private final ScopeAuthorizationService scopeAuthorizationService;
+  private final ReportExcelExporter reportExcelExporter;
 
   @Override
   public ReportResponse generateReport(ReportCreateRequest request, String actorId) {
@@ -138,11 +140,7 @@ public class ReportServiceImpl implements ReportService {
 
   @Override
   public byte[] exportReportCsv(String id) {
-    Report report =
-        reportRepository
-            .findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy báo cáo: " + id));
-    verifyReportReadAccess(report);
+    Report report = loadAuthorizedReport(id);
 
     StringBuilder csv = new StringBuilder("\uFEFF");
     csv.append("ReportId,Type,Title,RunId,Limitations\n");
@@ -185,16 +183,37 @@ public class ReportServiceImpl implements ReportService {
       }
     }
 
+    recordExport(report, "csv", "report-" + report.getId() + ".csv");
+    return csv.toString().getBytes(StandardCharsets.UTF_8);
+  }
+
+  @Override
+  public byte[] exportReportXlsx(String id) {
+    Report report = loadAuthorizedReport(id);
+    byte[] content = reportExcelExporter.exportToXlsx(report);
+    recordExport(report, "xlsx", "report-" + report.getId() + ".xlsx");
+    return content;
+  }
+
+  private Report loadAuthorizedReport(String id) {
+    Report report =
+        reportRepository
+            .findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy báo cáo: " + id));
+    verifyReportReadAccess(report);
+    return report;
+  }
+
+  private void recordExport(Report report, String format, String fileRef) {
     report
         .getExports()
         .add(
             Report.ReportExport.builder()
-                .format("csv")
-                .fileRef("report-" + report.getId() + ".csv")
+                .format(format)
+                .fileRef(fileRef)
                 .generatedAt(Instant.now())
                 .build());
     reportRepository.save(report);
-    return csv.toString().getBytes(StandardCharsets.UTF_8);
   }
 
   private Map<String, Object> buildSummary(ReportCreateRequest request, CalculationRun run) {

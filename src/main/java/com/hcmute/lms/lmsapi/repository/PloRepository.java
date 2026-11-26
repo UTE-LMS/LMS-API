@@ -17,5 +17,7 @@ public interface PloRepository extends MongoRepository<Plo, String> {
 
   boolean existsByProgramVersionIdAndCodeAndIdNot(String programVersionId, String code, String id);
 
+  long countByProgramVersionId(String programVersionId);
+
   void deleteByProgramVersionId(String programVersionId);
 }

@@ -1,6 +1,9 @@
 package com.hcmute.lms.lmsapi.mapper.impl;
 
+import com.hcmute.lms.lmsapi.document.Course;
 import com.hcmute.lms.lmsapi.document.CourseSection;
+import com.hcmute.lms.lmsapi.document.Syllabus;
+import com.hcmute.lms.lmsapi.document.Term;
 import com.hcmute.lms.lmsapi.document.User;
 import com.hcmute.lms.lmsapi.dto.SectionRequest;
 import com.hcmute.lms.lmsapi.dto.SectionResponse;
@@ -33,11 +36,31 @@ public class SectionMapperImpl implements SectionMapper {
 
   @Override
   public SectionResponse toResponse(CourseSection section) {
-    return toResponse(section, Collections.emptyMap());
+    return toResponse(
+        section,
+        Collections.emptyMap(),
+        Collections.emptyMap(),
+        Collections.emptyMap(),
+        Collections.emptyMap());
   }
 
   @Override
   public SectionResponse toResponse(CourseSection section, Map<String, User> lecturersById) {
+    return toResponse(
+        section,
+        lecturersById,
+        Collections.emptyMap(),
+        Collections.emptyMap(),
+        Collections.emptyMap());
+  }
+
+  @Override
+  public SectionResponse toResponse(
+      CourseSection section,
+      Map<String, User> lecturersById,
+      Map<String, Term> termsById,
+      Map<String, Course> coursesById,
+      Map<String, Syllabus> syllabiById) {
     if (section == null) {
       return null;
     }
@@ -59,12 +82,29 @@ public class SectionMapperImpl implements SectionMapper {
         }
       }
     }
+    Term term =
+        termsById != null && section.getTermId() != null
+            ? termsById.get(section.getTermId())
+            : null;
+    Course course =
+        coursesById != null && section.getCourseId() != null
+            ? coursesById.get(section.getCourseId())
+            : null;
+    Syllabus syllabus =
+        syllabiById != null && section.getSyllabusId() != null
+            ? syllabiById.get(section.getSyllabusId())
+            : null;
     return SectionResponse.builder()
         .id(section.getId())
         .code(section.getCode())
         .courseId(section.getCourseId())
+        .courseCode(course != null ? course.getCode() : null)
+        .courseName(course != null ? course.getName() : null)
         .syllabusId(section.getSyllabusId())
+        .syllabusVersion(syllabus != null ? syllabus.getVersion() : null)
+        .syllabusStatus(syllabus != null ? syllabus.getStatus() : null)
         .termId(section.getTermId())
+        .termCode(term != null ? term.getCode() : null)
         .lecturerIds(lecturerIds)
         .lecturers(lecturers)
         .enrolledCount(section.getEnrolledCount())
@@ -74,16 +114,43 @@ public class SectionMapperImpl implements SectionMapper {
 
   @Override
   public List<SectionResponse> toResponseList(List<CourseSection> sections) {
-    return toResponseList(sections, Collections.emptyMap());
+    return toResponseList(
+        sections,
+        Collections.emptyMap(),
+        Collections.emptyMap(),
+        Collections.emptyMap(),
+        Collections.emptyMap());
   }
 
   @Override
   public List<SectionResponse> toResponseList(
       List<CourseSection> sections, Map<String, User> lecturersById) {
+    return toResponseList(
+        sections,
+        lecturersById,
+        Collections.emptyMap(),
+        Collections.emptyMap(),
+        Collections.emptyMap());
+  }
+
+  @Override
+  public List<SectionResponse> toResponseList(
+      List<CourseSection> sections,
+      Map<String, User> lecturersById,
+      Map<String, Term> termsById,
+      Map<String, Course> coursesById,
+      Map<String, Syllabus> syllabiById) {
     if (sections == null || sections.isEmpty()) {
       return Collections.emptyList();
     }
-    Map<String, User> lookup = lecturersById != null ? lecturersById : Collections.emptyMap();
-    return sections.stream().map(s -> toResponse(s, lookup)).toList();
+    Map<String, User> lecturerLookup =
+        lecturersById != null ? lecturersById : Collections.emptyMap();
+    Map<String, Term> termLookup = termsById != null ? termsById : Collections.emptyMap();
+    Map<String, Course> courseLookup = coursesById != null ? coursesById : Collections.emptyMap();
+    Map<String, Syllabus> syllabusLookup =
+        syllabiById != null ? syllabiById : Collections.emptyMap();
+    return sections.stream()
+        .map(s -> toResponse(s, lecturerLookup, termLookup, courseLookup, syllabusLookup))
+        .toList();
   }
 }

@@ -162,12 +162,16 @@ class ApiContractIntegrationTest extends IntegrationTestBase {
         .containsExactlyInAnyOrder(
             "id",
             "programId",
+            "programCode",
+            "programName",
             "version",
             "totalCredits",
             "durationYears",
             "applicableCohort",
             "status",
-            "verification");
+            "verification",
+            "ploCount",
+            "piCount");
     assertThat(topKeys(mockMvc.perform(getAs(bearer, ploUrl, pv, plo.getId()))))
         .containsExactlyInAnyOrder(
             "id",

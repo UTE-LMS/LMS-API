@@ -1,5 +1,6 @@
 package com.hcmute.lms.lmsapi.service.impl;
 
+import com.hcmute.lms.lmsapi.document.Course;
 import com.hcmute.lms.lmsapi.document.ProgramCourse;
 import com.hcmute.lms.lmsapi.document.Syllabus;
 import com.hcmute.lms.lmsapi.document.Term;
@@ -20,8 +21,13 @@ import com.hcmute.lms.lmsapi.repository.TermRepository;
 import com.hcmute.lms.lmsapi.service.AuditService;
 import com.hcmute.lms.lmsapi.service.SyllabusService;
 import com.hcmute.lms.lmsapi.util.ObjectIdUtils;
+import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -54,8 +60,7 @@ public class SyllabusServiceImpl implements SyllabusService {
       String courseId, SyllabusStatus status, String effectiveFromTermId, String search) {
     requireCourse(courseId);
     List<Syllabus> syllabi = syllabusRepository.findByCourseIdOrderByVersionAsc(courseId);
-    return syllabusMapper.toResponseList(
-        filterSyllabi(syllabi, null, status, effectiveFromTermId, search));
+    return toResponses(filterSyllabi(syllabi, null, status, effectiveFromTermId, search));
   }
 
   @Override
@@ -86,8 +91,7 @@ public class SyllabusServiceImpl implements SyllabusService {
 
     List<Syllabus> syllabi =
         syllabusRepository.findByCourseIdInOrderByCourseIdAscVersionAsc(courseIds);
-    return syllabusMapper.toResponseList(
-        filterSyllabi(syllabi, courseId, status, effectiveFromTermId, search));
+    return toResponses(filterSyllabi(syllabi, courseId, status, effectiveFromTermId, search));
   }
 
   private List<Syllabus> filterSyllabi(
@@ -120,7 +124,7 @@ public class SyllabusServiceImpl implements SyllabusService {
 
   @Override
   public SyllabusResponse getSyllabus(String id) {
-    return syllabusMapper.toResponse(requireSyllabus(id));
+    return toResponse(requireSyllabus(id));
   }
 
   @Override
@@ -147,7 +151,7 @@ public class SyllabusServiceImpl implements SyllabusService {
           courseId);
       AuditLogHelper.record(
           auditService, AuditAction.CREATE, "syllabi", saved.getId(), null, saved, null);
-      return syllabusMapper.toResponse(saved);
+      return toResponse(saved);
     } catch (DuplicateKeyException ex) {
       throw conflict(
           String.format(
@@ -161,7 +165,7 @@ public class SyllabusServiceImpl implements SyllabusService {
     SyllabusStatus currentStatus = syllabus.getStatus();
 
     if (currentStatus == newStatus) {
-      return syllabusMapper.toResponse(syllabus);
+      return toResponse(syllabus);
     }
 
     boolean validTransition =
@@ -185,7 +189,57 @@ public class SyllabusServiceImpl implements SyllabusService {
         Map.of("status", currentStatus),
         Map.of("status", newStatus),
         null);
-    return syllabusMapper.toResponse(updated);
+    return toResponse(updated);
+  }
+
+  private List<SyllabusResponse> toResponses(List<Syllabus> syllabi) {
+    if (syllabi == null || syllabi.isEmpty()) {
+      return List.of();
+    }
+    Set<String> courseIds = new LinkedHashSet<>();
+    Set<String> termIds = new LinkedHashSet<>();
+    for (Syllabus s : syllabi) {
+      if (hasText(s.getCourseId())) {
+        courseIds.add(s.getCourseId());
+      }
+      if (hasText(s.getEffectiveFromTermId())) {
+        termIds.add(s.getEffectiveFromTermId());
+      }
+      if (hasText(s.getEffectiveToTermId())) {
+        termIds.add(s.getEffectiveToTermId());
+      }
+    }
+    Map<String, Course> coursesById =
+        courseIds.isEmpty()
+            ? Collections.emptyMap()
+            : courseRepository.findAllById(courseIds).stream()
+                .collect(Collectors.toMap(Course::getId, Function.identity(), (a, b) -> a));
+    Map<String, Term> termsById =
+        termIds.isEmpty()
+            ? Collections.emptyMap()
+            : termRepository.findAllById(termIds).stream()
+                .collect(Collectors.toMap(Term::getId, Function.identity(), (a, b) -> a));
+    return syllabi.stream()
+        .map(
+            s ->
+                syllabusMapper.toResponse(
+                    s,
+                    hasText(s.getCourseId()) ? coursesById.get(s.getCourseId()) : null,
+                    hasText(s.getEffectiveFromTermId())
+                        ? termsById.get(s.getEffectiveFromTermId())
+                        : null,
+                    hasText(s.getEffectiveToTermId())
+                        ? termsById.get(s.getEffectiveToTermId())
+                        : null))
+        .toList();
+  }
+
+  private SyllabusResponse toResponse(Syllabus syllabus) {
+    return toResponses(List.of(syllabus)).get(0);
+  }
+
+  private static boolean hasText(String value) {
+    return value != null && !value.isBlank();
   }
 
   private void validateEffectiveTerms(String fromTermId, String toTermId) {

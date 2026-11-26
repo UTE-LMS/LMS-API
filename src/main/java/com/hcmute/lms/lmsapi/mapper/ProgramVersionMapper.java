@@ -1,5 +1,6 @@
 package com.hcmute.lms.lmsapi.mapper;
 
+import com.hcmute.lms.lmsapi.document.Program;
 import com.hcmute.lms.lmsapi.document.ProgramVersion;
 import com.hcmute.lms.lmsapi.dto.ProgramVersionResponse;
 import java.util.List;
@@ -7,6 +8,9 @@ import java.util.List;
 public interface ProgramVersionMapper {
 
   ProgramVersionResponse toResponse(ProgramVersion programVersion);
+
+  ProgramVersionResponse toResponse(
+      ProgramVersion programVersion, Program program, long ploCount, long piCount);
 
   List<ProgramVersionResponse> toResponseList(List<ProgramVersion> programVersions);
 }

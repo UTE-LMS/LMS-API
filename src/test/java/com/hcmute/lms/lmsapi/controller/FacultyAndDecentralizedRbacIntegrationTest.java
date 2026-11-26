@@ -113,7 +113,15 @@ class FacultyAndDecentralizedRbacIntegrationTest extends IntegrationTestBase {
                 "/api/v1/faculties/" + createdFacultyId1 + "/program-managers",
                 FacultyAssignPmRequest.builder().userId(pm1.getId()).build()))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.facultyId").value(createdFacultyId1));
+        .andExpect(jsonPath("$.facultyId").value(createdFacultyId1))
+        .andExpect(jsonPath("$.facultyCode").value(f1Code))
+        .andExpect(jsonPath("$.facultyName").value("Khoa CNTT " + f1Code));
+
+    mockMvc
+        .perform(getAs(adminBearer, "/api/v1/users/{id}", pm1.getId()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.facultyCode").value(f1Code))
+        .andExpect(jsonPath("$.facultyName").value("Khoa CNTT " + f1Code));
 
     mockMvc
         .perform(
@@ -144,7 +152,9 @@ class FacultyAndDecentralizedRbacIntegrationTest extends IntegrationTestBase {
                     .transferReason("Điều chuyển công tác")
                     .build()))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.facultyId").value(createdFacultyId2));
+        .andExpect(jsonPath("$.facultyId").value(createdFacultyId2))
+        .andExpect(jsonPath("$.facultyCode").value(f2Code))
+        .andExpect(jsonPath("$.facultyName").value("Khoa KHCB " + f2Code));
 
     mockMvc.perform(getAs(pm1OldBearer, "/api/v1/faculties")).andExpect(status().isUnauthorized());
 

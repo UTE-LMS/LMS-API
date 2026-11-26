@@ -1,7 +1,7 @@
 # ADR 0005 — ADMIN khởi tạo danh mục CTĐT; PROGRAM_MANAGER quản lý phiên bản theo scope
 
-- **Trạng thái:** ĐỀ XUẤT, **chờ Khoa/GVHD xác nhận**. Chưa phải quyết định chính thức.
-- **Ngày:** 2026-11-03
+- **Trạng thái:** **ĐÃ THAY THẾ (Superseded)** — Theo quyết định phân quyền mới nhất: `ADMIN` chỉ quản lý Khoa (`faculties`) và gán `PROGRAM_MANAGER` vào Khoa; toàn bộ thao tác ghi trên danh mục CTĐT (`programs`), phiên bản (`program_versions`) và khung học phần (`program_courses`) thuộc quyền độc quyền của `PROGRAM_MANAGER` trong phạm vi Khoa (`facultyId`) được giao. `ADMIN` giữ quyền đọc (`GET`) phục vụ báo cáo/thống kê nhưng bị từ chối (HTTP 403) ở các endpoint ghi CTĐT.
+- **Ngày:** 2026-11-03 (cập nhật trạng thái: 2026-11-26)
 - **Người soạn:** Antigravity theo yêu cầu của sinh viên TinMH (IT); sinh viên rà soát và ghi tên người chốt: [ĐIỀN]
 
 ---

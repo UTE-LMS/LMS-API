@@ -2,6 +2,7 @@ package com.hcmute.lms.lmsapi.service.impl;
 
 import com.hcmute.lms.lmsapi.document.AuditEntity;
 import com.hcmute.lms.lmsapi.document.AuditLog;
+import com.hcmute.lms.lmsapi.dto.UserPrincipal;
 import com.hcmute.lms.lmsapi.enums.AuditAction;
 import com.hcmute.lms.lmsapi.mapper.AuditLogMapper;
 import com.hcmute.lms.lmsapi.repository.AuditLogRepository;
@@ -100,6 +101,11 @@ public class AuditServiceImpl implements AuditService {
           || !authentication.isAuthenticated()
           || "anonymousUser".equals(authentication.getPrincipal())) {
         return null;
+      }
+      if (authentication.getPrincipal() instanceof UserPrincipal principal
+          && principal.getId() != null
+          && ObjectId.isValid(principal.getId())) {
+        return principal.getId();
       }
       String name = authentication.getName();
       if (name != null && ObjectId.isValid(name)) {

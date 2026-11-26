@@ -26,6 +26,12 @@ public class AuditLogResponse {
   /** ID người thực hiện; {@code null} nếu hành động không gắn với người dùng đã xác thực. */
   private String userId;
 
+  /** Tên đăng nhập người thực hiện (nếu userId khớp bản ghi trong collection users). */
+  private String username;
+
+  /** Họ và tên người thực hiện (nếu userId khớp bản ghi trong collection users). */
+  private String actorFullName;
+
   private AuditAction action;
 
   /** Thực thể bị tác động {@code { collection, id }}. */

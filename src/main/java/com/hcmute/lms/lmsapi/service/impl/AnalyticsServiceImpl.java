@@ -31,6 +31,7 @@ import com.hcmute.lms.lmsapi.enums.ResultStatus;
 import com.hcmute.lms.lmsapi.enums.Role;
 import com.hcmute.lms.lmsapi.exception.BusinessRuleViolationException;
 import com.hcmute.lms.lmsapi.exporter.MatrixCsvExporter;
+import com.hcmute.lms.lmsapi.exporter.MatrixExcelExporter;
 import com.hcmute.lms.lmsapi.repository.AggregateResultRepository;
 import com.hcmute.lms.lmsapi.repository.AssessmentRepository;
 import com.hcmute.lms.lmsapi.repository.CalculationRunRepository;
@@ -101,6 +102,7 @@ public class AnalyticsServiceImpl implements AnalyticsService {
   private final ProgramVersionRepository programVersionRepository;
   private final ScopeAuthorizationService scopeAuthorizationService;
   private final MatrixCsvExporter matrixCsvExporter;
+  private final MatrixExcelExporter matrixExcelExporter;
   private final UserRepository userRepository;
   private final StudentRepository studentRepository;
   private final EnrollmentRepository enrollmentRepository;
@@ -265,6 +267,16 @@ public class AnalyticsServiceImpl implements AnalyticsService {
     }
     AnalyticsMatrixResponse matrix = buildFilteredMatrix(request, principal);
     return matrixCsvExporter.exportToCsv(matrix);
+  }
+
+  @Override
+  public byte[] exportAnalyticsMatrixXlsx(AnalyticsQueryRequest request, UserPrincipal principal) {
+    if (request == null || request.getDimension() == null) {
+      throw new IllegalArgumentException(
+          "Yêu cầu truy vấn hoặc chiều phân tích không được để trống");
+    }
+    AnalyticsMatrixResponse matrix = buildFilteredMatrix(request, principal);
+    return matrixExcelExporter.exportToXlsx(matrix);
   }
 
   // =========================================================================

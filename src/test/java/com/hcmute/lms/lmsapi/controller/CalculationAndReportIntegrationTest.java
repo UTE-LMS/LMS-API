@@ -63,8 +63,17 @@ import com.hcmute.lms.lmsapi.repository.StudentResultRepository;
 import com.hcmute.lms.lmsapi.repository.SyllabusRepository;
 import com.hcmute.lms.lmsapi.testsupport.IntegrationTestBase;
 import com.jayway.jsonpath.JsonPath;
+import java.io.ByteArrayInputStream;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellType;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.assertj.core.api.Assertions;
 import org.bson.types.ObjectId;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -95,6 +104,7 @@ class CalculationAndReportIntegrationTest extends IntegrationTestBase {
 
   private String createdRunId;
   private String createdReportId;
+  private final List<String> extraReportIds = new ArrayList<>();
 
   @AfterEach
   void cleanupCalculationArtifacts() {
@@ -102,6 +112,10 @@ class CalculationAndReportIntegrationTest extends IntegrationTestBase {
       reportRepository.deleteById(createdReportId);
       createdReportId = null;
     }
+    for (String extraId : extraReportIds) {
+      reportRepository.deleteById(extraId);
+    }
+    extraReportIds.clear();
     if (createdRunId != null) {
       studentResultRepository.deleteAll(studentResultRepository.findByRunId(createdRunId));
       aggregateResultRepository.deleteAll(aggregateResultRepository.findByRunId(createdRunId));
@@ -311,10 +325,83 @@ class CalculationAndReportIntegrationTest extends IntegrationTestBase {
             .perform(postAs(qaToken, "/api/v1/calculation-runs", runReq))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.status").value("SUCCESS"))
+            .andExpect(jsonPath("$.programCode").value(program.getCode()))
+            .andExpect(jsonPath("$.programName").value(program.getName()))
+            .andExpect(jsonPath("$.programVersion").value(pv.getVersion()))
+            .andExpect(jsonPath("$.termCode").value(term.getCode()))
+            .andExpect(jsonPath("$.sectionCodes[0]").value(section.getCode()))
+            .andExpect(jsonPath("$.courseCode").value(course.getCode()))
+            .andExpect(jsonPath("$.courseName").value(course.getName()))
             .andExpect(jsonPath("$.studentResultCount").value(8))
             .andExpect(jsonPath("$.aggregateResultCount").value(4))
             .andReturn();
     createdRunId = JsonPath.read(runRes.getResponse().getContentAsString(), "$.id");
+
+    // Kiểm tra danh sách & chi tiết lượt tính (đếm theo index/aggregation thay vì tải toàn bộ
+    // kết quả)
+    mockMvc
+        .perform(
+            getAs(
+                qaToken,
+                "/api/v1/calculation-runs?programVersionId={pvId}&page=0&size=20",
+                pv.getId()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content[0].id").value(createdRunId))
+        .andExpect(jsonPath("$.content[0].programCode").value(program.getCode()))
+        .andExpect(jsonPath("$.content[0].programVersion").value(pv.getVersion()))
+        .andExpect(jsonPath("$.content[0].termCode").value(term.getCode()))
+        .andExpect(jsonPath("$.content[0].sectionCodes[0]").value(section.getCode()))
+        .andExpect(jsonPath("$.content[0].courseCode").value(course.getCode()))
+        .andExpect(jsonPath("$.content[0].studentResultCount").value(8))
+        .andExpect(jsonPath("$.content[0].aggregateResultCount").value(4))
+        .andExpect(jsonPath("$.totalElements").value(1));
+
+    mockMvc
+        .perform(getAs(qaToken, "/api/v1/calculation-runs/{id}", createdRunId))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.id").value(createdRunId))
+        .andExpect(jsonPath("$.programCode").value(program.getCode()))
+        .andExpect(jsonPath("$.sectionCodes[0]").value(section.getCode()))
+        .andExpect(jsonPath("$.studentResultCount").value(8))
+        .andExpect(jsonPath("$.aggregateResultCount").value(4));
+
+    mockMvc
+        .perform(getAs(qaToken, "/api/v1/calculation-runs?size=0"))
+        .andExpect(status().isBadRequest());
+
+    // Kiểm tra aggregate ASSESSMENT_CLO (có đủ assessmentName/Type, sectionCode, courseCode/Name,
+    // termCode, programCode/Version)
+    mockMvc
+        .perform(
+            getAs(
+                qaToken,
+                "/api/v1/calculation-runs/{id}/aggregate-results?level=ASSESSMENT_CLO",
+                createdRunId))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content[0].sectionCode").value(section.getCode()))
+        .andExpect(jsonPath("$.content[0].courseCode").value(course.getCode()))
+        .andExpect(jsonPath("$.content[0].courseName").value(course.getName()))
+        .andExpect(jsonPath("$.content[0].termCode").value(term.getCode()))
+        .andExpect(jsonPath("$.content[0].assessmentName").value("Giữa kỳ"))
+        .andExpect(jsonPath("$.content[0].assessmentType").value("MIDTERM"))
+        .andExpect(jsonPath("$.content[0].programCode").value(program.getCode()))
+        .andExpect(jsonPath("$.content[0].programVersion").value(pv.getVersion()));
+
+    // Kiểm tra student-results ASSESSMENT_CLO
+    mockMvc
+        .perform(
+            getAs(
+                qaToken,
+                "/api/v1/calculation-runs/{id}/student-results?level=ASSESSMENT_CLO",
+                createdRunId))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content[0].sectionCode").value(section.getCode()))
+        .andExpect(jsonPath("$.content[0].courseCode").value(course.getCode()))
+        .andExpect(jsonPath("$.content[0].termCode").value(term.getCode()))
+        .andExpect(jsonPath("$.content[0].assessmentName").value("Giữa kỳ"))
+        .andExpect(jsonPath("$.content[0].assessmentType").value("MIDTERM"))
+        .andExpect(jsonPath("$.content[0].programCode").value(program.getCode()))
+        .andExpect(jsonPath("$.content[0].programVersion").value(pv.getVersion()));
 
     // Kiểm tra aggregate PLO (1 passed / 2 enrolled -> passRateOfEnrolled = 0.5, dataCompleteness =
     // 0.5)
@@ -326,6 +413,8 @@ class CalculationAndReportIntegrationTest extends IntegrationTestBase {
         .andExpect(jsonPath("$.content", hasSize(1)))
         .andExpect(jsonPath("$.totalElements").value(1))
         .andExpect(jsonPath("$.content[0].subjectCode").value("PLO1"))
+        .andExpect(jsonPath("$.content[0].programCode").value(program.getCode()))
+        .andExpect(jsonPath("$.content[0].programVersion").value(pv.getVersion()))
         .andExpect(jsonPath("$.content[0].counts.enrolled").value(2))
         .andExpect(jsonPath("$.content[0].counts.passed").value(1))
         .andExpect(jsonPath("$.content[0].insufficientData").value(1))
@@ -366,6 +455,76 @@ class CalculationAndReportIntegrationTest extends IntegrationTestBase {
                     containsString("report-" + createdReportId + ".csv")))
         .andExpect(content().string(containsString("PLO1")));
 
+    // Xuất Excel .xlsx báo cáo -> ghi nhận thêm mục xlsx vào exports[]
+    MvcResult xlsxRes =
+        mockMvc
+            .perform(
+                postAs(qaToken, "/api/v1/reports/{id}/export?format=xlsx", null, createdReportId))
+            .andExpect(status().isOk())
+            .andExpect(
+                header()
+                    .string(
+                        HttpHeaders.CONTENT_TYPE,
+                        containsString(
+                            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")))
+            .andExpect(
+                header()
+                    .string(
+                        HttpHeaders.CONTENT_DISPOSITION,
+                        containsString("report-" + createdReportId + ".xlsx")))
+            .andReturn();
+
+    try (Workbook wb =
+        new XSSFWorkbook(new ByteArrayInputStream(xlsxRes.getResponse().getContentAsByteArray()))) {
+      Sheet sheet = wb.getSheet("BaoCao");
+      Assertions.assertThat(sheet).isNotNull();
+      Row ploRow = findRowContaining(sheet, "PLO", "PLO1");
+      Assertions.assertThat(ploRow).isNotNull();
+      Assertions.assertThat(ploRow.getCell(2).getNumericCellValue()).isEqualTo(2.0);
+      Assertions.assertThat(ploRow.getCell(4).getNumericCellValue()).isEqualTo(1.0);
+      Assertions.assertThat(ploRow.getCell(9).getNumericCellValue()).isEqualTo(0.5);
+    }
+
+    // Lịch sử exports[] ghi đủ cả csv và xlsx
+    mockMvc
+        .perform(getAs(qaToken, "/api/v1/reports/{id}", createdReportId))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.exports", hasSize(2)))
+        .andExpect(jsonPath("$.exports[0].format").value("csv"))
+        .andExpect(jsonPath("$.exports[1].format").value("xlsx"));
+
+    // Định dạng không hợp lệ bị từ chối 400
+    mockMvc
+        .perform(postAs(qaToken, "/api/v1/reports/{id}/export?format=pdf", null, createdReportId))
+        .andExpect(status().isBadRequest());
+
+    // Xuất Excel báo cáo DATA_COMPLETENESS chứa sinh viên thiếu điểm s2
+    ReportCreateRequest compReq =
+        ReportCreateRequest.builder()
+            .type(ReportType.DATA_COMPLETENESS)
+            .runId(createdRunId)
+            .sectionId(section.getId())
+            .build();
+    MvcResult compRes =
+        mockMvc
+            .perform(postAs(qaToken, "/api/v1/reports", compReq))
+            .andExpect(status().isCreated())
+            .andReturn();
+    String compReportId = JsonPath.read(compRes.getResponse().getContentAsString(), "$.id");
+    extraReportIds.add(compReportId);
+
+    MvcResult compXlsxRes =
+        mockMvc
+            .perform(postAs(qaToken, "/api/v1/reports/{id}/export?format=xlsx", null, compReportId))
+            .andExpect(status().isOk())
+            .andReturn();
+    try (Workbook wb =
+        new XSSFWorkbook(
+            new ByteArrayInputStream(compXlsxRes.getResponse().getContentAsByteArray()))) {
+      Sheet sheet = wb.getSheet("BaoCao");
+      Assertions.assertThat(findRowContaining(sheet, s2.getStudentCode(), "CLO")).isNotNull();
+    }
+
     // Truy vết ngược: PLO student_result -> PI -> CLO -> ASSESSMENT_CLO -> SCORE -> ImportBatch
     MvcResult ploSrRes =
         mockMvc
@@ -396,5 +555,21 @@ class CalculationAndReportIntegrationTest extends IntegrationTestBase {
         .andExpect(jsonPath("$.fileName").value("diem-gk1.csv"))
         .andExpect(jsonPath("$.sourceRow").value(2))
         .andExpect(jsonPath("$.rawScore").value(8.0));
+  }
+
+  private static Row findRowContaining(Sheet sheet, String col0, String col1) {
+    for (Row row : sheet) {
+      Cell c0 = row.getCell(0);
+      Cell c1 = row.getCell(1);
+      if (c0 != null
+          && c1 != null
+          && c0.getCellType() == CellType.STRING
+          && c1.getCellType() == CellType.STRING
+          && col0.equals(c0.getStringCellValue())
+          && col1.equals(c1.getStringCellValue())) {
+        return row;
+      }
+    }
+    return null;
   }
 }

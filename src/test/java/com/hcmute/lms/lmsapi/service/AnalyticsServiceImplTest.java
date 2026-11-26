@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.within;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.hcmute.lms.lmsapi.document.AggregateResult;
@@ -38,6 +39,7 @@ import com.hcmute.lms.lmsapi.enums.ResultStatus;
 import com.hcmute.lms.lmsapi.enums.Role;
 import com.hcmute.lms.lmsapi.exception.BusinessRuleViolationException;
 import com.hcmute.lms.lmsapi.exporter.MatrixCsvExporter;
+import com.hcmute.lms.lmsapi.exporter.MatrixExcelExporter;
 import com.hcmute.lms.lmsapi.repository.AggregateResultRepository;
 import com.hcmute.lms.lmsapi.repository.AssessmentRepository;
 import com.hcmute.lms.lmsapi.repository.CalculationRunRepository;
@@ -90,6 +92,7 @@ class AnalyticsServiceImplTest {
   @Mock private StudentRepository studentRepository;
   @Mock private EnrollmentRepository enrollmentRepository;
   @Spy private MatrixCsvExporter matrixCsvExporter = new MatrixCsvExporter();
+  @Spy private MatrixExcelExporter matrixExcelExporter = new MatrixExcelExporter();
 
   @InjectMocks private AnalyticsServiceImpl analyticsService;
 
@@ -1387,6 +1390,12 @@ class AnalyticsServiceImplTest {
               analyticsService.exportAnalyticsMatrixCsv(pagedReq, adminPrincipal),
               StandardCharsets.UTF_8);
       assertThat(exportedCodes).isEqualTo("21110001,21110002");
+
+      byte[] xlsxBytes = analyticsService.exportAnalyticsMatrixXlsx(pagedReq, adminPrincipal);
+      verify(matrixExcelExporter).exportToXlsx(any());
+      assertThat(xlsxBytes).isNotEmpty();
+      assertThat(xlsxBytes[0]).isEqualTo((byte) 'P');
+      assertThat(xlsxBytes[1]).isEqualTo((byte) 'K');
 
       // Dòng CLO1:
       // s1: đạt (mean=0.85, passed=1, passRate=1.0)

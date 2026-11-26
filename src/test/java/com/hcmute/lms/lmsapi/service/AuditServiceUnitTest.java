@@ -6,7 +6,9 @@ import static org.mockito.Mockito.*;
 
 import com.hcmute.lms.lmsapi.document.AuditEntity;
 import com.hcmute.lms.lmsapi.document.AuditLog;
+import com.hcmute.lms.lmsapi.dto.UserPrincipal;
 import com.hcmute.lms.lmsapi.enums.AuditAction;
+import com.hcmute.lms.lmsapi.enums.Role;
 import com.hcmute.lms.lmsapi.mapper.AuditLogMapper;
 import com.hcmute.lms.lmsapi.mapper.impl.AuditLogMapperImpl;
 import com.hcmute.lms.lmsapi.repository.AuditLogRepository;
@@ -19,6 +21,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import tools.jackson.databind.json.JsonMapper;
 
 @ExtendWith(MockitoExtension.class)
@@ -293,5 +297,34 @@ public class AuditServiceUnitTest {
                 auditService.record(
                     AuditAction.LOGIN, new AuditEntity("collection", null), null, null, "reason"))
         .isInstanceOf(IllegalArgumentException.class);
+  }
+
+  @Test
+  @DisplayName("Extracts UserPrincipal.id from SecurityContextHolder when recording audit log")
+  void testExtractsUserPrincipalIdFromSecurityContext() {
+    String userId = "507f1f77bcf86cd799439011";
+    UserPrincipal principal =
+        UserPrincipal.builder()
+            .id(userId)
+            .username("admin_user")
+            .roles(List.of(Role.ADMIN))
+            .build();
+    SecurityContextHolder.getContext()
+        .setAuthentication(
+            new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities()));
+    try {
+      auditService.record(
+          AuditAction.CREATE,
+          new AuditEntity("courses", "507f1f77bcf86cd799439022"),
+          null,
+          null,
+          null);
+    } finally {
+      SecurityContextHolder.clearContext();
+    }
+
+    ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
+    verify(auditLogRepository).save(captor.capture());
+    assertThat(captor.getValue().getUserId()).isEqualTo(userId);
   }
 }

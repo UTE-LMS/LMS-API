@@ -29,6 +29,7 @@ class ProgramAndSyllabusImportIntegrationTest extends IntegrationTestBase {
   private Program program;
   private Course course;
   private String pmToken;
+  private String adminToken;
   private String lecturerToken;
 
   @BeforeEach
@@ -47,6 +48,7 @@ class ProgramAndSyllabusImportIntegrationTest extends IntegrationTestBase {
     pmUser = mongo().save(pmUser);
     pmToken = fixtures.bearer(pmUser);
 
+    adminToken = fixtures.bearerFor(Role.ADMIN);
     lecturerToken = fixtures.bearerFor(Role.LECTURER);
   }
 
@@ -54,7 +56,11 @@ class ProgramAndSyllabusImportIntegrationTest extends IntegrationTestBase {
   @DisplayName(
       "Import CTĐT & Import Đề cương bởi PROGRAM_MANAGER -> xác nhận -> chỉ đọc GET -> QA verification")
   void fullImportConfirmAndReadOnlyFlow() throws Exception {
-    // 1. Tải template CTĐT
+    // 1. Tải template CTĐT (ADMIN bị 403)
+    mockMvc
+        .perform(getAs(adminToken, "/api/v1/program-versions/import-template"))
+        .andExpect(status().isForbidden());
+
     mockMvc
         .perform(getAs(pmToken, "/api/v1/program-versions/import-template"))
         .andExpect(status().isOk())
@@ -64,7 +70,7 @@ class ProgramAndSyllabusImportIntegrationTest extends IntegrationTestBase {
                     HttpHeaders.CONTENT_DISPOSITION,
                     org.hamcrest.Matchers.containsString("program-version-template.csv")));
 
-    // 2. Import CTĐT CSV (LECTURER bị 403)
+    // 2. Import CTĐT CSV (LECTURER và ADMIN bị 403)
     String programCsv =
         "ploCode,ploName,ploPassThreshold,ploDisplayOrder,piCode,piName,piWeight,piPassThreshold,courseCodes\n"
             + "PLO1,Kiến thức nền tảng,0.6,1,PI1.1,Phân tích yêu cầu,1.0,0.5,"
@@ -75,14 +81,8 @@ class ProgramAndSyllabusImportIntegrationTest extends IntegrationTestBase {
         new MockMultipartFile(
             "file", "ctdt.csv", "text/csv", programCsv.getBytes(StandardCharsets.UTF_8));
 
-    mockMvc
-        .perform(
-            multipart("/api/v1/program-versions/import")
-                .file(programFile)
-                .param("programId", program.getId())
-                .param("version", "2026.1")
-                .header(HttpHeaders.AUTHORIZATION, lecturerToken))
-        .andExpect(status().isForbidden());
+    assertProgramImportForbidden(lecturerToken, programFile);
+    assertProgramImportForbidden(adminToken, programFile);
 
     MvcResult pvImportRes =
         mockMvc
@@ -112,7 +112,24 @@ class ProgramAndSyllabusImportIntegrationTest extends IntegrationTestBase {
                 .header(HttpHeaders.AUTHORIZATION, pmToken))
         .andExpect(status().isOk());
 
-    // 3. Xác nhận Import CTĐT (ACTIVE & VERIFIED)
+    // 3. Xác nhận Import CTĐT (ACTIVE & VERIFIED) — ADMIN bị 403
+    mockMvc
+        .perform(
+            postAs(
+                adminToken, "/api/v1/program-versions/{id}/confirm-import", null, programVersionId))
+        .andExpect(status().isForbidden());
+    mockMvc
+        .perform(putAs(adminToken, "/api/v1/program-versions/{id}/lock", null, programVersionId))
+        .andExpect(status().isForbidden());
+    mockMvc
+        .perform(
+            putAs(
+                adminToken,
+                "/api/v1/program-versions/{id}/status",
+                java.util.Map.of("status", "ARCHIVED"),
+                programVersionId))
+        .andExpect(status().isForbidden());
+
     mockMvc
         .perform(
             postAs(pmToken, "/api/v1/program-versions/{id}/confirm-import", null, programVersionId))
@@ -205,7 +222,14 @@ class ProgramAndSyllabusImportIntegrationTest extends IntegrationTestBase {
     mockMvc
         .perform(getAs(lecturerToken, "/api/v1/syllabi/{id}/clo-pi-links", syllabusId))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$", hasSize(1)));
+        .andExpect(jsonPath("$", hasSize(1)))
+        .andExpect(jsonPath("$[0].piCode").value("PI1.1"));
+
+    mockMvc
+        .perform(getAs(lecturerToken, "/api/v1/syllabi/{id}", syllabusId))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.courseCode").value(course.getCode()))
+        .andExpect(jsonPath("$.courseName").value(course.getName()));
 
     mockMvc
         .perform(
@@ -270,7 +294,11 @@ class ProgramAndSyllabusImportIntegrationTest extends IntegrationTestBase {
 
     String pvId = JsonPath.read(pvRes.getResponse().getContentAsString(), "$.programVersionId");
 
-    // 2. Tải template khung học phần
+    // 2. Tải template khung học phần (ADMIN bị 403)
+    mockMvc
+        .perform(getAs(adminToken, "/api/v1/program-versions/{id}/courses/import-template", pvId))
+        .andExpect(status().isForbidden());
+
     mockMvc
         .perform(getAs(pmToken, "/api/v1/program-versions/{id}/courses/import-template", pvId))
         .andExpect(status().isOk())
@@ -297,13 +325,9 @@ class ProgramAndSyllabusImportIntegrationTest extends IntegrationTestBase {
         new MockMultipartFile(
             "file", "program-courses.csv", "text/csv", coursesCsv.getBytes(StandardCharsets.UTF_8));
 
-    // LECTURER bị 403
-    mockMvc
-        .perform(
-            multipart("/api/v1/program-versions/{id}/courses/import", pvId)
-                .file(coursesFile)
-                .header(HttpHeaders.AUTHORIZATION, lecturerToken))
-        .andExpect(status().isForbidden());
+    // LECTURER và ADMIN bị 403
+    assertCourseImportForbidden(lecturerToken, pvId, coursesFile);
+    assertCourseImportForbidden(adminToken, pvId, coursesFile);
 
     mockMvc
         .perform(
@@ -330,5 +354,26 @@ class ProgramAndSyllabusImportIntegrationTest extends IntegrationTestBase {
         .andExpect(jsonPath("$.category").value("SPECIALIZED"))
         .andExpect(jsonPath("$.previousCourseIds[0]").value(prevCourse.getId()))
         .andExpect(jsonPath("$.prerequisiteCourseIds[0]").value(prereqCourse.getId()));
+  }
+
+  private void assertProgramImportForbidden(String token, MockMultipartFile file) throws Exception {
+    mockMvc
+        .perform(
+            multipart("/api/v1/program-versions/import")
+                .file(file)
+                .param("programId", program.getId())
+                .param("version", "2026.1")
+                .header(HttpHeaders.AUTHORIZATION, token))
+        .andExpect(status().isForbidden());
+  }
+
+  private void assertCourseImportForbidden(String token, String pvId, MockMultipartFile file)
+      throws Exception {
+    mockMvc
+        .perform(
+            multipart("/api/v1/program-versions/{id}/courses/import", pvId)
+                .file(file)
+                .header(HttpHeaders.AUTHORIZATION, token))
+        .andExpect(status().isForbidden());
   }
 }

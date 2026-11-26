@@ -2,6 +2,7 @@ package com.hcmute.lms.lmsapi.mapper.impl;
 
 import com.hcmute.lms.lmsapi.document.AuditEntity;
 import com.hcmute.lms.lmsapi.document.AuditLog;
+import com.hcmute.lms.lmsapi.document.User;
 import com.hcmute.lms.lmsapi.dto.AuditLogResponse;
 import com.hcmute.lms.lmsapi.enums.AuditAction;
 import com.hcmute.lms.lmsapi.mapper.AuditLogMapper;
@@ -70,10 +71,17 @@ public class AuditLogMapperImpl implements AuditLogMapper {
 
   @Override
   public AuditLogResponse toResponse(AuditLog auditLog) {
+    return toResponse(auditLog, null);
+  }
+
+  @Override
+  public AuditLogResponse toResponse(AuditLog auditLog, User actor) {
     return AuditLogResponse.builder()
         .id(auditLog.getId())
         .at(auditLog.getAt())
         .userId(auditLog.getUserId())
+        .username(actor != null ? actor.getUsername() : null)
+        .actorFullName(actor != null ? actor.getFullName() : null)
         .action(auditLog.getAction())
         .entity(auditLog.getEntity())
         .before(sanitize(auditLog.getBefore()))

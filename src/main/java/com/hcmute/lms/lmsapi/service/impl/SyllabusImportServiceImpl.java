@@ -31,6 +31,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -108,6 +109,9 @@ public class SyllabusImportServiceImpl implements SyllabusImportService {
         Map.of("cloCount", savedClos.size(), "linkCount", savedLinks.size()),
         "Import CSV đề cương");
 
+    Map<String, String> piCodeById =
+        piByCode.values().stream().collect(Collectors.toMap(Pi::getId, Pi::getCode, (a, b) -> a));
+
     return SyllabusCsvImportResponse.builder()
         .syllabusId(syllabus.getId())
         .courseId(courseId)
@@ -118,7 +122,7 @@ public class SyllabusImportServiceImpl implements SyllabusImportService {
         .linkCount(savedLinks.size())
         .warnings(data.warnings())
         .clos(cloMapper.toResponseList(savedClos))
-        .links(cloPiLinkMapper.toResponseList(savedLinks))
+        .links(cloPiLinkMapper.toResponseList(savedLinks, piCodeById))
         .build();
   }
 
@@ -184,7 +188,7 @@ public class SyllabusImportServiceImpl implements SyllabusImportService {
         .linkCount(links.size())
         .warnings(List.of())
         .clos(cloMapper.toResponseList(clos))
-        .links(cloPiLinkMapper.toResponseList(links))
+        .links(CloPiLinkServiceImpl.toEnrichedResponses(links, piRepository, cloPiLinkMapper))
         .build();
   }
 

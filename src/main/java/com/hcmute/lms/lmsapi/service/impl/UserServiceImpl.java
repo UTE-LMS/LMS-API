@@ -36,7 +36,9 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.bson.types.ObjectId;
@@ -134,7 +136,7 @@ public class UserServiceImpl implements UserService {
     log.info("User [{}] created successfully with ID [{}]", user.getUsername(), user.getId());
     AuditLogHelper.record(
         auditService, AuditAction.CREATE, "users", user.getId(), null, user, null);
-    return userMapper.toResponse(user);
+    return toResponse(user);
   }
 
   @Override
@@ -145,7 +147,18 @@ public class UserServiceImpl implements UserService {
     Pageable pageable = PageableValidationUtils.createPageable(page, size);
 
     Page<User> userPage = userRepository.findAll(pageable);
-    List<UserResponse> content = userMapper.toResponseList(userPage.getContent());
+    List<User> users = userPage.getContent();
+    Set<String> facultyIds =
+        users.stream()
+            .map(User::getFacultyId)
+            .filter(id -> id != null && !id.isBlank())
+            .collect(Collectors.toCollection(LinkedHashSet::new));
+    Map<String, Faculty> facultyMap =
+        facultyIds.isEmpty() || facultyRepository == null
+            ? Map.of()
+            : facultyRepository.findAllById(facultyIds).stream()
+                .collect(Collectors.toMap(Faculty::getId, Function.identity(), (a, b) -> a));
+    List<UserResponse> content = userMapper.toResponseList(users, facultyMap);
 
     return PageResponse.of(
         content, userPage.getNumber(), userPage.getSize(), userPage.getTotalElements());
@@ -160,7 +173,7 @@ public class UserServiceImpl implements UserService {
             .findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("User", "id", id));
 
-    return userMapper.toResponse(user);
+    return toResponse(user);
   }
 
   @Override
@@ -235,7 +248,7 @@ public class UserServiceImpl implements UserService {
     log.info("User [{}] updated successfully", user.getId());
     AuditLogHelper.record(
         auditService, AuditAction.UPDATE, "users", user.getId(), null, user, null);
-    return userMapper.toResponse(user);
+    return toResponse(user);
   }
 
   @Override
@@ -301,7 +314,15 @@ public class UserServiceImpl implements UserService {
         null,
         Map.of("status", newStatus),
         null);
-    return userMapper.toResponse(user);
+    return toResponse(user);
+  }
+
+  private UserResponse toResponse(User user) {
+    Faculty faculty =
+        facultyRepository != null && user.getFacultyId() != null && !user.getFacultyId().isBlank()
+            ? facultyRepository.findById(user.getFacultyId()).orElse(null)
+            : null;
+    return userMapper.toResponse(user, faculty);
   }
 
   private void validateObjectId(String id) {
