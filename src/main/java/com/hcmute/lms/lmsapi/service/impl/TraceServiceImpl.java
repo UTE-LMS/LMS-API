@@ -13,6 +13,7 @@ import com.hcmute.lms.lmsapi.dto.UserPrincipal;
 import com.hcmute.lms.lmsapi.enums.AccessType;
 import com.hcmute.lms.lmsapi.enums.ResultInputSourceType;
 import com.hcmute.lms.lmsapi.enums.ResultLevel;
+import com.hcmute.lms.lmsapi.enums.Role;
 import com.hcmute.lms.lmsapi.exception.ResourceNotFoundException;
 import com.hcmute.lms.lmsapi.repository.AssessmentRepository;
 import com.hcmute.lms.lmsapi.repository.CloRepository;
@@ -203,10 +204,26 @@ public class TraceServiceImpl implements TraceService {
     if (auth == null || !(auth.getPrincipal() instanceof UserPrincipal principal)) {
       return;
     }
+    boolean isGlobal =
+        principal.getRoles() == null
+            || principal.getRoles().contains(Role.ADMIN)
+            || principal.getRoles().contains(Role.QA);
+    if (isGlobal) {
+      return;
+    }
+    // Giảng viên chỉ được truy vết kết quả có sectionId (kết quả cấp lớp)
+    if (principal.getRoles().contains(Role.LECTURER)
+        && !principal.getRoles().contains(Role.PROGRAM_MANAGER)) {
+      throw new AccessDeniedException("Giảng viên không có quyền truy vết kết quả cấp CTĐT");
+    }
     if (result.getProgramVersionId() != null
         && !scopeAuthorizationService.canAccessProgramVersion(
             principal, result.getProgramVersionId(), AccessType.READ)) {
       throw new AccessDeniedException("Không có quyền truy vết kết quả này");
+    }
+    if (result.getProgramVersionId() == null) {
+      throw new AccessDeniedException(
+          "Không có quyền truy vết kết quả này (thiếu thông tin phạm vi)");
     }
   }
 

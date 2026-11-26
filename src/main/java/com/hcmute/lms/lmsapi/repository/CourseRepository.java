@@ -1,6 +1,7 @@
 package com.hcmute.lms.lmsapi.repository;
 
 import com.hcmute.lms.lmsapi.document.Course;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -16,6 +17,8 @@ public interface CourseRepository extends MongoRepository<Course, String> {
 
   Page<Course> findByNameContainingIgnoreCaseOrCodeContainingIgnoreCase(
       String name, String code, Pageable pageable);
+
+  List<Course> findByFacultyId(String facultyId);
 
   Page<Course> findByFacultyId(String facultyId, Pageable pageable);
 

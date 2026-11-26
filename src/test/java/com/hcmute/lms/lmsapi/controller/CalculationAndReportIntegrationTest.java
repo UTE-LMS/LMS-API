@@ -16,6 +16,7 @@ import com.hcmute.lms.lmsapi.document.CloPiLink;
 import com.hcmute.lms.lmsapi.document.Course;
 import com.hcmute.lms.lmsapi.document.CourseSection;
 import com.hcmute.lms.lmsapi.document.Enrollment;
+import com.hcmute.lms.lmsapi.document.Faculty;
 import com.hcmute.lms.lmsapi.document.ImportBatch;
 import com.hcmute.lms.lmsapi.document.OutcomeMapping;
 import com.hcmute.lms.lmsapi.document.Pi;
@@ -555,6 +556,228 @@ class CalculationAndReportIntegrationTest extends IntegrationTestBase {
         .andExpect(jsonPath("$.fileName").value("diem-gk1.csv"))
         .andExpect(jsonPath("$.sourceRow").value(2))
         .andExpect(jsonPath("$.rawScore").value(8.0));
+  }
+
+  @Test
+  @DisplayName("Kiểm thử phân quyền tính toán & báo cáo: LECTURER (Phương án A) và PROGRAM_MANAGER")
+  void strictScopeAuthorizationForLecturerAndProgramManager() throws Exception {
+    String adminToken = fixtures.bearerFor(Role.ADMIN);
+
+    com.hcmute.lms.lmsapi.document.User lecturer1 = fixtures.user(Role.LECTURER);
+    com.hcmute.lms.lmsapi.document.User lecturer2 = fixtures.user(Role.LECTURER);
+    String lec1Token = fixtures.bearer(lecturer1);
+    String lec2Token = fixtures.bearer(lecturer2);
+
+    Faculty fac1 = fixtures.faculty();
+    Faculty fac2 = fixtures.faculty();
+    com.hcmute.lms.lmsapi.document.User pm1 = fixtures.user(Role.PROGRAM_MANAGER);
+    pm1.setFacultyId(fac1.getId());
+    mongo().save(pm1);
+    String pm1Token = fixtures.bearer(pm1);
+
+    Program prog1 = fixtures.program();
+    prog1.setFacultyId(fac1.getId());
+    mongo().save(prog1);
+
+    Program prog2 = fixtures.program();
+    prog2.setFacultyId(fac2.getId());
+    mongo().save(prog2);
+
+    Verification verified =
+        Verification.builder()
+            .status(VerificationStatus.VERIFIED)
+            .verifiedAt(Instant.now())
+            .build();
+
+    ProgramVersion pv1 =
+        programVersionRepository.save(
+            ProgramVersion.builder()
+                .programId(prog1.getId())
+                .version("2026-PV1-" + System.nanoTime())
+                .status(ProgramVersionStatus.ACTIVE)
+                .verification(verified)
+                .build());
+
+    ProgramVersion pv2 =
+        programVersionRepository.save(
+            ProgramVersion.builder()
+                .programId(prog2.getId())
+                .version("2026-PV2-" + System.nanoTime())
+                .status(ProgramVersionStatus.ACTIVE)
+                .verification(verified)
+                .build());
+
+    Course course1 = fixtures.course();
+    Term term1 = fixtures.term();
+
+    Syllabus syl1 =
+        syllabusRepository.save(
+            Syllabus.builder()
+                .courseId(course1.getId())
+                .version("1.0-" + System.nanoTime())
+                .status(SyllabusStatus.CONFIRMED)
+                .verification(verified)
+                .build());
+
+    CourseSection sec1 =
+        courseSectionRepository.save(
+            CourseSection.builder()
+                .courseId(course1.getId())
+                .syllabusId(syl1.getId())
+                .termId(term1.getId())
+                .code("SEC1-" + System.nanoTime())
+                .status(SectionStatus.OPEN)
+                .lecturerIds(List.of(lecturer1.getId()))
+                .build());
+
+    CourseSection sec2 =
+        courseSectionRepository.save(
+            CourseSection.builder()
+                .courseId(course1.getId())
+                .syllabusId(syl1.getId())
+                .termId(term1.getId())
+                .code("SEC2-" + System.nanoTime())
+                .status(SectionStatus.OPEN)
+                .lecturerIds(List.of(lecturer2.getId()))
+                .build());
+
+    // 1. LECTURER POST /api/v1/calculation-runs:
+    // 1.1 Scope != SECTION -> 403 Forbidden
+    CalculationRunRequest cohortReq =
+        CalculationRunRequest.builder()
+            .scope(CalculationScope.COHORT)
+            .programVersionId(pv1.getId())
+            .cohorts(List.of("K21"))
+            .build();
+    mockMvc
+        .perform(postAs(lec1Token, "/api/v1/calculation-runs", cohortReq))
+        .andExpect(status().isForbidden());
+
+    // 1.2 Scope SECTION nhưng truyền programVersionId -> 403 Forbidden
+    CalculationRunRequest secWithPvReq =
+        CalculationRunRequest.builder()
+            .scope(CalculationScope.SECTION)
+            .sectionIds(List.of(sec1.getId()))
+            .programVersionId(pv1.getId())
+            .build();
+    mockMvc
+        .perform(postAs(lec1Token, "/api/v1/calculation-runs", secWithPvReq))
+        .andExpect(status().isForbidden());
+
+    // 1.3 Scope SECTION nhưng section thuộc về giảng viên khác -> 403 Forbidden
+    CalculationRunRequest sec2Req =
+        CalculationRunRequest.builder()
+            .scope(CalculationScope.SECTION)
+            .sectionIds(List.of(sec2.getId()))
+            .build();
+    mockMvc
+        .perform(postAs(lec1Token, "/api/v1/calculation-runs", sec2Req))
+        .andExpect(status().isForbidden());
+
+    // 1.4 Scope SECTION với đúng lớp phụ trách -> 201 Created
+    CalculationRunRequest sec1Req =
+        CalculationRunRequest.builder()
+            .scope(CalculationScope.SECTION)
+            .sectionIds(List.of(sec1.getId()))
+            .build();
+    MvcResult lec1RunRes =
+        mockMvc
+            .perform(postAs(lec1Token, "/api/v1/calculation-runs", sec1Req))
+            .andExpect(status().isCreated())
+            .andReturn();
+    String lec1RunId = JsonPath.read(lec1RunRes.getResponse().getContentAsString(), "$.id");
+
+    // 2. LECTURER GET /api/v1/calculation-runs: chỉ thấy các run thuộc lớp mình phụ trách
+    // Admin chạy 1 run cho sec2
+    MvcResult adminRunRes =
+        mockMvc
+            .perform(postAs(adminToken, "/api/v1/calculation-runs", sec2Req))
+            .andExpect(status().isCreated())
+            .andReturn();
+    String adminRunId = JsonPath.read(adminRunRes.getResponse().getContentAsString(), "$.id");
+
+    mockMvc
+        .perform(getAs(lec1Token, "/api/v1/calculation-runs"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content[?(@.id == '" + lec1RunId + "')]").exists())
+        .andExpect(jsonPath("$.content[?(@.id == '" + adminRunId + "')]").doesNotExist());
+
+    mockMvc
+        .perform(getAs(lec2Token, "/api/v1/calculation-runs"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content[?(@.id == '" + lec1RunId + "')]").doesNotExist())
+        .andExpect(jsonPath("$.content[?(@.id == '" + adminRunId + "')]").exists());
+
+    // 3. LECTURER GET student-results / aggregate-results:
+    // Cố tình xem PLO/PI -> 403 Forbidden
+    mockMvc
+        .perform(
+            getAs(lec1Token, "/api/v1/calculation-runs/{id}/student-results?level=PLO", lec1RunId))
+        .andExpect(status().isForbidden());
+
+    mockMvc
+        .perform(
+            getAs(lec1Token, "/api/v1/calculation-runs/{id}/aggregate-results?level=PI", lec1RunId))
+        .andExpect(status().isForbidden());
+
+    // Xem lớp của giảng viên khác -> 403 Forbidden
+    mockMvc
+        .perform(
+            getAs(
+                lec1Token,
+                "/api/v1/calculation-runs/{id}/student-results?level=CLO&sectionId={secId}",
+                adminRunId,
+                sec2.getId()))
+        .andExpect(status().isForbidden());
+
+    // 4. LECTURER Báo cáo:
+    // 4.1 Báo cáo COURSE_PI / PROGRAM_PLO -> 403 Forbidden
+    ReportCreateRequest ploReportReq =
+        ReportCreateRequest.builder().type(ReportType.PROGRAM_PLO).runId(lec1RunId).build();
+    mockMvc
+        .perform(postAs(lec1Token, "/api/v1/reports", ploReportReq))
+        .andExpect(status().isForbidden());
+
+    // 4.2 Báo cáo SECTION_CLO với lớp của giảng viên khác -> 403 Forbidden
+    ReportCreateRequest sec2ReportReq =
+        ReportCreateRequest.builder()
+            .type(ReportType.SECTION_CLO)
+            .runId(adminRunId)
+            .sectionId(sec2.getId())
+            .build();
+    mockMvc
+        .perform(postAs(lec1Token, "/api/v1/reports", sec2ReportReq))
+        .andExpect(status().isForbidden());
+
+    // 4.3 Báo cáo SECTION_CLO với lớp mình phụ trách -> 201 Created
+    ReportCreateRequest sec1ReportReq =
+        ReportCreateRequest.builder()
+            .type(ReportType.SECTION_CLO)
+            .runId(lec1RunId)
+            .sectionId(sec1.getId())
+            .build();
+    MvcResult repRes =
+        mockMvc
+            .perform(postAs(lec1Token, "/api/v1/reports", sec1ReportReq))
+            .andExpect(status().isCreated())
+            .andReturn();
+    String report1Id = JsonPath.read(repRes.getResponse().getContentAsString(), "$.id");
+    extraReportIds.add(report1Id);
+
+    // 5. PROGRAM_MANAGER kiểm soát theo Khoa:
+    // PM khoa 1 cố tình chạy tính toán trên CTĐT khoa 2 -> 403 Forbidden
+    CalculationRunRequest foreignPmReq =
+        CalculationRunRequest.builder()
+            .scope(CalculationScope.PROGRAM)
+            .programVersionId(pv2.getId())
+            .build();
+    mockMvc
+        .perform(postAs(pm1Token, "/api/v1/calculation-runs", foreignPmReq))
+        .andExpect(status().isForbidden());
+
+    // Cleanup extra runs
+    calculationRunRepository.deleteById(lec1RunId);
+    calculationRunRepository.deleteById(adminRunId);
   }
 
   private static Row findRowContaining(Sheet sheet, String col0, String col1) {

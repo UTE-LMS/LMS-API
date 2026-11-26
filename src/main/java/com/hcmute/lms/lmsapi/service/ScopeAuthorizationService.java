@@ -98,4 +98,11 @@ public interface ScopeAuthorizationService {
 
   /** Kiểm tra quyền quản lý đề cương theo syllabusId (suy qua course.facultyId). */
   boolean canManageSyllabus(UserPrincipal principal, String syllabusId);
+
+  /** Kiểm tra quyền xem/truy cập lượt tính toán đo lường 4 cấp độ (F06). */
+  boolean canAccessCalculationRun(
+      UserPrincipal principal, com.hcmute.lms.lmsapi.document.CalculationRun run);
+
+  /** Kiểm tra quyền xem/xuất báo cáo chuẩn đầu ra (F07). */
+  boolean canAccessReport(UserPrincipal principal, com.hcmute.lms.lmsapi.document.Report report);
 }

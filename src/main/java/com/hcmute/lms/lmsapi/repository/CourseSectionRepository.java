@@ -37,5 +37,9 @@ public interface CourseSectionRepository extends MongoRepository<CourseSection, 
 
   List<CourseSection> findByCourseId(String courseId);
 
+  List<CourseSection> findByCourseIdIn(java.util.Collection<String> courseIds);
+
+  List<CourseSection> findByLecturerIdsContaining(String lecturerId);
+
   List<CourseSection> findByTermIdAndCourseId(String termId, String courseId);
 }

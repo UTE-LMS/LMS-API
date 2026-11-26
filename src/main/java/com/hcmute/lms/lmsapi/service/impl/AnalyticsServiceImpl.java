@@ -139,11 +139,13 @@ public class AnalyticsServiceImpl implements AnalyticsService {
     // 3. Phân luồng tổng hợp theo các chiều phân tích
     AnalyticsMatrixResponse response =
         switch (request.getDimension()) {
-          case TIME_TERM -> buildTimeTermMatrix(request, targetRun);
+          case TIME_TERM -> buildTimeTermMatrix(request, targetRun, principal);
           case COURSE_SECTIONS -> buildCourseSectionsMatrix(request, targetRun, principal);
           case COHORT -> buildCohortMatrix(request, targetRun);
-          case ASSESSMENT_COMPONENT -> buildAssessmentComponentMatrix(request, targetRun);
-          case CURRICULUM_CLASSIFICATION -> buildCurriculumClassificationMatrix(request, targetRun);
+          case ASSESSMENT_COMPONENT ->
+              buildAssessmentComponentMatrix(request, targetRun, principal);
+          case CURRICULUM_CLASSIFICATION ->
+              buildCurriculumClassificationMatrix(request, targetRun, principal);
           case COURSE_LECTURER -> buildCourseLecturerMatrix(request, targetRun, principal);
           case STUDENT -> buildStudentMatrix(request, targetRun, principal);
         };
@@ -481,16 +483,20 @@ public class AnalyticsServiceImpl implements AnalyticsService {
           calculationRunRepository.findByProgramVersionIdOrderByStartedAtDesc(
               request.getProgramVersionId());
       Optional<CalculationRun> successRun =
-          runs.stream().filter(r -> r.getStatus() == CalculationStatus.SUCCESS).findFirst();
+          runs.stream()
+              .filter(r -> r.getStatus() == CalculationStatus.SUCCESS)
+              .filter(r -> scopeAuthorizationService.canAccessCalculationRun(principal, r))
+              .findFirst();
       if (successRun.isPresent()) {
         return successRun.get();
       }
     }
 
-    // Tìm kiếm trong toàn bộ các lượt tính SUCCESS mới nhất
+    // Tìm kiếm trong toàn bộ các lượt tính SUCCESS mới nhất mà người dùng có quyền
     List<CalculationRun> allRuns = calculationRunRepository.findAllByOrderByStartedAtDesc();
     return allRuns.stream()
         .filter(r -> r.getStatus() == CalculationStatus.SUCCESS)
+        .filter(r -> scopeAuthorizationService.canAccessCalculationRun(principal, r))
         .findFirst()
         .orElse(null);
   }
@@ -583,7 +589,7 @@ public class AnalyticsServiceImpl implements AnalyticsService {
   // =========================================================================
 
   private AnalyticsMatrixResponse buildTimeTermMatrix(
-      AnalyticsQueryRequest request, CalculationRun run) {
+      AnalyticsQueryRequest request, CalculationRun run, UserPrincipal principal) {
     // Tự động suy ra courseId từ lớp đầu tiên nếu courseId bị trống
     if ((request.getCourseId() == null || request.getCourseId().isBlank())
         && request.getSectionIds() != null
@@ -626,6 +632,7 @@ public class AnalyticsServiceImpl implements AnalyticsService {
     if (runId != null) {
       List<AggregateResult> allAggregates =
           aggregateResultRepository.findByRunIdAndLevel(runId, level);
+      allAggregates = filterAggregatesByAccessAndSections(allAggregates, request, principal);
 
       // Tra cứu termId của section nếu aggregateResult chưa gắn sẵn scope.termId
       Map<String, String> sectionToTermMap = buildSectionToTermMap();
@@ -883,7 +890,7 @@ public class AnalyticsServiceImpl implements AnalyticsService {
   // =========================================================================
 
   private AnalyticsMatrixResponse buildAssessmentComponentMatrix(
-      AnalyticsQueryRequest request, CalculationRun run) {
+      AnalyticsQueryRequest request, CalculationRun run, UserPrincipal principal) {
     boolean isOfficial = run != null && run.isOfficial();
     boolean isStale = run != null && run.isStale();
     String runId = run != null ? run.getId() : null;
@@ -935,6 +942,7 @@ public class AnalyticsServiceImpl implements AnalyticsService {
     if (runId != null) {
       List<AggregateResult> aggregates =
           aggregateResultRepository.findByRunIdAndLevel(runId, ResultLevel.ASSESSMENT_CLO);
+      aggregates = filterAggregatesByAccessAndSections(aggregates, request, principal);
 
       // Tra cứu assessmentId -> AssessmentType
       Map<String, AssessmentType> assessmentTypeMap = buildAssessmentTypeMap();
@@ -974,7 +982,7 @@ public class AnalyticsServiceImpl implements AnalyticsService {
   // =========================================================================
 
   private AnalyticsMatrixResponse buildCurriculumClassificationMatrix(
-      AnalyticsQueryRequest request, CalculationRun run) {
+      AnalyticsQueryRequest request, CalculationRun run, UserPrincipal principal) {
     CurriculumClassificationType classificationType =
         request.getClassificationType() != null
             ? request.getClassificationType()
@@ -1142,7 +1150,19 @@ public class AnalyticsServiceImpl implements AnalyticsService {
 
         // Cột: Các học kỳ hoặc các lớp
         if (request.getCourseId() != null) {
-          columns = toSectionHeaders(courseSectionRepository.findByCourseId(request.getCourseId()));
+          List<CourseSection> sections =
+              courseSectionRepository.findByCourseId(request.getCourseId());
+          RoleFlags roles = resolveRoleFlags(principal);
+          if (roles.isLecturer() && !roles.isPm() && !roles.isQa() && !roles.isAdmin()) {
+            sections =
+                sections.stream()
+                    .filter(
+                        s ->
+                            scopeAuthorizationService.canAccessLoadedSection(
+                                principal, s, AccessType.READ))
+                    .toList();
+          }
+          columns = toSectionHeaders(sections);
         } else {
           columns = toTermHeaders(termRepository.findAllByOrderByStartDateDesc());
         }
@@ -1158,6 +1178,7 @@ public class AnalyticsServiceImpl implements AnalyticsService {
 
           List<AggregateResult> aggregates =
               aggregateResultRepository.findByRunIdAndLevel(runId, ResultLevel.CLO);
+          aggregates = filterAggregatesByAccessAndSections(aggregates, request, principal);
 
           for (MatrixHeader row : rows) {
             int levelNum = row.getBloomLevel();
@@ -1440,19 +1461,6 @@ public class AnalyticsServiceImpl implements AnalyticsService {
       UserPrincipal principal) {
     RoleFlags roles = resolveRoleFlags(principal);
 
-    if (request.getStudentIds() != null && !request.getStudentIds().isEmpty()) {
-      List<Student> list = studentRepository.findAllById(request.getStudentIds());
-      list = new ArrayList<>(list);
-      list.sort(
-          Comparator.comparing(Student::getStudentCode, Comparator.nullsLast(String::compareTo)));
-      return filterStudentsBySearch(list, request.getSearch());
-    }
-    if (request.getStudentId() != null && !request.getStudentId().isBlank()) {
-      List<Student> single =
-          studentRepository.findById(request.getStudentId().trim()).map(List::of).orElse(List.of());
-      return filterStudentsBySearch(single, request.getSearch());
-    }
-
     // Thu thập danh sách sectionIds hợp lệ
     List<CourseSection> sections;
     if (request.getSectionIds() != null && !request.getSectionIds().isEmpty()) {
@@ -1478,29 +1486,54 @@ public class AnalyticsServiceImpl implements AnalyticsService {
               .toList();
     }
 
+    Set<String> scopeStudentIds = null;
     if (!sections.isEmpty()) {
       List<String> secIds = sections.stream().map(CourseSection::getId).toList();
       List<Enrollment> enrollments =
           enrollmentRepository.findBySectionIdInAndStatus(secIds, EnrollmentStatus.ENROLLED);
-      Set<String> studentIds =
+      scopeStudentIds =
           enrollments.stream()
               .map(Enrollment::getStudentId)
               .filter(Objects::nonNull)
               .collect(Collectors.toSet());
-      return filterStudentsBySearch(
-          filterAndSortStudents(studentIds, request.getCohorts()), request.getSearch());
-    }
-
-    // Nếu theo CTĐT hoặc không có lớp trực tiếp: tìm qua student_results của run
-    if (run != null) {
+    } else if (run != null) {
       List<StudentResult> srs = studentResultRepository.findByRunIdAndLevel(run.getId(), level);
-      Set<String> studentIds =
+      scopeStudentIds =
           srs.stream()
               .map(StudentResult::getStudentId)
               .filter(Objects::nonNull)
               .collect(Collectors.toSet());
+    }
+
+    if (request.getStudentIds() != null && !request.getStudentIds().isEmpty()) {
+      List<String> targetIds = request.getStudentIds();
+      if (!roles.hasGlobalReadAccess() && scopeStudentIds != null) {
+        targetIds = targetIds.stream().filter(scopeStudentIds::contains).toList();
+      }
+      if (targetIds.isEmpty()) {
+        return List.of();
+      }
+      List<Student> list = studentRepository.findAllById(targetIds);
+      list = new ArrayList<>(list);
+      list.sort(
+          Comparator.comparing(Student::getStudentCode, Comparator.nullsLast(String::compareTo)));
+      return filterStudentsBySearch(list, request.getSearch());
+    }
+
+    if (request.getStudentId() != null && !request.getStudentId().isBlank()) {
+      String targetId = request.getStudentId().trim();
+      if (!roles.hasGlobalReadAccess()
+          && scopeStudentIds != null
+          && !scopeStudentIds.contains(targetId)) {
+        return List.of();
+      }
+      List<Student> single = studentRepository.findById(targetId).map(List::of).orElse(List.of());
+      return filterStudentsBySearch(single, request.getSearch());
+    }
+
+    if (scopeStudentIds != null && !scopeStudentIds.isEmpty()) {
       return filterStudentsBySearch(
-          filterAndSortStudents(studentIds, request.getCohorts()), request.getSearch());
+          filterAndSortStudents(scopeStudentIds, request.getCohorts()), request.getSearch());
     }
 
     return List.of();
@@ -1519,6 +1552,27 @@ public class AnalyticsServiceImpl implements AnalyticsService {
                     || (s.getFullName() != null
                         && s.getFullName().toLowerCase(Locale.ROOT).contains(keyword)))
         .toList();
+  }
+
+  private List<AggregateResult> filterAggregatesByAccessAndSections(
+      List<AggregateResult> aggregates, AnalyticsQueryRequest request, UserPrincipal principal) {
+    RoleFlags roles = resolveRoleFlags(principal);
+    if (roles.isLecturer() && !roles.isPm() && !roles.isQa() && !roles.isAdmin()) {
+      return aggregates.stream()
+          .filter(
+              a ->
+                  a.getSectionId() != null
+                      && scopeAuthorizationService.canAccessSection(
+                          principal, a.getSectionId(), AccessType.READ))
+          .toList();
+    }
+    if (request.getSectionIds() != null && !request.getSectionIds().isEmpty()) {
+      return aggregates.stream()
+          .filter(
+              a -> a.getSectionId() != null && request.getSectionIds().contains(a.getSectionId()))
+          .toList();
+    }
+    return aggregates;
   }
 
   private String resolveCourseId(AnalyticsQueryRequest request) {

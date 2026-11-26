@@ -838,3 +838,38 @@ Phần này chuẩn bị sẵn câu trả lời khoa học, chuẩn mực cho 4 
   - Khi bỏ `ADMIN` khỏi `PUT /api/v1/programs/{id}`, `@PreAuthorize` (`canManageProgram`) chạy trước ràng buộc `@Pattern` nên path `id` sai định dạng trả về `403` fail-closed (thay vì `400`), đã cập nhật kỳ vọng trong `ProgramApiIntegrationTest.malformedId`.
 - **Sinh viên đã sửa/rà soát:** _chờ sinh viên rà soát_
 - **Commit / PR:** chưa commit.
+
+---
+
+## Phiên #56 — 2026-11-27: Phân quyền phạm vi nghiêm ngặt cho Engine tính toán, Báo cáo và Phân tích đa chiều (Phương án A cho LECTURER, ADMIN toàn quyền tính toán, PM theo Khoa)
+
+- **Sinh viên yêu cầu:** minhat5 (theo `git config user.name`)
+- **Cơ sở / công cụ / mô hình:** Antigravity, Gemini 4 Neon (High)
+- **Mục tiêu:**
+  - Thiết lập cơ chế kiểm soát phạm vi truy cập (Scope-based Authorization) cho các phân hệ Tính toán đo lường (F06), Báo cáo & Truy vết (F07), và Phân tích đa chiều 7 chiều theo Phương án A đã thống nhất:
+    1. **ADMIN**: Giữ toàn quyền chạy tính toán đo lường (`ALL`, `SECTION`, `COHORT`, `PROGRAM`), xem kết quả và báo cáo trên toàn hệ thống.
+    2. **PROGRAM_MANAGER**: Kiểm soát theo Khoa chủ quản (`facultyId == principal.facultyId`). Chạy `SECTION` phải thuộc các môn của Khoa; chạy `COHORT`/`PROGRAM` bắt buộc có `programVersionId` thuộc Khoa. Engine nạp đúng các lớp học phần thuộc các môn trong `program_courses` của phiên bản CTĐT đó. Chỉ xem kết quả và báo cáo thuộc Khoa mình.
+    3. **LECTURER (Phương án A)**:
+       - `POST /api/v1/calculation-runs`: Chỉ được chạy `scope = SECTION`, mọi `sectionId` phải do mình trực tiếp giảng dạy (`CourseSection.lecturerIds.contains(userId)`), nghiêm cấm truyền `programVersionId` hoặc chọn `scope = COHORT | PROGRAM` (trả về HTTP 403 `AccessDeniedException`).
+       - `GET /api/v1/calculation-runs`: Chỉ thấy các lượt tính có `scope = SECTION` và chứa ít nhất một lớp do mình dạy. Ẩn toàn bộ lượt tính `COHORT` và `PROGRAM`.
+       - `GET /api/v1/calculation-runs/{id}/student-results` và `/aggregate-results`: Chỉ xem được kết quả cấp 1–2 (`ASSESSMENT_CLO`, `CLO`) của lớp mình phụ trách. Cố tình truy vấn cấp 3–4 (`PI`, `PLO`) hoặc lớp khác bị từ chối 403. Nếu không truyền `sectionId`, hệ thống tự động lọc theo các lớp mình phụ trách.
+       - `POST /api/v1/reports`: Chỉ được sinh/xem báo cáo `SECTION_CLO` và `DATA_COMPLETENESS` với `sectionId` của lớp mình. Cố tình chọn `COURSE_PI`, `PROGRAM_PLO` hoặc lớp khác bị từ chối 403.
+       - `GET /api/v1/reports`: Tự động lọc danh sách chỉ hiển thị báo cáo của các lớp mình phụ trách.
+       - `POST /api/v1/trace`: Giảng viên truy vết kết quả cấp CTĐT không có `sectionId` hoặc không thuộc lớp mình bị từ chối 403.
+       - `GET /api/v1/reports/analytics`: Tự động kiểm tra quyền trên lượt tính nguồn (`canAccessCalculationRun`). Chặn Giảng viên truy cập chiều `COHORT` và phân loại `PLO_CATEGORY`. Ở các chiều `TIME_TERM`, `ASSESSMENT_COMPONENT`, `BLOOM_LEVEL` chỉ gom dữ liệu lớp mình phụ trách. Ở chiều `STUDENT` chỉ cho phép xem sinh viên thuộc lớp mình phụ trách (loại bỏ tham số `studentIds`/`studentId` ngoài phạm vi).
+- **File AI sinh/sửa:**
+  - Repositories: `CourseRepository.java` (thêm `findByFacultyId`), `CourseSectionRepository.java` (thêm `findByCourseIdIn`, `findByLecturerIdsContaining`), `ProgramVersionRepository.java` (thêm `findByProgramIdIn`).
+  - Authorization Services: `ScopeAuthorizationService.java` và `ScopeAuthorizationServiceImpl.java` (khai báo và hiện thực `canAccessCalculationRun`, `canAccessReport`).
+  - Services: `CalculationServiceImpl.java` (kiểm soát phân trang, phân quyền chạy, nạp môn liên khoa qua `program_courses`, validate kết quả truy cập), `ReportServiceImpl.java` (kiểm soát sinh và lọc danh sách báo cáo theo lớp/Khoa), `TraceServiceImpl.java` (kiểm soát truy vết cấp kết quả sinh viên), `AnalyticsServiceImpl.java` (truyền `principal` vào ma trận, lọc aggregates và students theo quyền lớp).
+  - Tests: `CalculationAndReportIntegrationTest.java` (thêm kịch bản test tích hợp toàn diện phân quyền LECTURER Phương án A và PM theo Khoa), `AnalyticsServiceImplTest.java` (cập nhật lenient stubbing `canAccessCalculationRun`).
+  - Docs: `doc/plan/F06-do-luong.md`, `doc/plan/F07-bao-cao-truy-vet.md`, `logsAI/ai-usage-log.md`.
+- **Kiểm chứng đã làm:**
+  - `.\mvnw.cmd test-compile spotless:apply spotless:check spotbugs:check pmd:cpd-check`: `BUILD SUCCESS`, Spotless 463/463 file sạch, SpotBugs `BugInstance size is 0`, PMD-CPD 0 trùng lặp.
+  - `.\mvnw.cmd test`: Toàn bộ test suite **930/930 test đạt** (0 failures, 0 errors, 0 skipped) trên MongoDB replica set `localhost:27018`.
+- **Lỗi/ảo giác AI tự phát hiện:**
+  - Ban đầu `AnalyticsServiceImplTest` bị `UnnecessaryStubbingException` tại `shouldAllowQaWithStrictEmptyScopeAccess` vì phương thức `canAccessCalculationRun` trên mock service trả về `false` mặc định khiến `resolveCalculationRun` trả về null; đã cấu hình `lenient().when(...).thenReturn(true)` trong `setUp()`.
+  - Ban đầu trong `CalculationAndReportIntegrationTest`, MongoDB ném lỗi mã 121 Schema Validation do `CourseSection` thiếu `syllabusId` bắt buộc; đã tạo `Syllabus` và liên kết đúng schema.
+  - SpotBugs phát hiện biến `lec2Token` không được sử dụng (`DLS_DEAD_LOCAL_STORE`); đã bổ sung assertion đối xứng kiểm chứng `lecturer2` chỉ thấy lượt tính của lớp mình và không thấy lượt tính của `lecturer1`.
+  - PMD-CPD phát hiện trùng lặp mã giữa `getStudentResults` và `getAggregateResults` trong `CalculationServiceImpl.java` (48 dòng) và giữa các chiều phân tích trong `AnalyticsServiceImpl.java` (21 dòng); đã trích xuất thành các helper method dùng chung `validateResultsAccess` và `filterAggregatesByAccessAndSections`.
+- **Sinh viên đã sửa/rà soát:** _chờ sinh viên rà soát_
+- **Commit / PR:** chưa commit.

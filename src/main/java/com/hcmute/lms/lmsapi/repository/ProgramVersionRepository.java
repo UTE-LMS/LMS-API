@@ -15,6 +15,8 @@ public interface ProgramVersionRepository extends MongoRepository<ProgramVersion
 
   Page<ProgramVersion> findByProgramId(String programId, Pageable pageable);
 
+  List<ProgramVersion> findByProgramIdIn(Collection<String> programIds);
+
   Optional<ProgramVersion> findByProgramIdAndVersion(String programId, String version);
 
   List<ProgramVersion> findByProgramIdAndStatus(String programId, ProgramVersionStatus status);

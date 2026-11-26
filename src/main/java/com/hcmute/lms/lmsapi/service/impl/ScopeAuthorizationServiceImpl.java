@@ -1,12 +1,17 @@
 package com.hcmute.lms.lmsapi.service.impl;
 
+import com.hcmute.lms.lmsapi.document.CalculationRun;
 import com.hcmute.lms.lmsapi.document.Course;
 import com.hcmute.lms.lmsapi.document.CourseSection;
+import com.hcmute.lms.lmsapi.document.Report;
 import com.hcmute.lms.lmsapi.dto.UserPrincipal;
 import com.hcmute.lms.lmsapi.enums.AccessType;
 import com.hcmute.lms.lmsapi.enums.AssessmentScope;
+import com.hcmute.lms.lmsapi.enums.CalculationScope;
+import com.hcmute.lms.lmsapi.enums.ReportType;
 import com.hcmute.lms.lmsapi.enums.Role;
 import com.hcmute.lms.lmsapi.repository.AssessmentRepository;
+import com.hcmute.lms.lmsapi.repository.CalculationRunRepository;
 import com.hcmute.lms.lmsapi.repository.CloPiLinkRepository;
 import com.hcmute.lms.lmsapi.repository.CloRepository;
 import com.hcmute.lms.lmsapi.repository.CourseRepository;
@@ -47,6 +52,7 @@ public class ScopeAuthorizationServiceImpl implements ScopeAuthorizationService 
   private final EnrollmentRepository enrollmentRepository;
   private final AssessmentRepository assessmentRepository;
   private final ImportBatchRepository importBatchRepository;
+  private final CalculationRunRepository calculationRunRepository;
 
   @Override
   public boolean canAccessSection(
@@ -503,5 +509,154 @@ public class ScopeAuthorizationServiceImpl implements ScopeAuthorizationService 
       return false;
     }
     return section.getLecturerIds().contains(userId);
+  }
+
+  @Override
+  public boolean canAccessCalculationRun(UserPrincipal principal, CalculationRun run) {
+    if (principal == null || run == null) {
+      return false;
+    }
+    if (principal.getRoles() == null || principal.getRoles().isEmpty()) {
+      return false;
+    }
+    if (principal.getRoles().contains(Role.ADMIN) || principal.getRoles().contains(Role.QA)) {
+      return true;
+    }
+
+    for (Role role : principal.getRoles()) {
+      if (checkRoleForCalculationRun(role, principal, run)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  @Override
+  public boolean canAccessReport(UserPrincipal principal, Report report) {
+    if (principal == null || report == null) {
+      return false;
+    }
+    if (principal.getRoles() == null || principal.getRoles().isEmpty()) {
+      return false;
+    }
+    if (principal.getRoles().contains(Role.ADMIN) || principal.getRoles().contains(Role.QA)) {
+      return true;
+    }
+
+    for (Role role : principal.getRoles()) {
+      if (checkRoleForReport(role, principal, report)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private boolean checkRoleForCalculationRun(
+      Role role, UserPrincipal principal, CalculationRun run) {
+    if (role == null) {
+      return false;
+    }
+    return switch (role) {
+      case ADMIN, QA -> true;
+      case PROGRAM_MANAGER -> {
+        if (principal.getFacultyId() == null) {
+          yield false;
+        }
+        if (run.getProgramVersionId() != null && !run.getProgramVersionId().isBlank()) {
+          if (canAccessProgramVersion(principal, run.getProgramVersionId(), AccessType.READ)) {
+            yield true;
+          }
+        }
+        if (run.getScopeRef() != null) {
+          if (run.getScopeRef().getSectionIds() != null
+              && !run.getScopeRef().getSectionIds().isEmpty()) {
+            boolean anySection =
+                run.getScopeRef().getSectionIds().stream()
+                    .anyMatch(sId -> canAccessSection(principal, sId, AccessType.READ));
+            if (anySection) {
+              yield true;
+            }
+          }
+          if (run.getScopeRef().getCourseIds() != null
+              && !run.getScopeRef().getCourseIds().isEmpty()) {
+            boolean anyCourse =
+                run.getScopeRef().getCourseIds().stream()
+                    .anyMatch(cId -> canAccessCourse(principal, cId, AccessType.READ));
+            if (anyCourse) {
+              yield true;
+            }
+          }
+        }
+        yield false;
+      }
+      case LECTURER -> {
+        // Phương án A: Chỉ cho phép nếu scope là SECTION và có ít nhất 1 lớp do giảng viên phụ
+        // trách
+        if (run.getScope() != CalculationScope.SECTION) {
+          yield false;
+        }
+        if (run.getScopeRef() != null
+            && run.getScopeRef().getSectionIds() != null
+            && !run.getScopeRef().getSectionIds().isEmpty()) {
+          yield run.getScopeRef().getSectionIds().stream()
+              .anyMatch(sId -> canAccessSection(principal, sId, AccessType.READ));
+        }
+        yield false;
+      }
+    };
+  }
+
+  private boolean checkRoleForReport(Role role, UserPrincipal principal, Report report) {
+    if (role == null) {
+      return false;
+    }
+    return switch (role) {
+      case ADMIN, QA -> true;
+      case PROGRAM_MANAGER -> {
+        if (principal.getFacultyId() == null) {
+          yield false;
+        }
+        if (report.getProgramVersionId() != null && !report.getProgramVersionId().isBlank()) {
+          if (canAccessProgramVersion(principal, report.getProgramVersionId(), AccessType.READ)) {
+            yield true;
+          }
+        }
+        if (report.getParams() != null) {
+          Object secId = report.getParams().get("sectionId");
+          if (secId instanceof String sId && !sId.isBlank()) {
+            if (canAccessSection(principal, sId, AccessType.READ)) {
+              yield true;
+            }
+          }
+          Object crsId = report.getParams().get("courseId");
+          if (crsId instanceof String cId && !cId.isBlank()) {
+            if (canAccessCourse(principal, cId, AccessType.READ)) {
+              yield true;
+            }
+          }
+        }
+        if (report.getRunId() != null && !report.getRunId().isBlank()) {
+          yield calculationRunRepository
+              .findById(report.getRunId())
+              .map(r -> canAccessCalculationRun(principal, r))
+              .orElse(false);
+        }
+        yield false;
+      }
+      case LECTURER -> {
+        // Giảng viên chỉ được xem báo cáo lớp học phần mà mình phụ trách
+        if (report.getType() != ReportType.SECTION_CLO
+            && report.getType() != ReportType.DATA_COMPLETENESS) {
+          yield false;
+        }
+        if (report.getParams() != null) {
+          Object secId = report.getParams().get("sectionId");
+          if (secId instanceof String sId && !sId.isBlank()) {
+            yield canAccessSection(principal, sId, AccessType.READ);
+          }
+        }
+        yield false;
+      }
+    };
   }
 }

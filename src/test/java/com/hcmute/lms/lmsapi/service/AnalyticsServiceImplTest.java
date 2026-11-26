@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.within;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -136,6 +137,10 @@ class AnalyticsServiceImplTest {
             .official(true)
             .stale(false)
             .build();
+
+    lenient()
+        .when(scopeAuthorizationService.canAccessCalculationRun(any(), any()))
+        .thenReturn(true);
   }
 
   @Nested

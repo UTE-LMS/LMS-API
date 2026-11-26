@@ -15,6 +15,7 @@ import com.hcmute.lms.lmsapi.document.OutcomeMapping;
 import com.hcmute.lms.lmsapi.document.Pi;
 import com.hcmute.lms.lmsapi.document.Plo;
 import com.hcmute.lms.lmsapi.document.Program;
+import com.hcmute.lms.lmsapi.document.ProgramCourse;
 import com.hcmute.lms.lmsapi.document.ProgramVersion;
 import com.hcmute.lms.lmsapi.document.Score;
 import com.hcmute.lms.lmsapi.document.Student;
@@ -37,6 +38,7 @@ import com.hcmute.lms.lmsapi.enums.EnrollmentStatus;
 import com.hcmute.lms.lmsapi.enums.ResultInputSourceType;
 import com.hcmute.lms.lmsapi.enums.ResultLevel;
 import com.hcmute.lms.lmsapi.enums.ResultStatus;
+import com.hcmute.lms.lmsapi.enums.Role;
 import com.hcmute.lms.lmsapi.exception.BusinessRuleViolationException;
 import com.hcmute.lms.lmsapi.exception.ResourceNotFoundException;
 import com.hcmute.lms.lmsapi.repository.AggregateResultRepository;
@@ -49,6 +51,7 @@ import com.hcmute.lms.lmsapi.repository.CourseSectionRepository;
 import com.hcmute.lms.lmsapi.repository.EnrollmentRepository;
 import com.hcmute.lms.lmsapi.repository.PiRepository;
 import com.hcmute.lms.lmsapi.repository.PloRepository;
+import com.hcmute.lms.lmsapi.repository.ProgramCourseRepository;
 import com.hcmute.lms.lmsapi.repository.ProgramRepository;
 import com.hcmute.lms.lmsapi.repository.ProgramVersionRepository;
 import com.hcmute.lms.lmsapi.repository.ScoreRepository;
@@ -77,9 +80,12 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -110,6 +116,7 @@ public class CalculationServiceImpl implements CalculationService {
   private final PloRepository ploRepository;
   private final StudentRepository studentRepository;
   private final TermRepository termRepository;
+  private final ProgramCourseRepository programCourseRepository;
   private final AuditService auditService;
   private final ScopeAuthorizationService scopeAuthorizationService;
   private final MongoTemplate mongoTemplate;
@@ -182,16 +189,118 @@ public class CalculationServiceImpl implements CalculationService {
     }
   }
 
+  private UserPrincipal getCurrentUserPrincipal() {
+    Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+    if (auth != null && auth.getPrincipal() instanceof UserPrincipal principal) {
+      return principal;
+    }
+    return null;
+  }
+
   @Override
   public PageResponse<CalculationRunResponse> getCalculationRuns(
       String programVersionId, int page, int size) {
     PageableValidationUtils.validate(page, size);
     Pageable pageable = PageRequest.of(page, size);
-    Page<CalculationRun> runPage =
-        programVersionId != null && !programVersionId.isBlank()
-            ? calculationRunRepository.findByProgramVersionIdOrderByStartedAtDesc(
-                programVersionId.trim(), pageable)
-            : calculationRunRepository.findAllByOrderByStartedAtDesc(pageable);
+
+    UserPrincipal principal = getCurrentUserPrincipal();
+    boolean isGlobal =
+        principal == null
+            || principal.getRoles() == null
+            || principal.getRoles().contains(Role.ADMIN)
+            || principal.getRoles().contains(Role.QA);
+
+    Page<CalculationRun> runPage;
+    if (isGlobal) {
+      runPage =
+          programVersionId != null && !programVersionId.isBlank()
+              ? calculationRunRepository.findByProgramVersionIdOrderByStartedAtDesc(
+                  programVersionId.trim(), pageable)
+              : calculationRunRepository.findAllByOrderByStartedAtDesc(pageable);
+    } else {
+      boolean isPm = principal.getRoles().contains(Role.PROGRAM_MANAGER);
+      boolean isLecturer = principal.getRoles().contains(Role.LECTURER);
+
+      if (isLecturer && !isPm) {
+        // Phương án A: Giảng viên chỉ được xem lượt tính scope = SECTION có lớp mình dạy
+        if (hasText(programVersionId)) {
+          throw new AccessDeniedException(
+              "Giảng viên không có quyền lọc lượt tính toán theo phiên bản CTĐT");
+        }
+        List<String> mySectionIds =
+            courseSectionRepository.findByLecturerIdsContaining(principal.getId()).stream()
+                .map(CourseSection::getId)
+                .toList();
+        if (mySectionIds.isEmpty()) {
+          return PageResponse.of(List.of(), page, size, 0);
+        }
+        Query query =
+            Query.query(
+                    Criteria.where("scope")
+                        .is(CalculationScope.SECTION)
+                        .and("scopeRef.sectionIds")
+                        .in(mySectionIds))
+                .with(pageable);
+        long total = mongoTemplate.count(Query.of(query).limit(-1).skip(-1), CalculationRun.class);
+        List<CalculationRun> runs = mongoTemplate.find(query, CalculationRun.class);
+        runPage = new PageImpl<>(runs, pageable, total);
+      } else if (isPm) {
+        if (hasText(programVersionId)) {
+          if (!scopeAuthorizationService.canAccessProgramVersion(
+              principal, programVersionId, AccessType.READ)) {
+            throw new AccessDeniedException("Không có quyền truy cập phiên bản CTĐT này");
+          }
+          runPage =
+              calculationRunRepository.findByProgramVersionIdOrderByStartedAtDesc(
+                  programVersionId.trim(), pageable);
+        } else {
+          String facultyId = principal.getFacultyId();
+          if (facultyId == null) {
+            return PageResponse.of(List.of(), page, size, 0);
+          }
+          List<String> programIds =
+              programRepository.findByFacultyId(facultyId).stream().map(Program::getId).toList();
+          List<String> pvIds =
+              programIds.isEmpty()
+                  ? List.of()
+                  : programVersionRepository.findByProgramIdIn(programIds).stream()
+                      .map(ProgramVersion::getId)
+                      .toList();
+          List<String> courseIds =
+              courseRepository.findByFacultyId(facultyId).stream().map(Course::getId).toList();
+          List<String> sectionIds =
+              courseIds.isEmpty()
+                  ? List.of()
+                  : courseSectionRepository.findByCourseIdIn(courseIds).stream()
+                      .map(CourseSection::getId)
+                      .toList();
+
+          List<Criteria> orCriteria = new ArrayList<>();
+          if (!pvIds.isEmpty()) {
+            orCriteria.add(Criteria.where("programVersionId").in(pvIds));
+          }
+          if (!sectionIds.isEmpty()) {
+            orCriteria.add(
+                Criteria.where("scope")
+                    .is(CalculationScope.SECTION)
+                    .and("scopeRef.sectionIds")
+                    .in(sectionIds));
+          }
+          if (orCriteria.isEmpty()) {
+            return PageResponse.of(List.of(), page, size, 0);
+          }
+          Query query =
+              Query.query(new Criteria().orOperator(orCriteria.toArray(new Criteria[0])))
+                  .with(pageable);
+          long total =
+              mongoTemplate.count(Query.of(query).limit(-1).skip(-1), CalculationRun.class);
+          List<CalculationRun> runs = mongoTemplate.find(query, CalculationRun.class);
+          runPage = new PageImpl<>(runs, pageable, total);
+        }
+      } else {
+        return PageResponse.of(List.of(), page, size, 0);
+      }
+    }
 
     List<CalculationRun> pageRuns = runPage.getContent();
     List<String> pageRunIds = pageRuns.stream().map(CalculationRun::getId).toList();
@@ -209,6 +318,10 @@ public class CalculationServiceImpl implements CalculationService {
         calculationRunRepository
             .findById(runId)
             .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy lượt tính: " + runId));
+    UserPrincipal principal = getCurrentUserPrincipal();
+    if (!scopeAuthorizationService.canAccessCalculationRun(principal, run)) {
+      throw new AccessDeniedException("Không có quyền truy cập lượt tính toán này");
+    }
     return toRunResponses(
             List.of(run),
             Map.of(runId, studentResultRepository.countByRunId(runId)),
@@ -232,7 +345,14 @@ public class CalculationServiceImpl implements CalculationService {
       int page,
       int size) {
     PageableValidationUtils.validate(page, size);
-    ensureRunExists(runId);
+    CalculationRun run =
+        calculationRunRepository
+            .findById(runId)
+            .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy lượt tính: " + runId));
+
+    UserPrincipal principal = getCurrentUserPrincipal();
+    List<String> mySectionIds = validateResultsAccess(principal, run, level, sectionId);
+
     List<StudentResult> results;
     if (studentId != null && !studentId.isBlank()) {
       results =
@@ -261,7 +381,61 @@ public class CalculationServiceImpl implements CalculationService {
       results = results.stream().filter(r -> passed.equals(r.getPassed())).toList();
     }
 
+    // Nếu là Giảng viên và không lọc đích danh sectionId, giới hạn trong các lớp mình phụ trách
+    if (!mySectionIds.isEmpty() && !hasText(sectionId)) {
+      results =
+          results.stream()
+              .filter(r -> r.getSectionId() != null && mySectionIds.contains(r.getSectionId()))
+              .filter(
+                  r ->
+                      r.getLevel() == ResultLevel.ASSESSMENT_CLO || r.getLevel() == ResultLevel.CLO)
+              .toList();
+    }
+
     return PageResponse.slice(results, page, size, this::toStudentResultResponses);
+  }
+
+  private List<String> validateResultsAccess(
+      UserPrincipal principal, CalculationRun run, ResultLevel level, String sectionId) {
+    if (!scopeAuthorizationService.canAccessCalculationRun(principal, run)) {
+      throw new AccessDeniedException("Không có quyền truy cập kết quả của lượt tính toán này");
+    }
+
+    boolean isGlobal =
+        principal == null
+            || principal.getRoles() == null
+            || principal.getRoles().contains(Role.ADMIN)
+            || principal.getRoles().contains(Role.QA);
+
+    if (isGlobal) {
+      return List.of();
+    }
+
+    boolean isPm = principal.getRoles().contains(Role.PROGRAM_MANAGER);
+    boolean isLecturer = principal.getRoles().contains(Role.LECTURER);
+    if (isLecturer && !isPm) {
+      if (run.getScope() != CalculationScope.SECTION) {
+        throw new AccessDeniedException(
+            "Giảng viên không có quyền xem kết quả của lượt tính cấp CTĐT");
+      }
+      if (level == ResultLevel.PI || level == ResultLevel.PLO) {
+        throw new AccessDeniedException("Giảng viên không có quyền xem kết quả cấp PI/PLO");
+      }
+      List<String> mySectionIds =
+          courseSectionRepository.findByLecturerIdsContaining(principal.getId()).stream()
+              .map(CourseSection::getId)
+              .toList();
+      if (hasText(sectionId) && !mySectionIds.contains(sectionId.trim())) {
+        throw new AccessDeniedException("Giảng viên không phụ trách lớp học phần: " + sectionId);
+      }
+      return mySectionIds;
+    } else if (isPm) {
+      if (hasText(sectionId)
+          && !scopeAuthorizationService.canAccessSection(principal, sectionId, AccessType.READ)) {
+        throw new AccessDeniedException("Không có quyền truy cập lớp học phần: " + sectionId);
+      }
+    }
+    return List.of();
   }
 
   private List<StudentResultResponse> toStudentResultResponses(List<StudentResult> results) {
@@ -328,7 +502,14 @@ public class CalculationServiceImpl implements CalculationService {
   public PageResponse<AggregateResultResponse> getAggregateResults(
       String runId, ResultLevel level, String sectionId, int page, int size) {
     PageableValidationUtils.validate(page, size);
-    ensureRunExists(runId);
+    CalculationRun run =
+        calculationRunRepository
+            .findById(runId)
+            .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy lượt tính: " + runId));
+
+    UserPrincipal principal = getCurrentUserPrincipal();
+    List<String> mySectionIds = validateResultsAccess(principal, run, level, sectionId);
+
     List<AggregateResult> results;
     if (level != null) {
       results =
@@ -339,6 +520,16 @@ public class CalculationServiceImpl implements CalculationService {
       results = aggregateResultRepository.findByRunIdAndSectionId(runId, sectionId);
     } else {
       results = aggregateResultRepository.findByRunId(runId);
+    }
+
+    if (!mySectionIds.isEmpty() && !hasText(sectionId)) {
+      results =
+          results.stream()
+              .filter(r -> r.getSectionId() != null && mySectionIds.contains(r.getSectionId()))
+              .filter(
+                  r ->
+                      r.getLevel() == ResultLevel.ASSESSMENT_CLO || r.getLevel() == ResultLevel.CLO)
+              .toList();
     }
 
     return PageResponse.slice(results, page, size, this::toAggregateResponses);
@@ -1021,10 +1212,26 @@ public class CalculationServiceImpl implements CalculationService {
     }
 
     List<String> explicitIds = safeList(request.getSectionIds());
-    List<CourseSection> candidates =
-        !explicitIds.isEmpty()
-            ? courseSectionRepository.findAllById(explicitIds)
-            : courseSectionRepository.findAll();
+    List<CourseSection> candidates;
+    if (!explicitIds.isEmpty()) {
+      candidates = courseSectionRepository.findAllById(explicitIds);
+    } else if (hasText(request.getProgramVersionId())) {
+      List<String> courseIdsInPv =
+          programCourseRepository
+              .findByProgramVersionIdOrderBySemesterAscCourseIdAsc(
+                  request.getProgramVersionId().trim())
+              .stream()
+              .map(ProgramCourse::getCourseId)
+              .filter(Objects::nonNull)
+              .distinct()
+              .toList();
+      candidates =
+          courseIdsInPv.isEmpty()
+              ? List.of()
+              : courseSectionRepository.findByCourseIdIn(courseIdsInPv);
+    } else {
+      candidates = courseSectionRepository.findAll();
+    }
 
     Set<String> courseFilter = new LinkedHashSet<>(safeList(request.getCourseIds()));
     return candidates.stream()
@@ -1035,22 +1242,66 @@ public class CalculationServiceImpl implements CalculationService {
 
   private void verifyCurrentUserScopeAccess(
       CalculationRunRequest request, List<CourseSection> sections) {
-    Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-    if (auth == null || !(auth.getPrincipal() instanceof UserPrincipal principal)) {
+    UserPrincipal principal = getCurrentUserPrincipal();
+    if (principal == null || principal.getRoles() == null || principal.getRoles().isEmpty()) {
       return;
     }
-    if (request.getScope() == CalculationScope.SECTION) {
+    // ADMIN và QA có quyền chạy tính toán toàn diện
+    if (principal.getRoles().contains(Role.ADMIN) || principal.getRoles().contains(Role.QA)) {
+      return;
+    }
+
+    boolean isPm = principal.getRoles().contains(Role.PROGRAM_MANAGER);
+    boolean isLecturer = principal.getRoles().contains(Role.LECTURER);
+
+    if (isLecturer && !isPm) {
+      if (request.getScope() != CalculationScope.SECTION) {
+        throw new AccessDeniedException(
+            "Giảng viên chỉ có quyền kích hoạt tính toán phạm vi lớp học phần (SECTION)");
+      }
+      if (hasText(request.getProgramVersionId())) {
+        throw new AccessDeniedException(
+            "Giảng viên không được chỉ định phiên bản CTĐT khi tính toán");
+      }
       for (CourseSection section : sections) {
-        if (!scopeAuthorizationService.canAccessLoadedSection(
-            principal, section, AccessType.READ)) {
+        if (!scopeAuthorizationService.canAccessLoadedSection(principal, section, AccessType.WRITE)
+            && !scopeAuthorizationService.canAccessLoadedSection(
+                principal, section, AccessType.READ)) {
           throw new AccessDeniedException(
-              "Không có quyền chạy tính toán trên lớp: " + section.getCode());
+              "Giảng viên không phụ trách lớp học phần: " + section.getCode());
         }
       }
-    } else if (request.getProgramVersionId() != null
-        && !scopeAuthorizationService.canAccessProgramVersion(
+      return;
+    }
+
+    if (isPm) {
+      if (principal.getFacultyId() == null) {
+        throw new AccessDeniedException("Tài khoản Quản lý CTĐT chưa được gán Khoa");
+      }
+      if (request.getScope() == CalculationScope.SECTION) {
+        for (CourseSection section : sections) {
+          if (!scopeAuthorizationService.canAccessLoadedSection(
+              principal, section, AccessType.READ)) {
+            throw new AccessDeniedException(
+                "Không có quyền chạy tính toán trên lớp: " + section.getCode());
+          }
+        }
+        if (hasText(request.getProgramVersionId())
+            && !scopeAuthorizationService.canAccessProgramVersion(
+                principal, request.getProgramVersionId(), AccessType.READ)) {
+          throw new AccessDeniedException("Không có quyền truy cập phiên bản CTĐT này");
+        }
+      } else {
+        if (!hasText(request.getProgramVersionId())) {
+          throw new BusinessRuleViolationException(
+              "Phạm vi " + request.getScope() + " bắt buộc chỉ định programVersionId");
+        }
+        if (!scopeAuthorizationService.canAccessProgramVersion(
             principal, request.getProgramVersionId(), AccessType.READ)) {
-      throw new AccessDeniedException("Không có quyền truy cập phiên bản CTĐT này");
+          throw new AccessDeniedException(
+              "Không có quyền kích hoạt tính toán cho phiên bản CTĐT này");
+        }
+      }
     }
   }
 

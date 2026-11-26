@@ -103,4 +103,31 @@ Mở rộng tầng đọc báo cáo/dashboard của F07 bằng động cơ tổn
   - Chỉ đọc từ lượt tính `calculation_runs` có `status = SUCCESS` (từ chối `422` nếu chỉ định `runId` ở trạng thái `RUNNING`/`FAILED`).
   - Mỗi ô `MatrixMetricCell` luôn mang đủ 10 trường chỉ số (`enrolled`, `evaluated`, `passed`, `failed`, `insufficientData`, `mean`, `passRate`, `passRateOfEnrolled`, `isOfficial`, `isStale`); khi `evaluated == 0` thì `passRate = null` và `mean = null`, khi `enrolled == 0` thì `passRateOfEnrolled = null` (không bao giờ trả `0.0` giả tạo).
   - Kiểm soát phạm vi 4 vai trò qua `ScopeAuthorizationService`: `ADMIN` và `QA` (strict empty scope) đọc toàn hệ thống; `PROGRAM_MANAGER` bắt buộc truyền `programVersionId` hoặc `courseId` thuộc phạm vi quản lý; `LECTURER` chỉ xem chiều cấp lớp/môn mình phụ trách và bị chặn `403` ở chiều cấp CTĐT (`COHORT`, `PLO_CATEGORY`) hoặc lớp/lượt tính ngoài phân công.
+
+## 12. Phân quyền và Kiểm soát Phạm vi Báo cáo & Phân tích Đa chiều
+
+Theo nguyên tắc fail-closed và phân quyền RBAC:
+
+### 12.1 Báo cáo (`ReportController`)
+- **ADMIN / QA**: Toàn quyền sinh và xem tất cả các loại báo cáo trên toàn hệ thống.
+- **PROGRAM_MANAGER**: Chỉ được sinh và xem các báo cáo thuộc phạm vi Khoa quản lý (`facultyId == principal.facultyId`).
+- **LECTURER (Phương án A)**:
+  - Chỉ được sinh và xem báo cáo `SECTION_CLO` và `DATA_COMPLETENESS` cho các lớp học phần mình trực tiếp phụ trách (`sectionId` thuộc quyền).
+  - Nghiêm cấm sinh hoặc xem báo cáo cấp CTĐT/học phần (`COURSE_PI`, `PROGRAM_PLO`) $\to$ HTTP 403 `AccessDeniedException`.
+  - Cố tình chọn `sectionId` của lớp khác $\to$ HTTP 403 `AccessDeniedException`.
+  - `GET /api/v1/reports`: Tự động lọc danh sách chỉ hiển thị báo cáo của các lớp mình phụ trách.
+
+### 12.2 Truy vết (`TraceController`)
+- Truy vết `student_results/{id}`:
+  - Non-Admin/QA không được truy vết kết quả cấp CTĐT không có `sectionId` hoặc không thuộc phạm vi quản lý.
+  - Giảng viên cố tình truy vết kết quả cấp CTĐT hoặc lớp học phần không do mình phụ trách $\to$ HTTP 403 `AccessDeniedException`.
+
+### 12.3 Phân tích Đa chiều (`AnalyticsController`)
+- `resolveCalculationRun`: Luôn lọc các lượt tính SUCCESS qua kiểm tra `canAccessCalculationRun(principal, run)`.
+- Giảng viên:
+  - Bị cấm truy cập chiều `COHORT` và phân loại `PLO_CATEGORY`.
+  - Ở các chiều `TIME_TERM`, `ASSESSMENT_COMPONENT`, `BLOOM_LEVEL`: dữ liệu ma trận được lọc nghiêm ngặt chỉ gom các kết quả của lớp học phần mà giảng viên trực tiếp phụ trách.
+  - Ở chiều `STUDENT`: Chỉ được xem kết quả của sinh viên trong các lớp mình phụ trách; bất kỳ tham số `studentIds`/`studentId` nào ngoài danh sách lớp phụ trách đều bị lọc bỏ.
+  - Ở chiều `COURSE_LECTURER`: Chỉ được xem cột hiệu quả giảng dạy của chính mình (`principal.getId()`).
+
 - **Tài liệu vấn đáp chi tiết:** xem `doc/de-van-dap/f07-bao-cao-phan-tich-da-chieu.md`.

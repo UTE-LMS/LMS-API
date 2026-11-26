@@ -2,6 +2,7 @@ package com.hcmute.lms.lmsapi.service.impl;
 
 import com.hcmute.lms.lmsapi.document.AggregateResult;
 import com.hcmute.lms.lmsapi.document.CalculationRun;
+import com.hcmute.lms.lmsapi.document.CourseSection;
 import com.hcmute.lms.lmsapi.document.Report;
 import com.hcmute.lms.lmsapi.document.Student;
 import com.hcmute.lms.lmsapi.document.StudentResult;
@@ -15,12 +16,14 @@ import com.hcmute.lms.lmsapi.enums.CalculationStatus;
 import com.hcmute.lms.lmsapi.enums.ReportType;
 import com.hcmute.lms.lmsapi.enums.ResultLevel;
 import com.hcmute.lms.lmsapi.enums.ResultStatus;
+import com.hcmute.lms.lmsapi.enums.Role;
 import com.hcmute.lms.lmsapi.exception.BusinessRuleViolationException;
 import com.hcmute.lms.lmsapi.exception.ResourceNotFoundException;
 import com.hcmute.lms.lmsapi.exporter.ReportExcelExporter;
 import com.hcmute.lms.lmsapi.repository.AggregateResultRepository;
 import com.hcmute.lms.lmsapi.repository.CalculationRunRepository;
 import com.hcmute.lms.lmsapi.repository.CloRepository;
+import com.hcmute.lms.lmsapi.repository.CourseSectionRepository;
 import com.hcmute.lms.lmsapi.repository.PiRepository;
 import com.hcmute.lms.lmsapi.repository.PloRepository;
 import com.hcmute.lms.lmsapi.repository.ReportRepository;
@@ -57,6 +60,7 @@ public class ReportServiceImpl implements ReportService {
   private final PiRepository piRepository;
   private final PloRepository ploRepository;
   private final StudentRepository studentRepository;
+  private final CourseSectionRepository courseSectionRepository;
   private final ScopeAuthorizationService scopeAuthorizationService;
   private final ReportExcelExporter reportExcelExporter;
 
@@ -105,6 +109,38 @@ public class ReportServiceImpl implements ReportService {
   public PageResponse<ReportResponse> listReports(
       ReportType type, String programVersionId, String runId, int page, int size) {
     PageableValidationUtils.validate(page, size);
+
+    Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+    UserPrincipal principal =
+        auth != null && auth.getPrincipal() instanceof UserPrincipal p ? p : null;
+
+    boolean isGlobal =
+        principal == null
+            || principal.getRoles() == null
+            || principal.getRoles().contains(Role.ADMIN)
+            || principal.getRoles().contains(Role.QA);
+
+    if (!isGlobal) {
+      boolean isPm = principal.getRoles().contains(Role.PROGRAM_MANAGER);
+      boolean isLecturer = principal.getRoles().contains(Role.LECTURER);
+      if (isLecturer && !isPm) {
+        if (type == ReportType.COURSE_PI || type == ReportType.PROGRAM_PLO) {
+          throw new AccessDeniedException("Giảng viên không có quyền xem loại báo cáo này");
+        }
+        if (programVersionId != null && !programVersionId.isBlank()) {
+          throw new AccessDeniedException(
+              "Giảng viên không có quyền lọc báo cáo theo phiên bản CTĐT");
+        }
+      } else if (isPm) {
+        if (programVersionId != null
+            && !programVersionId.isBlank()
+            && !scopeAuthorizationService.canAccessProgramVersion(
+                principal, programVersionId, AccessType.READ)) {
+          throw new AccessDeniedException("Không có quyền truy cập phiên bản CTĐT này");
+        }
+      }
+    }
+
     List<Report> reports;
     if (runId != null && !runId.isBlank()) {
       reports = reportRepository.findByRunIdOrderByCreatedAtDesc(runId);
@@ -115,6 +151,33 @@ public class ReportServiceImpl implements ReportService {
     } else {
       reports = reportRepository.findAllByOrderByCreatedAtDesc();
     }
+
+    if (!isGlobal) {
+      boolean isPm = principal.getRoles().contains(Role.PROGRAM_MANAGER);
+      boolean isLecturer = principal.getRoles().contains(Role.LECTURER);
+      if (isLecturer && !isPm) {
+        List<String> mySectionIds =
+            courseSectionRepository.findByLecturerIdsContaining(principal.getId()).stream()
+                .map(CourseSection::getId)
+                .toList();
+        reports =
+            reports.stream()
+                .filter(
+                    r ->
+                        (r.getType() == ReportType.SECTION_CLO
+                                || r.getType() == ReportType.DATA_COMPLETENESS)
+                            && r.getParams() != null
+                            && r.getParams().get("sectionId") instanceof String secId
+                            && mySectionIds.contains(secId))
+                .toList();
+      } else if (isPm) {
+        reports =
+            reports.stream()
+                .filter(r -> scopeAuthorizationService.canAccessReport(principal, r))
+                .toList();
+      }
+    }
+
     List<Report> filtered =
         reports.stream()
             .filter(r -> type == null || r.getType() == type)
@@ -414,15 +477,72 @@ public class ReportServiceImpl implements ReportService {
     if (auth == null || !(auth.getPrincipal() instanceof UserPrincipal principal)) {
       return;
     }
-    if (request.getSectionId() != null && !request.getSectionId().isBlank()) {
-      if (!scopeAuthorizationService.canAccessSection(
-          principal, request.getSectionId(), AccessType.READ)) {
-        throw new AccessDeniedException("Không có quyền xem/sinh báo cáo lớp học phần này");
+    boolean isGlobal =
+        principal.getRoles() == null
+            || principal.getRoles().contains(Role.ADMIN)
+            || principal.getRoles().contains(Role.QA);
+    if (isGlobal) {
+      return;
+    }
+
+    if (!scopeAuthorizationService.canAccessCalculationRun(principal, run)) {
+      throw new AccessDeniedException("Không có quyền sinh báo cáo từ lượt tính toán này");
+    }
+
+    boolean isPm = principal.getRoles().contains(Role.PROGRAM_MANAGER);
+    boolean isLecturer = principal.getRoles().contains(Role.LECTURER);
+
+    if (isLecturer && !isPm) {
+      if (request.getType() == ReportType.COURSE_PI
+          || request.getType() == ReportType.PROGRAM_PLO) {
+        throw new AccessDeniedException(
+            "Giảng viên không có quyền sinh báo cáo cấp CTĐT/học phần (PI/PLO)");
       }
-    } else if (run.getProgramVersionId() != null
-        && !scopeAuthorizationService.canAccessProgramVersion(
-            principal, run.getProgramVersionId(), AccessType.READ)) {
-      throw new AccessDeniedException("Không có quyền truy cập phiên bản CTĐT này");
+      if (request.getType() == ReportType.DATA_COMPLETENESS
+          && (request.getSectionId() == null || request.getSectionId().isBlank())) {
+        throw new AccessDeniedException(
+            "Giảng viên phải chỉ định lớp học phần khi sinh báo cáo độ đầy đủ dữ liệu");
+      }
+      if (request.getSectionId() != null && !request.getSectionId().isBlank()) {
+        if (!scopeAuthorizationService.canAccessSection(
+            principal, request.getSectionId(), AccessType.READ)) {
+          throw new AccessDeniedException("Không có quyền sinh báo cáo cho lớp học phần này");
+        }
+      } else {
+        throw new AccessDeniedException("Giảng viên phải chỉ định lớp học phần để sinh báo cáo");
+      }
+      return;
+    }
+
+    if (isPm) {
+      if (request.getType() == ReportType.SECTION_CLO) {
+        if (request.getSectionId() == null
+            || !scopeAuthorizationService.canAccessSection(
+                principal, request.getSectionId(), AccessType.READ)) {
+          throw new AccessDeniedException("Không có quyền sinh báo cáo cho lớp học phần này");
+        }
+      } else if (request.getType() == ReportType.COURSE_PI
+          || request.getType() == ReportType.PROGRAM_PLO) {
+        if (run.getProgramVersionId() == null
+            || !scopeAuthorizationService.canAccessProgramVersion(
+                principal, run.getProgramVersionId(), AccessType.READ)) {
+          throw new AccessDeniedException("Không có quyền sinh báo cáo cho phiên bản CTĐT này");
+        }
+      } else if (request.getType() == ReportType.DATA_COMPLETENESS) {
+        if (request.getSectionId() != null && !request.getSectionId().isBlank()) {
+          if (!scopeAuthorizationService.canAccessSection(
+              principal, request.getSectionId(), AccessType.READ)) {
+            throw new AccessDeniedException("Không có quyền sinh báo cáo cho lớp học phần này");
+          }
+        } else if (run.getProgramVersionId() != null && !run.getProgramVersionId().isBlank()) {
+          if (!scopeAuthorizationService.canAccessProgramVersion(
+              principal, run.getProgramVersionId(), AccessType.READ)) {
+            throw new AccessDeniedException("Không có quyền sinh báo cáo cho phiên bản CTĐT này");
+          }
+        } else {
+          throw new AccessDeniedException("Không có quyền sinh báo cáo độ đầy đủ dữ liệu");
+        }
+      }
     }
   }
 
@@ -431,15 +551,8 @@ public class ReportServiceImpl implements ReportService {
     if (auth == null || !(auth.getPrincipal() instanceof UserPrincipal principal)) {
       return;
     }
-    Object secId = report.getParams() != null ? report.getParams().get("sectionId") : null;
-    if (secId instanceof String sectionId && !sectionId.isBlank()) {
-      if (!scopeAuthorizationService.canAccessSection(principal, sectionId, AccessType.READ)) {
-        throw new AccessDeniedException("Không có quyền xem báo cáo lớp học phần này");
-      }
-    } else if (report.getProgramVersionId() != null
-        && !scopeAuthorizationService.canAccessProgramVersion(
-            principal, report.getProgramVersionId(), AccessType.READ)) {
-      throw new AccessDeniedException("Không có quyền xem báo cáo này");
+    if (!scopeAuthorizationService.canAccessReport(principal, report)) {
+      throw new AccessDeniedException("Không có quyền truy cập báo cáo này");
     }
   }
 

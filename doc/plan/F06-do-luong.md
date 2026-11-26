@@ -48,3 +48,32 @@ $$\text{Passed}(PI_{s,m}) = \big( Value(PI_{s,m}) \ge \text{PassThreshold}(PI_m)
 $$Value(PLO_{s,q}) = \frac{\sum_{m \in \text{Evaluated}(s, PLO_q)} \big( W_{PI_m \to PLO_q} \times Value(PI_{s,m}) \big)}{\sum_{m \in \text{Evaluated}(s, PLO_q)} W_{PI_m \to PLO_q}} \in [0, 1]$$
 $$\text{Passed}(PLO_{s,q}) = \big( Value(PLO_{s,q}) \ge \text{PassThreshold}(PLO_q) \big)$$
 - Thống kê cấp khóa / CTĐT: chia cho mẫu số $N_{\text{cohort}}$.
+
+## 5. Phân quyền và Kiểm soát Phạm vi (Scope-based Authorization)
+
+Theo kiến trúc phân quyền RBAC và nguyên tắc đặc quyền tối thiểu (Least Privilege):
+
+### 5.1 ADMIN và QA
+- Toàn quyền kích hoạt tính toán trên mọi phạm vi (`scope = SECTION | COHORT | PROGRAM`).
+- Toàn quyền truy xuất danh sách lượt tính và toàn bộ kết quả đo lường 4 cấp độ trên toàn hệ thống.
+
+### 5.2 PROGRAM_MANAGER (PM)
+- **Giới hạn theo Khoa**: Chỉ được thao tác với các thực thể thuộc Khoa quản lý (`facultyId == principal.facultyId`).
+- Khi chạy tính toán:
+  - `scope = SECTION`: tất cả các lớp học phần chỉ định phải thuộc môn học của Khoa quản lý.
+  - `scope = COHORT | PROGRAM`: bắt buộc chỉ định `programVersionId` thuộc Khoa quản lý. Thuật toán `resolveSections` tự động truy vấn danh sách môn học từ `program_courses` của phiên bản CTĐT đó và nạp các lớp tương ứng.
+- Khi xem danh sách và kết quả: Chỉ thấy các lượt tính và kết quả thuộc phạm vi CTĐT hoặc học phần thuộc Khoa.
+
+### 5.3 LECTURER (Phương án A - Phân quyền nghiêm ngặt theo lớp học phần phụ trách)
+- **Kích hoạt tính toán (`POST /api/v1/calculation-runs`)**:
+  - Chỉ được phép chạy `scope = SECTION`. Bất kỳ yêu cầu nào có `scope = COHORT | PROGRAM` đều bị từ chối với HTTP 403 `AccessDeniedException`.
+  - Mọi `sectionId` trong danh sách yêu cầu bắt buộc phải do giảng viên trực tiếp phụ trách (`CourseSection.lecturerIds.contains(principal.getId())`).
+  - Không được phép chỉ định `programVersionId` khi chạy tính toán (HTTP 403).
+- **Xem danh sách lượt tính (`GET /api/v1/calculation-runs`)**:
+  - Chỉ nhìn thấy các lượt tính có `scope = SECTION` và chứa ít nhất một lớp học phần do mình phụ trách (`scopeRef.sectionIds` giao với lớp phụ trách).
+  - Ẩn toàn bộ lượt tính cấp khóa (`COHORT`) và CTĐT (`PROGRAM`).
+- **Xem kết quả chi tiết (`/student-results`, `/aggregate-results`)**:
+  - Chỉ được xem kết quả ở cấp 1 và cấp 2 (`level = ASSESSMENT_CLO` và `CLO`).
+  - Cố tình truy vấn kết quả cấp CTĐT (`level = PI` hoặc `PLO`) $\to$ bị từ chối với HTTP 403 `AccessDeniedException`.
+  - Cố tình xem kết quả của lớp học phần khác $\to$ HTTP 403 `AccessDeniedException`.
+  - Khi không truyền `sectionId`, hệ thống tự động lọc dữ liệu trả về chỉ thuộc các lớp học phần giảng viên phụ trách.
