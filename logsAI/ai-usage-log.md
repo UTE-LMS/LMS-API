@@ -740,3 +740,101 @@ Phần này chuẩn bị sẵn câu trả lời khoa học, chuẩn mực cho 4 
 - **Lỗi/ảo giác AI tự phát hiện:** trong lần chạy đầu (197/199), `AssessmentIntegrationTest.templateCsv_syllabusTemplate_returns422` lỗi khớp chuỗi thông báo do gộp helper kiểm tra phạm vi lớp; đã cho phép truyền thông báo riêng từng ngữ cảnh, đồng thời bổ sung `courseId` vào request phân trang trong `AnalyticsServiceImplTest.testStudentHappyPathCloLevel` để tránh thiếu stub `courseSectionRepository.findById` khi tách `pagedReq`; chạy lại đạt 199/199.
 - **Sinh viên đã sửa/rà soát:** _chờ sinh viên rà soát_
 - **Commit / PR:** chưa commit (lưu ý cập nhật `LMS-UI` đọc `.content` ở 5 endpoint dùng `PageResponse`, đọc `enrollments` kèm `totalElements`/`page`/`size` ở `/enrollments`, cập nhật bảng ma trận `STUDENT` đọc `totalElements`/`page`/`size` ở `/reports/analytics`, và gọi `/scores/export` khi xuất CSV/XLSX bảng điểm).
+
+---
+
+## Phiên #51 — 2026-11-26: Bổ sung xuất Excel (`.xlsx`) cho Báo cáo và Phân tích đa chiều (F07)
+
+- **Sinh viên yêu cầu:** minhat5 (theo `git config user.name`)
+- **Cơ sở / công cụ / mô hình:** Antigravity, Gemini 4 Neon (High)
+- **Mục tiêu:** bổ sung xuất tệp Excel `.xlsx` song song với CSV mặc định cho cả hai API xuất báo cáo (`POST /api/v1/reports/{id}/export?format=csv|xlsx`) và xuất ma trận phân tích đa chiều (`GET /api/v1/reports/analytics/export?format=csv|xlsx`), tái sử dụng `org.apache.poi:poi-ooxml:6.0.0` (ADR 0015), bảo toàn quy tắc mẫu số bằng `0` (ô `null` giữ trống) và chống Formula Injection (CWE-1236).
+- **File AI sinh/sửa:**
+  - `src/main/java/com/hcmute/lms/lmsapi/exporter/ExcelExportSupport.java` (mới: chuẩn hóa `format=csv|xlsx`, từ chối định dạng lạ bằng `400 VALIDATION_ERROR`, chống CWE-1236 `sanitizeFormulaText`, `WorkbookStyles` đóng gói style, ghi ô số nguyên/số thực giữ trống khi `null`, tính độ rộng cột theo ký tự không dùng `autoSizeColumn`)
+  - `src/main/java/com/hcmute/lms/lmsapi/exporter/ReportExcelExporter.java` (mới: xuất sheet `BaoCao` cho cả 4 loại báo cáo `SECTION_CLO`, `COURSE_PI`, `PROGRAM_PLO`, `DATA_COMPLETENESS`)
+  - `src/main/java/com/hcmute/lms/lmsapi/exporter/MatrixExcelExporter.java` (mới: xuất 2 sheet `MaTranPhanTich` và `DuLieuChiTiet` với đủ 10 chỉ số)
+  - `src/main/java/com/hcmute/lms/lmsapi/service/ReportService.java`, `ReportServiceImpl.java`, `ReportController.java` (thêm `exportReportXlsx`, chia sẻ `loadAuthorizedReport` & `recordExport`, hỗ trợ `?format=csv|xlsx` và ghi nhận vào `reports.exports[]`)
+  - `src/main/java/com/hcmute/lms/lmsapi/service/AnalyticsService.java`, `AnalyticsServiceImpl.java`, `AnalyticsController.java` (thêm `exportAnalyticsMatrixXlsx`, hỗ trợ `?format=csv|xlsx`)
+  - Tests & Docs: `src/test/java/com/hcmute/lms/lmsapi/exporter/ExcelExportersTest.java` (mới), `AnalyticsServiceImplTest.java`, `CalculationAndReportIntegrationTest.java`, `AnalyticsControllerIntegrationTest.java`, `doc/plan/F07-bao-cao-truy-vet.md`, `doc/de-van-dap/f07-bao-cao-phan-tich-da-chieu.md`, `logsAI/ai-usage-log.md`
+- **Kiểm chứng đã làm:**
+  - `.\mvnw.cmd spotless:apply` và `.\mvnw.cmd test-compile spotless:check spotbugs:check pmd:cpd-check test "-Dtest=ExcelExportersTest,AnalyticsServiceImplTest,AnalyticsResultFilterTest,CalculationAndReportIntegrationTest,AnalyticsControllerIntegrationTest"`: `BUILD SUCCESS`, 0 lỗi Spotless (462 files), 0 lỗi SpotBugs (`BugInstance size is 0`), 0 trùng lặp PMD-CPD, **75/75 test đạt** (0 failures, 0 errors, 0 skipped) trên MongoDB replica set `localhost:27018` (`AnalyticsControllerIntegrationTest` 24, `CalculationAndReportIntegrationTest` 1, `ExcelExportersTest` 4, `AnalyticsServiceImplTest` 39, `AnalyticsResultFilterTest` 7).
+- **Lỗi/ảo giác AI tự phát hiện:**
+  - Lần chạy SpotBugs đầu báo 15 cảnh báo (`EI_EXPOSE_REP`/`EI_EXPOSE_REP2` do `record WorkbookStyles` giữ tham chiếu `CellStyle` mutable, và `URF_UNREAD_FIELD` trên `@Spy matrixExcelExporter`); đã đóng gói `CellStyle` nội bộ bằng `StyleRole` trong `WorkbookStyles` và thêm `verify(matrixExcelExporter).exportToXlsx(any())` trong test.
+  - Lần chạy CPD đầu báo trùng lặp 16 dòng giữa hai helper `findRow` trong `AnalyticsControllerIntegrationTest` và `ExcelExportersTest`; đã tách cách viết gọn bằng `StreamSupport`/helper riêng từng test.
+  - Lần chạy test tích hợp đầu `AnalyticsControllerIntegrationTest` gặp 3 lỗi do `setUpTestData()` gán `startedAt(Instant.now().minusSeconds(3600))` cũ hơn `calculation_runs` thủ công đang có sẵn trên MongoDB dev `localhost:27018`; đã cập nhật `setUpTestData()` dùng `Instant.now()`.
+- **Sinh viên đã sửa/rà soát:** _chờ sinh viên rà soát_
+- **Commit / PR:** chưa commit (lưu ý phía `LMS-UI` có thể truyền `?format=xlsx` vào `POST /api/v1/reports/{id}/export` và `GET /api/v1/reports/analytics/export` để tải file `.xlsx`).
+
+---
+
+## Phiên #52 — 2026-11-26: Tối ưu hiệu năng `GET /api/v1/calculation-runs` và `GET /api/v1/calculation-runs/{id}` (F06)
+
+- **Sinh viên yêu cầu:** minhat5 (theo `git config user.name`)
+- **Cơ sở / công cụ / mô hình:** Antigravity, Gemini 4 Neon (High)
+- **Mục tiêu:** khắc phục tình trạng `GET /api/v1/calculation-runs` và `GET /api/v1/calculation-runs/{id}` tải toàn bộ hàng chục nghìn document `student_results` và `aggregate_results` về RAM JVM chỉ để gọi `.size()` và phân trang in-memory.
+- **File AI sinh/sửa:**
+  - `src/main/java/com/hcmute/lms/lmsapi/repository/StudentResultRepository.java` & `AggregateResultRepository.java` (thêm `countByRunId(String runId)`)
+  - `src/main/java/com/hcmute/lms/lmsapi/repository/CalculationRunRepository.java` (thêm `findAllByOrderByStartedAtDesc(Pageable)` và `findByProgramVersionIdOrderByStartedAtDesc(String, Pageable)`)
+  - `src/main/java/com/hcmute/lms/lmsapi/document/CalculationRun.java` (thêm `@CompoundIndex` cho `{'startedAt': -1}` và `{'programVersionId': 1, 'startedAt': -1}`)
+  - `src/main/java/com/hcmute/lms/lmsapi/service/impl/CalculationServiceImpl.java` (dùng phân trang DB qua `Pageable`, batch-count theo trang qua `MongoTemplate.aggregate` `$match` + `$group` trên `runId` `ObjectId` cho `getCalculationRuns`, và `countByRunId` cho `getCalculationRun`)
+  - `src/test/java/com/hcmute/lms/lmsapi/controller/CalculationAndReportIntegrationTest.java` (bổ sung kiểm chứng `GET /api/v1/calculation-runs` và `GET /api/v1/calculation-runs/{id}` trả đúng `studentResultCount`, `aggregateResultCount`, `totalElements` và từ chối `size=0` với 400)
+  - `logsAI/ai-usage-log.md`
+- **Kiểm chứng đã làm:**
+  - `.\mvnw.cmd spotless:apply` và `.\mvnw.cmd test-compile spotless:check spotbugs:check pmd:cpd-check test "-Dtest=CalculationAndReportIntegrationTest,AnalyticsControllerIntegrationTest,AnalyticsServiceImplTest"`: `BUILD SUCCESS`, 0 lỗi Spotless (462 files), 0 lỗi SpotBugs (`BugInstance size is 0`), 0 trùng lặp PMD-CPD, **64/64 test đạt** (0 failures, 0 errors, 0 skipped) trên MongoDB replica set `localhost:27018` (`CalculationAndReportIntegrationTest` 1, `AnalyticsControllerIntegrationTest` 24, `AnalyticsServiceImplTest` 39).
+- **Sinh viên đã sửa/rà soát:** _chờ sinh viên rà soát_
+- **Commit / PR:** chưa commit.
+
+---
+
+## Phiên #53 — 2026-11-26: Nâng cấp 10 DTO phản hồi loại bỏ N+1 và tra cứu danh mục lớn phía Frontend
+
+- **Sinh viên yêu cầu:** minhat5 (theo `git config user.name`)
+- **Cơ sở / công cụ / mô hình:** Antigravity, Gemini 4 Neon (High)
+- **Mục tiêu:** bổ sung trực tiếp mã/tên ngữ cảnh và số đếm dẫn xuất vào 10 DTO phản hồi (`SectionResponse`, `ProgramVersionResponse`, `CalculationRunResponse`, `AggregateResultResponse`, `StudentResultResponse`, `AuditLogResponse`, `SyllabusResponse`, `CloPiLinkResponse`, `ProgramCourseResponse`, `UserResponse`) bằng truy vấn gộp (`findAllById` và MongoDB aggregation `$group`) ở tầng service/mapper, giúp Frontend xóa bỏ các chuỗi N+1 và tải danh mục `size=100` dư thừa.
+- **File AI sinh/sửa:**
+  - Utility & Repos: `src/main/java/com/hcmute/lms/lmsapi/util/MongoCountUtils.java` (mới: đếm batch theo khóa `ObjectId`), `PloRepository.java`, `PiRepository.java` (thêm `countByProgramVersionId`).
+  - DTOs: `SectionResponse.java`, `ProgramVersionResponse.java`, `CalculationRunResponse.java`, `AggregateResultResponse.java`, `StudentResultResponse.java`, `AuditLogResponse.java`, `SyllabusResponse.java`, `CloPiLinkResponse.java`, `ProgramCourseResponse.java`, `UserResponse.java`.
+  - Mappers: `SectionMapper(.java, impl/SectionMapperImpl.java)`, `ProgramVersionMapper(.java, impl/ProgramVersionMapperImpl.java)`, `AuditLogMapper(.java, impl/AuditLogMapperImpl.java)`, `SyllabusMapper(.java, impl/SyllabusMapperImpl.java)`, `CloPiLinkMapper(.java, impl/CloPiLinkMapperImpl.java)`, `ProgramCourseMapper(.java, impl/ProgramCourseMapperImpl.java)`, `UserMapper(.java, impl/UserMapperImpl.java)` (giữ nguyên chữ ký cũ, bổ sung overload nhận ngữ cảnh đã nạp).
+  - Services: `SectionServiceImpl.java`, `ProgramVersionServiceImpl.java`, `CalculationServiceImpl.java`, `AuditLogQueryServiceImpl.java`, `AuditServiceImpl.java` (trích `UserPrincipal.getId()` khi ghi audit log), `SyllabusServiceImpl.java`, `CloPiLinkServiceImpl.java`, `SyllabusImportServiceImpl.java`, `ProgramCourseServiceImpl.java`, `UserServiceImpl.java`, `FacultyServiceImpl.java`.
+  - Docs & Tests: `doc/plan/F02-ctdt-plo-pi.md`, `ApiContractIntegrationTest.java`, `AuditServiceUnitTest.java`, `SectionServiceImplTest.java`, `ProgramVersionServiceImplTest.java`, `SyllabusServiceImplTest.java`, `AuditLogQueryServiceImplTest.java`, `UserServiceImplTest.java`, `AdminGuardsEmpiricalChallengeTest.java`, `ProgramCourseServiceImplTest.java`, `CloPiLinkServiceImplTest.java`, `SectionIntegrationTest.java`, `ProgramIntegrationTest.java`, `CourseIntegrationTest.java`, `ProgramAndSyllabusImportIntegrationTest.java`, `AuditLogApiIntegrationTest.java`, `FacultyAndDecentralizedRbacIntegrationTest.java`, `CalculationAndReportIntegrationTest.java`, `logsAI/ai-usage-log.md`.
+- **Kiểm chứng đã làm:**
+  - `.\mvnw.cmd spotless:apply` và `.\mvnw.cmd test-compile spotless:check spotbugs:check pmd:cpd-check test`: `BUILD SUCCESS`, Spotless giữ sạch 463/463 file, SpotBugs `BugInstance size is 0`, PMD-CPD 0 trùng lặp, **929/929 test đạt** (`Tests run: 929, Failures: 0, Errors: 0, Skipped: 0`) trên MongoDB replica set `localhost:27018`.
+- **Lỗi/ảo giác AI tự phát hiện:**
+  - Lần chạy PMD-CPD đầu báo trùng lặp 11 dòng giữa `CloPiLinkServiceImpl` và `SyllabusImportServiceImpl` khi gom `piIds` tra `PiRepository`; đã tách thành helper dùng chung `CloPiLinkServiceImpl.toEnrichedResponses(...)`.
+  - Lần chạy test đầu gặp `NullPointerException` tại `ImmutableCollections$MapN.get` vì trả `Map.of()` khi tập ID rỗng nhưng lại gọi `.get(nullableId)`; đã đổi sang `Collections.emptyMap()` kèm kiểm tra khác `null` trước khi tra cứu ở toàn bộ service/mapper.
+  - Phát hiện `AuditServiceImpl.resolveCurrentUserId()` chỉ kiểm tra `authentication.getName()` (trả về `username` của `UserPrincipal` thay vì ObjectId 24 hex) khiến `audit_logs.userId` bị `null` ở các thao tác CRUD thật; đã kiểm tra `UserPrincipal.getId()` trước `authentication.getName()` và bổ sung unit test.
+- **Sinh viên đã sửa/rà soát:** _chờ sinh viên rà soát_
+- **Commit / PR:** chưa commit.
+
+---
+
+## Phiên #54 — 2026-11-26: Sửa lỗi `TermIntegrationTest` xóa sạch collection `terms` sau mỗi test
+
+- **Sinh viên yêu cầu:** minhat5 (theo `git config user.name`)
+- **Cơ sở / công cụ / mô hình:** Antigravity, Gemini 4 Neon (High)
+- **Mục tiêu:** loại bỏ phương thức `@AfterEach cleanUpTerms()` gọi `mongo().remove(new Query(), "terms")` trong `TermIntegrationTest.java` (gây mất toàn bộ dữ liệu học kỳ trong MongoDB cục bộ mỗi khi chạy test), đồng thời cập nhật assertion không giả định DB trống.
+- **File AI sinh/sửa:**
+  - `src/test/java/com/hcmute/lms/lmsapi/controller/TermIntegrationTest.java` (xóa `cleanUpTerms()`, xóa import thừa `AfterEach` và `Query`, cập nhật kiểm tra `GET /api/v1/terms` theo `id` và lọc theo `search={code}` khi kiểm tra `status=CLOSED`)
+  - `logsAI/ai-usage-log.md`
+- **Kiểm chứng đã làm:**
+  - `.\mvnw.cmd spotless:apply` và `.\mvnw.cmd test-compile spotless:check spotbugs:check pmd:cpd-check test "-Dtest=TermIntegrationTest"`: `BUILD SUCCESS`, Spotless giữ sạch 463/463 file, SpotBugs `BugInstance size is 0`, PMD-CPD 0 trùng lặp, **4/4 test trong `TermIntegrationTest` đạt** (`Tests run: 4, Failures: 0, Errors: 0, Skipped: 0`) trên MongoDB replica set `localhost:27018`.
+- **Sinh viên đã sửa/rà soát:** _chờ sinh viên rà soát_
+- **Commit / PR:** chưa commit.
+
+---
+
+## Phiên #55 — 2026-11-26: Bỏ quyền ADMIN quản lý CTĐT, chỉ cho `PROGRAM_MANAGER` thuộc Khoa thực hiện
+
+- **Sinh viên yêu cầu:** minhat5 (theo `git config user.name`)
+- **Cơ sở / công cụ / mô hình:** Antigravity, Gemini 4 Neon (High)
+- **Mục tiêu:** loại bỏ quyền ghi/import/khóa/chuyển trạng thái của `ADMIN` trên danh mục CTĐT (`programs`), phiên bản CTĐT (`program_versions`) và khung học phần (`program_courses`); chỉ cho phép `PROGRAM_MANAGER` đúng Khoa (`facultyId`) được giao thao tác ghi, trong khi vẫn giữ nguyên quyền đọc (`GET`) cho `ADMIN` và các vai trò hợp lệ phục vụ báo cáo/thống kê.
+- **File AI sinh/sửa:**
+  - Controllers: `ProgramController.java` (gỡ `hasRole('ADMIN')` khỏi `@PreAuthorize` của `POST`/`PUT`, luôn bắt buộc `principal.getFacultyId()` và không cho chuyển Khoa chủ quản), `ProgramVersionController.java` (chỉ còn `PROGRAM_MANAGER` cho `/import-template`, `/import`, `/import/preview`, `/{id}/confirm-import`, `/{id}/lock`, `/{id}/status`), `ProgramCourseController.java` (chỉ còn `PROGRAM_MANAGER` cho `/import-template`, `/import`).
+  - Authorization Service: `ScopeAuthorizationServiceImpl.java` (`canManageProgram` bỏ nhánh bypass `ADMIN` bằng cách tham số hóa `allowAdmin=false` trên `canManageFacultyResource`; `checkProgramRole` đổi `case ADMIN` thành `accessType == AccessType.READ`).
+  - Tests & Docs: `ProgramApiIntegrationTest.java`, `ProgramIntegrationTest.java`, `ProgramAndSyllabusImportIntegrationTest.java`, `doc/plan/F02-ctdt-plo-pi.md`, `doc/adr/0005-phan-quyen-khoi-tao-danh-muc-ctdt.md`, `logsAI/ai-usage-log.md`.
+- **Kiểm chứng đã làm:**
+  - `.\mvnw.cmd spotless:apply` và `.\mvnw.cmd test-compile spotless:check spotbugs:check pmd:cpd-check test`: `BUILD SUCCESS`, Spotless giữ sạch 463/463 file, SpotBugs `BugInstance size is 0` (`Error size is 0`), PMD-CPD 0 trùng lặp, **929/929 test đạt** (`Tests run: 929, Failures: 0, Errors: 0, Skipped: 0`) trên MongoDB replica set `localhost:27018`.
+- **Lỗi/ảo giác AI tự phát hiện:**
+  - Khi sửa `ScopeAuthorizationServiceImpl.java`, lệnh thay thế ngắn `case ADMIN -> true;` khớp cả `checkCourseRole` và `checkRoleForSection`, khiến 2 test `EnrollmentImportIntegrationTest.us20_rbac` và `EnrollmentIntegrationTest.withdrawAndReEnrollRecountsTheDenominator` báo `403` khi chạy full suite; đã khôi phục `case ADMIN -> true;` cho học phần và lớp học phần, chỉ giữ `accessType == AccessType.READ` trong `checkProgramRole`.
+  - Khi bỏ `ADMIN` khỏi `PUT /api/v1/programs/{id}`, `@PreAuthorize` (`canManageProgram`) chạy trước ràng buộc `@Pattern` nên path `id` sai định dạng trả về `403` fail-closed (thay vì `400`), đã cập nhật kỳ vọng trong `ProgramApiIntegrationTest.malformedId`.
+- **Sinh viên đã sửa/rà soát:** _chờ sinh viên rà soát_
+- **Commit / PR:** chưa commit.
