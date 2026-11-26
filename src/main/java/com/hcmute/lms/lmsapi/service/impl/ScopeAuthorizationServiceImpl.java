@@ -327,26 +327,30 @@ public class ScopeAuthorizationServiceImpl implements ScopeAuthorizationService 
   @Override
   public boolean canManageProgram(UserPrincipal principal, String programId) {
     return canManageFacultyResource(
-        principal, programId, id -> programRepository.findById(id).map(p -> p.getFacultyId()));
+        principal,
+        programId,
+        id -> programRepository.findById(id).map(p -> p.getFacultyId()),
+        false);
   }
 
   @Override
   public boolean canManageCourse(UserPrincipal principal, String courseId) {
     return canManageFacultyResource(
-        principal, courseId, id -> courseRepository.findById(id).map(Course::getFacultyId));
+        principal, courseId, id -> courseRepository.findById(id).map(Course::getFacultyId), true);
   }
 
   private boolean canManageFacultyResource(
       UserPrincipal principal,
       String resourceId,
-      Function<String, Optional<String>> facultyLookup) {
+      Function<String, Optional<String>> facultyLookup,
+      boolean allowAdmin) {
     if (principal == null
         || resourceId == null
         || resourceId.isBlank()
         || principal.getRoles() == null) {
       return false;
     }
-    if (principal.getRoles().contains(Role.ADMIN)) {
+    if (allowAdmin && principal.getRoles().contains(Role.ADMIN)) {
       return true;
     }
     boolean isPm = principal.getRoles().contains(Role.PROGRAM_MANAGER);
@@ -447,7 +451,7 @@ public class ScopeAuthorizationServiceImpl implements ScopeAuthorizationService 
     }
 
     return switch (role) {
-      case ADMIN -> true;
+      case ADMIN -> accessType == AccessType.READ;
       case PROGRAM_MANAGER -> {
         if (principal.getFacultyId() == null) {
           yield false;

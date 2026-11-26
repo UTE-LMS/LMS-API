@@ -30,6 +30,8 @@ Quản lý khung chuẩn đầu ra cấp chương trình: chương trình, phiê
 
 `verification = { status: UNVERIFIED | VERIFIED | NEEDS_CLARIFICATION, verifiedBy, verifiedAt, note }`.
 
+Ghi chú DTO API: `ProgramVersionResponse` trả kèm các trường dẫn xuất `programCode`, `programName`, `ploCount`, `piCount` để loại bỏ truy vấn N+1 phía Frontend.
+
 ## 4. Quy tắc nghiệp vụ
 
 1. **PLO/PI nhận diện bằng mã**, không bằng thứ tự dòng. `displayOrder` là trường riêng (tài liệu xếp PLO1, 6, 7, 4, 5, 2, 3).
@@ -46,9 +48,7 @@ Quản lý khung chuẩn đầu ra cấp chương trình: chương trình, phiê
 9. **Người xác nhận nội dung là cán bộ ĐBCL (`QA`)** **[ADR 0004 & ADR 0014]**: chỉ `QA` được đổi
    `verification.status` của `program_versions`, `plos`, `pis`. `PROGRAM_MANAGER` soạn nội dung nhưng không tự xác nhận
    (tách người soạn khỏi người thẩm định ĐBCL). `ADMIN` không có quyền này.
-10. **Quyền khởi tạo danh mục CTĐT và Import CTĐT (Phương án R1 — ADR 0013):** `POST/PUT /api/v1/programs` do `ADMIN`
-    thực hiện (ADR 0005). `PROGRAM_MANAGER` quản lý các phiên bản `program_versions`, `plos`, `pis`, `course_pi_contributions`
-    trong phạm vi `scope.programIds` được giao và có thể thực hiện **Import Bản mô tả CTĐT** (`POST /api/v1/program-versions/{pvId}/import-specification`) để khởi tạo đồng bộ PLO, PI, học phần (`courses`), vị trí học phần (`program_courses`) và ma trận đóng góp `course_pi_contributions` ($I/R/M$).
+10. **Quyền khởi tạo danh mục CTĐT và Import CTĐT:** `POST/PUT /api/v1/programs`, quản lý `program_versions`, `program_courses`, `plos`, `pis`, `course_pi_contributions` đều do `PROGRAM_MANAGER` thực hiện trong phạm vi Khoa (`facultyId`) được giao; `ADMIN` quản lý Khoa và gán PM vào Khoa, giữ quyền đọc phục vụ báo cáo/thống kê nhưng không tạo/sửa/import/khóa CTĐT. `PROGRAM_MANAGER` cũng thực hiện **Import Bản mô tả CTĐT** (`POST /api/v1/program-versions/import`) và khung học phần (`POST /api/v1/program-versions/{pvId}/courses/import`).
 
 ## 5. Stories và acceptance criteria (nháp)
 
@@ -77,7 +77,7 @@ Tiền tố thực tế: `/api/v1` (theo F01 và ADR 0002), không phải `/api`
 
 | Phương thức | Đường dẫn | Quyền |
 |---|---|---|
-| GET/POST/PUT | `/api/v1/programs`, `/api/v1/programs/{id}` | đọc: mọi vai trò; ghi: ADMIN [ADR 0005] |
+| GET/POST/PUT | `/api/v1/programs`, `/api/v1/programs/{id}` | đọc: mọi vai trò; ghi: PROGRAM_MANAGER (trong scope Khoa) [ADR 0005 (đã cập nhật)] |
 | GET/POST/PUT | `/api/v1/program-versions`, `/api/v1/program-versions/{id}` | đọc: mọi vai trò; ghi: PROGRAM_MANAGER (trong scope) [ADR 0005] |
 | GET/POST/PUT | `/api/v1/program-versions/{pvId}/plos`, `.../plos/{id}` | đọc: mọi vai trò; ghi: PROGRAM_MANAGER (trong scope) [ADR 0005] |
 | GET/POST/PUT | `/api/v1/program-versions/{pvId}/pis`, `.../pis/{id}` | đọc: mọi vai trò; ghi: PROGRAM_MANAGER (trong scope) [ADR 0005] |

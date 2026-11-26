@@ -85,7 +85,7 @@ public class ProgramVersionController {
   @GetMapping(
       value = "/import-template",
       produces = {ImportTemplateResponses.CSV_MEDIA_TYPE, ImportTemplateResponses.XLSX_MEDIA_TYPE})
-  @PreAuthorize("hasAnyRole('PROGRAM_MANAGER', 'ADMIN')")
+  @PreAuthorize("hasRole('PROGRAM_MANAGER')")
   public ResponseEntity<byte[]> getImportTemplateCsv(
       @RequestParam(name = "format", defaultValue = "csv") String format) {
     log.info("API request: GET /api/v1/program-versions/import-template");
@@ -97,7 +97,7 @@ public class ProgramVersionController {
       value = {"/import", "/import/preview"},
       consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   @PreAuthorize(
-      "hasRole('ADMIN') or (hasRole('PROGRAM_MANAGER') and @scopeAuthorizationService.canAccessProgram(authentication.principal, #programId, T(com.hcmute.lms.lmsapi.enums.AccessType).WRITE))")
+      "hasRole('PROGRAM_MANAGER') and @scopeAuthorizationService.canAccessProgram(authentication.principal, #programId, T(com.hcmute.lms.lmsapi.enums.AccessType).WRITE)")
   public ResponseEntity<ProgramCsvImportResponse> importProgramCsv(
       @RequestParam("programId")
           @Pattern(
@@ -129,7 +129,7 @@ public class ProgramVersionController {
 
   @PostMapping("/{id}/confirm-import")
   @PreAuthorize(
-      "hasRole('ADMIN') or (hasRole('PROGRAM_MANAGER') and @scopeAuthorizationService.canAccessProgramVersion(authentication.principal, #id, T(com.hcmute.lms.lmsapi.enums.AccessType).WRITE))")
+      "hasRole('PROGRAM_MANAGER') and @scopeAuthorizationService.canAccessProgramVersion(authentication.principal, #id, T(com.hcmute.lms.lmsapi.enums.AccessType).WRITE)")
   public ResponseEntity<ProgramCsvImportResponse> confirmImport(
       @PathVariable("id")
           @Pattern(
@@ -144,7 +144,7 @@ public class ProgramVersionController {
 
   @PutMapping("/{id}/lock")
   @PreAuthorize(
-      "hasRole('ADMIN') or (hasRole('PROGRAM_MANAGER') and @scopeAuthorizationService.canAccessProgramVersion(authentication.principal, #id, T(com.hcmute.lms.lmsapi.enums.AccessType).WRITE))")
+      "hasRole('PROGRAM_MANAGER') and @scopeAuthorizationService.canAccessProgramVersion(authentication.principal, #id, T(com.hcmute.lms.lmsapi.enums.AccessType).WRITE)")
   public ResponseEntity<ProgramVersionResponse> lockProgramVersion(
       @PathVariable("id")
           @Pattern(
@@ -162,7 +162,7 @@ public class ProgramVersionController {
 
   @PutMapping("/{id}/status")
   @PreAuthorize(
-      "hasRole('ADMIN') or (hasRole('PROGRAM_MANAGER') and @scopeAuthorizationService.canAccessProgramVersion(authentication.principal, #id, T(com.hcmute.lms.lmsapi.enums.AccessType).WRITE))")
+      "hasRole('PROGRAM_MANAGER') and @scopeAuthorizationService.canAccessProgramVersion(authentication.principal, #id, T(com.hcmute.lms.lmsapi.enums.AccessType).WRITE)")
   public ResponseEntity<ProgramVersionResponse> updateProgramVersionStatus(
       @PathVariable("id")
           @Pattern(

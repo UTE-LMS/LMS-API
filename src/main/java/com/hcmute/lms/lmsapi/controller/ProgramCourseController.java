@@ -69,7 +69,7 @@ public class ProgramCourseController {
   @GetMapping(
       value = "/import-template",
       produces = {ImportTemplateResponses.CSV_MEDIA_TYPE, ImportTemplateResponses.XLSX_MEDIA_TYPE})
-  @PreAuthorize("hasAnyRole('PROGRAM_MANAGER', 'ADMIN')")
+  @PreAuthorize("hasRole('PROGRAM_MANAGER')")
   public ResponseEntity<byte[]> getImportTemplateCsv(
       @RequestParam(name = "format", defaultValue = "csv") String format) {
     log.info("API request: GET /api/v1/program-versions/{id}/courses/import-template");
@@ -79,7 +79,7 @@ public class ProgramCourseController {
 
   @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   @PreAuthorize(
-      "hasRole('ADMIN') or (hasRole('PROGRAM_MANAGER') and @scopeAuthorizationService.canAccessProgramVersion(authentication.principal, #programVersionId, T(com.hcmute.lms.lmsapi.enums.AccessType).WRITE))")
+      "hasRole('PROGRAM_MANAGER') and @scopeAuthorizationService.canAccessProgramVersion(authentication.principal, #programVersionId, T(com.hcmute.lms.lmsapi.enums.AccessType).WRITE)")
   public ResponseEntity<ProgramCourseCsvImportResponse> importProgramCoursesCsv(
       @PathVariable("programVersionId")
           @Pattern(

@@ -4,7 +4,6 @@ import com.hcmute.lms.lmsapi.dto.PageResponse;
 import com.hcmute.lms.lmsapi.dto.ProgramRequest;
 import com.hcmute.lms.lmsapi.dto.ProgramResponse;
 import com.hcmute.lms.lmsapi.dto.UserPrincipal;
-import com.hcmute.lms.lmsapi.enums.Role;
 import com.hcmute.lms.lmsapi.service.ProgramService;
 import com.hcmute.lms.lmsapi.util.PageableValidationUtils;
 import jakarta.validation.Valid;
@@ -73,17 +72,15 @@ public class ProgramController {
 
   @PostMapping
   @PreAuthorize(
-      "hasRole('ADMIN') or (hasRole('PROGRAM_MANAGER') and (#request.facultyId == null or authentication.principal.facultyId == #request.facultyId))")
+      "hasRole('PROGRAM_MANAGER') and (#request.facultyId == null or authentication.principal.facultyId == #request.facultyId)")
   public ResponseEntity<ProgramResponse> createProgram(
       @Valid @RequestBody ProgramRequest request,
       @AuthenticationPrincipal UserPrincipal principal) {
-    if (principal != null && !hasRole(principal, Role.ADMIN)) {
-      if (principal.getFacultyId() == null) {
-        throw new AccessDeniedException("Program Manager chưa được gán vào Khoa nào");
-      }
-      if (request.getFacultyId() == null) {
-        request.setFacultyId(principal.getFacultyId());
-      }
+    if (principal == null || principal.getFacultyId() == null) {
+      throw new AccessDeniedException("Program Manager chưa được gán vào Khoa nào");
+    }
+    if (request.getFacultyId() == null) {
+      request.setFacultyId(principal.getFacultyId());
     }
     log.info("API request: POST /api/v1/programs with code [{}]", request.getCode());
     return ResponseEntity.status(HttpStatus.CREATED).body(programService.createProgram(request));
@@ -91,7 +88,7 @@ public class ProgramController {
 
   @PutMapping("/{id}")
   @PreAuthorize(
-      "hasRole('ADMIN') or (hasRole('PROGRAM_MANAGER') and @scopeAuthorizationService.canManageProgram(authentication.principal, #id))")
+      "hasRole('PROGRAM_MANAGER') and @scopeAuthorizationService.canManageProgram(authentication.principal, #id)")
   public ResponseEntity<ProgramResponse> updateProgram(
       @PathVariable("id")
           @Pattern(
@@ -101,18 +98,14 @@ public class ProgramController {
       @Valid @RequestBody ProgramRequest request,
       @AuthenticationPrincipal UserPrincipal principal) {
     log.info("API request: PUT /api/v1/programs/{}", id);
-    if (principal != null && !hasRole(principal, Role.ADMIN)) {
-      ProgramResponse existing = programService.getProgramById(id);
-      if (request.getFacultyId() != null
-          && !request.getFacultyId().equals(existing.getFacultyId())) {
-        throw new AccessDeniedException(
-            "Program Manager không có quyền chuyển Khoa chủ quản của CTĐT");
-      }
+    if (principal == null || principal.getFacultyId() == null) {
+      throw new AccessDeniedException("Program Manager chưa được gán vào Khoa nào");
+    }
+    ProgramResponse existing = programService.getProgramById(id);
+    if (request.getFacultyId() != null && !request.getFacultyId().equals(existing.getFacultyId())) {
+      throw new AccessDeniedException(
+          "Program Manager không có quyền chuyển Khoa chủ quản của CTĐT");
     }
     return ResponseEntity.ok(programService.updateProgram(id, request));
-  }
-
-  private boolean hasRole(UserPrincipal principal, Role role) {
-    return principal.getRoles() != null && principal.getRoles().contains(role);
   }
 }

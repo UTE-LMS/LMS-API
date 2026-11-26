@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.hcmute.lms.lmsapi.document.Course;
+import com.hcmute.lms.lmsapi.document.Faculty;
 import com.hcmute.lms.lmsapi.document.Pi;
 import com.hcmute.lms.lmsapi.document.Plo;
 import com.hcmute.lms.lmsapi.document.Program;
@@ -22,6 +23,7 @@ import com.hcmute.lms.lmsapi.enums.Role;
 import com.hcmute.lms.lmsapi.enums.UserStatus;
 import com.hcmute.lms.lmsapi.enums.VerificationStatus;
 import com.hcmute.lms.lmsapi.repository.CourseRepository;
+import com.hcmute.lms.lmsapi.repository.FacultyRepository;
 import com.hcmute.lms.lmsapi.repository.PiRepository;
 import com.hcmute.lms.lmsapi.repository.PloRepository;
 import com.hcmute.lms.lmsapi.repository.ProgramRepository;
@@ -65,6 +67,8 @@ class ProgramIntegrationTest {
 
   @Autowired private CourseRepository courseRepository;
 
+  @Autowired private FacultyRepository facultyRepository;
+
   @Autowired private PasswordEncoder passwordEncoder;
 
   @Autowired private ObjectMapper objectMapper;
@@ -74,6 +78,7 @@ class ProgramIntegrationTest {
   private static final String RAW_PASSWORD = "Password123!";
   private static final String SUFFIX = String.valueOf(System.nanoTime());
 
+  private Faculty faculty;
   private Program program;
   private ProgramVersion draftVersion;
   private ProgramVersion activeVersion;
@@ -123,7 +128,14 @@ class ProgramIntegrationTest {
                 .credits(3)
                 .build());
 
-    String facultyId = new org.bson.types.ObjectId().toHexString();
+    faculty =
+        facultyRepository.save(
+            Faculty.builder()
+                .code("FAC_F02_" + SUFFIX)
+                .name("Khoa kiểm thử F02")
+                .isActive(true)
+                .build());
+    String facultyId = faculty.getId();
     program.setFacultyId(facultyId);
     program = programRepository.save(program);
 
@@ -153,6 +165,7 @@ class ProgramIntegrationTest {
         .filter(item -> item.getCode() != null && item.getCode().equals("F02_NEW_" + SUFFIX))
         .forEach(programRepository::delete);
     programRepository.delete(program);
+    facultyRepository.delete(faculty);
     courseRepository.delete(course);
     userRepository.deleteAll(
         List.of(managerUser, qaUser, qaOutOfScopeUser, adminUser, lecturerUser));
@@ -218,10 +231,15 @@ class ProgramIntegrationTest {
         .andExpect(status().isForbidden());
 
     ApiTestSupport.performJson(mockMvc, objectMapper, post("/api/v1/programs"), adminToken, request)
+        .andExpect(status().isForbidden());
+
+    ApiTestSupport.performJson(
+            mockMvc, objectMapper, post("/api/v1/programs"), managerToken, request)
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.code").value("F02_NEW_" + SUFFIX));
 
-    ApiTestSupport.performJson(mockMvc, objectMapper, post("/api/v1/programs"), adminToken, request)
+    ApiTestSupport.performJson(
+            mockMvc, objectMapper, post("/api/v1/programs"), managerToken, request)
         .andExpect(status().isConflict());
 
     mockMvc
@@ -230,7 +248,11 @@ class ProgramIntegrationTest {
                 .param("programId", program.getId())
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + managerToken))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.content", hasSize(2)));
+        .andExpect(jsonPath("$.content", hasSize(2)))
+        .andExpect(jsonPath("$.content[0].programCode").value(program.getCode()))
+        .andExpect(jsonPath("$.content[0].programName").value(program.getName()))
+        .andExpect(jsonPath("$.content[0].ploCount").value(0))
+        .andExpect(jsonPath("$.content[0].piCount").value(0));
 
     ProgramVersionStatusUpdateRequest backward =
         ProgramVersionStatusUpdateRequest.builder().status(ProgramVersionStatus.ACTIVE).build();
@@ -294,5 +316,15 @@ class ProgramIntegrationTest {
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + managerToken))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$", hasSize(1)));
+
+    mockMvc
+        .perform(
+            get("/api/v1/program-versions/" + draftVersion.getId())
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + managerToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.programCode").value(program.getCode()))
+        .andExpect(jsonPath("$.programName").value(program.getName()))
+        .andExpect(jsonPath("$.ploCount").value(1))
+        .andExpect(jsonPath("$.piCount").value(1));
   }
 }
