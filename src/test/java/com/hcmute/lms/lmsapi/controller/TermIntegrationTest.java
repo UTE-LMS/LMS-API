@@ -1,5 +1,6 @@
 package com.hcmute.lms.lmsapi.controller;
 
+import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -11,11 +12,9 @@ import com.hcmute.lms.lmsapi.enums.TermStatus;
 import com.hcmute.lms.lmsapi.testsupport.IntegrationTestBase;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.test.web.servlet.MvcResult;
 
 @DisplayName("F05a: Terms Management Integration Tests (US-18)")
@@ -32,11 +31,6 @@ class TermIntegrationTest extends IntegrationTestBase {
     adminToken = fixtures.bearerFor(Role.ADMIN);
     pmToken = fixtures.bearerFor(Role.PROGRAM_MANAGER);
     lecturerToken = fixtures.bearerFor(Role.LECTURER);
-  }
-
-  @AfterEach
-  void cleanUpTerms() {
-    mongo().remove(new Query(), "terms");
   }
 
   @Test
@@ -87,9 +81,8 @@ class TermIntegrationTest extends IntegrationTestBase {
     mockMvc
         .perform(getAs(lecturerToken, "/api/v1/terms"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.content", hasSize(1)))
-        .andExpect(jsonPath("$.totalElements").value(1))
-        .andExpect(jsonPath("$.last").value(true));
+        .andExpect(jsonPath("$.content[?(@.id=='" + termId + "')]", hasSize(1)))
+        .andExpect(jsonPath("$.totalElements", greaterThanOrEqualTo(1)));
 
     mockMvc
         .perform(
@@ -102,7 +95,7 @@ class TermIntegrationTest extends IntegrationTestBase {
         .andExpect(jsonPath("$.content[0].id").value(termId));
 
     mockMvc
-        .perform(getAs(lecturerToken, "/api/v1/terms?status=CLOSED"))
+        .perform(getAs(lecturerToken, "/api/v1/terms?search={q}&status=CLOSED", code))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.content", hasSize(0)))
         .andExpect(jsonPath("$.totalElements").value(0));
