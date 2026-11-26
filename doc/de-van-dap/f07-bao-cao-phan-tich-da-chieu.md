@@ -46,11 +46,14 @@
 - **Tham số/thư viện từ đâu:** `ScopeAuthorizationService` (ADR 0003, ADR 0014) kết hợp kiểm tra vai trò từ `UserPrincipal`.
 - **Bỏ đi thì sao:** Giảng viên lớp A có thể truyền `sectionIds` của giảng viên lớp B hoặc truyền `runId` của ngành khác để xem/xuất điểm lớp không thuộc phân công giảng dạy.
 
-## 5. Xuất CSV chuẩn RFC 4180 kèm UTF-8 BOM & Chống CSV Formula Injection (`MatrixCsvExporter`)
+## 5. Xuất CSV & Excel `.xlsx` (`MatrixCsvExporter`, `MatrixExcelExporter`, `ReportExcelExporter`, `ExcelExportSupport`)
 
-- **Làm gì:** Chuyển `AnalyticsMatrixResponse` thành mảng `byte[]` UTF-8 có 3 byte BOM (`0xEF, 0xBB, 0xBF`) ở đầu tệp, gồm cả bảng ma trận tỷ lệ đạt và bảng chi tiết 10 chỉ số thô. Hàm `escape(String)` kiểm tra nếu chuỗi (hoặc chuỗi sau `trim()`) bắt đầu bằng `=`, `+`, `-`, `@` hoặc bắt đầu bằng `\t`, `\r` thì chèn dấu nháy đơn `'` ở đầu trước khi bọc nháy kép theo chuẩn RFC 4180.
+- **Làm gì:**
+  - `MatrixCsvExporter`: Chuyển `AnalyticsMatrixResponse` thành mảng `byte[]` UTF-8 có 3 byte BOM (`0xEF, 0xBB, 0xBF`) ở đầu tệp, gồm cả bảng ma trận tỷ lệ đạt và bảng chi tiết 10 chỉ số thô.
+  - `ReportExcelExporter` & `MatrixExcelExporter` (dùng chung `ExcelExportSupport`): Xuất bản chụp `Report` (sheet `BaoCao` cho cả 4 loại báo cáo kể cả `DATA_COMPLETENESS`) và ma trận phân tích đa chiều 2 sheet (`MaTranPhanTich` + `DuLieuChiTiet`) sang định dạng `.xlsx` khi truyền `?format=xlsx` (mặc định giữ `format=csv` để tương thích ngược; định dạng khác ngoài `csv|xlsx` trả `400`).
+  - Chống Formula Injection (CWE-1236) trên cả CSV và Excel (`CellType.STRING` kèm tiền tố `'` nếu giá trị sau `trim()` bắt đầu bằng `=`, `+`, `-`, `@` hoặc bắt đầu bằng `\t`, `\r`). Các ô có mẫu số bằng `0` (`mean`, `passRate`, `passRateOfEnrolled` là `null`) được giữ trống hoàn toàn trong Excel, không bao giờ ép về `0.0`.
 - **Vì sao có:**
-  - UTF-8 BOM giúp giảng viên/cán bộ QA mở trực tiếp tệp `.csv` bằng Microsoft Excel trên Windows mà không bị lỗi font tiếng Việt.
-  - Chống tấn công **CSV Formula Injection (CWE-1236)**: nếu tên/mã học phần hoặc CLO chứa chuỗi như `=cmd|'/C calc'!A0` hay `@IMPORTDATA(...)`, Excel sẽ coi là văn bản thuần thay vì thực thi lệnh.
-- **Tham số/thư viện từ đâu:** Cài đặt thuần bằng `java.nio.charset.StandardCharsets` và `StringBuilder` của JDK 25 (0 thư viện ngoài, đồng nhất với `CsvUtils` của dự án).
-- **Bỏ đi thì sao:** Mở CSV bằng Excel bị vỡ dấu tiếng Việt, và tồn tại rủi ro bảo mật khi mở tệp xuất trên máy người dùng cuối.
+  - Hỗ trợ cả xuất nhanh CSV UTF-8 BOM lẫn tệp `.xlsx` định dạng sẵn bảng, phần trăm (`0.00%`), số thập phân (`0.000`) và tách 2 sheet riêng biệt để QA/Giảng viên nộp minh chứng trực tiếp mà không phải tách cột thủ công.
+  - Tính độ rộng cột bằng số ký tự thay vì `sheet.autoSizeColumn()` để tránh lỗi thiếu font AWT trên container Linux headless trong CI/staging.
+- **Tham số/thư viện từ đâu:** CSV cài đặt thuần bằng `java.nio.charset.StandardCharsets` và `StringBuilder` của JDK 25; Excel tái sử dụng `org.apache.poi:poi-ooxml:6.0.0` (đã chốt ở ADR 0015 cho nhập/xuất mẫu, không thêm dependency mới) và `ImportTemplateResponses.XLSX_MEDIA_TYPE`.
+- **Bỏ đi thì sao:** Người dùng phải tự chuyển đổi CSV hoặc định dạng lại bảng số liệu khi lập hồ sơ kiểm định, hoặc tồn tại rủi ro thực thi công thức (CWE-1236) / sập dịch vụ trên môi trường Linux không có font đồ họa nếu dùng `autoSizeColumn()`.

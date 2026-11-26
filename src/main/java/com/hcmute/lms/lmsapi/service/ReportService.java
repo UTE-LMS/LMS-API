@@ -16,4 +16,6 @@ public interface ReportService {
   ReportResponse getReport(String id);
 
   byte[] exportReportCsv(String id);
+
+  byte[] exportReportXlsx(String id);
 }

@@ -5,7 +5,9 @@ import com.hcmute.lms.lmsapi.dto.ReportCreateRequest;
 import com.hcmute.lms.lmsapi.dto.ReportResponse;
 import com.hcmute.lms.lmsapi.dto.UserPrincipal;
 import com.hcmute.lms.lmsapi.enums.ReportType;
+import com.hcmute.lms.lmsapi.exporter.ExcelExportSupport;
 import com.hcmute.lms.lmsapi.service.ReportService;
+import com.hcmute.lms.lmsapi.util.ImportTemplateResponses;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -78,16 +80,25 @@ public class ReportController {
     return ResponseEntity.ok(reportService.getReport(id));
   }
 
-  @PostMapping(value = "/{id}/export", produces = "text/csv; charset=UTF-8")
+  @PostMapping("/{id}/export")
   @PreAuthorize("hasAnyRole('ADMIN', 'PROGRAM_MANAGER', 'QA', 'LECTURER')")
   public ResponseEntity<byte[]> exportReport(
       @PathVariable("id")
           @Pattern(regexp = ID_PATTERN, message = "reportId phải là ObjectId 24 ký tự hex")
-          String id) {
-    byte[] content = reportService.exportReportCsv(id);
+          String id,
+      @RequestParam(name = "format", defaultValue = "csv") String format) {
+    String normalized = ExcelExportSupport.normalizeFormat(format);
+    boolean isXlsx = "xlsx".equals(normalized);
+    byte[] content =
+        isXlsx ? reportService.exportReportXlsx(id) : reportService.exportReportCsv(id);
+    String extension = isXlsx ? ".xlsx" : ".csv";
+    String mediaType =
+        isXlsx ? ImportTemplateResponses.XLSX_MEDIA_TYPE : ImportTemplateResponses.CSV_MEDIA_TYPE;
     return ResponseEntity.ok()
-        .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"report-" + id + ".csv\"")
-        .contentType(MediaType.parseMediaType("text/csv; charset=UTF-8"))
+        .header(
+            HttpHeaders.CONTENT_DISPOSITION,
+            "attachment; filename=\"report-" + id + extension + "\"")
+        .contentType(MediaType.parseMediaType(mediaType))
         .body(content);
   }
 }

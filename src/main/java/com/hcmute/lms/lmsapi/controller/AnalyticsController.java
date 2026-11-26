@@ -3,7 +3,9 @@ package com.hcmute.lms.lmsapi.controller;
 import com.hcmute.lms.lmsapi.dto.UserPrincipal;
 import com.hcmute.lms.lmsapi.dto.analytics.AnalyticsMatrixResponse;
 import com.hcmute.lms.lmsapi.dto.analytics.AnalyticsQueryRequest;
+import com.hcmute.lms.lmsapi.exporter.ExcelExportSupport;
 import com.hcmute.lms.lmsapi.service.AnalyticsService;
+import com.hcmute.lms.lmsapi.util.ImportTemplateResponses;
 import jakarta.validation.Valid;
 import java.time.Instant;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +19,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -59,27 +62,40 @@ public class AnalyticsController {
   }
 
   /**
-   * Xuất dữ liệu ma trận phân tích đa chiều sang file CSV.
+   * Xuất dữ liệu ma trận phân tích đa chiều sang file CSV (mặc định) hoặc Excel {@code .xlsx}.
    *
    * @param request tham số truy vấn và lọc
+   * @param format {@code csv} (mặc định) hoặc {@code xlsx}
    * @param principal thông tin người dùng trong Security Context
-   * @return file CSV định dạng UTF-8 BOM
+   * @return file CSV UTF-8 BOM hoặc Excel {@code .xlsx}
    */
-  @GetMapping(value = "/export", produces = "text/csv; charset=UTF-8")
+  @GetMapping("/export")
   @PreAuthorize("hasAnyRole('ADMIN', 'QA', 'PROGRAM_MANAGER', 'LECTURER')")
-  public ResponseEntity<byte[]> exportAnalyticsCsv(
+  public ResponseEntity<byte[]> exportAnalytics(
       @Valid @ModelAttribute AnalyticsQueryRequest request,
+      @RequestParam(name = "format", defaultValue = "csv") String format,
       @AuthenticationPrincipal UserPrincipal principal) {
-    log.info("API GET /api/v1/reports/analytics/export: dimension=[{}]", request.getDimension());
-    byte[] csvContent = analyticsService.exportAnalyticsMatrixCsv(request, principal);
+    String normalized = ExcelExportSupport.normalizeFormat(format);
+    boolean isXlsx = "xlsx".equals(normalized);
+    log.info(
+        "API GET /api/v1/reports/analytics/export: dimension=[{}] format=[{}]",
+        request.getDimension(),
+        normalized);
+    byte[] content =
+        isXlsx
+            ? analyticsService.exportAnalyticsMatrixXlsx(request, principal)
+            : analyticsService.exportAnalyticsMatrixCsv(request, principal);
     String dimensionStr =
         request.getDimension() != null ? request.getDimension().name().toLowerCase() : "matrix";
+    String extension = isXlsx ? ".xlsx" : ".csv";
     String filename =
-        "analytics-matrix-" + dimensionStr + "-" + Instant.now().toEpochMilli() + ".csv";
+        "analytics-matrix-" + dimensionStr + "-" + Instant.now().toEpochMilli() + extension;
+    String mediaType =
+        isXlsx ? ImportTemplateResponses.XLSX_MEDIA_TYPE : ImportTemplateResponses.CSV_MEDIA_TYPE;
 
     return ResponseEntity.ok()
         .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
-        .contentType(MediaType.parseMediaType("text/csv; charset=UTF-8"))
-        .body(csvContent);
+        .contentType(MediaType.parseMediaType(mediaType))
+        .body(content);
   }
 }

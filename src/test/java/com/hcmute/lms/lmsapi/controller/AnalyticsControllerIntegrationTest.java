@@ -33,14 +33,23 @@ import com.hcmute.lms.lmsapi.enums.SectionStatus;
 import com.hcmute.lms.lmsapi.enums.SyllabusStatus;
 import com.hcmute.lms.lmsapi.enums.VerificationStatus;
 import com.hcmute.lms.lmsapi.testsupport.IntegrationTestBase;
+import java.io.ByteArrayInputStream;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellType;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
+import org.springframework.test.web.servlet.MvcResult;
 
 @DisplayName("AnalyticsController Integration Tests (Milestone 1)")
 class AnalyticsControllerIntegrationTest extends IntegrationTestBase {
@@ -116,8 +125,8 @@ class AnalyticsControllerIntegrationTest extends IntegrationTestBase {
                     .status(CalculationStatus.SUCCESS)
                     .official(true)
                     .stale(false)
-                    .startedAt(Instant.now().minusSeconds(3600))
-                    .finishedAt(Instant.now().minusSeconds(3500))
+                    .startedAt(Instant.now())
+                    .finishedAt(Instant.now())
                     .build());
     createdRunIds.add(calculationRun.getId());
 
@@ -689,5 +698,128 @@ class AnalyticsControllerIntegrationTest extends IntegrationTestBase {
                     HttpHeaders.CONTENT_DISPOSITION,
                     containsString("attachment; filename=\"analytics-matrix-student-")))
         .andExpect(content().string(containsString("STUDENT")));
+  }
+
+  @Test
+  @DisplayName(
+      "Xuất Excel .xlsx ma trận phân tích trả về 2 sheet chuẩn, giữ null mẫu số 0 và chặn injection")
+  void testMatrixXlsxExportEndpoint() throws Exception {
+    Clo formulaClo =
+        mongo()
+            .save(
+                Clo.builder()
+                    .syllabusId(syllabus.getId())
+                    .courseId(course.getId())
+                    .code("CLO97")
+                    .contentOriginal("=cmd|calc")
+                    .bloomLevel(1)
+                    .measurement(CloMeasurement.builder().defaultPassThreshold(0.5).build())
+                    .verification(
+                        Verification.builder().status(VerificationStatus.UNVERIFIED).build())
+                    .build());
+    try {
+      MvcResult res =
+          mockMvc
+              .perform(
+                  getAs(
+                      adminToken,
+                      "/api/v1/reports/analytics/export?dimension=COURSE_SECTIONS&courseId={courseId}&format=xlsx",
+                      course.getId()))
+              .andExpect(status().isOk())
+              .andExpect(
+                  header()
+                      .string(
+                          HttpHeaders.CONTENT_TYPE,
+                          containsString(
+                              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")))
+              .andExpect(
+                  header()
+                      .string(
+                          HttpHeaders.CONTENT_DISPOSITION,
+                          containsString(
+                              "attachment; filename=\"analytics-matrix-course_sections-")))
+              .andExpect(
+                  header().string(HttpHeaders.CONTENT_DISPOSITION, containsString(".xlsx\"")))
+              .andReturn();
+
+      try (Workbook wb =
+          new XSSFWorkbook(new ByteArrayInputStream(res.getResponse().getContentAsByteArray()))) {
+        Sheet matrixSheet = wb.getSheet("MaTranPhanTich");
+        Sheet detailSheet = wb.getSheet("DuLieuChiTiet");
+        Assertions.assertThat(matrixSheet).isNotNull();
+        Assertions.assertThat(detailSheet).isNotNull();
+
+        Row clo1PassRow = findRow(matrixSheet, 0, "CLO1", 2, "Tỷ lệ đạt (Evaluated)");
+        Assertions.assertThat(clo1PassRow).isNotNull();
+        Assertions.assertThat(clo1PassRow.getCell(3).getNumericCellValue()).isEqualTo(0.90);
+        // section2 chưa có dữ liệu -> ô rỗng, không ép thành 0.0
+        Assertions.assertThat(clo1PassRow.getCell(4)).isNull();
+
+        Row formulaRow = findRow(matrixSheet, 0, "CLO97", 2, "Tỷ lệ đạt (Evaluated)");
+        Assertions.assertThat(formulaRow).isNotNull();
+        Assertions.assertThat(formulaRow.getCell(1).getCellType()).isEqualTo(CellType.STRING);
+        Assertions.assertThat(formulaRow.getCell(1).getStringCellValue()).isEqualTo("'=cmd|calc");
+      }
+    } finally {
+      mongo().remove(formulaClo);
+    }
+  }
+
+  @Test
+  @DisplayName(
+      "Xuất Excel .xlsx cho STUDENT bỏ qua phân trang, từ chối format=pdf (400) và chặn LECTURER ngoài phạm vi (403)")
+  void testMatrixXlsxStudentValidationAndAuthorization() throws Exception {
+    Student s1 = fixtures.student();
+    Student s2 = fixtures.student();
+    fixtures.enrollment(section1, s1, EnrollmentStatus.ENROLLED);
+    fixtures.enrollment(section1, s2, EnrollmentStatus.ENROLLED);
+
+    MvcResult stuRes =
+        mockMvc
+            .perform(
+                getAs(
+                    adminToken,
+                    "/api/v1/reports/analytics/export?dimension=STUDENT&courseId={courseId}&page=0&size=1&format=xlsx",
+                    course.getId()))
+            .andExpect(status().isOk())
+            .andReturn();
+    try (Workbook wb =
+        new XSSFWorkbook(new ByteArrayInputStream(stuRes.getResponse().getContentAsByteArray()))) {
+      Sheet detailSheet = wb.getSheet("DuLieuChiTiet");
+      Assertions.assertThat(findRow(detailSheet, 0, "CLO1", 1, s1.getStudentCode())).isNotNull();
+      Assertions.assertThat(findRow(detailSheet, 0, "CLO1", 1, s2.getStudentCode())).isNotNull();
+    }
+
+    mockMvc
+        .perform(
+            getAs(
+                adminToken,
+                "/api/v1/reports/analytics/export?dimension=COURSE_SECTIONS&courseId={courseId}&format=pdf",
+                course.getId()))
+        .andExpect(status().isBadRequest());
+
+    mockMvc
+        .perform(
+            getAs(
+                lecturerToken,
+                "/api/v1/reports/analytics/export?dimension=COURSE_SECTIONS&courseId={courseId}&sectionIds={sec1},{sec2}&format=xlsx",
+                course.getId(),
+                section1.getId(),
+                section2.getId()))
+        .andExpect(status().isForbidden());
+  }
+
+  private static Row findRow(Sheet sheet, int colA, String valA, int colB, String valB) {
+    for (Row row : sheet) {
+      if (valA.equals(stringCell(row, colA)) && valB.equals(stringCell(row, colB))) {
+        return row;
+      }
+    }
+    return null;
+  }
+
+  private static String stringCell(Row row, int col) {
+    Cell cell = row.getCell(col);
+    return cell != null && cell.getCellType() == CellType.STRING ? cell.getStringCellValue() : null;
   }
 }
