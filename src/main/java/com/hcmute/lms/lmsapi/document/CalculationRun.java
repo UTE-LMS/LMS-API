@@ -23,6 +23,8 @@ import org.springframework.data.mongodb.core.mapping.FieldType;
 @AllArgsConstructor
 @Document(collection = "calculation_runs")
 @CompoundIndexes({
+  @CompoundIndex(name = "calc_started_idx", def = "{'startedAt': -1}"),
+  @CompoundIndex(name = "calc_pv_started_idx", def = "{'programVersionId': 1, 'startedAt': -1}"),
   @CompoundIndex(name = "calc_scope_started_idx", def = "{'scope': 1, 'startedAt': -1}"),
   @CompoundIndex(
       name = "calc_sections_started_idx",

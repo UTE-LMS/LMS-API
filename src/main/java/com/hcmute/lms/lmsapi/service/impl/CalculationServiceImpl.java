@@ -8,11 +8,14 @@ import com.hcmute.lms.lmsapi.document.AuditEntity;
 import com.hcmute.lms.lmsapi.document.CalculationRun;
 import com.hcmute.lms.lmsapi.document.Clo;
 import com.hcmute.lms.lmsapi.document.CloPiLink;
+import com.hcmute.lms.lmsapi.document.Course;
 import com.hcmute.lms.lmsapi.document.CourseSection;
 import com.hcmute.lms.lmsapi.document.Enrollment;
 import com.hcmute.lms.lmsapi.document.OutcomeMapping;
 import com.hcmute.lms.lmsapi.document.Pi;
 import com.hcmute.lms.lmsapi.document.Plo;
+import com.hcmute.lms.lmsapi.document.Program;
+import com.hcmute.lms.lmsapi.document.ProgramVersion;
 import com.hcmute.lms.lmsapi.document.Score;
 import com.hcmute.lms.lmsapi.document.Student;
 import com.hcmute.lms.lmsapi.document.StudentResult;
@@ -41,10 +44,13 @@ import com.hcmute.lms.lmsapi.repository.AssessmentRepository;
 import com.hcmute.lms.lmsapi.repository.CalculationRunRepository;
 import com.hcmute.lms.lmsapi.repository.CloPiLinkRepository;
 import com.hcmute.lms.lmsapi.repository.CloRepository;
+import com.hcmute.lms.lmsapi.repository.CourseRepository;
 import com.hcmute.lms.lmsapi.repository.CourseSectionRepository;
 import com.hcmute.lms.lmsapi.repository.EnrollmentRepository;
 import com.hcmute.lms.lmsapi.repository.PiRepository;
 import com.hcmute.lms.lmsapi.repository.PloRepository;
+import com.hcmute.lms.lmsapi.repository.ProgramRepository;
+import com.hcmute.lms.lmsapi.repository.ProgramVersionRepository;
 import com.hcmute.lms.lmsapi.repository.ScoreRepository;
 import com.hcmute.lms.lmsapi.repository.StudentRepository;
 import com.hcmute.lms.lmsapi.repository.StudentResultRepository;
@@ -53,6 +59,7 @@ import com.hcmute.lms.lmsapi.repository.TermRepository;
 import com.hcmute.lms.lmsapi.service.AuditService;
 import com.hcmute.lms.lmsapi.service.CalculationService;
 import com.hcmute.lms.lmsapi.service.ScopeAuthorizationService;
+import com.hcmute.lms.lmsapi.util.MongoCountUtils;
 import com.hcmute.lms.lmsapi.util.PageableValidationUtils;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -66,8 +73,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -85,6 +97,9 @@ public class CalculationServiceImpl implements CalculationService {
   private final StudentResultRepository studentResultRepository;
   private final AggregateResultRepository aggregateResultRepository;
   private final CourseSectionRepository courseSectionRepository;
+  private final CourseRepository courseRepository;
+  private final ProgramVersionRepository programVersionRepository;
+  private final ProgramRepository programRepository;
   private final SyllabusRepository syllabusRepository;
   private final AssessmentRepository assessmentRepository;
   private final EnrollmentRepository enrollmentRepository;
@@ -97,6 +112,7 @@ public class CalculationServiceImpl implements CalculationService {
   private final TermRepository termRepository;
   private final AuditService auditService;
   private final ScopeAuthorizationService scopeAuthorizationService;
+  private final MongoTemplate mongoTemplate;
 
   @Override
   public CalculationRunResponse triggerCalculation(CalculationRunRequest request, String actorId) {
@@ -152,7 +168,11 @@ public class CalculationServiceImpl implements CalculationService {
           null,
           Map.of("scope", savedRun.getScope().name(), "status", savedRun.getStatus().name()),
           "Chạy đo lường chuẩn đầu ra 4 cấp độ");
-      return toRunResponse(savedRun, acc.studentResults.size(), acc.aggregateResults.size());
+      return toRunResponses(
+              List.of(savedRun),
+              Map.of(savedRun.getId(), (long) acc.studentResults.size()),
+              Map.of(savedRun.getId(), (long) acc.aggregateResults.size()))
+          .get(0);
     } catch (RuntimeException ex) {
       run.setStatus(CalculationStatus.FAILED);
       run.setErrorMessage(ex.getMessage());
@@ -165,24 +185,22 @@ public class CalculationServiceImpl implements CalculationService {
   @Override
   public PageResponse<CalculationRunResponse> getCalculationRuns(
       String programVersionId, int page, int size) {
-    List<CalculationRun> runs =
+    PageableValidationUtils.validate(page, size);
+    Pageable pageable = PageRequest.of(page, size);
+    Page<CalculationRun> runPage =
         programVersionId != null && !programVersionId.isBlank()
-            ? calculationRunRepository.findByProgramVersionIdOrderByStartedAtDesc(programVersionId)
-            : calculationRunRepository.findAllByOrderByStartedAtDesc();
-    // Chỉ đếm số kết quả (truy vấn tốn kém) cho các lượt tính nằm trong trang hiện tại
-    return PageResponse.slice(
-        runs,
-        page,
-        size,
-        pageRuns ->
-            pageRuns.stream()
-                .map(
-                    r ->
-                        toRunResponse(
-                            r,
-                            studentResultRepository.findByRunId(r.getId()).size(),
-                            aggregateResultRepository.findByRunId(r.getId()).size()))
-                .toList());
+            ? calculationRunRepository.findByProgramVersionIdOrderByStartedAtDesc(
+                programVersionId.trim(), pageable)
+            : calculationRunRepository.findAllByOrderByStartedAtDesc(pageable);
+
+    List<CalculationRun> pageRuns = runPage.getContent();
+    List<String> pageRunIds = pageRuns.stream().map(CalculationRun::getId).toList();
+    Map<String, Long> studentCounts = countByRunIds(StudentResult.class, pageRunIds);
+    Map<String, Long> aggregateCounts = countByRunIds(AggregateResult.class, pageRunIds);
+
+    List<CalculationRunResponse> content = toRunResponses(pageRuns, studentCounts, aggregateCounts);
+    return PageResponse.of(
+        content, runPage.getNumber(), runPage.getSize(), runPage.getTotalElements());
   }
 
   @Override
@@ -191,10 +209,15 @@ public class CalculationServiceImpl implements CalculationService {
         calculationRunRepository
             .findById(runId)
             .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy lượt tính: " + runId));
-    return toRunResponse(
-        run,
-        studentResultRepository.findByRunId(runId).size(),
-        aggregateResultRepository.findByRunId(runId).size());
+    return toRunResponses(
+            List.of(run),
+            Map.of(runId, studentResultRepository.countByRunId(runId)),
+            Map.of(runId, aggregateResultRepository.countByRunId(runId)))
+        .get(0);
+  }
+
+  private Map<String, Long> countByRunIds(Class<?> documentClass, List<String> runIds) {
+    return MongoCountUtils.countByObjectIdField(mongoTemplate, documentClass, "runId", runIds);
   }
 
   @Override
@@ -242,32 +265,62 @@ public class CalculationServiceImpl implements CalculationService {
   }
 
   private List<StudentResultResponse> toStudentResultResponses(List<StudentResult> results) {
+    if (results == null || results.isEmpty()) {
+      return List.of();
+    }
     Map<String, String> studentRefs = loadStudentRefs(results);
     Map<String, String> subjectCodes =
         loadSubjectCodes(results.stream().map(StudentResult::getSubjectId).toList());
+    ResultContext ctx =
+        loadResultContext(
+            results.stream().map(StudentResult::getProgramVersionId).toList(),
+            results.stream().map(StudentResult::getSectionId).toList(),
+            results.stream().map(StudentResult::getTermId).toList(),
+            List.of(),
+            results.stream().map(StudentResult::getAssessmentId).toList());
     return results.stream()
         .map(
-            r ->
-                StudentResultResponse.builder()
-                    .id(r.getId())
-                    .runId(r.getRunId())
-                    .level(r.getLevel())
-                    .subjectId(r.getSubjectId())
-                    .subjectCode(subjectCodes.get(r.getSubjectId()))
-                    .sectionId(r.getSectionId())
-                    .assessmentId(r.getAssessmentId())
-                    .studentId(r.getStudentId())
-                    .studentCode(studentRefs.get(r.getStudentId()))
-                    .termId(r.getTermId())
-                    .status(r.getStatus())
-                    .value(r.getValue())
-                    .passThreshold(r.getPassThreshold())
-                    .passed(r.getPassed())
-                    .completeness(r.getCompleteness())
-                    .inputs(r.getInputs())
-                    .programVersionId(r.getProgramVersionId())
-                    .syllabusId(r.getSyllabusId())
-                    .build())
+            r -> {
+              ProgramVersion pv = resolveProgramVersion(ctx, r.getProgramVersionId());
+              Program program = resolveProgram(ctx, pv);
+              CourseSection section = resolveSection(ctx, r.getSectionId());
+              Course course = resolveCourse(ctx, section != null ? section.getCourseId() : null);
+              String termId =
+                  hasText(r.getTermId())
+                      ? r.getTermId()
+                      : (section != null ? section.getTermId() : null);
+              Term term = resolveTerm(ctx, termId);
+              Assessment assessment = resolveAssessment(ctx, r.getAssessmentId());
+              return StudentResultResponse.builder()
+                  .id(r.getId())
+                  .runId(r.getRunId())
+                  .level(r.getLevel())
+                  .subjectId(r.getSubjectId())
+                  .subjectCode(subjectCodes.get(r.getSubjectId()))
+                  .sectionId(r.getSectionId())
+                  .sectionCode(section != null ? section.getCode() : null)
+                  .courseCode(course != null ? course.getCode() : null)
+                  .courseName(course != null ? course.getName() : null)
+                  .assessmentId(r.getAssessmentId())
+                  .assessmentName(assessment != null ? assessment.getName() : null)
+                  .assessmentType(assessment != null ? assessment.getType() : null)
+                  .studentId(r.getStudentId())
+                  .studentCode(studentRefs.get(r.getStudentId()))
+                  .termId(r.getTermId())
+                  .termCode(term != null ? term.getCode() : null)
+                  .status(r.getStatus())
+                  .value(r.getValue())
+                  .passThreshold(r.getPassThreshold())
+                  .passed(r.getPassed())
+                  .completeness(r.getCompleteness())
+                  .inputs(r.getInputs())
+                  .programVersionId(r.getProgramVersionId())
+                  .programCode(program != null ? program.getCode() : null)
+                  .programName(program != null ? program.getName() : null)
+                  .programVersion(pv != null ? pv.getVersion() : null)
+                  .syllabusId(r.getSyllabusId())
+                  .build();
+            })
         .toList();
   }
 
@@ -292,10 +345,22 @@ public class CalculationServiceImpl implements CalculationService {
   }
 
   private List<AggregateResultResponse> toAggregateResponses(List<AggregateResult> results) {
+    if (results == null || results.isEmpty()) {
+      return List.of();
+    }
     Map<String, String> subjectCodes =
         loadSubjectCodes(results.stream().map(AggregateResult::getSubjectId).toList());
+    ResultContext ctx =
+        loadResultContext(
+            results.stream().map(AggregateResult::getProgramVersionId).toList(),
+            results.stream().map(AggregateResult::getSectionId).toList(),
+            results.stream()
+                .map(r -> r.getScope() != null ? r.getScope().getTermId() : null)
+                .toList(),
+            List.of(),
+            results.stream().map(AggregateResult::getAssessmentId).toList());
     return results.stream()
-        .map(r -> toAggregateResponse(r, subjectCodes.get(r.getSubjectId())))
+        .map(r -> toAggregateResponse(r, subjectCodes.get(r.getSubjectId()), ctx))
         .toList();
   }
 
@@ -1117,30 +1182,116 @@ public class CalculationServiceImpl implements CalculationService {
         .build();
   }
 
-  private CalculationRunResponse toRunResponse(
-      CalculationRun run, long studentResultCount, long aggregateResultCount) {
-    return CalculationRunResponse.builder()
-        .id(run.getId())
-        .scope(run.getScope())
-        .scopeRef(run.getScopeRef())
-        .lockKey(run.getLockKey())
-        .programVersionId(run.getProgramVersionId())
-        .syllabusIds(run.getSyllabusIds())
-        .official(run.isOfficial())
-        .dataSnapshot(run.getDataSnapshot())
-        .stale(run.isStale())
-        .staleReason(run.getStaleReason())
-        .status(run.getStatus())
-        .errorMessage(run.getErrorMessage())
-        .triggeredBy(run.getTriggeredBy())
-        .startedAt(run.getStartedAt())
-        .finishedAt(run.getFinishedAt())
-        .studentResultCount(studentResultCount)
-        .aggregateResultCount(aggregateResultCount)
-        .build();
+  private List<CalculationRunResponse> toRunResponses(
+      List<CalculationRun> runs,
+      Map<String, Long> studentCounts,
+      Map<String, Long> aggregateCounts) {
+    if (runs == null || runs.isEmpty()) {
+      return List.of();
+    }
+    List<String> pvIds = runs.stream().map(CalculationRun::getProgramVersionId).toList();
+    List<String> sectionIds =
+        runs.stream()
+            .map(CalculationRun::getScopeRef)
+            .filter(Objects::nonNull)
+            .flatMap(ref -> safeList(ref.getSectionIds()).stream())
+            .toList();
+    List<String> termIds =
+        runs.stream()
+            .map(CalculationRun::getScopeRef)
+            .filter(Objects::nonNull)
+            .map(CalculationRun.ScopeRef::getTermId)
+            .toList();
+    List<String> courseIds =
+        runs.stream()
+            .map(CalculationRun::getScopeRef)
+            .filter(Objects::nonNull)
+            .flatMap(ref -> safeList(ref.getCourseIds()).stream())
+            .toList();
+
+    ResultContext ctx = loadResultContext(pvIds, sectionIds, termIds, courseIds, List.of());
+
+    return runs.stream()
+        .map(
+            run -> {
+              ProgramVersion pv = resolveProgramVersion(ctx, run.getProgramVersionId());
+              Program program = resolveProgram(ctx, pv);
+              CalculationRun.ScopeRef scopeRef = run.getScopeRef();
+              List<String> runSectionIds =
+                  scopeRef != null ? safeList(scopeRef.getSectionIds()) : List.of();
+              List<CourseSection> runSections =
+                  runSectionIds.stream()
+                      .map(id -> resolveSection(ctx, id))
+                      .filter(Objects::nonNull)
+                      .toList();
+              List<String> sectionCodes =
+                  runSections.stream()
+                      .map(CourseSection::getCode)
+                      .filter(CalculationServiceImpl::hasText)
+                      .toList();
+
+              String resolvedTermId = scopeRef != null ? scopeRef.getTermId() : null;
+              if (!hasText(resolvedTermId)) {
+                Set<String> sectionTermIds =
+                    runSections.stream()
+                        .map(CourseSection::getTermId)
+                        .filter(CalculationServiceImpl::hasText)
+                        .collect(Collectors.toCollection(LinkedHashSet::new));
+                if (sectionTermIds.size() == 1) {
+                  resolvedTermId = sectionTermIds.iterator().next();
+                }
+              }
+              Term term = resolveTerm(ctx, resolvedTermId);
+
+              Set<String> runCourseIds =
+                  scopeRef != null
+                      ? safeList(scopeRef.getCourseIds()).stream()
+                          .filter(CalculationServiceImpl::hasText)
+                          .collect(Collectors.toCollection(LinkedHashSet::new))
+                      : new LinkedHashSet<>();
+              if (runCourseIds.isEmpty()) {
+                runSections.stream()
+                    .map(CourseSection::getCourseId)
+                    .filter(CalculationServiceImpl::hasText)
+                    .forEach(runCourseIds::add);
+              }
+              Course singleCourse =
+                  runCourseIds.size() == 1
+                      ? resolveCourse(ctx, runCourseIds.iterator().next())
+                      : null;
+
+              return CalculationRunResponse.builder()
+                  .id(run.getId())
+                  .scope(run.getScope())
+                  .scopeRef(run.getScopeRef())
+                  .lockKey(run.getLockKey())
+                  .programVersionId(run.getProgramVersionId())
+                  .programCode(program != null ? program.getCode() : null)
+                  .programName(program != null ? program.getName() : null)
+                  .programVersion(pv != null ? pv.getVersion() : null)
+                  .termCode(term != null ? term.getCode() : null)
+                  .sectionCodes(sectionCodes)
+                  .courseCode(singleCourse != null ? singleCourse.getCode() : null)
+                  .courseName(singleCourse != null ? singleCourse.getName() : null)
+                  .syllabusIds(run.getSyllabusIds())
+                  .official(run.isOfficial())
+                  .dataSnapshot(run.getDataSnapshot())
+                  .stale(run.isStale())
+                  .staleReason(run.getStaleReason())
+                  .status(run.getStatus())
+                  .errorMessage(run.getErrorMessage())
+                  .triggeredBy(run.getTriggeredBy())
+                  .startedAt(run.getStartedAt())
+                  .finishedAt(run.getFinishedAt())
+                  .studentResultCount(studentCounts.getOrDefault(run.getId(), 0L))
+                  .aggregateResultCount(aggregateCounts.getOrDefault(run.getId(), 0L))
+                  .build();
+            })
+        .toList();
   }
 
-  private AggregateResultResponse toAggregateResponse(AggregateResult r, String subjectCode) {
+  private AggregateResultResponse toAggregateResponse(
+      AggregateResult r, String subjectCode, ResultContext ctx) {
     int enrolled =
         r.getCounts() != null && r.getCounts().getEnrolled() != null
             ? r.getCounts().getEnrolled()
@@ -1152,6 +1303,17 @@ public class CalculationServiceImpl implements CalculationService {
     int evaluated = passed + failed;
     int insufficient = Math.max(0, enrolled - evaluated);
     Double passRateOfEnrolled = enrolled > 0 ? (double) passed / enrolled : null;
+
+    ProgramVersion pv = resolveProgramVersion(ctx, r.getProgramVersionId());
+    Program program = resolveProgram(ctx, pv);
+    CourseSection section = resolveSection(ctx, r.getSectionId());
+    Course course = resolveCourse(ctx, section != null ? section.getCourseId() : null);
+    String scopeTermId = r.getScope() != null ? r.getScope().getTermId() : null;
+    String resolvedTermId =
+        hasText(scopeTermId) ? scopeTermId : (section != null ? section.getTermId() : null);
+    Term term = resolveTerm(ctx, resolvedTermId);
+    Assessment assessment = resolveAssessment(ctx, r.getAssessmentId());
+
     return AggregateResultResponse.builder()
         .id(r.getId())
         .runId(r.getRunId())
@@ -1159,7 +1321,13 @@ public class CalculationServiceImpl implements CalculationService {
         .subjectId(r.getSubjectId())
         .subjectCode(subjectCode)
         .sectionId(r.getSectionId())
+        .sectionCode(section != null ? section.getCode() : null)
+        .courseCode(course != null ? course.getCode() : null)
+        .courseName(course != null ? course.getName() : null)
         .assessmentId(r.getAssessmentId())
+        .assessmentName(assessment != null ? assessment.getName() : null)
+        .assessmentType(assessment != null ? assessment.getType() : null)
+        .termCode(term != null ? term.getCode() : null)
         .scope(r.getScope())
         .counts(r.getCounts())
         .evaluated(evaluated)
@@ -1170,8 +1338,121 @@ public class CalculationServiceImpl implements CalculationService {
         .passThreshold(r.getPassThreshold())
         .dataCompleteness(r.getDataCompleteness())
         .programVersionId(r.getProgramVersionId())
+        .programCode(program != null ? program.getCode() : null)
+        .programName(program != null ? program.getName() : null)
+        .programVersion(pv != null ? pv.getVersion() : null)
         .build();
   }
+
+  private ResultContext loadResultContext(
+      Collection<String> rawPvIds,
+      Collection<String> rawSectionIds,
+      Collection<String> rawTermIds,
+      Collection<String> rawCourseIds,
+      Collection<String> rawAssessmentIds) {
+    Set<String> pvIds = cleanIds(rawPvIds);
+    Set<String> sectionIds = cleanIds(rawSectionIds);
+    Set<String> termIds = cleanIds(rawTermIds);
+    Set<String> courseIds = cleanIds(rawCourseIds);
+    Set<String> assessmentIds = cleanIds(rawAssessmentIds);
+
+    Map<String, CourseSection> sections =
+        sectionIds.isEmpty()
+            ? Map.of()
+            : courseSectionRepository.findAllById(sectionIds).stream()
+                .collect(Collectors.toMap(CourseSection::getId, Function.identity(), (a, b) -> a));
+    for (CourseSection sec : sections.values()) {
+      if (hasText(sec.getTermId())) {
+        termIds.add(sec.getTermId());
+      }
+      if (hasText(sec.getCourseId())) {
+        courseIds.add(sec.getCourseId());
+      }
+    }
+
+    Map<String, ProgramVersion> pvs =
+        pvIds.isEmpty()
+            ? Map.of()
+            : programVersionRepository.findAllById(pvIds).stream()
+                .collect(Collectors.toMap(ProgramVersion::getId, Function.identity(), (a, b) -> a));
+    Set<String> programIds = new LinkedHashSet<>();
+    for (ProgramVersion pv : pvs.values()) {
+      if (hasText(pv.getProgramId())) {
+        programIds.add(pv.getProgramId());
+      }
+    }
+    Map<String, Program> programs =
+        programIds.isEmpty()
+            ? Map.of()
+            : programRepository.findAllById(programIds).stream()
+                .collect(Collectors.toMap(Program::getId, Function.identity(), (a, b) -> a));
+
+    Map<String, Term> terms =
+        termIds.isEmpty()
+            ? Map.of()
+            : termRepository.findAllById(termIds).stream()
+                .collect(Collectors.toMap(Term::getId, Function.identity(), (a, b) -> a));
+    Map<String, Course> courses =
+        courseIds.isEmpty()
+            ? Map.of()
+            : courseRepository.findAllById(courseIds).stream()
+                .collect(Collectors.toMap(Course::getId, Function.identity(), (a, b) -> a));
+    Map<String, Assessment> assessments =
+        assessmentIds.isEmpty()
+            ? Map.of()
+            : assessmentRepository.findAllById(assessmentIds).stream()
+                .collect(Collectors.toMap(Assessment::getId, Function.identity(), (a, b) -> a));
+
+    return new ResultContext(pvs, programs, sections, terms, courses, assessments);
+  }
+
+  private static Set<String> cleanIds(Collection<String> rawIds) {
+    Set<String> cleaned = new LinkedHashSet<>();
+    if (rawIds != null) {
+      for (String id : rawIds) {
+        if (hasText(id)) {
+          cleaned.add(id);
+        }
+      }
+    }
+    return cleaned;
+  }
+
+  private static boolean hasText(String value) {
+    return value != null && !value.isBlank();
+  }
+
+  private ProgramVersion resolveProgramVersion(ResultContext ctx, String pvId) {
+    return hasText(pvId) ? ctx.programVersions().get(pvId) : null;
+  }
+
+  private Program resolveProgram(ResultContext ctx, ProgramVersion pv) {
+    return pv != null && hasText(pv.getProgramId()) ? ctx.programs().get(pv.getProgramId()) : null;
+  }
+
+  private CourseSection resolveSection(ResultContext ctx, String sectionId) {
+    return hasText(sectionId) ? ctx.sections().get(sectionId) : null;
+  }
+
+  private Term resolveTerm(ResultContext ctx, String termId) {
+    return hasText(termId) ? ctx.terms().get(termId) : null;
+  }
+
+  private Course resolveCourse(ResultContext ctx, String courseId) {
+    return hasText(courseId) ? ctx.courses().get(courseId) : null;
+  }
+
+  private Assessment resolveAssessment(ResultContext ctx, String assessmentId) {
+    return hasText(assessmentId) ? ctx.assessments().get(assessmentId) : null;
+  }
+
+  private record ResultContext(
+      Map<String, ProgramVersion> programVersions,
+      Map<String, Program> programs,
+      Map<String, CourseSection> sections,
+      Map<String, Term> terms,
+      Map<String, Course> courses,
+      Map<String, Assessment> assessments) {}
 
   private Map<String, String> loadStudentRefs(List<StudentResult> results) {
     List<String> ids = results.stream().map(StudentResult::getStudentId).distinct().toList();

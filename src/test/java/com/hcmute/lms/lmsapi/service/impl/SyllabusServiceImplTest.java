@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.hcmute.lms.lmsapi.document.Course;
 import com.hcmute.lms.lmsapi.document.Syllabus;
 import com.hcmute.lms.lmsapi.document.Term;
 import com.hcmute.lms.lmsapi.dto.SyllabusRequest;
@@ -17,6 +18,8 @@ import com.hcmute.lms.lmsapi.exception.ErrorCode;
 import com.hcmute.lms.lmsapi.exception.ResourceNotFoundException;
 import com.hcmute.lms.lmsapi.mapper.SyllabusMapper;
 import com.hcmute.lms.lmsapi.repository.CourseRepository;
+import com.hcmute.lms.lmsapi.repository.ProgramCourseRepository;
+import com.hcmute.lms.lmsapi.repository.ProgramVersionRepository;
 import com.hcmute.lms.lmsapi.repository.SyllabusRepository;
 import com.hcmute.lms.lmsapi.repository.TermRepository;
 import java.time.Instant;
@@ -39,6 +42,8 @@ class SyllabusServiceImplTest {
 
   @Mock private SyllabusRepository syllabusRepository;
   @Mock private CourseRepository courseRepository;
+  @Mock private ProgramVersionRepository programVersionRepository;
+  @Mock private ProgramCourseRepository programCourseRepository;
   @Mock private TermRepository termRepository;
   @Mock private SyllabusMapper syllabusMapper;
 
@@ -89,16 +94,41 @@ class SyllabusServiceImplTest {
   }
 
   @Test
-  @DisplayName("getSyllabi: Thành công khi học phần tồn tại")
+  @DisplayName(
+      "getSyllabi: Thành công khi học phần tồn tại, trả kèm courseCode/courseName và termCode")
   void getSyllabi_Success() {
+    Course course = Course.builder().id(courseId).code("CS101").name("Cơ sở lập trình").build();
+    Term fromTerm = Term.builder().id(fromTermId).code("2025-HK1").build();
+    Term toTerm = Term.builder().id(toTermId).code("2026-HK2").build();
+    syllabus.setEffectiveFromTermId(fromTermId);
+    syllabus.setEffectiveToTermId(toTermId);
+    SyllabusResponse enriched =
+        SyllabusResponse.builder()
+            .id(syllabusId)
+            .courseId(courseId)
+            .courseCode("CS101")
+            .courseName("Cơ sở lập trình")
+            .version("2024.1")
+            .effectiveFromTermId(fromTermId)
+            .effectiveFromTermCode("2025-HK1")
+            .effectiveToTermId(toTermId)
+            .effectiveToTermCode("2026-HK2")
+            .status(SyllabusStatus.CONFIRMED)
+            .build();
+
     when(courseRepository.existsById(courseId)).thenReturn(true);
     when(syllabusRepository.findByCourseIdOrderByVersionAsc(courseId))
         .thenReturn(List.of(syllabus));
-    when(syllabusMapper.toResponseList(List.of(syllabus))).thenReturn(List.of(response));
+    when(courseRepository.findAllById(any())).thenReturn(List.of(course));
+    when(termRepository.findAllById(any())).thenReturn(List.of(fromTerm, toTerm));
+    when(syllabusMapper.toResponse(syllabus, course, fromTerm, toTerm)).thenReturn(enriched);
 
     List<SyllabusResponse> result = syllabusService.getSyllabi(courseId);
     assertThat(result).hasSize(1);
     assertThat(result.get(0).getVersion()).isEqualTo("2024.1");
+    assertThat(result.get(0).getCourseCode()).isEqualTo("CS101");
+    assertThat(result.get(0).getEffectiveFromTermCode()).isEqualTo("2025-HK1");
+    assertThat(result.get(0).getEffectiveToTermCode()).isEqualTo("2026-HK2");
   }
 
   @Test
@@ -115,7 +145,7 @@ class SyllabusServiceImplTest {
   @DisplayName("getSyllabus: Thành công khi đề cương tồn tại")
   void getSyllabus_Success() {
     when(syllabusRepository.findById(syllabusId)).thenReturn(Optional.of(syllabus));
-    when(syllabusMapper.toResponse(syllabus)).thenReturn(response);
+    when(syllabusMapper.toResponse(any(), any(), any(), any())).thenReturn(response);
 
     SyllabusResponse result = syllabusService.getSyllabus(syllabusId);
     assertThat(result).isNotNull();
@@ -154,7 +184,7 @@ class SyllabusServiceImplTest {
     when(syllabusRepository.existsByCourseIdAndVersion(courseId, "2024.1")).thenReturn(false);
     when(syllabusMapper.toDocument(courseId, request)).thenReturn(syllabus);
     when(syllabusRepository.save(syllabus)).thenReturn(syllabus);
-    when(syllabusMapper.toResponse(syllabus)).thenReturn(response);
+    when(syllabusMapper.toResponse(any(), any(), any(), any())).thenReturn(response);
 
     SyllabusResponse result = syllabusService.createSyllabus(courseId, request);
     assertThat(result).isNotNull();
@@ -223,7 +253,7 @@ class SyllabusServiceImplTest {
     when(termRepository.findById(toTermId)).thenReturn(Optional.of(toTerm));
     when(syllabusMapper.toDocument(courseId, request)).thenReturn(syllabus);
     when(syllabusRepository.save(syllabus)).thenReturn(syllabus);
-    when(syllabusMapper.toResponse(syllabus)).thenReturn(response);
+    when(syllabusMapper.toResponse(any(), any(), any(), any())).thenReturn(response);
 
     SyllabusResponse result = syllabusService.createSyllabus(courseId, request);
     assertThat(result).isNotNull();
@@ -235,7 +265,7 @@ class SyllabusServiceImplTest {
   void updateStatus_DraftToConfirmed_Success() {
     when(syllabusRepository.findById(syllabusId)).thenReturn(Optional.of(syllabus));
     when(syllabusRepository.save(any(Syllabus.class))).thenReturn(syllabus);
-    when(syllabusMapper.toResponse(any(Syllabus.class))).thenReturn(response);
+    when(syllabusMapper.toResponse(any(), any(), any(), any())).thenReturn(response);
 
     SyllabusResponse result = syllabusService.updateStatus(syllabusId, SyllabusStatus.ARCHIVED);
     assertThat(result).isNotNull();

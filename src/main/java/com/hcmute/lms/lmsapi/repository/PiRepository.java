@@ -21,5 +21,7 @@ public interface PiRepository extends MongoRepository<Pi, String> {
 
   boolean existsByPloIdAndProgramVersionId(String ploId, String programVersionId);
 
+  long countByProgramVersionId(String programVersionId);
+
   void deleteByProgramVersionId(String programVersionId);
 }

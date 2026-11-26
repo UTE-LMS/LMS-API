@@ -1,6 +1,9 @@
 package com.hcmute.lms.lmsapi.mapper;
 
+import com.hcmute.lms.lmsapi.document.Course;
 import com.hcmute.lms.lmsapi.document.CourseSection;
+import com.hcmute.lms.lmsapi.document.Syllabus;
+import com.hcmute.lms.lmsapi.document.Term;
 import com.hcmute.lms.lmsapi.document.User;
 import com.hcmute.lms.lmsapi.dto.SectionRequest;
 import com.hcmute.lms.lmsapi.dto.SectionResponse;
@@ -16,8 +19,22 @@ public interface SectionMapper {
 
   SectionResponse toResponse(CourseSection section, Map<String, User> lecturersById);
 
+  SectionResponse toResponse(
+      CourseSection section,
+      Map<String, User> lecturersById,
+      Map<String, Term> termsById,
+      Map<String, Course> coursesById,
+      Map<String, Syllabus> syllabiById);
+
   List<SectionResponse> toResponseList(List<CourseSection> sections);
 
   List<SectionResponse> toResponseList(
       List<CourseSection> sections, Map<String, User> lecturersById);
+
+  List<SectionResponse> toResponseList(
+      List<CourseSection> sections,
+      Map<String, User> lecturersById,
+      Map<String, Term> termsById,
+      Map<String, Course> coursesById,
+      Map<String, Syllabus> syllabiById);
 }

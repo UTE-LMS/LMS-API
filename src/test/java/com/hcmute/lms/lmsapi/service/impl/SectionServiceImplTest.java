@@ -7,7 +7,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.hcmute.lms.lmsapi.document.Course;
 import com.hcmute.lms.lmsapi.document.CourseSection;
+import com.hcmute.lms.lmsapi.document.Faculty;
 import com.hcmute.lms.lmsapi.document.Syllabus;
 import com.hcmute.lms.lmsapi.document.Term;
 import com.hcmute.lms.lmsapi.document.User;
@@ -31,6 +33,7 @@ import com.hcmute.lms.lmsapi.mapper.impl.SectionMapperImpl;
 import com.hcmute.lms.lmsapi.mapper.impl.UserMapperImpl;
 import com.hcmute.lms.lmsapi.repository.CourseRepository;
 import com.hcmute.lms.lmsapi.repository.CourseSectionRepository;
+import com.hcmute.lms.lmsapi.repository.FacultyRepository;
 import com.hcmute.lms.lmsapi.repository.SyllabusRepository;
 import com.hcmute.lms.lmsapi.repository.TermRepository;
 import com.hcmute.lms.lmsapi.repository.UserRepository;
@@ -60,6 +63,7 @@ class SectionServiceImplTest {
   @Mock private SyllabusRepository syllabusRepository;
   @Mock private TermRepository termRepository;
   @Mock private UserRepository userRepository;
+  @Mock private FacultyRepository facultyRepository;
   @Mock private ScopeAuthorizationService scopeAuthorizationService;
 
   private SectionServiceImpl service;
@@ -73,6 +77,7 @@ class SectionServiceImplTest {
             syllabusRepository,
             termRepository,
             userRepository,
+            facultyRepository,
             scopeAuthorizationService,
             new SectionMapperImpl(),
             new UserMapperImpl());
@@ -100,13 +105,17 @@ class SectionServiceImplTest {
 
   private void stubValidReferences() {
     when(sectionRepository.existsByCode("SEC-01")).thenReturn(false);
-    when(courseRepository.existsById(COURSE_ID)).thenReturn(true);
+    when(courseRepository.findById(COURSE_ID))
+        .thenReturn(
+            Optional.of(
+                Course.builder().id(COURSE_ID).code("CS101").name("Nhập môn CNTT").build()));
     when(syllabusRepository.findById(SYLLABUS_ID))
         .thenReturn(
             Optional.of(
                 Syllabus.builder()
                     .id(SYLLABUS_ID)
                     .courseId(COURSE_ID)
+                    .version("2026.1")
                     .status(SyllabusStatus.CONFIRMED)
                     .build()));
     when(termRepository.findById(TERM_ID))
@@ -118,7 +127,7 @@ class SectionServiceImplTest {
   }
 
   @Test
-  @DisplayName("US-19/AC-1: mở lớp hợp lệ -> lưu OPEN, sĩ số 0")
+  @DisplayName("US-19/AC-1: mở lớp hợp lệ -> lưu OPEN, sĩ số 0, trả kèm nhãn ngữ cảnh")
   void createSection_success() {
     stubValidReferences();
     when(sectionRepository.save(any(CourseSection.class)))
@@ -134,6 +143,11 @@ class SectionServiceImplTest {
     assertThat(response.getId()).isEqualTo(SECTION_ID);
     assertThat(response.getStatus()).isEqualTo(SectionStatus.OPEN);
     assertThat(response.getEnrolledCount()).isZero();
+    assertThat(response.getTermCode()).isEqualTo("2026-HK1");
+    assertThat(response.getCourseCode()).isEqualTo("CS101");
+    assertThat(response.getCourseName()).isEqualTo("Nhập môn CNTT");
+    assertThat(response.getSyllabusVersion()).isEqualTo("2026.1");
+    assertThat(response.getSyllabusStatus()).isEqualTo(SyllabusStatus.CONFIRMED);
     assertThat(response.getLecturerIds()).containsExactly(LECTURER_ID);
     assertThat(response.getLecturers())
         .extracting(
@@ -171,7 +185,7 @@ class SectionServiceImplTest {
   @DisplayName("US-19/AC-2: học phần không tồn tại -> 422")
   void createSection_unknownCourse() {
     when(sectionRepository.existsByCode("SEC-01")).thenReturn(false);
-    when(courseRepository.existsById(COURSE_ID)).thenReturn(false);
+    when(courseRepository.findById(COURSE_ID)).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> service.createSection(request()))
         .isInstanceOf(BusinessRuleViolationException.class)
@@ -182,7 +196,8 @@ class SectionServiceImplTest {
   @DisplayName("US-19/AC-2: đề cương không tồn tại / khác học phần / chưa CONFIRMED -> 422")
   void createSection_syllabusRules() {
     when(sectionRepository.existsByCode("SEC-01")).thenReturn(false);
-    when(courseRepository.existsById(COURSE_ID)).thenReturn(true);
+    when(courseRepository.findById(COURSE_ID))
+        .thenReturn(Optional.of(Course.builder().id(COURSE_ID).build()));
 
     when(syllabusRepository.findById(SYLLABUS_ID)).thenReturn(Optional.empty());
     assertThatThrownBy(() -> service.createSection(request()))
@@ -213,7 +228,8 @@ class SectionServiceImplTest {
   @DisplayName("US-19/AC-2: học kỳ không tồn tại hoặc không OPEN -> 422")
   void createSection_termRules() {
     when(sectionRepository.existsByCode("SEC-01")).thenReturn(false);
-    when(courseRepository.existsById(COURSE_ID)).thenReturn(true);
+    when(courseRepository.findById(COURSE_ID))
+        .thenReturn(Optional.of(Course.builder().id(COURSE_ID).build()));
     when(syllabusRepository.findById(SYLLABUS_ID))
         .thenReturn(
             Optional.of(
@@ -394,10 +410,15 @@ class SectionServiceImplTest {
             .build();
     when(userRepository.findByRolesContainingAndStatus(Role.LECTURER, UserStatus.ACTIVE))
         .thenReturn(List.of(zed, an));
+    when(facultyRepository.findAllById(any()))
+        .thenReturn(
+            List.of(
+                Faculty.builder().id(facultyA).code("FIT").name("Khoa CNTT").build(),
+                Faculty.builder().id(facultyB).code("FAS").name("Khoa KHUD").build()));
 
-    assertThat(service.getActiveLecturers(null))
-        .extracting(UserResponse::getUsername)
-        .containsExactly("gv_an", "gv_zed");
+    List<UserResponse> all = service.getActiveLecturers(null);
+    assertThat(all).extracting(UserResponse::getUsername).containsExactly("gv_an", "gv_zed");
+    assertThat(all).extracting(UserResponse::getFacultyCode).containsExactly("FIT", "FAS");
 
     assertThat(service.getActiveLecturers(facultyA))
         .extracting(UserResponse::getUsername)

@@ -1,6 +1,7 @@
 package com.hcmute.lms.lmsapi.dto;
 
 import com.hcmute.lms.lmsapi.document.AggregateResult;
+import com.hcmute.lms.lmsapi.enums.AssessmentType;
 import com.hcmute.lms.lmsapi.enums.ResultLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -19,7 +20,13 @@ public class AggregateResultResponse {
   private String subjectId;
   private String subjectCode;
   private String sectionId;
+  private String sectionCode;
+  private String courseCode;
+  private String courseName;
   private String assessmentId;
+  private String assessmentName;
+  private AssessmentType assessmentType;
+  private String termCode;
   private AggregateResult.Scope scope;
   private AggregateResult.Counts counts;
   private int evaluated;
@@ -30,4 +37,7 @@ public class AggregateResultResponse {
   private Double passThreshold;
   private Double dataCompleteness;
   private String programVersionId;
+  private String programCode;
+  private String programName;
+  private String programVersion;
 }

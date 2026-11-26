@@ -36,6 +36,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
@@ -185,10 +186,10 @@ public class FacultyServiceImpl implements FacultyService {
 
   @Override
   public List<UserResponse> getProgramManagers(String facultyId) {
-    requireFaculty(facultyId);
+    Faculty faculty = requireFaculty(facultyId);
     List<User> pms =
         userRepository.findByFacultyIdAndRolesContaining(facultyId, Role.PROGRAM_MANAGER);
-    return userMapper.toResponseList(pms);
+    return userMapper.toResponseList(pms, Map.of(faculty.getId(), faculty));
   }
 
   @Override
@@ -221,7 +222,7 @@ public class FacultyServiceImpl implements FacultyService {
         null,
         user,
         "Gán Program Manager vào Khoa " + facultyId);
-    return userMapper.toResponse(user);
+    return userMapper.toResponse(user, faculty);
   }
 
   @Override
@@ -287,7 +288,7 @@ public class FacultyServiceImpl implements FacultyService {
         request.getTransferReason());
     AuditLogHelper.record(
         auditService, AuditAction.UPDATE, "users", userId, null, user, request.getTransferReason());
-    return userMapper.toResponse(user);
+    return userMapper.toResponse(user, targetFaculty);
   }
 
   private Faculty requireFaculty(String id) {

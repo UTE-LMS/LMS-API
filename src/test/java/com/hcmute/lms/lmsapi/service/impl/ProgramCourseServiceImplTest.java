@@ -3,6 +3,8 @@ package com.hcmute.lms.lmsapi.service.impl;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -86,7 +88,12 @@ class ProgramCourseServiceImplTest {
     when(courseRepository.existsById(PREV_ID)).thenReturn(true);
     when(programCourseRepository.save(any(ProgramCourse.class)))
         .thenAnswer(invocation -> invocation.getArgument(0));
-    when(programCourseMapper.toResponse(any(ProgramCourse.class), any(Course.class)))
+    when(courseRepository.findAllById(any()))
+        .thenReturn(
+            List.of(
+                Course.builder().id(PREREQ_ID).code("CS101").build(),
+                Course.builder().id(PREV_ID).code("CS100").build()));
+    when(programCourseMapper.toResponse(any(ProgramCourse.class), any(Course.class), anyMap()))
         .thenReturn(
             ProgramCourseResponse.builder()
                 .programVersionId(VERSION_ID)
@@ -95,7 +102,9 @@ class ProgramCourseServiceImplTest {
                 .type(CourseType.COMPULSORY)
                 .category(CourseCategory.MAJOR_FOUNDATION)
                 .previousCourseIds(List.of(PREV_ID))
+                .previousCourseCodes(List.of("CS100"))
                 .prerequisiteCourseIds(List.of(PREREQ_ID))
+                .prerequisiteCodes(List.of("CS101"))
                 .build());
 
     ProgramCourseResponse response =
@@ -104,7 +113,9 @@ class ProgramCourseServiceImplTest {
 
     assertThat(response.getCourseId()).isEqualTo(COURSE_ID);
     assertThat(response.getPrerequisiteCourseIds()).containsExactly(PREREQ_ID);
+    assertThat(response.getPrerequisiteCodes()).containsExactly("CS101");
     assertThat(response.getPreviousCourseIds()).containsExactly(PREV_ID);
+    assertThat(response.getPreviousCourseCodes()).containsExactly("CS100");
     verify(programCourseRepository).save(any(ProgramCourse.class));
   }
 
@@ -271,7 +282,7 @@ class ProgramCourseServiceImplTest {
     when(courseRepository.existsById(PREREQ_ID)).thenReturn(true);
     when(courseRepository.existsById(PREV_ID)).thenReturn(true);
     when(programCourseRepository.save(any(ProgramCourse.class))).thenReturn(pc);
-    when(programCourseMapper.toResponse(any(), any()))
+    when(programCourseMapper.toResponse(any(), any(), anyMap()))
         .thenReturn(
             ProgramCourseResponse.builder()
                 .programVersionId(VERSION_ID)
@@ -341,10 +352,10 @@ class ProgramCourseServiceImplTest {
     when(programVersionRepository.existsById(VERSION_ID)).thenReturn(true);
     when(programCourseRepository.findByProgramVersionIdOrderBySemesterAscCourseIdAsc(VERSION_ID))
         .thenReturn(List.of(pc1, pc2));
-    when(courseRepository.findAllById(List.of(COURSE_ID, PREREQ_ID))).thenReturn(List.of(c1, c2));
-    when(programCourseMapper.toResponse(pc1, c1))
+    when(courseRepository.findAllById(any())).thenReturn(List.of(c1, c2));
+    when(programCourseMapper.toResponse(eq(pc1), eq(c1), anyMap()))
         .thenReturn(ProgramCourseResponse.builder().courseId(COURSE_ID).semester(1).build());
-    when(programCourseMapper.toResponse(pc2, c2))
+    when(programCourseMapper.toResponse(eq(pc2), eq(c2), anyMap()))
         .thenReturn(ProgramCourseResponse.builder().courseId(PREREQ_ID).semester(2).build());
 
     PageResponse<ProgramCourseResponse> page0 =

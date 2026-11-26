@@ -1,9 +1,11 @@
 package com.hcmute.lms.lmsapi.mapper;
 
+import com.hcmute.lms.lmsapi.document.Faculty;
 import com.hcmute.lms.lmsapi.document.User;
 import com.hcmute.lms.lmsapi.dto.CreateUserRequest;
 import com.hcmute.lms.lmsapi.dto.UserResponse;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Interface chuyển đổi dữ liệu người dùng giữa Document và DTO (F01 / US-02). Đảm bảo nguyên lý
@@ -20,6 +22,8 @@ public interface UserMapper {
    */
   UserResponse toResponse(User user);
 
+  UserResponse toResponse(User user, Faculty faculty);
+
   /**
    * Chuyển đổi danh sách User document sang danh sách UserResponse DTO.
    *
@@ -27,6 +31,8 @@ public interface UserMapper {
    * @return danh sách UserResponse
    */
   List<UserResponse> toResponseList(List<User> users);
+
+  List<UserResponse> toResponseList(List<User> users, Map<String, Faculty> facultiesById);
 
   /**
    * Chuyển đổi từ CreateUserRequest sang User document với mật khẩu đã được băm.

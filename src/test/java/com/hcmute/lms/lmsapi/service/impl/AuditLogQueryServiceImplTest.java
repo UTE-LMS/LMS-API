@@ -9,12 +9,14 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.hcmute.lms.lmsapi.document.AuditLog;
+import com.hcmute.lms.lmsapi.document.User;
 import com.hcmute.lms.lmsapi.dto.AuditLogResponse;
 import com.hcmute.lms.lmsapi.dto.PageResponse;
 import com.hcmute.lms.lmsapi.enums.AuditAction;
 import com.hcmute.lms.lmsapi.exception.PageableValidationException;
 import com.hcmute.lms.lmsapi.mapper.AuditLogMapper;
 import com.hcmute.lms.lmsapi.repository.AuditLogRepository;
+import com.hcmute.lms.lmsapi.repository.UserRepository;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
@@ -32,27 +34,38 @@ import org.springframework.data.domain.Pageable;
 class AuditLogQueryServiceImplTest {
 
   @Mock private AuditLogRepository auditLogRepository;
+  @Mock private UserRepository userRepository;
   @Mock private AuditLogMapper auditLogMapper;
   @InjectMocks private AuditLogQueryServiceImpl service;
 
   @Test
-  @DisplayName("US-04/AC-1: chuyển tiêu chí cho repository và ánh xạ từng dòng sang DTO")
+  @DisplayName("US-04/AC-1: chuyển tiêu chí cho repository và batch-load actor username/fullName")
   void delegatesToRepositoryAndMapsRows() {
     Instant from = Instant.parse("2026-10-01T00:00:00Z");
     Instant to = Instant.parse("2026-10-02T00:00:00Z");
-    AuditLog row = AuditLog.builder().id("1").build();
-    AuditLogResponse dto = AuditLogResponse.builder().id("1").build();
+    String actorId = "507f1f77bcf86cd799439011";
+    User actor = User.builder().id(actorId).username("qa_user").fullName("Nguyễn Văn QA").build();
+    AuditLog row = AuditLog.builder().id("1").userId(actorId).build();
+    AuditLogResponse dto =
+        AuditLogResponse.builder()
+            .id("1")
+            .userId(actorId)
+            .username("qa_user")
+            .actorFullName("Nguyễn Văn QA")
+            .build();
     Pageable pageable = PageRequest.of(1, 5);
     when(auditLogRepository.searchLogs(
-            "507f1f77bcf86cd799439011", "users", "x", AuditAction.LOGIN, from, to, pageable))
+            actorId, "users", "x", AuditAction.LOGIN, from, to, pageable))
         .thenReturn(new PageImpl<>(List.of(row), pageable, 6));
-    when(auditLogMapper.toResponse(row)).thenReturn(dto);
+    when(userRepository.findAllById(any())).thenReturn(List.of(actor));
+    when(auditLogMapper.toResponse(row, actor)).thenReturn(dto);
 
     PageResponse<AuditLogResponse> result =
-        service.searchAuditLogs(
-            "507f1f77bcf86cd799439011", "users", "x", AuditAction.LOGIN, from, to, 1, 5);
+        service.searchAuditLogs(actorId, "users", "x", AuditAction.LOGIN, from, to, 1, 5);
 
     assertThat(result.getContent()).containsExactly(dto);
+    assertThat(result.getContent().get(0).getUsername()).isEqualTo("qa_user");
+    assertThat(result.getContent().get(0).getActorFullName()).isEqualTo("Nguyễn Văn QA");
     assertThat(result.getPage()).isEqualTo(1);
     assertThat(result.getSize()).isEqualTo(5);
     assertThat(result.getTotalElements()).isEqualTo(6);

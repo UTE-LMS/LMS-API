@@ -3,7 +3,9 @@ package com.hcmute.lms.lmsapi.service.impl;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -132,7 +134,7 @@ class UserServiceImplTest {
                 return saved;
               });
 
-      when(userMapper.toResponse(any(User.class))).thenReturn(sampleUserResponse);
+      when(userMapper.toResponse(any(User.class), any())).thenReturn(sampleUserResponse);
 
       UserResponse response = userService.createUser(request);
 
@@ -192,11 +194,15 @@ class UserServiceImplTest {
   class GetUsersTests {
 
     @Test
-    @DisplayName("getUsers should return PageResponse with valid envelope")
+    @DisplayName("getUsers should return PageResponse with valid envelope and batch faculty lookup")
     void shouldReturnPageResponse() {
+      String facultyId = "671dcba5f123456789abcd99";
+      sampleTargetUser.setFacultyId(facultyId);
+      Faculty fit = Faculty.builder().id(facultyId).code("FIT").name("Khoa CNTT").build();
       Page<User> page = new PageImpl<>(List.of(sampleTargetUser));
       when(userRepository.findAll(any(Pageable.class))).thenReturn(page);
-      when(userMapper.toResponseList(any())).thenReturn(List.of(sampleUserResponse));
+      when(facultyRepository.findAllById(any())).thenReturn(List.of(fit));
+      when(userMapper.toResponseList(any(), anyMap())).thenReturn(List.of(sampleUserResponse));
 
       PageResponse<UserResponse> response = userService.getUsers(0, 20);
 
@@ -205,13 +211,14 @@ class UserServiceImplTest {
       assertThat(response.getTotalElements()).isEqualTo(1);
       assertThat(response.getPage()).isZero();
       assertThat(response.isLast()).isTrue();
+      verify(facultyRepository).findAllById(any());
     }
 
     @Test
     @DisplayName("getUserById should return UserResponse for valid ID")
     void shouldReturnUserById() {
       when(userRepository.findById(TARGET_USER_ID)).thenReturn(Optional.of(sampleTargetUser));
-      when(userMapper.toResponse(sampleTargetUser)).thenReturn(sampleUserResponse);
+      when(userMapper.toResponse(eq(sampleTargetUser), any())).thenReturn(sampleUserResponse);
 
       UserResponse response = userService.getUserById(TARGET_USER_ID);
 
@@ -257,7 +264,7 @@ class UserServiceImplTest {
       when(userRepository.findById(TARGET_USER_ID)).thenReturn(Optional.of(sampleTargetUser));
       when(userRepository.findByEmail("updated@hcmute.edu.vn")).thenReturn(Optional.empty());
       when(userRepository.save(any(User.class))).thenReturn(sampleTargetUser);
-      when(userMapper.toResponse(sampleTargetUser)).thenReturn(sampleUserResponse);
+      when(userMapper.toResponse(eq(sampleTargetUser), any())).thenReturn(sampleUserResponse);
 
       UserResponse response = userService.updateUser(TARGET_USER_ID, request, ADMIN_ID);
 
@@ -349,7 +356,7 @@ class UserServiceImplTest {
       when(userRepository.countByRolesContainingAndStatus(Role.ADMIN, UserStatus.ACTIVE))
           .thenReturn(2L);
       when(userRepository.save(any(User.class))).thenReturn(admin2);
-      when(userMapper.toResponse(admin2)).thenReturn(sampleUserResponse);
+      when(userMapper.toResponse(eq(admin2), any())).thenReturn(sampleUserResponse);
 
       UserResponse response = userService.updateUser(OTHER_ADMIN_ID, demotionRequest, ADMIN_ID);
 
@@ -421,7 +428,7 @@ class UserServiceImplTest {
       when(userRepository.findById(TARGET_USER_ID)).thenReturn(Optional.of(sampleTargetUser));
       when(userRepository.save(any(User.class))).thenReturn(sampleTargetUser);
       when(userRepository.incrementTokenVersion(TARGET_USER_ID)).thenReturn(1L);
-      when(userMapper.toResponse(any(User.class))).thenReturn(sampleUserResponse);
+      when(userMapper.toResponse(any(User.class), any())).thenReturn(sampleUserResponse);
 
       UserResponse response = userService.updateStatus(TARGET_USER_ID, lockRequest, ADMIN_ID);
 
@@ -441,7 +448,7 @@ class UserServiceImplTest {
 
       when(userRepository.findById(TARGET_USER_ID)).thenReturn(Optional.of(sampleTargetUser));
       when(userRepository.save(any(User.class))).thenReturn(sampleTargetUser);
-      when(userMapper.toResponse(any(User.class))).thenReturn(sampleUserResponse);
+      when(userMapper.toResponse(any(User.class), any())).thenReturn(sampleUserResponse);
 
       UserResponse response = userService.updateStatus(TARGET_USER_ID, unlockRequest, ADMIN_ID);
 

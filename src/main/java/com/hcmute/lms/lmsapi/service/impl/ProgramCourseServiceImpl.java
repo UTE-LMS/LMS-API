@@ -27,12 +27,15 @@ import com.hcmute.lms.lmsapi.util.ObjectIdUtils;
 import com.hcmute.lms.lmsapi.util.PageableValidationUtils;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -71,10 +74,23 @@ public class ProgramCourseServiceImpl implements ProgramCourseService {
         programCourseRepository.findByProgramVersionIdOrderBySemesterAscCourseIdAsc(
             programVersionId);
 
-    List<String> courseIds = programCourses.stream().map(ProgramCourse::getCourseId).toList();
+    Set<String> allCourseIds = new LinkedHashSet<>();
+    for (ProgramCourse pc : programCourses) {
+      if (pc.getCourseId() != null) {
+        allCourseIds.add(pc.getCourseId());
+      }
+      if (pc.getPrerequisiteCourseIds() != null) {
+        allCourseIds.addAll(pc.getPrerequisiteCourseIds());
+      }
+      if (pc.getPreviousCourseIds() != null) {
+        allCourseIds.addAll(pc.getPreviousCourseIds());
+      }
+    }
     Map<String, Course> courseMap =
-        courseRepository.findAllById(courseIds).stream()
-            .collect(Collectors.toMap(Course::getId, Function.identity()));
+        allCourseIds.isEmpty()
+            ? Collections.emptyMap()
+            : courseRepository.findAllById(allCourseIds).stream()
+                .collect(Collectors.toMap(Course::getId, Function.identity(), (a, b) -> a));
 
     String query =
         search != null && !search.isBlank() ? search.trim().toLowerCase(Locale.ROOT) : null;
@@ -83,7 +99,12 @@ public class ProgramCourseServiceImpl implements ProgramCourseService {
             .filter(pc -> semester == null || semester.equals(pc.getSemester()))
             .filter(pc -> type == null || type == pc.getType())
             .filter(pc -> category == null || category == pc.getCategory())
-            .map(pc -> programCourseMapper.toResponse(pc, courseMap.get(pc.getCourseId())))
+            .map(
+                pc ->
+                    programCourseMapper.toResponse(
+                        pc,
+                        pc.getCourseId() != null ? courseMap.get(pc.getCourseId()) : null,
+                        courseMap))
             .filter(
                 resp -> {
                   if (query == null) {
@@ -115,7 +136,7 @@ public class ProgramCourseServiceImpl implements ProgramCourseService {
                         "ProgramCourse", "courseId", courseId + " in PV " + programVersionId));
 
     Course course = courseRepository.findById(courseId).orElse(null);
-    return programCourseMapper.toResponse(programCourse, course);
+    return toEnrichedResponse(programCourse, course);
   }
 
   @Override
@@ -179,7 +200,7 @@ public class ProgramCourseServiceImpl implements ProgramCourseService {
         null,
         programCourse,
         null);
-    return programCourseMapper.toResponse(programCourse, course);
+    return toEnrichedResponse(programCourse, course);
   }
 
   @Override
@@ -221,7 +242,23 @@ public class ProgramCourseServiceImpl implements ProgramCourseService {
         null,
         programCourse,
         null);
-    return programCourseMapper.toResponse(programCourse, course);
+    return toEnrichedResponse(programCourse, course);
+  }
+
+  private ProgramCourseResponse toEnrichedResponse(ProgramCourse programCourse, Course course) {
+    Set<String> relatedIds = new LinkedHashSet<>();
+    if (programCourse.getPrerequisiteCourseIds() != null) {
+      relatedIds.addAll(programCourse.getPrerequisiteCourseIds());
+    }
+    if (programCourse.getPreviousCourseIds() != null) {
+      relatedIds.addAll(programCourse.getPreviousCourseIds());
+    }
+    Map<String, Course> relatedCoursesById =
+        relatedIds.isEmpty()
+            ? Map.of()
+            : courseRepository.findAllById(relatedIds).stream()
+                .collect(Collectors.toMap(Course::getId, Function.identity(), (a, b) -> a));
+    return programCourseMapper.toResponse(programCourse, course, relatedCoursesById);
   }
 
   @Override
@@ -441,9 +478,13 @@ public class ProgramCourseServiceImpl implements ProgramCourseService {
     }
 
     List<ProgramCourse> saved = programCourseRepository.saveAll(toSave);
+    Map<String, Course> coursesById =
+        courseCache.values().stream()
+            .filter(Objects::nonNull)
+            .collect(Collectors.toMap(Course::getId, Function.identity(), (a, b) -> a));
     List<ProgramCourseResponse> responses = new ArrayList<>();
     for (int i = 0; i < saved.size(); i++) {
-      responses.add(programCourseMapper.toResponse(saved.get(i), savedCourses.get(i)));
+      responses.add(programCourseMapper.toResponse(saved.get(i), savedCourses.get(i), coursesById));
     }
 
     ProgramCourseCsvImportResponse response =

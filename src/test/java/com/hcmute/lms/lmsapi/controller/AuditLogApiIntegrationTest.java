@@ -361,6 +361,8 @@ class AuditLogApiIntegrationTest extends IntegrationTestBase {
         .andExpect(
             jsonPath(
                 "$.content[*].action",
-                org.hamcrest.Matchers.hasItems("CREATE", "UPDATE", "DELETE")));
+                org.hamcrest.Matchers.hasItems("CREATE", "UPDATE", "DELETE")))
+        .andExpect(jsonPath("$.content[0].username").isString())
+        .andExpect(jsonPath("$.content[0].actorFullName").isString());
   }
 }

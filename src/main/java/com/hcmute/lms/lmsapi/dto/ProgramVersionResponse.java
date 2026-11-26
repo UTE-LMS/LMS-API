@@ -14,10 +14,14 @@ public class ProgramVersionResponse {
 
   private String id;
   private String programId;
+  private String programCode;
+  private String programName;
   private String version;
   private Integer totalCredits;
   private Double durationYears;
   private String applicableCohort;
   private ProgramVersionStatus status;
   private VerificationResponse verification;
+  private long ploCount;
+  private long piCount;
 }

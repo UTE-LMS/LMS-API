@@ -9,6 +9,7 @@ import com.hcmute.lms.lmsapi.mapper.CloPiLinkMapper;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -31,6 +32,11 @@ public class CloPiLinkMapperImpl implements CloPiLinkMapper {
 
   @Override
   public CloPiLinkResponse toResponse(CloPiLink link) {
+    return toResponse(link, null);
+  }
+
+  @Override
+  public CloPiLinkResponse toResponse(CloPiLink link, String piCode) {
     if (link == null) {
       return null;
     }
@@ -40,6 +46,7 @@ public class CloPiLinkMapperImpl implements CloPiLinkMapper {
         .syllabusId(link.getSyllabusId())
         .cloId(link.getCloId())
         .piId(link.getPiId())
+        .piCode(piCode)
         .weight(link.getWeight())
         .verification(link.getVerification())
         .build();
@@ -47,12 +54,20 @@ public class CloPiLinkMapperImpl implements CloPiLinkMapper {
 
   @Override
   public List<CloPiLinkResponse> toResponseList(List<CloPiLink> links) {
+    return toResponseList(links, Collections.emptyMap());
+  }
+
+  @Override
+  public List<CloPiLinkResponse> toResponseList(
+      List<CloPiLink> links, Map<String, String> piCodeById) {
     if (links == null || links.isEmpty()) {
       return Collections.emptyList();
     }
+    Map<String, String> lookup = piCodeById != null ? piCodeById : Collections.emptyMap();
     List<CloPiLinkResponse> responses = new ArrayList<>(links.size());
     for (CloPiLink link : links) {
-      responses.add(toResponse(link));
+      String piCode = link.getPiId() != null ? lookup.get(link.getPiId()) : null;
+      responses.add(toResponse(link, piCode));
     }
     return responses;
   }

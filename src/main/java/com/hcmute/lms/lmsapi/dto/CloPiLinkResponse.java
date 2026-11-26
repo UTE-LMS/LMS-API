@@ -17,6 +17,7 @@ public class CloPiLinkResponse {
   private String syllabusId;
   private String cloId;
   private String piId;
+  private String piCode;
   private Double weight;
   private Verification verification;
 }

@@ -28,7 +28,11 @@ import com.hcmute.lms.lmsapi.service.AuditService;
 import com.hcmute.lms.lmsapi.service.CloPiLinkService;
 import com.hcmute.lms.lmsapi.util.ObjectIdUtils;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -58,7 +62,26 @@ public class CloPiLinkServiceImpl implements CloPiLinkService {
   @Override
   public List<CloPiLinkResponse> getLinks(String syllabusId) {
     requireSyllabus(syllabusId);
-    return cloPiLinkMapper.toResponseList(cloPiLinkRepository.findBySyllabusId(syllabusId));
+    List<CloPiLink> links = cloPiLinkRepository.findBySyllabusId(syllabusId);
+    return toEnrichedResponses(links, piRepository, cloPiLinkMapper);
+  }
+
+  static List<CloPiLinkResponse> toEnrichedResponses(
+      List<CloPiLink> links, PiRepository piRepository, CloPiLinkMapper cloPiLinkMapper) {
+    if (links == null || links.isEmpty()) {
+      return List.of();
+    }
+    Set<String> piIds =
+        links.stream()
+            .map(CloPiLink::getPiId)
+            .filter(id -> id != null && !id.isBlank())
+            .collect(Collectors.toCollection(LinkedHashSet::new));
+    Map<String, String> piCodeById =
+        piIds.isEmpty()
+            ? Map.of()
+            : piRepository.findAllById(piIds).stream()
+                .collect(Collectors.toMap(Pi::getId, Pi::getCode, (a, b) -> a));
+    return cloPiLinkMapper.toResponseList(links, piCodeById);
   }
 
   @Override
@@ -116,7 +139,7 @@ public class CloPiLinkServiceImpl implements CloPiLinkService {
           request.getPiId());
       AuditLogHelper.record(
           auditService, AuditAction.CREATE, "clo_pi_links", saved.getId(), null, saved, null);
-      return cloPiLinkMapper.toResponse(saved);
+      return cloPiLinkMapper.toResponse(saved, pi.getCode());
     } catch (DuplicateKeyException ex) {
       throw conflict(
           String.format(

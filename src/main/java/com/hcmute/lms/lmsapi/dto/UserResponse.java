@@ -38,6 +38,12 @@ public class UserResponse {
   /** Định danh Khoa quản lý (dành cho PROGRAM_MANAGER). */
   private String facultyId;
 
+  /** Mã Khoa quản lý (nếu facultyId hợp lệ). */
+  private String facultyCode;
+
+  /** Tên Khoa quản lý (nếu facultyId hợp lệ). */
+  private String facultyName;
+
   /** Danh sách vai trò của người dùng. */
   @Builder.Default private List<Role> roles = new ArrayList<>();
 

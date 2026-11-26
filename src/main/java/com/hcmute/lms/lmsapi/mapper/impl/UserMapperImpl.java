@@ -1,5 +1,6 @@
 package com.hcmute.lms.lmsapi.mapper.impl;
 
+import com.hcmute.lms.lmsapi.document.Faculty;
 import com.hcmute.lms.lmsapi.document.User;
 import com.hcmute.lms.lmsapi.dto.CreateUserRequest;
 import com.hcmute.lms.lmsapi.dto.UserResponse;
@@ -7,7 +8,9 @@ import com.hcmute.lms.lmsapi.enums.UserStatus;
 import com.hcmute.lms.lmsapi.mapper.UserMapper;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import org.springframework.stereotype.Component;
 
 /**
@@ -19,6 +22,11 @@ public class UserMapperImpl implements UserMapper {
 
   @Override
   public UserResponse toResponse(User user) {
+    return toResponse(user, null);
+  }
+
+  @Override
+  public UserResponse toResponse(User user, Faculty faculty) {
     if (user == null) {
       return null;
     }
@@ -30,6 +38,8 @@ public class UserMapperImpl implements UserMapper {
         .fullName(user.getFullName())
         .status(user.getStatus())
         .facultyId(user.getFacultyId())
+        .facultyCode(faculty != null ? faculty.getCode() : null)
+        .facultyName(faculty != null ? faculty.getName() : null)
         .roles(user.getRoles() != null ? new ArrayList<>(user.getRoles()) : new ArrayList<>())
         .createdAt(user.getCreatedAt())
         .updatedAt(user.getUpdatedAt())
@@ -38,10 +48,18 @@ public class UserMapperImpl implements UserMapper {
 
   @Override
   public List<UserResponse> toResponseList(List<User> users) {
+    return toResponseList(users, Collections.emptyMap());
+  }
+
+  @Override
+  public List<UserResponse> toResponseList(List<User> users, Map<String, Faculty> facultiesById) {
     if (users == null) {
       return new ArrayList<>();
     }
-    return users.stream().map(this::toResponse).toList();
+    Map<String, Faculty> lookup = facultiesById != null ? facultiesById : Collections.emptyMap();
+    return users.stream()
+        .map(u -> toResponse(u, u.getFacultyId() != null ? lookup.get(u.getFacultyId()) : null))
+        .toList();
   }
 
   @Override

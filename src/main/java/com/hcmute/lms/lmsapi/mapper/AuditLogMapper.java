@@ -2,6 +2,7 @@ package com.hcmute.lms.lmsapi.mapper;
 
 import com.hcmute.lms.lmsapi.document.AuditEntity;
 import com.hcmute.lms.lmsapi.document.AuditLog;
+import com.hcmute.lms.lmsapi.document.User;
 import com.hcmute.lms.lmsapi.dto.AuditLogResponse;
 import com.hcmute.lms.lmsapi.enums.AuditAction;
 
@@ -50,4 +51,6 @@ public interface AuditLogMapper {
    * @return DTO tương ứng
    */
   AuditLogResponse toResponse(AuditLog auditLog);
+
+  AuditLogResponse toResponse(AuditLog auditLog, User actor);
 }

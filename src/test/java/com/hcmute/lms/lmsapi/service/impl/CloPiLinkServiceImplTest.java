@@ -2,6 +2,9 @@ package com.hcmute.lms.lmsapi.service.impl;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -74,7 +77,7 @@ class CloPiLinkServiceImplTest {
 
     syllabus = Syllabus.builder().id(syllabusId).build();
     clo = Clo.builder().id(cloId).syllabusId(syllabusId).build();
-    pi = Pi.builder().id(piId).programVersionId(programVersionId).build();
+    pi = Pi.builder().id(piId).programVersionId(programVersionId).code("PI1.1").build();
 
     link =
         CloPiLink.builder()
@@ -101,20 +104,23 @@ class CloPiLinkServiceImplTest {
             .programVersionId(programVersionId)
             .cloId(cloId)
             .piId(piId)
+            .piCode("PI1.1")
             .weight(0.5)
             .build();
   }
 
   @Test
-  @DisplayName("getLinks: Lấy danh sách liên kết theo syllabusId")
+  @DisplayName("getLinks: Lấy danh sách liên kết theo syllabusId kèm piCode cho mọi phiên bản CTĐT")
   void getLinks_Success() {
     when(syllabusRepository.findById(syllabusId)).thenReturn(Optional.of(syllabus));
     when(cloPiLinkRepository.findBySyllabusId(syllabusId)).thenReturn(List.of(link));
-    when(cloPiLinkMapper.toResponseList(List.of(link))).thenReturn(List.of(response));
+    when(piRepository.findAllById(any())).thenReturn(List.of(pi));
+    when(cloPiLinkMapper.toResponseList(eq(List.of(link)), anyMap())).thenReturn(List.of(response));
 
     List<CloPiLinkResponse> result = cloPiLinkService.getLinks(syllabusId);
     assertThat(result).hasSize(1);
     assertThat(result.get(0).getId()).isEqualTo(linkId);
+    assertThat(result.get(0).getPiCode()).isEqualTo("PI1.1");
   }
 
   @Test
@@ -173,7 +179,7 @@ class CloPiLinkServiceImplTest {
     when(cloPiLinkRepository.existsByCloIdAndPiId(cloId, piId)).thenReturn(false);
     when(cloPiLinkMapper.toDocument(syllabusId, request)).thenReturn(link);
     when(cloPiLinkRepository.save(link)).thenReturn(link);
-    when(cloPiLinkMapper.toResponse(link)).thenReturn(response);
+    when(cloPiLinkMapper.toResponse(link, "PI1.1")).thenReturn(response);
 
     CloPiLinkResponse result = cloPiLinkService.createLink(syllabusId, request);
     assertThat(result).isNotNull();

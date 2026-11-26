@@ -9,6 +9,8 @@ public interface AggregateResultRepository extends MongoRepository<AggregateResu
 
   List<AggregateResult> findByRunId(String runId);
 
+  long countByRunId(String runId);
+
   List<AggregateResult> findByRunIdAndLevel(String runId, ResultLevel level);
 
   List<AggregateResult> findByRunIdAndSectionId(String runId, String sectionId);

@@ -1,6 +1,7 @@
 package com.hcmute.lms.lmsapi.dto;
 
 import com.hcmute.lms.lmsapi.document.StudentResult;
+import com.hcmute.lms.lmsapi.enums.AssessmentType;
 import com.hcmute.lms.lmsapi.enums.ResultLevel;
 import com.hcmute.lms.lmsapi.enums.ResultStatus;
 import java.util.List;
@@ -21,10 +22,16 @@ public class StudentResultResponse {
   private String subjectId;
   private String subjectCode;
   private String sectionId;
+  private String sectionCode;
+  private String courseCode;
+  private String courseName;
   private String assessmentId;
+  private String assessmentName;
+  private AssessmentType assessmentType;
   private String studentId;
   private String studentCode;
   private String termId;
+  private String termCode;
   private ResultStatus status;
   private Double value;
   private Double passThreshold;
@@ -32,5 +39,8 @@ public class StudentResultResponse {
   private StudentResult.Completeness completeness;
   private List<StudentResult.ResultInput> inputs;
   private String programVersionId;
+  private String programCode;
+  private String programName;
+  private String programVersion;
   private String syllabusId;
 }

@@ -148,7 +148,9 @@ class CourseIntegrationTest extends IntegrationTestBase {
         .andExpect(jsonPath("$.totalElements").value(1))
         .andExpect(jsonPath("$.last").value(true))
         .andExpect(jsonPath("$.content[0].courseId").value(course2.getId()))
-        .andExpect(jsonPath("$.content[0].course.code").value(course2.getCode()));
+        .andExpect(jsonPath("$.content[0].course.code").value(course2.getCode()))
+        .andExpect(jsonPath("$.content[0].prerequisiteCodes[0]").value(course1.getCode()))
+        .andExpect(jsonPath("$.content[0].previousCourseCodes[0]").value(course3.getCode()));
 
     // 2. Lấy chi tiết gán học phần
     mockMvc
@@ -159,7 +161,9 @@ class CourseIntegrationTest extends IntegrationTestBase {
                 programVersion.getId(),
                 course2.getId()))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.semester").value(2));
+        .andExpect(jsonPath("$.semester").value(2))
+        .andExpect(jsonPath("$.prerequisiteCodes[0]").value(course1.getCode()))
+        .andExpect(jsonPath("$.previousCourseCodes[0]").value(course3.getCode()));
 
     // 3. Cố gắng xóa course2 khi đang được tham chiếu trong CTĐT -> 422
     mockMvc
